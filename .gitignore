@@ -1,0 +1,11 @@
+config.local.ahk
+src/config.local.ahk
+*.clip
+*.log
+logs/
+tmp/
+screenshots/
+release/*.exe
+.DS_Store
+.vscode/
+.idea/
