@@ -1,5 +1,5 @@
 ; Generated file. Edit src/*.ahk instead.
-; Generated at: 2026-07-08 13:34:59 UTC
+; Generated at: 2026-07-08 14:07:49 UTC
 
 ; --- BEGIN config.example.ahk ---
 ; Copy this file to config.local.ahk and calibrate values on the target workstation.
@@ -102,26 +102,50 @@ ClickPoint(name, clicks := 1) {
 ; --- END utils.ahk ---
 
 ; --- BEGIN clipboard_rtf.ahk ---
+PastePlainText(text) {
+    return WithClipboardRestore(() => PastePlainTextWithoutRestore(text))
+}
+
 PasteRedFigureText(text := "（见图）") {
-    ; TODO: Add true RTF/HTML clipboard support after the plain-text workflow is tested.
+    ; TODO: Add true RTF/HTML clipboard support after compatibility testing on Windows.
+    ; For now, use a plain-text fallback and avoid external clipboard snapshot files.
+    return PastePlainText(text)
+}
+
+WithClipboardRestore(callback) {
+    if !HasMethod(callback, "Call") {
+        Flash("Invalid clipboard action")
+        return false
+    }
+
     savedClipboard := ClipboardAll()
 
     try {
-        A_Clipboard := text
-        if !ClipWait(0.5) {
-            Flash("Clipboard unavailable")
-            return false
-        }
-
-        Send "^v"
-        Sleep 50
-        return true
+        return callback.Call()
     } catch as err {
-        Flash("Paste failed: " err.Message)
+        Flash("Clipboard action failed: " err.Message)
         return false
     } finally {
+        Sleep 50
         A_Clipboard := savedClipboard
+        Sleep 50
     }
+}
+
+PastePlainTextWithoutRestore(text) {
+    A_Clipboard := ""
+    Sleep 30
+    A_Clipboard := text
+
+    if !ClipWait(1) {
+        Flash("Clipboard unavailable")
+        return false
+    }
+
+    Sleep 80
+    Send("^v")
+    Sleep 100
+    return true
 }
 
 ; --- END clipboard_rtf.ahk ---
@@ -173,24 +197,24 @@ ExampleCalibratedViewerClick() {
 }
 
 ::;fzg::{
-    SendText "放射性摄取增高，SUVmax约"
+    SendText("放射性摄取增高，SUVmax约")
     PasteRedFigureText()
-    Send "{Left 4}"
+    Send("{Left 4}")
 }
 
 ::;fwj::{
-    SendText "放射性摄取未见明显增高"
+    SendText("放射性摄取未见明显增高")
     PasteRedFigureText()
 }
 
 ::;fjd::{
-    SendText "放射性摄取降低"
+    SendText("放射性摄取降低")
     PasteRedFigureText()
 }
 
 ::;cmx::{
-    SendText "cm×cm"
-    Send "{Left 2}"
+    SendText("cm×cm")
+    Send("{Left 2}")
 }
 
 ; --- END hotstrings.ahk ---
