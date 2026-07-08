@@ -8,10 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added Chinese documentation structure for maintainers and end users.
+- Added internal architecture, roadmap, decisions, maintenance, and release checklist documents.
+- Added user-facing quick start, hotkey guide, update guide, troubleshooting, and emergency stop documents.
 - Initial maintainable project structure.
 - Minimal AutoHotkey v2 entrypoint.
 - Safety-focused module placeholders.
 - Manual workstation test checklist.
+
+## [0.2.0] - Planned
+
+### Planned
+
+- Maintain Chinese documentation layers for internal maintainers and non-technical users.
+- Review early English technical drafts and decide whether to migrate or archive them.
+- Align release workflow with the new internal checklist.
 
 ## [0.1.0] - Planned
 

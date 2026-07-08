@@ -1,12 +1,37 @@
 # Report Assistant AHK
 
-Report Assistant AHK is a private AutoHotkey v2 project for Windows clinical report-writing and viewer automation workflows. The first milestone is a maintainable project skeleton, clear safety boundaries, and a minimal runnable entrypoint.
+Report Assistant AHK 是一个私有 AutoHotkey v2 项目，用于 Windows 报告书写和阅片窗口自动化辅助。
 
-## Current Status
+## 当前状态
 
-This is an early personal prototype. It is not ready for department-wide use, unattended use, or use on uncalibrated workstations.
+当前项目状态：early personal prototype。
 
-The legacy scripts are preserved as historical source material in `legacy/`. They have not been fully refactored into the new project structure.
+这仍然是早期个人原型，不适合直接科室范围推广，不适合无人值守使用，也不适合在未校准的工作站上启用坐标类动作。
+
+## 文档分层
+
+- `docs/internal/`：维护者中文文档，用于记录架构、路线图、关键决策、维护流程和发布检查。
+- `docs/user/`：普通用户中文文档，面向没有软件知识的使用者，强调简单操作和故障处理。
+- `docs/*.md`：早期英文技术草稿，暂时保留，后续再决定是否迁移或合并。
+
+## 开发原则
+
+- Code and identifiers in English.
+- Human-facing documentation in Chinese when appropriate.
+- No patient data.
+- No credentials.
+- No automatic final submission by default.
+- Coordinate actions require local calibration.
+- 不提交患者信息、医院敏感信息、账号、截图、真实内网地址或敏感日志。
+
+## 当前开发路线
+
+1. 文档与安全边界
+2. hotstrings 重构
+3. clipboard / red text 重构
+4. coordinate map and viewer action migration
+5. release packaging
+6. internal pilot
 
 ## Requirements
 
@@ -15,30 +40,20 @@ The legacy scripts are preserved as historical source material in `legacy/`. The
 - Target report-writing workstation
 - Local calibration for any coordinate-based viewer actions
 
-## Safety Principles
-
-- No database access.
-- No permission bypass.
-- No automatic final submission by default.
-- Clipboard contents must be restored after scripted paste actions.
-- Coordinate-based actions require local calibration.
-- Do not commit patient data, hospital identifiers, credentials, screenshots, or sensitive logs.
-
 ## Repository Layout
 
 ```text
 legacy/   Historical AutoHotkey scripts kept unchanged.
 src/      AutoHotkey v2 source modules.
-docs/     Installation, usage, safety, calibration, and release notes.
+docs/     Documentation for maintainers, users, and early technical drafts.
 scripts/  Development helper scripts.
 release/  Generated single-file release script.
 tests/    Manual workstation test checklist.
 ```
 
-## Quick Start
+## Quick Start for Maintainers
 
-1. Install AutoHotkey v2 on the Windows workstation.
-2. Copy `src/config.example.ahk` to `src/config.local.ahk`.
-3. Adjust local executable names and coordinates in `src/config.local.ahk`.
-4. Run `src/main.ahk` with AutoHotkey v2 for development, or run `python scripts/build_release.py` to generate `release/report_assistant.ahk`.
-5. Test the generated script using `tests/manual-test-checklist.md` before using it in a real workflow.
+1. 在本地修改 `src/` 或 `docs/`。
+2. 运行 `python scripts/build_release.py` 生成 `release/report_assistant.ahk`。
+3. 在 Windows 工作站上用 AutoHotkey v2 测试生成文件。
+4. 按 `tests/manual-test-checklist.md` 完成手动检查。
