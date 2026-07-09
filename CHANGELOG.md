@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Emergency hotkeys are exempt from suspension.
+- Semicolon hotstrings restored to immediate-trigger legacy behavior.
+
 ### Added
 
 - Refactored core report hotstrings into `src/hotstrings.ahk`.
@@ -36,6 +41,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Continue validating report hotstrings on Windows.
 - Test clipboard restore behavior in the target report editor.
 - Design true RTF / HTML red text insertion after compatibility testing.
+
+## [0.3.1] - Planned
+
+### Planned
+
+- Validate emergency suspend/restore behavior on Windows.
+- Validate immediate-trigger report hotstrings in the target report editor.
 
 ## [0.1.0] - Planned
 

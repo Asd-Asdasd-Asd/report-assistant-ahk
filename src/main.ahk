@@ -11,7 +11,22 @@
 #Include viewer_actions.ahk
 #Include hotstrings.ahk
 
-^!Esc::Suspend
-^!q::ExitApp
+#SuspendExempt
+
+^!Esc::
+{
+    Suspend -1
+    if A_IsSuspended
+        Flash("Report Assistant suspended")
+    else
+        Flash("Report Assistant active")
+}
+
+^!q::
+{
+    ExitApp
+}
+
+#SuspendExempt False
 
 Flash("Report Assistant AHK loaded")

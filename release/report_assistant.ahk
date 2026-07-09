@@ -1,5 +1,5 @@
 ; Generated file. Edit src/*.ahk instead.
-; Generated at: 2026-07-08 14:07:49 UTC
+; Generated at: 2026-07-09 16:02:10 UTC
 
 ; --- BEGIN config.example.ahk ---
 ; Copy this file to config.local.ahk and calibrate values on the target workstation.
@@ -192,27 +192,32 @@ ExampleCalibratedViewerClick() {
 ; --- END viewer_actions.ahk ---
 
 ; --- BEGIN hotstrings.ahk ---
-::;red::{
+:*?:;red::
+{
     PasteRedFigureText()
 }
 
-::;fzg::{
+:*?:;fzg::
+{
     SendText("放射性摄取增高，SUVmax约")
     PasteRedFigureText()
     Send("{Left 4}")
 }
 
-::;fwj::{
+:*?:;fwj::
+{
     SendText("放射性摄取未见明显增高")
     PasteRedFigureText()
 }
 
-::;fjd::{
+:*?:;fjd::
+{
     SendText("放射性摄取降低")
     PasteRedFigureText()
 }
 
-::;cmx::{
+:*?:;cmx::
+{
     SendText("cm×cm")
     Send("{Left 2}")
 }
@@ -225,8 +230,23 @@ ExampleCalibratedViewerClick() {
 #Warn
 
 
-^!Esc::Suspend
-^!q::ExitApp
+#SuspendExempt
+
+^!Esc::
+{
+    Suspend -1
+    if A_IsSuspended
+        Flash("Report Assistant suspended")
+    else
+        Flash("Report Assistant active")
+}
+
+^!q::
+{
+    ExitApp
+}
+
+#SuspendExempt False
 
 Flash("Report Assistant AHK loaded")
 
