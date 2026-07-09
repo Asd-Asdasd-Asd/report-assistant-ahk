@@ -22,7 +22,11 @@
 - 后续可以逐步加入 RTF / HTML 剪贴板事务，减少手工格式调整。
 - 不需要接触数据库，也不需要绕过原系统权限。
 
-真正的红色格式文本插入计划通过 RTF / HTML clipboard support 实现。v0.3.0 阶段仍可能使用纯文本 fallback 插入 `（见图）`，直到在 Windows 工作站上完成兼容性测试。这样可以优先保证剪贴板恢复和基础输入稳定，不依赖外部 `.clip` 文件。
+红色 `（见图）` 插入采用动态 RTF clipboard construction。脚本在运行时构造包含红色和黑色 color table 的 RTF 文本，通过 Windows Clipboard API 写入 `Rich Text Format`，同时写入 `CF_UNICODETEXT` 作为兼容格式。整个过程包裹在 clipboard save/restore transaction 中，完成粘贴后恢复用户原始剪贴板。
+
+新代码路径不依赖保存好的 `red_not.clip` 或其他 clipboard snapshot 文件。`；red` 默认路径也不应在 RTF 写入失败时静默插入黑色 `（见图）`，否则会掩盖兼容性问题。失败时应提示用户手动添加，并在 Windows 工作站上记录问题。
+
+RTF 内容末尾会切换回黑色，例如 `\cf2`，预期后续继续输入的文字保持黑色。这个行为必须在目标 Windows 报告编辑器中测试，因为不同 Word-like 控件对剪贴板格式和末尾格式状态的处理可能不同。
 
 所有报告书写辅助都必须保留人工确认，不默认执行最终提交、审核或发送。
 

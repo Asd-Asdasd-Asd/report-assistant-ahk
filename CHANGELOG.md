@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added dynamic RTF clipboard construction for red figure text.
+- Added clipboard save/restore transaction around red text paste.
+- Removed default dependency on saved `red_not.clip` snapshots.
+- Red insertion requires Windows report editor compatibility testing.
 - Refactored core report hotstrings into `src/hotstrings.ahk`.
 - Added safer clipboard save/restore helpers.
 - Removed dependency on external `red_not.clip` in the new code path.
@@ -48,6 +52,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Validate emergency suspend/restore behavior on Windows.
 - Validate immediate-trigger report hotstrings in the target report editor.
+
+## [0.4.0] - Planned
+
+### Planned
+
+- Validate dynamic RTF red figure text insertion in the target Windows report editor.
+- Confirm that text typed after red insertion continues in black.
+- Keep HTML clipboard support as a future compatibility option if RTF is insufficient.
 
 ## [0.1.0] - Planned
 
