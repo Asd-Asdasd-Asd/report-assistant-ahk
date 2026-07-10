@@ -10,7 +10,7 @@
 
 稳定科室发布阶段再考虑 portable `.exe` package、外部配置文件和完整中文用户文档。`.exe` 有利于降低使用门槛，但会增加调试、回滚和问题定位成本。
 
-后续产品化阶段可以再加入 tray menu、version display、calibration mode、logging 和更容易远程支持的工具。
+后续产品化阶段可以再加入 tray menu、version display、calibration mode、logging、diagnostics export 和更容易远程支持的工具。
 
 当前不应过早切换到 exe，因为调试和快速迭代仍然比包装形式更重要。
 
@@ -81,6 +81,101 @@
 - 不保存敏感剪贴板日志。
 - 不自动最终提交报告。
 - 不实现 HTML clipboard。
+
+## v0.4.1 调查记录和路线校正
+
+目标：记录 Windows 红字剪贴板测试和 MxNMSoft 现场调查，修正后续路线。
+
+范围：
+
+- 记录 RTF 语法问题和手工最小修复。
+- 记录 RTF + `CF_UNICODETEXT` 与 RTF only 的现场行为。
+- 将 RTF 红字插入重新分类为 experimental/reference。
+- 记录 HTML Clipboard / `CF_HTML` 作为下一步主路径。
+- 记录 line measurement 和 SUVMax 的 context-menu 读取发现。
+- 明确 SUV 策略从 log-first 改为 current-image context-menu first。
+
+不做：
+
+- 不修改 `src/` 功能代码。
+- 不实现 HTML clipboard。
+- 不实现 `ContextMeasurementProvider`。
+- 不重建 release。
+
+## v0.4.2 or v0.5.0 HTML Clipboard 红字插入
+
+目标：实现 HTML Clipboard / `CF_HTML` 红色 `（见图）` 插入。
+
+范围：
+
+- 动态构造 `CF_HTML` payload。
+- 保留 clipboard save/restore transaction。
+- 验证目标报告编辑器是否接受 HTML Clipboard。
+- 验证后续输入恢复黑色。
+
+不做：
+
+- 不静默 fallback 成黑色文本。
+- 不依赖 `red_not.clip`。
+
+## later ContextMeasurementProvider core
+
+目标：建立 MxNMSoft context-menu 测量读取 provider。
+
+范围：
+
+- 实现 popup 打开、命令查找、clipboard 读取和结果结构。
+- 动态识别 popup 和控件，不硬编码 runtime HWND/PID。
+
+## later line-axis context-command parser
+
+目标：解析 `复制直线测量值` 的 clipboard 输出。
+
+范围：
+
+- 支持 `cm` / `mm`。
+- 支持 `×`、`x`、`X`、`*`、`＊`。
+- 输出 structured line axes。
+
+## later SUVMax context-command parser
+
+目标：解析 `复制SUVMax值` 的 clipboard 输出。
+
+范围：
+
+- 读取当前图像 context-menu 的 SUVMax。
+- 格式化为报告需要的数值。
+- 不自动使用最后一条 log 作为 fallback。
+
+## later safe manual fallback
+
+目标：自动读取失败时回到人工输入流程。
+
+范围：
+
+- 明确失败提示。
+- 不插入旧值。
+- 不要求用户重启 MxNMSoft。
+
+## later centralized user-editable hotstrings and hotkeys
+
+目标：集中管理可编辑 hotstrings 和 hotkeys。
+
+范围：
+
+- 设计外部配置格式。
+- 保留安全默认值。
+- 避免普通用户直接修改源码。
+
+## later workstation profiles and calibration
+
+目标：支持工作站 profile、coordinate/control calibration。
+
+范围：
+
+- 保存本机校准结果。
+- 区分工作站差异。
+- 避免跨机器误用坐标。
 
 ## v0.5.0 坐标表集中管理和窗口校验
 

@@ -13,6 +13,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Documented Windows RTF clipboard test results.
+- Recorded the temporary `BuildRedRtf()` syntax fix used during field testing.
+- Reclassified RTF red-text insertion as experimental/reference.
+- Added planned HTML Clipboard / CF_HTML implementation path.
+- Documented MxNMSoft context-menu measurement reading for line axes and SUVMax.
+- Updated SUV strategy from log-first to current-image context-menu first.
+- Added the safety requirement to never reuse stale measurements and to fall back to manual input.
 - Added dynamic RTF clipboard construction for red figure text.
 - Added clipboard save/restore transaction around red text paste.
 - Removed default dependency on saved `red_not.clip` snapshots.
@@ -60,6 +67,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Validate dynamic RTF red figure text insertion in the target Windows report editor.
 - Confirm that text typed after red insertion continues in black.
 - Keep HTML clipboard support as a future compatibility option if RTF is insufficient.
+
+## [0.4.1] - Planned
+
+### Planned
+
+- Preserve Windows red-text and MxNMSoft field-test findings as internal documentation.
+- Delete temporary diagnostic artifacts from the product repository.
+- Prepare for a future CF_HTML implementation without changing runtime behavior in this step.
 
 ## [0.1.0] - Planned
 

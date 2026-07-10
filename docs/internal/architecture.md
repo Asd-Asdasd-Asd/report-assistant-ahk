@@ -22,13 +22,21 @@
 - 后续可以逐步加入 RTF / HTML 剪贴板事务，减少手工格式调整。
 - 不需要接触数据库，也不需要绕过原系统权限。
 
-红色 `（见图）` 插入采用动态 RTF clipboard construction。脚本在运行时构造包含红色和黑色 color table 的 RTF 文本，通过 Windows Clipboard API 写入 `Rich Text Format`，同时写入 `CF_UNICODETEXT` 作为兼容格式。整个过程包裹在 clipboard save/restore transaction 中，完成粘贴后恢复用户原始剪贴板。
+红色 `（见图）` 插入的 v0.4.0 方案曾尝试动态 RTF clipboard construction。Windows 现场测试显示，RTF payload 没有被目标报告编辑器正确消费；当同时写入 `CF_UNICODETEXT` 时，编辑器插入的是黑色文本。RTF 因此降级为 experimental/reference。
 
-新代码路径不依赖保存好的 `red_not.clip` 或其他 clipboard snapshot 文件。`；red` 默认路径也不应在 RTF 写入失败时静默插入黑色 `（见图）`，否则会掩盖兼容性问题。失败时应提示用户手动添加，并在 Windows 工作站上记录问题。
+新的主要方向是 HTML Clipboard / `CF_HTML`。`red_not.clip` 仍可作为诊断参考，但它依赖 `ClipboardAll` binary snapshot，可能受 session-specific registered clipboard format IDs 影响，不能成为生产依赖。`；red` 默认路径也不应静默 fallback 成黑色 `（见图）`，否则会掩盖兼容性问题。
 
-RTF 内容末尾会切换回黑色，例如 `\cf2`，预期后续继续输入的文字保持黑色。这个行为必须在目标 Windows 报告编辑器中测试，因为不同 Word-like 控件对剪贴板格式和末尾格式状态的处理可能不同。
+红字实现仍必须包裹在 clipboard save/restore transaction 中，最终行为必须插入红色 `（见图）`、恢复用户原始剪贴板，并让后续输入恢复黑色。
 
 所有报告书写辅助都必须保留人工确认，不默认执行最终提交、审核或发送。
+
+## Measurement architecture
+
+MxNMSoft 测量值读取计划通过未来的 `ContextMeasurementProvider` adapter/provider layer 实现。line measurement 和 SUVMax 使用相同的 context-menu transport：在当前图像区域打开右键菜单，按 visible command text 找到复制命令，读取并校验剪贴板结果。
+
+`ContextMeasurementProvider` 返回 structured measurement data，例如 measurement type、raw value、formatted value、source、timestamp、study identity 和 failure reason。hotstrings 或上层报告逻辑只负责决定最终插入的报告文本，不直接承担窗口消息、控件查找和解析细节。
+
+当前图像读取失败时，manual fallback 仍是上层 workflow。系统应优先 false negative，不能复用旧剪贴板值，也不能把最后一条 SUV log 自动当作当前图像测量值。
 
 ## 阅片界面的自动化策略
 
@@ -45,7 +53,7 @@ RTF 内容末尾会切换回黑色，例如 `\cf2`，预期后续继续输入的
 - `main.ahk`：项目入口，加载模块，注册全局安全热键。
 - `config.example.ahk`：示例配置，包含窗口可执行文件名和示例坐标表；真实本机配置应复制到 `config.local.ahk`。
 - `hotstrings.ahk`：文本扩展入口，只放文本输入相关逻辑。
-- `clipboard_rtf.ahk`：剪贴板事务和未来 RTF / HTML 粘贴支持。
+- `clipboard_rtf.ahk`：剪贴板事务和富文本粘贴实验；RTF 已降级为参考，HTML Clipboard / CF_HTML 是下一步方向。
 - `report_editor.ahk`：报告书写窗口相关动作，未来包括富文本插入、格式重置、编辑区焦点校验。
 - `viewer_actions.ahk`：阅片窗口动作，未来逐步迁移经过校准的坐标操作。
 - `window_guard.ahk`：窗口存在、激活和焦点保护。
