@@ -102,7 +102,7 @@
 - 不实现 `ContextMeasurementProvider`。
 - 不重建 release。
 
-## v0.4.2 or v0.5.0 HTML Clipboard 红字插入
+## v0.4.2 HTML Clipboard 红字插入
 
 目标：实现 HTML Clipboard / `CF_HTML` 红色 `（见图）` 插入。
 
@@ -112,11 +112,15 @@
 - 保留 clipboard save/restore transaction。
 - 验证目标报告编辑器是否接受 HTML Clipboard。
 - 验证后续输入恢复黑色。
+- 增加 UTF-8 byte offset 的平台无关结构测试。
+- 移除 RTF 实现的活动运行路径。
 
 不做：
 
 - 不静默 fallback 成黑色文本。
 - 不依赖 `red_not.clip`。
+- 不加入隐藏格式边界字符或编辑器专用格式重置。
+- 不实现测量提取、ZMQ 或 `window.nodeApi` 集成。
 
 ## later ContextMeasurementProvider core
 

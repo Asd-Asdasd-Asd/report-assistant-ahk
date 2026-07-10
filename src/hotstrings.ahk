@@ -6,8 +6,8 @@
 :*?:;fzg::
 {
     SendText("放射性摄取增高，SUVmax约")
-    PasteRedFigureText()
-    Send("{Left 4}")
+    if PasteRedFigureText()
+        Send("{Left 4}")
 }
 
 :*?:;fwj::

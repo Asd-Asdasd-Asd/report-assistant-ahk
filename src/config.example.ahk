@@ -4,8 +4,8 @@
 REPORT_EDITOR_EXE := "medexworkstation.exe"
 VIEWER_EXE := "MedExNMFusion.exe"
 
-; Red figure text expects dynamic RTF clipboard insertion by default.
-RED_TEXT_MODE := "rtf"
+; Red figure text expects dynamic CF_HTML clipboard insertion by default.
+RED_TEXT_MODE := "html"
 RED_TEXT_COLOR := "red"
 RED_TEXT_RESET_TO_BLACK := true
 

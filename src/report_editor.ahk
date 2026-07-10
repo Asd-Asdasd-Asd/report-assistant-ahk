@@ -3,8 +3,8 @@ FocusReportEditor() {
 }
 
 InsertReportRichTextPlaceholder() {
-    ; Future: validate editor focus before inserting RTF content.
-    ; Future: replace plain-text paste with calibrated RTF insertion.
+    ; Future: validate editor focus before inserting rich-text content.
+    ; CF_HTML red figure-text insertion currently lives in clipboard_html.ahk.
     Flash("Report rich-text insertion is not implemented")
     return false
 }

@@ -16,3 +16,37 @@ Use this checklist on a Windows workstation with AutoHotkey v2 installed.
 - [ ] Report editor remains usable after hotstring expansion.
 - [ ] Viewer coordinate actions are disabled or placeholder only.
 - [ ] No automatic final submission occurs.
+
+## v0.4.2 CF_HTML staged tests
+
+### Notepad
+
+- [ ] `;red`, `;fzg`, `;fwj`, and `;fjd` trigger immediately.
+- [ ] Unsupported HTML produces no insertion or a visible failure; it never inserts black `（见图）` as a fallback.
+- [ ] The original clipboard is restored after the attempt.
+- [ ] If `;fzg` paste dispatch fails, the cursor does not move left.
+
+### Microsoft Word
+
+- [ ] `;red` inserts red `（见图）`.
+- [ ] Typing `abc` immediately after the insertion produces black text.
+- [ ] The original clipboard is restored after insertion.
+- [ ] `;fzg`, `;fwj`, and `;fjd` preserve their existing phrases.
+- [ ] `;fzg` moves the cursor left 4 only after paste dispatch succeeds.
+
+### Edge or Chrome contenteditable
+
+- [ ] `;red` inserts red `（见图）` in a contenteditable field.
+- [ ] Typing `abc` immediately afterward produces black text.
+- [ ] No hidden or visible boundary character is added.
+- [ ] The original clipboard is restored after insertion.
+
+### MedEx report editor
+
+- [ ] The editor accepts the CF_HTML payload and renders `（见图）` in red.
+- [ ] Typing `abc` immediately afterward produces black text.
+- [ ] Paste timing is reliable during normal and repeated report entry.
+- [ ] The original clipboard is restored after success and failure.
+- [ ] Failure never inserts black `（见图）` as a fallback.
+- [ ] `;fzg` leaves the cursor in the expected position after successful paste dispatch.
+- [ ] Report input remains usable after a failed insertion.

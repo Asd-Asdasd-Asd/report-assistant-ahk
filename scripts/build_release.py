@@ -13,7 +13,7 @@ ORDER = [
     "config.example.ahk",
     "window_guard.ahk",
     "utils.ahk",
-    "clipboard_rtf.ahk",
+    "clipboard_html.ahk",
     "report_editor.ahk",
     "viewer_actions.ahk",
     "hotstrings.ahk",

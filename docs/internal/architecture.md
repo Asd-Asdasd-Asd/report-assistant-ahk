@@ -24,7 +24,9 @@
 
 红色 `（见图）` 插入的 v0.4.0 方案曾尝试动态 RTF clipboard construction。Windows 现场测试显示，RTF payload 没有被目标报告编辑器正确消费；当同时写入 `CF_UNICODETEXT` 时，编辑器插入的是黑色文本。RTF 因此降级为 experimental/reference。
 
-新的主要方向是 HTML Clipboard / `CF_HTML`。`red_not.clip` 仍可作为诊断参考，但它依赖 `ClipboardAll` binary snapshot，可能受 session-specific registered clipboard format IDs 影响，不能成为生产依赖。`；red` 默认路径也不应静默 fallback 成黑色 `（见图）`，否则会掩盖兼容性问题。
+v0.4.2 的活动实现改为 HTML Clipboard / `CF_HTML`。`clipboard_html.ahk` 动态构造 UTF-8 payload，按字节计算 `StartHTML`、`EndHTML`、`StartFragment` 和 `EndFragment`，并通过 Windows Clipboard API 写入注册格式 `HTML Format`。默认红字路径不写入 `CF_UNICODETEXT`，因此不支持 HTML 的编辑器不会静默插入黑色 `（见图）`。
+
+`red_not.clip` 仍可作为诊断参考，但它依赖 `ClipboardAll` binary snapshot，可能受 session-specific registered clipboard format IDs 影响，不能成为生产依赖。RTF 代码不再进入活动运行路径，相关调查结论由 Git 历史和 `red-text-clipboard-investigation.md` 保存。
 
 红字实现仍必须包裹在 clipboard save/restore transaction 中，最终行为必须插入红色 `（见图）`、恢复用户原始剪贴板，并让后续输入恢复黑色。
 
@@ -53,7 +55,7 @@ MxNMSoft 测量值读取计划通过未来的 `ContextMeasurementProvider` adapt
 - `main.ahk`：项目入口，加载模块，注册全局安全热键。
 - `config.example.ahk`：示例配置，包含窗口可执行文件名和示例坐标表；真实本机配置应复制到 `config.local.ahk`。
 - `hotstrings.ahk`：文本扩展入口，只放文本输入相关逻辑。
-- `clipboard_rtf.ahk`：剪贴板事务和富文本粘贴实验；RTF 已降级为参考，HTML Clipboard / CF_HTML 是下一步方向。
+- `clipboard_html.ahk`：构造 CF_HTML、调用 Windows Clipboard API、派发粘贴命令并恢复用户剪贴板。返回成功只表示粘贴命令已派发且恢复已尝试，不代表目标编辑器已经确认渲染结果。
 - `report_editor.ahk`：报告书写窗口相关动作，未来包括富文本插入、格式重置、编辑区焦点校验。
 - `viewer_actions.ahk`：阅片窗口动作，未来逐步迁移经过校准的坐标操作。
 - `window_guard.ahk`：窗口存在、激活和焦点保护。

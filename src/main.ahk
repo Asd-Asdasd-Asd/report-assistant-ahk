@@ -6,7 +6,7 @@
 #Include *i config.local.ahk
 #Include window_guard.ahk
 #Include utils.ahk
-#Include clipboard_rtf.ahk
+#Include clipboard_html.ahk
 #Include report_editor.ahk
 #Include viewer_actions.ahk
 #Include hotstrings.ahk

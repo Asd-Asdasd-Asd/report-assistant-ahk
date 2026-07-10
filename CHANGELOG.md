@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### v0.4.2
+
+- Replaced the active RTF path with dynamic CF_HTML red figure-text insertion.
+- Added UTF-8 byte-offset generation for CF_HTML headers and platform-independent structural tests.
+- Added deterministic HTML clipboard writing and save/restore transaction handling.
+- Removed `CF_UNICODETEXT` fallback from red figure-text insertion.
+- Changed `;fzg` cursor movement to run only after paste dispatch succeeds.
+- Added staged Windows tests for Notepad, Word, Chromium contenteditable, and the MedEx report editor.
+- CF_HTML rendering and post-paste text color still require Windows workstation validation.
+
 ### Fixed
 
 - Emergency hotkeys are exempt from suspension.

@@ -93,4 +93,17 @@ Windows 现场观察结果：
 - 失败必须可见；
 - 最终行为必须插入红色 `（见图）`、恢复剪贴板，并让后续输入恢复黑色。
 
+## v0.4.2 implementation
+
+v0.4.2 将活动实现从 `clipboard_rtf.ahk` 切换为 `clipboard_html.ahk`：
+
+- 动态生成符合 CF_HTML header 约定的 UTF-8 payload；
+- offset 按完整 payload 的 UTF-8 byte position 计算；
+- 只写入注册格式 `HTML Format`，不写 `CF_UNICODETEXT` fallback；
+- 使用 `ClipboardAll()` 保存并在 finally-style cleanup 中恢复原剪贴板；
+- 首版只使用红色 span 和黑色外层容器，不增加零宽字符或其他隐藏边界；
+- 返回成功表示 paste command dispatch success，不表示目标编辑器已经视觉确认红字。
+
+是否真正显示红色、后续输入是否恢复黑色，仍需依次在 Word、Chromium contenteditable 和 MedEx 报告编辑器中验证。
+
 `bugfix_report_assistant.ahk` 是临时一次性 field-test artifact。其发现记录到本文档后，应从仓库根目录删除，不能进入生产源码。
