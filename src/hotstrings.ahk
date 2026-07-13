@@ -1,25 +1,26 @@
 :*?:;red::
 {
-    PasteRedFigureText()
+    InsertRedFigureTextAndRestoreState()
 }
 
 :*?:;fzg::
 {
     SendText("放射性摄取增高，SUVmax约")
-    if PasteRedFigureText()
+    operation := InsertRedFigureTextAndRestoreState()
+    if operation.ok
         Send("{Left 4}")
 }
 
 :*?:;fwj::
 {
     SendText("放射性摄取未见明显增高")
-    PasteRedFigureText()
+    InsertRedFigureTextAndRestoreState()
 }
 
 :*?:;fjd::
 {
     SendText("放射性摄取降低")
-    PasteRedFigureText()
+    InsertRedFigureTextAndRestoreState()
 }
 
 :*?:;cmx::

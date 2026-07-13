@@ -2,11 +2,50 @@ FocusReportEditor() {
     return RequireReportEditor()
 }
 
-InsertReportRichTextPlaceholder() {
-    ; Future: validate editor focus before inserting rich-text content.
-    ; CF_HTML red figure-text insertion currently lives in clipboard_html.ahk.
-    Flash("Report rich-text insertion is not implemented")
-    return false
+InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
+    pasteResult := PasteRedFigureTextDetailed(text)
+    if !pasteResult.pasteDispatched {
+        return {
+            ok: false,
+            code: RedTextOperationCode.PASTE_FAILED,
+            pasteDispatched: false,
+            clipboardRestoreSucceeded: pasteResult.clipboardRestoreSucceeded,
+            reset: 0
+        }
+    }
+
+    ; The text is already present at this point. A reset failure is reported but
+    ; never triggers automatic deletion or undo of report content.
+    resetResult := ResetMedExInsertionColor(resetOptions)
+    if !resetResult.ok {
+        Flash("红字已插入，但输入颜色复位失败：" resetResult.code, 3000)
+        SoundBeep(650, 150)
+        return {
+            ok: false,
+            code: RedTextOperationCode.RESET_FAILED,
+            pasteDispatched: true,
+            clipboardRestoreSucceeded: pasteResult.clipboardRestoreSucceeded,
+            reset: resetResult
+        }
+    }
+
+    if !pasteResult.clipboardRestoreSucceeded {
+        return {
+            ok: false,
+            code: RedTextOperationCode.CLIPBOARD_RESTORE_FAILED,
+            pasteDispatched: true,
+            clipboardRestoreSucceeded: false,
+            reset: resetResult
+        }
+    }
+
+    return {
+        ok: true,
+        code: RedTextOperationCode.OK,
+        pasteDispatched: true,
+        clipboardRestoreSucceeded: true,
+        reset: resetResult
+    }
 }
 
 ResetReportFormattingPlaceholder() {

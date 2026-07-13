@@ -1,17 +1,30 @@
-# Release 检查清单
+# Internal Release 检查清单
 
 发布前逐项确认。
 
+- [ ] 确认版本 scope 与 `docs/internal/roadmap.md` 一致，没有混入 deferred features。
+- [ ] 运行 automated/reference tests。
 - [ ] 运行 `python scripts/build_release.py`。
 - [ ] 检查 `release/report_assistant.ahk` 是否生成。
-- [ ] 将 release 文件复制到 Windows 测试工作站。
-- [ ] Windows 上启动脚本。
+- [ ] 从 source truth 生成 internal-test executable，不手改生成产物。
+- [ ] 检查 executable/source release 不包含真实 `config.ini`、日志或 patient data。
+- [ ] 确认更新流程不会覆盖 `%LocalAppData%\MedExAHK\config.ini`。
+- [ ] 将 release artifacts 复制到 Windows 测试工作站。
+- [ ] Windows 上启动新项目和经过批准的 compatibility script；确认原始 legacy instances 已退出。
 - [ ] 测试 Ctrl+Alt+Q 紧急退出。
 - [ ] 测试 Ctrl+Alt+Esc 暂停/恢复。
 - [ ] 测试 `;cmx`。
 - [ ] 测试 `;red` 不破坏剪贴板。
+- [ ] 测试 `;red` 插入红色文字后，后续输入恢复黑色。
+- [ ] 测试 wrong process、missing anchors、invalid geometry、menu timeout、missing black item 和 Invoke failure 全部 fail-closed。
+- [ ] 检查 color-reset logs 只包含允许的 geometry/timing/result metadata，不包含报告文字或 clipboard content。
 - [ ] 测试 `;fzg`。
 - [ ] 检查没有自动提交、自动审核或自动最终发送功能。
+- [ ] 检查 new/compat hotkeys 和 hotstrings 没有重复注册。
+- [ ] 检查 compatibility 保留项、移除项和 rollback method 与本 release 中文维护说明一致。
+- [ ] 在目标 DPI、display scaling、resolution 和 MedEx version 上完成验证。
 - [ ] 更新 `CHANGELOG.md`。
+- [ ] 编写本 release 的中文 maintainer/update notes。
+- [ ] 更新简单中文 internal-test user instructions。
 - [ ] 创建 git tag。
-- [ ] 在 GitHub Release 上传 `release/report_assistant.ahk`。
+- [ ] 上传经过验证的 internal release artifacts；不上传 user config、logs 或 legacy local data。

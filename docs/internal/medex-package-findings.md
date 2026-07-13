@@ -17,12 +17,14 @@
 
 Electron bundle 中包含 TinyMCE 静态资源和 paste/textcolor/colorpicker 等插件，说明富文本编辑器很可能是 Web/Chromium 路径。第一轮尚未定位到明确的 first-party `tinymce.init(...)`，可能因为实际报告页面由配置 URL 加载，不完全包含在本地 bundle 中。
 
-对红色 `（见图）` 的下一步影响：
+对红色 `（见图）` 的当前影响：
 
 - v0.4.2 已实现动态 `CF_HTML` 作为优先测试路径。
-- 需要在运行中的报告页面确认 DOM、iframe/contenteditable、TinyMCE 初始化和 paste policy。
+- 现场已经确认 MedEx 接受 `CF_HTML` 并显示红色文字；剩余问题是恢复后续 insertion color。
+- 当前版本不能直接附加 DevTools，因此 DOM、iframe/contenteditable、TinyMCE 初始化和 paste policy inspection 继续 deferred。
 - 不应继续把 RTF 作为主要路径。
 - 源码返回成功只表示粘贴命令已经派发，不表示 DOM 或视觉渲染已经确认成功。
+- 已批准 V1 通过 UIA anchors、比例坐标定位 trigger，再 Invoke Name=`000000` 的 color item；详见 `docs/technical-investigations/2026-07-medex-rich-text-color-reset.md`。
 
 ## Measurement implications
 

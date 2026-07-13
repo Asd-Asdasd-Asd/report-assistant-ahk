@@ -8,13 +8,21 @@ PastePlainText(text) {
 }
 
 PasteRedFigureText(text := "（见图）") {
+    return PasteRedFigureTextDetailed(text).pasteDispatched
+}
+
+PasteRedFigureTextDetailed(text := "（见图）") {
     ; The black wrapper is intentionally empty of boundary/sentinel characters.
     escapedText := HtmlEscape(text)
     fragment := "<span style=`"color:#000000`"><span style=`"color:#ff0000`">" . escapedText . "</span></span>"
-    return PasteHtmlFragment(fragment)
+    return PasteHtmlFragmentDetailed(fragment)
 }
 
 PasteHtmlFragment(fragment) {
+    return PasteHtmlFragmentDetailed(fragment).pasteDispatched
+}
+
+PasteHtmlFragmentDetailed(fragment) {
     transaction := WithClipboardRestore(() => PasteHtmlFragmentWithoutRestore(fragment))
     pasteDispatched := transaction.actionSucceeded && transaction.restoreAttempted
 
@@ -29,9 +37,13 @@ PasteHtmlFragment(fragment) {
         SoundBeep(750, 120)
     }
 
-    ; True means the paste command was dispatched and restoration was attempted.
-    ; It does not confirm that the target editor accepted or rendered the HTML.
-    return pasteDispatched
+    ; pasteDispatched does not confirm that the target editor rendered the HTML.
+    return {
+        ok: transaction.actionSucceeded && transaction.restoreSucceeded,
+        pasteDispatched: pasteDispatched,
+        clipboardRestoreSucceeded: transaction.restoreSucceeded,
+        transaction: transaction
+    }
 }
 
 BuildCfHtml(fragment) {

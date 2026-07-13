@@ -104,6 +104,6 @@ v0.4.2 将活动实现从 `clipboard_rtf.ahk` 切换为 `clipboard_html.ahk`：
 - 首版只使用红色 span 和黑色外层容器，不增加零宽字符或其他隐藏边界；
 - 返回成功表示 paste command dispatch success，不表示目标编辑器已经视觉确认红字。
 
-是否真正显示红色、后续输入是否恢复黑色，仍需依次在 Word、Chromium contenteditable 和 MedEx 报告编辑器中验证。
+后续 MedEx 现场调查已确认 `CF_HTML` 可以正确显示红色文字，但 MedEx 会继承最后插入字符的红色，后续输入不会自动恢复黑色。颜色复位已经形成独立 Technical Investigation 和获批 V1，不应把空黑 span workaround 当作永久架构。详见 `docs/technical-investigations/2026-07-medex-rich-text-color-reset.md`。
 
 `bugfix_report_assistant.ahk` 是临时一次性 field-test artifact。其发现记录到本文档后，应从仓库根目录删除，不能进入生产源码。

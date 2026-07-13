@@ -7,6 +7,10 @@
 #Include window_guard.ahk
 #Include utils.ahk
 #Include clipboard_html.ahk
+#Include *i <UIA>
+#Include medex_color_reset_logic.ahk
+#Include diagnostics.ahk
+#Include adapters\medex_report_editor.ahk
 #Include report_editor.ahk
 #Include viewer_actions.ahk
 #Include hotstrings.ahk

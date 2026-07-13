@@ -4,15 +4,15 @@
 
 ## 长期发布策略
 
-短期阶段继续采用模块化 AHK 源码加生成单文件 `.ahk` release 的方式。这样便于快速调试、审查 diff、定位问题，也便于在 Windows 工作站上直接验证。
+源码继续采用模块化 AHK v2，并保留可生成的单文件 `.ahk` 作为调试产物。这样便于审查 diff、定位问题，也便于在 Windows 工作站上快速验证。
 
-内部试点阶段可以将 `.ahk` release 与离线 AutoHotkey v2 installer/runtime 一起分发，降低普通用户的安装门槛，同时仍保留脚本可读性和快速迭代能力。
+v0.5.0 内测阶段开始增加 internal-test executable，降低普通用户的安装门槛；`.ahk` release 继续作为维护和诊断产物，不作为普通用户配置入口。
 
-稳定科室发布阶段再考虑 portable `.exe` package、外部配置文件和完整中文用户文档。`.exe` 有利于降低使用门槛，但会增加调试、回滚和问题定位成本。
+用户配置从 v0.5.0 起放在应用二进制和 source release 之外，并在更新时保留。每次 internal release 必须同时提供简单中文用户说明和中文维护/更新说明。
 
-后续产品化阶段可以再加入 tray menu、version display、calibration mode、logging、diagnostics export 和更容易远程支持的工具。
+后续产品化阶段可以再加入完整 tray menu、version display、calibration mode、diagnostics export 和更容易远程支持的工具。
 
-当前不应过早切换到 exe，因为调试和快速迭代仍然比包装形式更重要。
+Executable 只改变交付形式，不改变源代码真相来源、配置保存位置或回滚要求。
 
 ## v0.1.0 项目初始化
 
@@ -122,123 +122,85 @@
 - 不加入隐藏格式边界字符或编辑器专用格式重置。
 - 不实现测量提取、ZMQ 或 `window.nodeApi` 集成。
 
-## later ContextMeasurementProvider core
+## v0.5.0 — Internal Test Foundation
 
-目标：建立 MxNMSoft context-menu 测量读取 provider。
+目标：建立能够开始小范围内部测试的安全基础，同时保留 legacy compatibility 作为未迁移功能的临时来源。
 
-范围：
+Required scope：
 
-- 实现 popup 打开、命令查找、clipboard 读取和结果结构。
-- 动态识别 popup 和控件，不硬编码 runtime HWND/PID。
+1. `CF_HTML` red-text insertion。
+2. MedEx insertion-color reset to black。
+3. 用户配置独立存放，不与 application binary 或 source release 混合。
+4. Configurable hotkeys。
+5. Configurable trigger strings for built-in hotstrings。
+6. Configurable replacement text for built-in hotstrings。
+7. 独立的 fully user-defined hotstrings 区域。
+8. 配置缺失或无效时使用 safe defaults。
+9. 应用更新不得覆盖 user configuration。
+10. Diagnostic logging 足以说明 color reset 或 automation 失败原因，且不记录报告内容。
+11. 打包 internal-test executable。
+12. 提供简单中文 internal-test user documentation。
+13. 每个 internal release 提供中文 maintainer/update notes。
 
-## later line-axis context-command parser
+Explicitly deferred，除非已经实现且稳定：
 
-目标：解析 `复制直线测量值` 的 clipboard 输出。
+- automatic SUVmax extraction；
+- automatic long-axis and short-axis extraction；
+- complete settings GUI；
+- Electron JavaScript injection；
+- automatic updater；
+- multi-editor support。
 
-范围：
+v0.5.0 的 MedEx color reset 采用已批准 V1：UIA anchors + proportional coordinate positioning + UIA Invoke。该方案属于可替换 adapter，不进入 generic clipboard module。
 
-- 支持 `cm` / `mm`。
-- 支持 `×`、`x`、`X`、`*`、`＊`。
-- 输出 structured line axes。
+## v0.5.x — Stabilization
 
-## later SUVMax context-command parser
+目标：处理内测暴露出的环境差异和可靠性问题。
 
-目标：解析 `复制SUVMax值` 的 clipboard 输出。
+计划范围：
 
-范围：
+- DPI and display-scaling compatibility；
+- resolution and layout variation；
+- MedEx version variation；
+- timing/retry improvements；
+- configuration migration；
+- improved diagnostics and failure logging。
 
-- 读取当前图像 context-menu 的 SUVMax。
-- 格式化为报告需要的数值。
-- 不自动使用最后一条 log 作为 fallback。
+每个 stabilizing release 都应缩小 compatibility script，但只有在对应新实现完成并通过工作站验证后才能移除 legacy capability。
 
-## later safe manual fallback
+## v0.6.0 — Measurement Capture
 
-目标：自动读取失败时回到人工输入流程。
+目标：安全获取当前 annotation 对应的 measurement，不复用旧值，不把 automation failure 当成未标注。
 
-范围：
+计划范围：
 
-- 明确失败提示。
-- 不插入旧值。
-- 不要求用户重启 MxNMSoft。
+- 从 image-window context menu 自动获取 SUVmax；
+- 自动获取 long-axis 和 short-axis；
+- annotation 存在时自动使用测量值；
+- annotation 不存在时 fallback 到 manual-input hotstrings；
+- 结果必须严格区分：
+  - `FOUND`；
+  - `NOT_ANNOTATED`；
+  - `AUTOMATION_FAILED`。
 
-## later centralized user-editable hotstrings and hotkeys
+技术自动化失败不等同于“无标注”。`AUTOMATION_FAILED` 不得触发静默的空值或旧值 fallback。
 
-目标：集中管理可编辑 hotstrings 和 hotkeys。
+## Later versions
 
-范围：
+计划范围：
 
-- 设计外部配置格式。
-- 保留安全默认值。
-- 避免普通用户直接修改源码。
+- simple configuration GUI；
+- import/export of user configuration；
+- automatic update support；
+- possible replacement of coordinate interaction with a direct Electron/editor command；
+- workstation profiles and calibration；
+- 经过逐项验证的其他 viewer actions。
 
-## later workstation profiles and calibration
+Direct editor command 仍是未来调查方向，当前不声称存在可调用的 embedded editor API。
 
-目标：支持工作站 profile、coordinate/control calibration。
+## 长期安全边界
 
-范围：
-
-- 保存本机校准结果。
-- 区分工作站差异。
-- 避免跨机器误用坐标。
-
-## v0.5.0 坐标表集中管理和窗口校验
-
-目标：让坐标动作可配置、可校准、可测试。
-
-范围：
-
-- 集中管理 coordinate map。
-- 加强 `window_guard.ahk`。
-- 为每个坐标动作建立本机校准记录要求。
-
-不做：
-
-- 不默认启用未校准动作。
-- 不假设不同工作站坐标一致。
-
-## v0.6.0 阅片动作迁移
-
-目标：逐步迁移低风险、高频阅片动作。
-
-范围：
-
-- 从 legacy 中选择单个动作迁移。
-- 为每个动作增加窗口校验和失败提示。
-- 在 Windows 工作站手动验证。
-
-不做：
-
-- 不一次性迁移全部点击序列。
-- 不迁移可能造成不可逆操作的动作。
-
-## v0.7.0 单文件 release 和 Windows 手动测试
-
-目标：形成可重复发布和测试流程。
-
-范围：
-
-- 改进 `scripts/build_release.py`。
-- 生成单文件 `release/report_assistant.ahk`。
-- 完善 Windows 手动测试清单。
-
-不做：
-
-- 不制作安装器。
-- 不自动更新用户工作站。
-
-## v1.0.0 科室内测稳定版
-
-目标：达到小范围内部试用的稳定度。
-
-范围：
-
-- 完成核心 hotstrings。
-- 完成可靠的剪贴板富文本插入。
-- 完成经过校准的少量阅片动作。
-- 具备普通用户文档和维护者发布流程。
-
-不做：
-
-- 不对外发布。
-- 不开放源码分发。
+- 不对外发布未经验证的临床工作流自动化。
 - 不替代人工审核和临床判断。
+- 不自动最终提交、审核或发送报告。
+- 不把患者信息或报告正文写入 diagnostics。

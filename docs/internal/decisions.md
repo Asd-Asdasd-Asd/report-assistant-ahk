@@ -92,3 +92,46 @@
 
 - 坐标配置不能直接跨机器复用。
 - 发布前必须进行 Windows 手动测试。
+
+## Decision 006: MedEx 颜色复位采用可替换 adapter V1
+
+状态：Accepted for v0.5.0 internal testing
+
+背景：`CF_HTML` 可以插入红色文字，但 MedEx 会把后续输入保持为红色。颜色菜单黑色项目可通过 UIA `Invoke()` 工作，而 color trigger 本身没有可用 UIA node。
+
+决策：V1 使用 UIA anchors、proportional coordinate positioning 和 UIA Invoke，并把实现限制在 MedEx-specific adapter 中。
+
+影响：
+
+- Generic `clipboard_html.ahk` 不包含 MedEx-specific logic。
+- 所有 geometry 或 UIA failure 都 fail-closed。
+- Direct renderer/editor command 保持为未来 replacement candidate，不声称当前 API 存在。
+
+## Decision 007: v0.5.0 使用外部 centralized INI config
+
+状态：Accepted for implementation
+
+背景：Hotkeys、built-in hotstring triggers/replacements 和 user-defined hotstrings 需要可配置，同时更新不能覆盖用户配置。
+
+决策：普通用户配置保存在 `%LocalAppData%\MedExAHK\config.ini`，通过 defaults → read → validate → migrate → normalize 的单一 pipeline 加载。
+
+影响：
+
+- Feature modules 不直接调用 `IniRead()`。
+- 用户不需要编辑 AHK source。
+- User replacement 只作为 data，不作为 executable code。
+- JSON 可在未来复杂度需要时通过 versioned migration 重新评估。
+
+## Decision 008: 使用独立 compatibility script 渐进替代 legacy
+
+状态：Accepted for migration planning
+
+背景：新项目尚未覆盖 legacy daily-use functions，直接停用 legacy 会造成能力丢失；直接并行原脚本会产生 hotstring 和 shared-resource conflicts。
+
+决策：原始 legacy 文件保持不变，新增 cleaned compatibility script，只保留新项目尚未完成并验证的功能。
+
+影响：
+
+- 同一个 trigger 只能有一个 active owner。
+- 每次新 release 逐项缩减 compatibility，并提供中文 update notes 和 rollback method。
+- 在用户确认依赖和新实现 validation 之前，不删除 legacy capability。

@@ -19,6 +19,14 @@
 7. 拷贝 `release/report_assistant.ahk` 到 Windows 测试。
 8. 按 `tests/manual-test-checklist.md` 或 `docs/internal/release-checklist.md` 完成测试。
 
+v0.5.0 起还必须：
+
+- 从 source truth 生成 internal-test executable，不手改 generated artifact；
+- 为每个 internal release 编写中文 maintainer/update notes；
+- 核对 `%LocalAppData%\MedExAHK\config.ini` 在更新前后保持不变；
+- 核对 compatibility script 与新 build 没有重复 hotkeys/hotstrings；
+- 记录本 release 从 compatibility 移除了哪些 capability 以及 rollback method。
+
 ## 如何记录问题
 
 记录问题时应包含：
@@ -56,3 +64,5 @@
 - 本机临时文件
 - 编译出的 `.exe`
 - 未经确认的坐标校准文件
+
+`%LocalAppData%\MedExAHK\config.ini` 是用户持久数据，不属于 release source，也不能在应用更新时删除或覆盖。诊断日志可以在用户授权的本机内测流程中生成，但不得提交到仓库，也不得包含患者信息或 report text。
