@@ -97,11 +97,12 @@ Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 scre
 
 ## 启用 compatibility scaffold 前的用户确认
 
-需要用户确认以下 legacy 行为是否仍属日常必需：
+需要继续确认或验证以下 legacy 行为的迁移条件：
 
-- XButton1 提示；
 - Shift+Alt+B/H/L 三组固定数值流程；
 - Shift+Alt+S 快速标图；
 - Ctrl+Win+Shift+S/M/A/C；
 - RAlt+H/J/K/L；
 - SUV 3 秒复按与 Arrow 1 秒复按的“清除”语义是否必须原样保留。
+
+XButton1 notification 是历史测试项，不属于正式 compatibility 功能；除非发现实际 hotkey conflict，否则忽略。

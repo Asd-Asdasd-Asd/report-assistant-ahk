@@ -1,0 +1,58 @@
+Test date: 2026-07-13
+Machine: MedEx workstation
+Resolution: 1920x1080
+Display scaling: 100%
+MedEx process: medexworkstations.exe
+MedEx version: 0.0.1.0
+AHK version: 2.0.18
+
+Test procedure:
+1. Focused the lower report text field.
+2. Triggered medex_color_reset_field_debug.ahk.
+3. Observed the toolbar dropdown and final text color behavior.
+
+Observed behavior:
+- The script selected the upper toolbar instead of the toolbar belonging to the focused lower text field.
+- The calculated click point successfully opened the color dropdown of the upper toolbar.
+- The script successfully found and invoked the black color item.
+- Diagnostic output reported COLOR_RESET_OK.
+- A diagnostic completion notification changed application focus.
+- After focus returned to the text field, subsequent script behavior changed the color back to red.
+- Based on direct observation, black color activation itself appeared successful before focus was disturbed.
+
+Expected behavior:
+- Select the toolbar immediately associated with the currently focused editor.
+- Invoke the black color item.
+- Return without any focus-stealing dialog or notification.
+
+Interpretation:
+- UIA lookup of the black color item works.
+- Invoke works.
+- Ratio-based color-button click works for the selected toolbar.
+- Current defect is toolbar-to-editor association.
+- Diagnostic notification interferes with validation.
+
+Required next changes:
+1. Identify the currently focused editable Document.
+2. Enumerate toolbar anchor pairs instead of taking the first match.
+3. Select the nearest valid toolbar above the focused Document.
+4. Abort if the toolbar association is ambiguous.
+5. Remove MsgBox or any other focus-stealing completion UI.
+6. Initialize RetryCount as integer 0.
+7. Review why ProcessNameConfirmed=false despite the matching process name.Toolbar geometry observations:
+Toolbar 1 - 病史信息
+FontSize 16px BoundingRectangle: [l=502,t=112,r=529,b=126]
+Number button ① BoundingRectangle: [l=953,t=111,r=967,b=127]
+Toolbar 2 - 检查所见
+FontSize 16px BoundingRectangle: [l=502,t=290,r=529,b=304]
+Number button ① BoundingRectangle: [l=953,t=289,r=967,b=305]
+Toolbar 3 - 检查结论
+FontSize 16px BoundingRectangle: [l=502,t=735,r=529,b=749]
+Number button ① BoundingRectangle: [l=953,t=734,r=967,b=750]
+Geometry interpretation:
+- All three toolbars share the same horizontal anchor positions.
+- Toolbar identity can be distinguished by vertical position.
+- The current red-text workflow targets Toolbar 2, associated with the 检查所见 editor.
+- The diagnostic script incorrectly selected Toolbar 1 because it used the first matching anchor.
+- For the current V1 implementation, valid toolbar candidates can be grouped by matching Y coordinates, sorted top-to-bottom, and the second candidate selected.
+- Absolute screen coordinates should not be hard-coded.

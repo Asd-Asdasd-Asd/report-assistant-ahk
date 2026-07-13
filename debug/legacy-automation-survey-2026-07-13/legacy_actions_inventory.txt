@@ -1,0 +1,991 @@
+﻿============================================================
+Action: Global HHKB Vim-style navigation remap
+============================================================
+Action ID:
+global-hhkb-navigation
+Category:
+Global keyboard remapping
+Purpose:
+Provide reliable arrow-key navigation on an HHKB keyboard that does not
+have dedicated arrow keys.
+User dependency:
+High. This is a frequently used global input feature and should be treated
+as a core retained capability, not as a temporary legacy workaround.
+Scope:
+Global across Windows.
+Current implementation:
+RAlt & h::SendInput("{Left}")
+RAlt & j::SendInput("{Down}")
+RAlt & k::SendInput("{Up}")
+RAlt & l::SendInput("{Right}")
+Key mapping:
+- Right Alt + H -> Left Arrow
+- Right Alt + J -> Down Arrow
+- Right Alt + K -> Up Arrow
+- Right Alt + L -> Right Arrow
+Technical characteristics:
+- Pure AHK keyboard remapping.
+- No MedEx dependency.
+- No window dependency.
+- No UIA dependency.
+- No coordinate dependency.
+- No image matching.
+- No mouse simulation.
+Migration decision:
+Retain directly in the main project.
+Recommended implementation:
+Move this mapping into a dedicated global input module, for example:
+src/navigation_hotkeys.ahk
+Do not place this feature inside:
+- report_editor.ahk
+- clipboard_html.ahk
+- MedEx-specific UI automation modules
+Do not wrap these hotkeys in a MedEx-only #HotIf condition.
+Recommended production code:
+RAlt & h::SendInput("{Left}")
+RAlt & j::SendInput("{Down}")
+RAlt & k::SendInput("{Up}")
+RAlt & l::SendInput("{Right}")
+Risk and validation:
+- Check for conflicts with any other Right Alt combinations.
+- Confirm the mappings work in MedEx, text editors, browsers, terminals,
+  and other normal Windows applications.
+- Preserve global behavior during migration.
+Status:
+Ready for direct merge.
+============================================================
+Action: Generate fixed-format report montage images
+============================================================
+Action ID:
+generate-fixed-report-montage
+Category:
+MedEx image-viewer automation
+Clinical purpose:
+Generate standardized composite screenshots used as the final images in the
+PET/CT report.
+Available presets:
+- Body montage
+- Head montage
+- Lung montage
+Current hotkeys:
+- Shift + Alt + B -> Body
+- Shift + Alt + H -> Head
+- Shift + Alt + L -> Lung
+Current implementation:
+Three AHK coordinate-based workflows containing:
+- layout-template selection;
+- parameter-tab switching;
+- dropdown operations;
+- numeric parameter input;
+- parameter application;
+- final confirmation.
+The three workflows are structurally similar and should eventually be replaced
+by one parameterized implementation rather than retained as three duplicated
+click sequences.
+------------------------------------------------------------
+Shared workflow semantics
+------------------------------------------------------------
+Step 1:
+Select the fixed montage/layout template.
+Current implementation:
+MouseClick "left", 2208, 556
+Target:
+One thumbnail inside the image-arrangement preset grid.
+UI assessment:
+- The whole preset grid is exposed as one outer Image control.
+- Individual thumbnails are not exposed as separate UIA elements.
+Migration strategy:
+Locate the outer Image control and click the target thumbnail using coordinates
+relative to that control. Do not rely primarily on absolute screen coordinates.
+Step 2:
+Switch to toolbar Tab 3.
+Current implementation:
+MouseClick "left", 2073, 628
+Purpose:
+Open the parameter page containing the four-corner annotation setting.
+UI assessment:
+- The overall tab strip is exposed.
+- Individual icon buttons inside the tab strip are not exposed separately.
+Migration strategy:
+Locate the tab-strip region and click the third tab using a relative position.
+Step 3:
+Open the four-corner annotation dropdown.
+Current implementation:
+MouseClick "left", 2152, 1100
+Purpose:
+Open the selector controlling the four-corner image annotations.
+Observed UI target:
+- Name: 打开
+- ControlType: Button
+Migration strategy:
+Prefer UIA Invoke.
+Use a click inside the control rectangle only as fallback.
+Step 4:
+Select NULL in the four-corner annotation dropdown.
+Current implementation:
+MouseClick "left", 2031, 1202
+Purpose:
+Remove the four-corner annotations from the generated report image.
+UI assessment:
+The dropdown options are exposed after expansion.
+Migration strategy:
+Prefer selecting the option by Name="NULL".
+Step 5:
+Switch to toolbar Tab 5.
+Current implementation:
+MouseClick "left", 2188, 628
+Purpose:
+Open the parameter page containing slice thickness, current slice count, and
+window-preset controls.
+UI assessment:
+- The overall tab strip is exposed.
+- Individual tab buttons are not exposed separately.
+Migration strategy:
+Locate the tab-strip region and use a relative click for Tab 5.
+Step 6:
+Edit slice thickness.
+Current implementation:
+MouseClick "left", 2030, 720, 2
+SendText(...)
+Target:
+The input field corresponding to "层厚 x 毫米".
+UI assessment:
+The input field is exposed.
+Migration strategy:
+Prefer UIA ValuePattern.
+Fallback: focus the field, select existing content, then send text.
+Step 7:
+Apply slice-thickness change.
+Current implementation:
+MouseClick "left", 2171, 719
+Target:
+The associated "更改" button.
+Migration strategy:
+Prefer UIA Invoke.
+Step 8:
+Edit current slice count.
+Current implementation:
+MouseClick "left", 2057, 806, 2
+SendText(...)
+Target:
+The current-slice-count input field.
+UI assessment:
+The input field is exposed.
+Migration strategy:
+Prefer UIA ValuePattern.
+Step 9:
+Apply current-slice-count change.
+Current implementation:
+MouseClick "left", 2175, 801
+Target:
+The associated "更改" button.
+Migration strategy:
+Prefer UIA Invoke.
+Step 10:
+Switch to toolbar Tab 4.
+Current implementation:
+MouseClick "left", 2133, 623
+Purpose:
+Open the parameter page containing image scale.
+UI assessment:
+- The overall tab strip is exposed.
+- The individual Tab 4 icon is not exposed separately.
+Migration strategy:
+Locate the tab-strip region and use a relative click for Tab 4.
+Step 11:
+Edit image scale.
+Current implementation:
+MouseClick "left", 2129, 836, 2
+SendText(...)
+Target:
+The image-scale input field.
+UI assessment:
+The input field is exposed.
+Migration strategy:
+Prefer UIA ValuePattern.
+Step 12:
+Confirm and apply the final state.
+Current implementation:
+Send "{Enter}"
+Migration strategy:
+Retain Enter if the application behavior is stable, or replace it with an
+explicit UIA confirmation action if a reliable target is identified.
+------------------------------------------------------------
+Preset values
+------------------------------------------------------------
+Body preset:
+- Slice thickness: 8.5
+- Current slice count: 8
+- Image scale: 0.8
+- Window preset: unchanged
+Head preset:
+- Slice thickness: 4
+- Current slice count: 11
+- Image scale: 1.2
+- Window preset: unchanged
+Lung preset:
+- Slice thickness: 7.5
+- Current slice count: 23
+- Image scale: 0.9
+- Window preset: explicitly set to lung window
+------------------------------------------------------------
+Lung-specific behavior
+------------------------------------------------------------
+Clinical reason:
+Thin-slice lung CT may previously have been viewed using a bone-window preset
+when assessing osseous structures. Therefore, the Lung montage workflow must
+explicitly restore the lung-window preset before generating the final image.
+Additional Lung steps:
+1. Open the window width/level preset dropdown under Tab 5.
+Current implementation:
+MouseClick "left", 2199, 673
+Purpose:
+Expand the window-preset selector.
+Migration strategy:
+If exposed as a Button or ComboBox, prefer UIA Invoke or ExpandCollapse.
+2. Select the lung-window preset.
+Current implementation:
+MouseClick "left", 2132, 754
+Purpose:
+Switch the current image display from the existing window preset, potentially
+bone window, back to lung window.
+Migration strategy:
+If the dropdown item is exposed, select it by its accessible Name.
+Otherwise use a relative click within the expanded menu.
+There is no separate Tab 5 click immediately before these Lung-specific steps,
+because the workflow is already on Tab 5 at that point.
+------------------------------------------------------------
+Recommended architecture
+------------------------------------------------------------
+Replace the three duplicated workflows with one shared function and preset data.
+Conceptual structure:
+GenerateReportMontage(preset)
+Preset fields:
+- layoutTemplate
+- sliceThickness
+- sliceCount
+- imageScale
+- windowPreset
+- optionalPreprocessingSteps
+Suggested preset semantics:
+Body:
+- windowPreset: unchanged
+- sliceThickness: 8.5
+- sliceCount: 8
+- imageScale: 0.8
+Head:
+- windowPreset: unchanged
+- sliceThickness: 4
+- sliceCount: 11
+- imageScale: 1.2
+Lung:
+- windowPreset: lung
+- sliceThickness: 7.5
+- sliceCount: 23
+- imageScale: 0.9
+Implementation principle:
+Use mixed automation step by step:
+- UIA Invoke for exposed buttons.
+- UIA ValuePattern for exposed input fields.
+- Accessible menu-item selection where available.
+- Relative clicks for custom-rendered tab icons and layout thumbnails.
+- Absolute coordinates only as temporary fallback or diagnostic reference.
+Current status:
+Business semantics documented.
+Representative UI behavior documented.
+Detailed UIA validation of all remaining controls deferred to a later dedicated
+diagnostic pass.
+============================================================
+Action: Copy selected report text to image caption and advance
+============================================================
+Action ID:
+copy-report-text-to-image-caption-and-advance
+Category:
+Dual-monitor MedEx report-image annotation workflow
+Hotkey:
+Shift + Alt + S
+Clinical and reporting purpose:
+Attach a selected sentence from the PET/CT report to the currently displayed
+report image as its printed image caption.
+The caption entered below the image is later shown underneath that image in the
+printed PET/CT report.
+Workflow context:
+- The primary monitor contains the report editing interface.
+- Clicking the "报告图像" function opens the saved report-image collection on
+  the secondary monitor.
+- The user selects a sentence in the report before triggering the hotkey.
+- The currently displayed report image on the secondary monitor is the target.
+Current implementation:
++!s::
+{
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &xpos, &ypos
+    SendInput("^c")
+    MouseClick "left", 2821, 1363
+    SendInput("^v")
+    MouseMove 2884, 704
+    SendInput("{WheelDown}")
+    MouseMove xpos, ypos
+}
+Detailed semantics:
+Step 1:
+Remember the original mouse position.
+Current implementation:
+MouseGetPos &xpos, &ypos
+Purpose:
+Allow the workflow to operate on the secondary monitor without leaving the
+user's pointer there afterward.
+Migration decision:
+Retain this behavior.
+Step 2:
+Copy the currently selected report sentence.
+Current implementation:
+SendInput("^c")
+Precondition:
+The required sentence must already be selected in the report editor on the
+primary monitor.
+Purpose:
+Place the selected report description onto the clipboard.
+Risk:
+The operation depends on the report editor still having keyboard focus and a
+valid text selection.
+Step 3:
+Activate the image-caption text field on the secondary monitor.
+Current implementation:
+MouseClick "left", 2821, 1363
+Purpose:
+Focus the text field below the currently displayed image.
+Business meaning:
+This text becomes the image caption printed underneath the corresponding PET/CT
+report image.
+Migration strategy:
+Prefer locating the caption editor through UIA and setting focus directly.
+If the editor supports ValuePattern, consider setting the value explicitly.
+Otherwise focus the editor and paste.
+Step 4:
+Paste the copied report sentence.
+Current implementation:
+SendInput("^v")
+Purpose:
+Insert the selected report text into the image-caption field.
+Migration strategy:
+Retain paste behavior if rich/plain-text behavior is correct.
+Consider explicit text assignment only after confirming that it triggers the
+same MedEx save/update behavior.
+Step 5:
+Move focus out of the caption editor.
+Current implementation:
+MouseMove 2884, 704
+Observed intended behavior:
+Move the pointer to the center area of the displayed image so that the caption
+field can lose focus before advancing.
+Important note:
+The current code contains MouseMove rather than MouseClick at this step.
+The intended workflow description says the image center is clicked to move
+focus out of the text field. This discrepancy should be verified against the
+actual legacy behavior before migration.
+Expected production behavior:
+Explicitly remove focus from the caption editor or invoke the application's
+caption-save/commit behavior.
+Step 6:
+Advance to the next report image.
+Current implementation:
+SendInput("{WheelDown}")
+Purpose:
+Display the next saved report image so the user can repeat the captioning
+workflow.
+Migration strategy:
+First determine whether the image collection exposes:
+- a next-page button;
+- a page index control;
+- a scrollable image container;
+- or only mouse-wheel navigation.
+Prefer an explicit "下一页" or next-image control if it reliably corresponds to
+the report-image collection. Otherwise retain wheel navigation after anchoring
+the pointer over the correct image viewer.
+Step 7:
+Restore the original pointer position.
+Current implementation:
+MouseMove xpos, ypos
+Purpose:
+Return control to the user's original primary-monitor working position.
+Migration decision:
+Retain.
+Current limitations:
+- Uses absolute dual-monitor coordinates.
+- Assumes a fixed monitor arrangement and resolution.
+- Assumes the caption input field remains at a fixed position.
+- Assumes wheel input is routed to the image viewer.
+- Does not validate that Ctrl+C produced non-empty text.
+- Does not verify that the caption was accepted.
+- Overwrites the user's existing clipboard content without restoring it.
+- The code uses MouseMove at the image center, while the intended behavior is
+  described as clicking the image center; this requires confirmation.
+Recommended production architecture:
+1. Capture and preserve ClipboardAll.
+2. Copy the selected report text.
+3. Abort if no usable text is obtained.
+4. Locate the secondary report-image window.
+5. Locate and focus the image-caption editor.
+6. Paste or assign the caption.
+7. Explicitly commit the caption by focus change or supported control action.
+8. Advance to the next report image.
+9. Restore the original mouse position.
+10. Restore the original clipboard in a finally-style cleanup block.
+Safety requirements:
+- Run only when the expected MedEx report and report-image windows are present.
+- Abort rather than clicking if the target caption field cannot be identified.
+- Do not send wheel input until the pointer or focus is confirmed over the image
+  viewer.
+- Preserve the user's original clipboard even if an intermediate step fails.
+Status:
+Business workflow documented.
+UIA survey of the caption field and next-image mechanism remains pending.
+============================================================
+Clarification: Caption commit and image advance behavior
+============================================================
+Related action:
+copy-report-text-to-image-caption-and-advance
+Validated behavior:
+The legacy code intentionally uses MouseMove rather than MouseClick after
+pasting into the image-caption editor.
+Confirmed sequence:
+1. Paste text into the image-caption field.
+2. Move the mouse pointer out of the caption field and over the image area.
+3. Send WheelDown.
+4. The viewer advances to the next report image.
+A click on the image is not required.
+Interpretation:
+- Moving the pointer outside the caption editor is sufficient for routing the
+  subsequent mouse-wheel event to the image viewer.
+- The wheel event then advances to the next image.
+- The previous implementation was intentionally optimized to avoid an
+  unnecessary mouse click.
+Migration requirement:
+Preserve this no-click behavior unless a more explicit and equally reliable
+UIA-based next-image action is validated.
+Do not insert an additional MouseClick merely to imitate focus loss.
+Production options:
+1. Preferred if validated:
+   Invoke a reliable next-image control directly after updating the caption.
+2. Compatible fallback:
+   Move the pointer to a validated point inside the image viewer, send
+   WheelDown, and then restore the original pointer position.
+Open technical question:
+It remains useful to determine whether the caption is committed immediately on
+paste, on pointer exit, or during the subsequent wheel-driven image change.
+This distinction is not required to preserve the existing workflow, but it may
+matter if the workflow is later converted to direct UIA value assignment.
+============================================================
+Action: Capture current viewer image
+============================================================
+Action ID:
+capture-current-viewer-image
+Category:
+MedEx viewer screenshot automation
+Current hotkey:
+Ctrl + Win + Shift + S
+Current implementation:
+^#+s::
+{
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &xpos, &ypos
+    MouseClick "left", 1981, 1350
+    MouseMove xpos, ypos
+}
+Purpose:
+Capture the currently displayed viewer image and add it to the report-image
+collection.
+Usage:
+This action is bound to a mouse shortcut and is used frequently during image
+review.
+Known official application shortcut:
+F12
+Observed behavior:
+- F12 performs the screenshot operation reliably.
+- F12 itself provides no visible or tactile confirmation.
+- The legacy coordinate implementation temporarily moves the mouse to the
+  screenshot button, clicks it, and restores the original pointer position.
+- This pointer movement provides the user with immediate execution feedback.
+Important distinction:
+The pointer movement confirms that the automation was triggered, but does not
+prove that the screenshot was successfully saved.
+Migration decision:
+Prefer the official F12 shortcut as the primary production implementation.
+Recommended implementation:
+1. Send F12.
+2. Provide lightweight, non-focus-stealing feedback.
+3. Optionally validate screenshot success if a reliable observable state can
+   later be identified.
+Suggested feedback:
+- Brief ToolTip near the pointer;
+- short system beep;
+- or another non-modal indicator.
+Do not use:
+- MsgBox;
+- focus-stealing GUI;
+- absolute screen-coordinate clicking as the primary implementation.
+Possible production behavior:
+SendInput("{F12}")
+ToolTip "截图"
+SetTimer () => ToolTip(), -500
+Optional future validation:
+Determine whether screenshot success changes any observable state, such as:
+- report-image count;
+- current image/page index;
+- thumbnail collection;
+- enabled state of report-image controls;
+- application status text.
+If a reliable state change is exposed, use it to distinguish:
+- command triggered;
+- screenshot actually created.
+Current status:
+Business semantics documented.
+Official shortcut confirmed.
+Coordinate click can be retired after F12 behavior is validated in the merged
+script.
+============================================================
+Action family: Activate or clear viewer annotations
+============================================================
+Action IDs:
+- toggle-suv-roi-tool
+- toggle-arrow-annotation-tool
+Category:
+High-frequency MedEx viewer annotation automation
+Input device:
+Two mouse side buttons, exposed to AHK as:
+- Ctrl + Win + Shift + M
+- Ctrl + Win + Shift + A
+Usage priority:
+These are among the most frequently used viewer actions, second only to the
+screenshot command.
+------------------------------------------------------------
+SUV ROI measurement workflow
+------------------------------------------------------------
+Hotkey:
+Ctrl + Win + Shift + M
+Clinical purpose:
+Activate the SUV 3D ROI measurement tool so the user can draw an ROI on the
+image and visually read the automatically displayed SUVmax value.
+User workflow:
+1. Press the mouse side button.
+2. The automation activates the SUV 3D tool.
+3. Draw an ROI on the image.
+4. Read and mentally retain the displayed SUVmax.
+5. Press the same mouse side button again.
+6. The automation switches to the relevant tool tab and clears the SUV
+   measurement annotation.
+Current implementation:
+^#+m::
+{
+    CoordMode "Mouse", "Screen"
+    startTime := A_TickCount
+    timeSinceLastPress := startTime - LastPressSUVTime
+    if (timeSinceLastPress > 3000) {
+        MouseGetPos &xpos, &ypos
+        MouseClick "left", 2471, 826
+        MouseMove xpos, ypos
+    } else {
+        MouseGetPos &xpos, &ypos
+        MouseClick "left", 1963, 627
+        MouseClick "left", 2043, 1113
+        MouseMove xpos, ypos
+    }
+    global LastPressSUVTime := startTime
+    return
+}
+Behavior:
+- If more than 3000 ms have elapsed since the previous press:
+  activate the SUV 3D ROI tool.
+- If pressed again within 3000 ms:
+  switch to the corresponding tool tab and clear the SUV measurement marker.
+Known coordinates:
+- Activate SUV 3D tool: (2471,826)
+- Switch to SUV-related tab before clearing: (1963,627)
+- Clear SUV marker: (2043,1113)
+Reason for time-based branching:
+No reliable state-detection mechanism has yet been identified for determining:
+- whether the SUV tool is currently active;
+- whether an SUV ROI has been drawn;
+- or whether a measurement annotation is present.
+The timing rule is therefore an intentional input-design mechanism used to
+reuse one mouse button for both activation and clearing.
+Do not remove the timing behavior during migration unless an explicit and
+reliable state signal is first validated.
+------------------------------------------------------------
+Arrow annotation workflow
+------------------------------------------------------------
+Hotkey:
+Ctrl + Win + Shift + A
+Clinical purpose:
+Activate the arrow annotation tool, then use the same mouse side button to
+clear the arrow annotation after use.
+Current implementation:
+^#+a::
+{
+    CoordMode "Mouse", "Screen"
+    startTime := A_TickCount
+    timeSinceLastPress := startTime - LastPressArrowTime
+    if (timeSinceLastPress > 1000) {
+        MouseGetPos &xpos, &ypos
+        MouseClick "left", 2470, 651
+        MouseMove xpos, ypos
+    } else {
+        MouseGetPos &xpos, &ypos
+        MouseClick "left", 2079, 626
+        MouseClick "left", 2170, 989
+        MouseMove xpos, ypos
+    }
+    global LastPressArrowTime := startTime
+    return
+}
+Behavior:
+- If more than 1000 ms have elapsed since the previous press:
+  activate the arrow annotation tool.
+- If pressed again within 1000 ms:
+  switch to the corresponding annotation tab and clear the arrow marker.
+Known coordinates:
+- Activate arrow annotation tool: (2470,651)
+- Switch to arrow-related tab before clearing: (2079,626)
+- Clear arrow marker: (2170,989)
+------------------------------------------------------------
+Why the SUV and arrow clear sequences differ
+------------------------------------------------------------
+The SUV and arrow tools have separate clear buttons.
+Although MedEx configuration can apparently bind both clear actions so that
+either clear button removes all annotation types, the current workflow
+deliberately uses the tool-specific clear button for each annotation type.
+For both tools, the clearing branch contains two operations:
+1. Switch to the tab containing the relevant clear control.
+2. Invoke the clear button for that annotation type.
+The extra tab-selection click is therefore required by the current interface
+layout and is not accidental duplication.
+------------------------------------------------------------
+Shared implementation characteristics
+------------------------------------------------------------
+Both workflows:
+- preserve the original mouse position;
+- move to the secondary viewer controls;
+- activate or clear the relevant annotation;
+- restore the pointer position;
+- use timing as a proxy for user intent;
+- are bound to dedicated mouse side buttons;
+- are highly latency-sensitive and should remain fast.
+Migration strategy:
+Evaluate each target individually.
+Preferred order:
+1. Use UIA Invoke for exposed activation and clear buttons.
+2. Use relative tab-strip clicks if the individual tab buttons are not exposed.
+3. Preserve absolute coordinates only as temporary fallback.
+4. Preserve the current mouse-position restoration behavior.
+Recommended architecture:
+Implement one shared timed dual-action helper with per-tool configuration.
+Conceptual structure:
+HandleTimedViewerTool(toolPreset)
+Preset fields:
+- actionId
+- activationTimeoutMs
+- activateControl
+- clearTab
+- clearControl
+Suggested presets:
+SUV:
+- timeoutMs: 3000
+- activate: SUV 3D button
+- clearTab: SUV measurement tab
+- clearControl: SUV-specific clear button
+Arrow:
+- timeoutMs: 1000
+- activate: arrow annotation button
+- clearTab: arrow annotation tab
+- clearControl: arrow-specific clear button
+Important behavior:
+Do not replace the two timeout values with one shared value without testing.
+They encode the user's established operating rhythm:
+- SUV: 3000 ms
+- Arrow: 1000 ms
+Potential future improvement:
+If MedEx exposes a reliable active-tool state or annotation-presence state,
+the timing heuristic could be replaced or supplemented by explicit state
+detection.
+Until then, the timing heuristic should remain the production behavior.
+Status:
+Business semantics documented.
+Buttons are reported as UIA-exposed.
+Detailed properties and Invoke support remain to be collected in a later
+targeted diagnostic pass.
+============================================================
+Action: Generate PET report cover images
+============================================================
+Action ID:
+generate-report-cover-images
+Category:
+MedEx dual-monitor report-image preparation
+Hotkey:
+Ctrl + Win + Shift + C
+Frequency:
+Low frequency.
+Normally used once per patient.
+Operational value:
+Although used only once per patient, this workflow replaces a relatively long
+sequence of manual image-layout, image-selection, initialization, and left/right
+assignment operations.
+Reporting purpose:
+Prepare the two representative images used on the first page of the printed
+PET/CT report.
+Expected printed result:
+- Left image: MIP image
+- Right image: coronal sectional/fusion image
+Current implementation:
+^#+c::
+{
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &xpos, &ypos
+    MouseClick "left", 2129, 404
+    MouseClick "left", 2073, 628
+    MouseClick "left", 2153, 1099
+    MouseClick "left", 2133, 1123
+    MouseClick "left", 3637, 1084
+    MouseClick "left", 1983, 1204
+    MouseClick "left", 2935, 1081
+    MouseClick "left", 2177, 1289
+    MouseClick "left", 2084, 1202
+    MouseMove xpos, ypos
+}
+High-level workflow:
+1. Select the required image-layout mode.
+2. Select the MIP image.
+3. Initialize the MIP image to its default display state.
+4. Assign the MIP image to the left report-image position using the L control.
+5. Select the coronal sectional/fusion image.
+6. Initialize the coronal image to its default display state.
+7. Assign the coronal image to the right report-image position using the R
+   control.
+8. Restore the original mouse position.
+Business semantics:
+The generated pair becomes the first-page image layout in the printed PET/CT
+report.
+Current coordinate sequence:
+- (2129,404)
+- (2073,628)
+- (2153,1099)
+- (2133,1123)
+- (3637,1084)
+- (1983,1204)
+- (2935,1081)
+- (2177,1289)
+- (2084,1202)
+Important:
+The exact semantic mapping of every individual coordinate should remain tied to
+the annotated legacy script. The stable high-level meaning is:
+- select layout;
+- select MIP;
+- initialize MIP;
+- assign MIP to Left;
+- select coronal image;
+- initialize coronal image;
+- assign coronal image to Right.
+Observed UI characteristics:
+- Some controls in this workflow are visually represented as icon buttons.
+- At least some buttons are exposed through UIA as Button controls.
+- Some image-layout or tab-like controls may remain custom-rendered and may
+  require outer-container-relative clicking.
+- The L and R assignment controls should be inspected for accessible Button
+  properties and InvokePattern support.
+- Image selection itself may need image-container-relative clicking if the
+  individual displayed series are not exposed through UIA.
+Migration strategy:
+Use mixed automation:
+1. UIA Invoke for exposed initialization, L, and R buttons.
+2. Relative clicking for custom-rendered layout selectors or image panes.
+3. Preserve absolute coordinates only as temporary fallback.
+4. Restore the original pointer position after completion.
+Recommended architecture:
+Implement this as a named, self-contained workflow rather than merging it into
+the Body/Head/Lung montage preset function.
+Reason:
+- Body/Head/Lung generate standardized final montage images.
+- This action prepares the two first-page report images.
+- The business purpose and sequence are distinct even though both workflows use
+  the same viewer UI.
+Suggested function boundary:
+GenerateReportCoverImages()
+Internal conceptual steps:
+- SelectCoverLayout()
+- SelectMIPImage()
+- ResetSelectedImage()
+- AssignSelectedImage("Left")
+- SelectCoronalImage()
+- ResetSelectedImage()
+- AssignSelectedImage("Right")
+Safety requirements:
+- Run only when the expected viewer layout is present.
+- Validate that the required image panes and assignment controls can be found.
+- Abort rather than clicking if the target layout is ambiguous.
+- Do not silently continue if an initialization or L/R assignment action fails.
+- Preserve and restore the original pointer location.
+Current status:
+Business purpose and workflow documented.
+The annotated legacy script preserves the exact meaning of the individual
+coordinate actions.
+Detailed per-control UIA inspection is deferred.
+============================================================
+Action family: Copy viewer measurement values
+============================================================
+Action IDs:
+- copy-suvmax-value
+- copy-line-measurement-values
+Category:
+MedEx viewer context-menu automation
+Purpose:
+Copy quantitative measurements from the active viewer image into the Windows
+clipboard for later insertion into the PET/CT report.
+Invocation context:
+The user right-clicks inside the image viewer to open the viewer context menu.
+Observed accessible context-menu buttons:
+- 复制SUVMax值
+- 复制直线测量值
+Both controls are exposed as UIA Button elements and should be invoked through
+UIA rather than selected by fixed screen coordinates.
+------------------------------------------------------------
+Action: Copy SUVmax value
+------------------------------------------------------------
+Accessible control:
+Name: 复制SUVMax值
+ControlType: Button
+Observed example with an SUV 3D ROI:
+SUVMax: 2.143
+Observed behavior without an ROI:
+SUVMax: 0.000
+Interpretation:
+The command always writes a formatted SUVMax value to the clipboard.
+The absence of an ROI is represented as zero rather than as an empty result or
+an error.
+Implementation requirement:
+Do not treat successful clipboard output as proof that an ROI exists.
+Validation rule:
+- Parse the expected prefix "SUVMax:".
+- A value of 0.000 should be treated as a valid command response but generally
+  indicates that no meaningful ROI measurement is currently available.
+Recommended production flow:
+1. Preserve the original clipboard.
+2. Clear or mark the clipboard before invocation.
+3. Invoke the Button named "复制SUVMax值".
+4. Wait briefly for clipboard update.
+5. Parse the returned value.
+6. Return a structured result:
+   - commandSucceeded
+   - rawText
+   - numericSUVMax
+   - likelyMeasurementPresent
+7. Restore the original clipboard when appropriate.
+Potential structured interpretation:
+- SUVMax > 0:
+  likely measured ROI value.
+- SUVMax = 0:
+  valid output, but likely no ROI or a zero-valued measurement.
+Do not silently insert SUVMax: 0.000 into the report without explicit workflow
+logic.
+------------------------------------------------------------
+Action: Copy line measurement values
+------------------------------------------------------------
+Accessible control:
+Name: 复制直线测量值
+ControlType: Button
+Observed behavior with no measurement line:
+- No visible paste result.
+- The clipboard does not appear to receive a new measurement string.
+Observed outputs:
+One line:
+2.6cm
+Interpretation:
+- Long axis only.
+Two lines:
+3.0cm×2.6cm (长径×短径)
+Interpretation:
+- First value: long axis
+- Second value: short axis
+Three lines:
+2.6cm×0.9cm×1.2cm (长径×短径×上下径)
+Interpretation:
+- First value: long axis
+- Second value: short axis
+- Third value: craniocaudal dimension
+Four lines:
+6.2cm×1.2cm×0.6cm (长径×短径×上下径)
+Observed rule:
+- The fourth line is ignored.
+- The copied output contains at most three dimensions.
+General output semantics:
+- 0 lines: no clipboard measurement output
+- 1 line: 长径
+- 2 lines: 长径×短径
+- 3 lines: 长径×短径×上下径
+- 4 or more lines: only the first three values are returned
+Important limitation:
+The software does not automatically determine which line is anatomically the
+longest or shortest. The semantic interpretation depends on the order in which
+the user draws the lines.
+User workflow requirement:
+The user should draw measurements in the intended order:
+1. Long axis
+2. Short axis
+3. Craniocaudal dimension
+Implementation requirement:
+Do not sort the returned values numerically unless explicitly requested.
+Preserve the order emitted by MedEx.
+Recommended production flow:
+1. Preserve the original clipboard.
+2. Clear or mark the clipboard before invocation.
+3. Invoke the Button named "复制直线测量值".
+4. Wait for clipboard update.
+5. If no update occurs within the timeout:
+   return NoMeasurement.
+6. Parse one to three values separated by the multiplication sign "×".
+7. Preserve original order.
+8. Return a structured result:
+   - dimensionCount
+   - longAxis
+   - shortAxis
+   - craniocaudalAxis
+   - rawText
+9. Restore the original clipboard when appropriate.
+Parser examples:
+Input:
+2.6cm
+Result:
+- dimensionCount: 1
+- longAxis: 2.6 cm
+Input:
+3.0cm×2.6cm
+Result:
+- dimensionCount: 2
+- longAxis: 3.0 cm
+- shortAxis: 2.6 cm
+Input:
+2.6cm×0.9cm×1.2cm
+Result:
+- dimensionCount: 3
+- longAxis: 2.6 cm
+- shortAxis: 0.9 cm
+- craniocaudalAxis: 1.2 cm
+------------------------------------------------------------
+Recommended architecture
+------------------------------------------------------------
+Create one context-menu measurement module with two independent actions:
+CopySUVMax()
+CopyLineMeasurements()
+Shared responsibilities:
+- confirm the expected MedEx viewer context menu is open;
+- locate the intended Button by exact accessible Name;
+- invoke the control;
+- detect clipboard change;
+- parse the result;
+- preserve or restore the original clipboard;
+- return explicit success, empty, or invalid-result states.
+Do not combine SUV and line-measurement parsing into one generic untyped string
+handler.
+Status:
+Business behavior fully documented.
+Accessible control names confirmed.
+Clipboard output rules validated in the production environment.

@@ -1,0 +1,61 @@
+﻿MedEx Legacy Automation Survey
+Date: 2026-07-13
+Purpose:
+Inventory the unmerged legacy AHK functions and decide whether each function
+should be retained directly, migrated to UIA, replaced by relative positioning,
+or kept as coordinate/image-based automation.
+Classification:
+1. Direct retain
+   Pure keyboard or text behavior with no UI dependency.
+2. UIA migration candidate
+   A visible control or menu item may support Invoke, Select, Toggle, or Value.
+3. Relative-position fallback
+   Container or anchor elements are visible, but the target control itself is not.
+4. Coordinate/image fallback
+   No reliable accessibility element is exposed.
+Current entries:
+- global-hhkb-navigation
+  Status: Ready for direct merge
+  Notes: Global HHKB Vim-style arrow-key remapping
+- generate-fixed-report-montage
+  Status: Business flow documented; partial UI survey complete
+  Presets: Body, Head, Lung
+  Strategy: Parameterized shared workflow with mixed UIA and relative clicking
+  Important Lung behavior: Explicitly restore lung window because thin-slice
+  lung CT may previously be displayed in bone window
+- copy-report-text-to-image-caption-and-advance
+  Status: Business flow documented; UI inspection pending
+  Purpose: Copy selected report sentence into current report-image caption,
+  commit it, advance to the next image, and restore the original pointer
+  Main migration targets: caption editor, image focus/commit behavior, next-page
+  control, clipboard preservation
+- capture-current-viewer-image
+  Status: Official F12 shortcut confirmed; ready for direct migration
+  Purpose: Capture the current viewer image into the report-image collection
+  Strategy: Use F12 with lightweight execution feedback; optional future
+  validation of image-count or page-index change
+- toggle-suv-roi-tool
+  Status: Business flow documented; button UIA details pending
+  Purpose: First press activates SUV 3D ROI measurement; second press within
+  3000 ms switches tab and clears the SUV measurement
+  Strategy: Preserve timing heuristic, migrate exposed buttons to UIA Invoke
+- toggle-arrow-annotation-tool
+  Status: Business flow documented; button UIA details pending
+  Purpose: First press activates arrow annotation; second press within
+  1000 ms switches tab and clears the arrow marker
+  Strategy: Preserve timing heuristic, migrate exposed buttons to UIA Invoke
+- generate-report-cover-images
+  Status: Business flow documented; per-control UIA inspection deferred
+  Purpose: Prepare the first-page PET/CT report images, with MIP assigned to the
+  left position and coronal sectional/fusion image assigned to the right
+  Strategy: Separate workflow using UIA Invoke for exposed controls and relative
+  selection for custom-rendered image panes or layout selectors
+- copy-suvmax-value
+  Status: UIA control and clipboard behavior validated
+  Purpose: Copy formatted SUVMax value from the active viewer
+  Important rule: No ROI still returns "SUVMax: 0.000"
+- copy-line-measurement-values
+  Status: UIA control and clipboard behavior validated
+  Purpose: Copy one to three ordered line measurements
+  Important rules: No line produces no usable clipboard output; fourth and
+  subsequent lines are ignored; value order is 长径×短径×上下径

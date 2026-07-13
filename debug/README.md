@@ -4,7 +4,7 @@
 
 ## UIA 依赖
 
-本实现选择 Descolada UIA-v2 v1.1.3。下载该版本后，最直接的 field-debug 目录结构是：
+本实现 pin Descolada UIA-v2 v1.1.3。仓库已包含该版本，field-debug 目录结构是：
 
 ```text
 debug\
@@ -13,7 +13,7 @@ debug\
     └── UIA.ahk
 ```
 
-这样 AutoHotkey v2 可以通过 `<UIA>` 找到依赖。也可以使用已验证的 standard AutoHotkey user library path，但不要同时 include 两份不同版本。
+这样 AutoHotkey v2 可以通过 `<UIA>` 找到 repository-pinned dependency。目标工作站无需系统级安装 UIA-v2，也不要同时 include 另一份 global library。
 
 - Repository: `https://github.com/Descolada/UIA-v2`
 - Pinned release: `v1.1.3`
@@ -32,7 +32,7 @@ COLOR_RESET_UIA_UNAVAILABLE
 Ctrl+Alt+F12
 ```
 
-脚本自动把完整结果复制到 clipboard，并默认追加写入：
+脚本不会显示 MsgBox、ToolTip 或 TrayTip。它自动把完整结果复制到 clipboard，并默认追加写入：
 
 ```text
 %TEMP%\MedExAHK\medex_color_reset_field_debug.txt
@@ -45,6 +45,8 @@ Ctrl+Alt+F12
 ```
 
 两者都不得包含 patient information、report text、clipboard text 或 pasted phrase。
+
+`AUTOMATION_CHAIN_OK` 只表示 candidate selection、menu click、black-item lookup 和 Invoke 自动化链路完成。输出仍为 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`；只有操作者随后输入无害字符并确认黑色，才能单独记录最终视觉验证成功。
 
 ## 可调 field-test overrides
 

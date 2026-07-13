@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### M1 — Color Reset V1 Mac-side implementation
+
+- Replaced first-match anchor lookup with foreground-window-root enumeration of all `16px` and `①` elements.
+- Added unique one-to-one toolbar pairing, geometry validation, stable center-Y sorting, and V1 selection of candidate index 2 without requiring exactly three candidates.
+- Added fail-closed results for missing second candidate, pairing ambiguity, and sorting ambiguity.
+- Revalidated foreground hwnd and process before trigger click and before black-item Invoke.
+- Changed automated completion to `AUTOMATION_CHAIN_OK` with `FINAL_COLOR_PENDING_VISUAL_VALIDATION`; Invoke success no longer claims final insertion-color success.
+- Added explicit candidate, selected rectangles, click, Invoke, process-confirmation, pinned UIA metadata, and manual-validation diagnostic fields.
+- Removed all field-debug startup/completion UI; validation output is clipboard and log/file only.
+- Expanded platform-independent color-reset tests. Windows workstation visual validation remains required.
+- Did not modify legacy behavior or begin M2.
+
+### M0 — 2026-07-13 现场证据固化
+
+- 固化 Windows 工作站 color-reset 与 legacy automation survey 证据，并保留原始 debug artifacts 不变。
+- 确认现有自动化链路打开了错误的第一组 toolbar；既有 `COLOR_RESET_OK` 不能代表目标编辑器最终颜色已恢复。
+- 将 V1 修订为从 foreground MedEx root/报告区域父容器枚举唯一 anchor pairs，至少两个候选并选择 Y 排序后的第二个。
+- 明确 automation chain success 与人工 `FinalInsertionColorVisuallyValidated` 是两个不同结果。
+- 记录 field debug 默认只写 clipboard/log，禁止 focus-stealing completion feedback。
+- 更新首次有限内测门槛：M3/M4 可由稳定 compatibility 暂时承接，不必自动阻塞首个内测。
+- 本次只更新文档；未修复 Color Reset V1、未修改 legacy、未开始 configuration 或 packaging。
+
 ### v0.5.0 规划基础
 
 - 新增正式的 MedEx 富文本颜色复位 Technical Investigation。
@@ -28,7 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added report-editor orchestration that reports paste/reset partial failure without deleting pasted text.
 - Added minimal privacy-safe development logging under `%TEMP%\MedExAHK\`.
 - Added a Ctrl+Alt+F12 Windows field-debug script with clipboard result export and editable debug overrides.
-- Added platform-independent color-reset reference tests; Windows UIA runtime remains unverified.
+- Added platform-independent color-reset reference tests; at implementation time Windows UIA runtime was unverified. The later 2026-07-13 field evidence now establishes partial automation-chain validation only.
 - Did not implement configuration runtime, measurement capture, packaging, or additional legacy migration.
 
 ### v0.4.2

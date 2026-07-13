@@ -2,7 +2,7 @@
 
 更新日期：2026-07-13
 
-本清单依据 `legacy/karabiner.ahk`、`legacy/string_change.ahk`、`src/*.ahk`、`release/report_assistant.ahk` 和 `scripts/build_release.py` 的实际实现与调用路径编写。名称相似不代表功能等价；无法从源码确认的日常依赖标记为“需用户确认”。
+本清单依据原始 legacy scripts、新项目源码以及 `debug/legacy-automation-survey-2026-07-13/` 的现场记录编写。名称相似不代表功能等价；业务语义已由现场记录确认时单独注明，实现可靠性仍需逐项验证。
 
 ## 状态定义
 
@@ -22,16 +22,17 @@
 | 尺寸模板：`;cmx` | `legacy/string_change.ahk:43-48`；`cm×cm` + Left 2 | `src/hotstrings.ahk:25-29`；`cm×cm` + Left 2 | 已迁移（源码行为一致；仍需目标环境回归） | 高 | 同名热字符串直接冲突 | 共存时禁用 legacy 版本，只保留新实现 | v0.5.0 |
 | Legacy clipboard snapshot 载入 | `legacy/string_change.ahk:51-67`，读取 `D:\AutoHotKey\red_not.clip` | `src/clipboard_html.ahk` 动态构造 `CF_HTML` | 已被替代，但现场等价性未完全验证 | 旧流程可能依赖 | 同时运行会争用系统剪贴板；legacy 恢复紧接 `Send("^v")`，没有显式 paste completion wait | v0.5.0 验证后不纳入兼容脚本；原文件继续保留作参考 | v0.5.0 |
 | 保存 `red_not.clip`：Shift+Alt+R | `legacy/karabiner.ahk:198-204` | 无；新项目不需要 snapshot | 不迁移，目标架构已弃用 | 仅旧红字流程需要 | 固定路径删除/覆盖；与新 clipboard transaction 并行时可能保存临时 payload | 不放入目标兼容脚本；在新 color reset 验证前，不删除用户现有旧流程 | v0.5.0 后退役 |
-| RAlt+H/J/K/L 方向移动 | `legacy/karabiner.ahk:3-6` | 无 | 未迁移 | 需用户确认，可能是高频键盘习惯 | 无新项目同键冲突；全局生效，可能影响其他应用和 bare RAlt 组合 | 兼容脚本保留；未来决定是否纳入用户可配置 hotkeys | Later |
-| XButton1 提示 | `legacy/karabiner.ahk:34-38` | 无 | 未迁移 | 需用户确认 | 全局 pass-through hotkey；会在任意应用显示 Tooltip | 兼容脚本暂时保留，用户确认无依赖后可删除 | v0.5.x review |
-| Shift+Alt+B 固定参数标注流程 | `legacy/karabiner.ahk:40-62` | `src/viewer_actions.ahk` 只有 placeholder | 未迁移 | 需用户确认；疑似日常阅片流程 | 无同键冲突；固定 screen coordinates、无 window guard、无 mouse restore；错误窗口会 blind click 并输入 `8.5`、`8`、`0.8` | 兼容脚本原样保留行为并显著标注风险；后续逐动作校准和加窗口保护 | v0.5.x 或 later |
-| Shift+Alt+H 固定参数标注流程 | `legacy/karabiner.ahk:64-86` | placeholder only | 未迁移 | 需用户确认 | 同上；输入 `4`、`11`、`1.2` | 同上，不在本次改变数值或点击顺序 | v0.5.x 或 later |
-| Shift+Alt+L 固定参数标注流程 | `legacy/karabiner.ahk:88-112` | placeholder only | 未迁移 | 需用户确认 | 同上；输入 `7.5`、`23`、`0.9` | 同上，不在本次改变数值或点击顺序 | v0.5.x 或 later |
-| Shift+Alt+S 快速标图 | `legacy/karabiner.ahk:114-124`；Ctrl+C → 固定输入框 → Ctrl+V → WheelDown | 无 | 未迁移 | 需用户确认 | 使用系统剪贴板但不保存/恢复；与新 CF_HTML transaction 同时触发会互相覆盖或粘贴错误内容 | 兼容脚本保留；文档要求不得与报告热字符串同时触发；后续加入 clipboard mutex/transaction | v0.5.x |
-| Ctrl+Win+Shift+S 截图按钮 | `legacy/karabiner.ahk:126-132` | 无 | 未迁移 | 需用户确认 | 固定 screen coordinate、无 window guard | 兼容脚本保留；后续加窗口/布局校验 | Later |
-| Ctrl+Win+Shift+M SUV 测量/清除 | `legacy/karabiner.ahk:134-156` | 无；测量读取仅有未来设计文档 | 未迁移 | 需用户确认 | 全局状态 `LastPressSUVTime`；3 秒内再次触发会走“清除”分支；固定坐标、无窗口校验 | 兼容脚本保留现有交互；不得误称为自动 SUVmax retrieval | v0.6.0 重新设计 |
-| Ctrl+Win+Shift+A 箭头/清除 | `legacy/karabiner.ahk:158-180` | 无 | 未迁移 | 需用户确认 | 全局状态 `LastPressArrowTime`；1 秒内再次触发会走“清除”分支；固定坐标、无窗口校验 | 兼容脚本保留；未来迁移必须保留或明确变更双击时序语义 | Later |
-| Ctrl+Win+Shift+C 封面图流程 | `legacy/karabiner.ahk:182-196` | 无 | 未迁移 | 需用户确认 | 多个固定坐标、无 window guard；中途失败仍继续后续点击 | 兼容脚本保留；未来拆分、校验和 fail-closed | Later |
+| RAlt+H/J/K/L 方向移动 | `legacy/karabiner.ahk:3-6` | 无 | 未迁移 | 高；已确认是全局 HHKB navigation | 无新项目同键冲突；全局生效 | compatibility 保留；M2 迁入独立 navigation module，不加 MedEx `#HotIf` | v0.5.0 M2 |
+| Shift+Alt+B Body montage | `legacy/karabiner.ahk:40-62` | `src/viewer_actions.ahk` 只有 placeholder | 未迁移 | 高；参数已确认 | 固定 screen coordinates、无 window guard、无 mouse restore | compatibility 暂留；未来参数化，Body=`8.5/8/0.8` | M4 |
+| Shift+Alt+H Head montage | `legacy/karabiner.ahk:64-86` | placeholder only | 未迁移 | 高；参数已确认 | 同上 | compatibility 暂留；Head=`4/11/1.2` | M4 |
+| Shift+Alt+L Lung montage | `legacy/karabiner.ahk:88-112` | placeholder only | 未迁移 | 高；参数及 lung-window reset 已确认 | 同上；遗漏 window reset 会改变报告图表现 | compatibility 暂留；Lung=`7.5/23/0.9` 并显式恢复 lung window | M4 |
+| Shift+Alt+S caption + advance | `legacy/karabiner.ahk:114-124`；Ctrl+C → caption → Ctrl+V → MouseMove → WheelDown | 无 | 未迁移 | 高；无需额外 click 已确认 | 不保存/恢复剪贴板；可能与 CF_HTML transaction 冲突 | compatibility 保留；迁移时验证 empty copy、commit semantics、WheelDown equivalence 和 mouse restore | M4 |
+| Viewer screenshot | `legacy/karabiner.ahk:126-132` | 无 | 未迁移 | 高频；官方 F12 已确认可靠 | command sent 不等于截图成功 | compatibility 保留；M3 使用 F12，反馈只能表示 command sent | M3 |
+| Ctrl+Win+Shift+M SUV activate/clear | `legacy/karabiner.ahk:134-156` | 无 | 未迁移 | 高频；3000 ms repeat semantics 已确认 | local timing state 可与应用状态失同步 | compatibility 保留；M3 保留 distinct tab/clear control，失败、超时、window/process change 时清 state | M3 |
+| Ctrl+Win+Shift+A Arrow activate/clear | `legacy/karabiner.ahk:158-180` | 无 | 未迁移 | 高频；1000 ms repeat semantics 已确认 | 同上 | compatibility 保留；不得与 SUV clear control 合并 | M3 |
+| Ctrl+Win+Shift+C cover images | `legacy/karabiner.ahk:182-196` | 无 | 未迁移 | 高价值；左 MIP/右 coronal sectional/fusion 已确认 | 多个固定坐标、无 window guard；中途失败仍继续 | compatibility 保留；保持独立于 montage，M4 逐步校验并 fail closed | M4 |
+| Copy SUVMax | 现场 context menu Name=`复制SUVMax值` | 仅调查文档 | 未迁移 | 计划功能 | `SUVMax: 0.000` 仍会更新 clipboard，不能当作 meaningful ROI | M3 使用 named Button/Invoke 和 sentinel；区分 zero value 与 automation failure | M3 |
+| Copy line measurements | 现场 context menu Name=`复制直线测量值` | 仅调查文档 | 未迁移 | 计划功能 | no-line 可能不更新 clipboard；第四条及以后忽略 | M3 保持创建顺序，区分 no update、valid、unexpected 和 invoke failure | M3 |
 | 紧急暂停/恢复 | 无 | `src/main.ahk:14-23`，Ctrl+Alt+Esc，`#SuspendExempt` | 新项目新增 | 高 | legacy 脚本是独立进程；暂停新项目不会暂停 legacy compatibility | 共存文档明确两个进程的边界；兼容脚本暂不新增冲突热键 | v0.5.0 |
 | 紧急退出 | 无 | `src/main.ahk:25-28`，Ctrl+Alt+Q | 新项目新增 | 高 | 只退出新项目，不会退出 legacy compatibility | 用户文档必须说明需从 tray 单独退出兼容脚本 | v0.5.0 |
 | 窗口校验 | legacy 坐标动作无校验 | `src/window_guard.ahk` 可激活配置的进程，但当前 viewer placeholder 未调用实际动作 | 部分基础设施 | 高 | legacy 可在错误窗口 blind click；新旧并行不会共享 guard | compatibility 暂保留但标红风险；迁移每个动作时加入专用 guard | v0.5.x |
@@ -57,6 +58,8 @@
 ```
 
 当前新项目 hotkeys `Ctrl+Alt+Esc` 和 `Ctrl+Alt+Q` 与 `legacy/karabiner.ahk` 中的 active hotkeys 没有字面冲突。
+
+Legacy 中的 XButton1 notification 是历史测试项，不属于正式功能、用户依赖或迁移范围。除非后续发现它与实际 hotkey 注册冲突，否则不建立模块、测试或迁移任务。
 
 ### 行为差异，不得静默处理
 

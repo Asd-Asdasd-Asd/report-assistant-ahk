@@ -27,13 +27,23 @@ ResetMedExInsertionColor(options := 0) {
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "foregroundProcess", "UNKNOWN",
         "foregroundWindowHandle", "UNKNOWN",
+        "provisionalProcessCandidateAccepted", false,
         "processNameConfirmed", false,
+        "toolbarCandidateCount", 0,
+        "toolbarCandidateSelected", false,
+        "selectedToolbarIndex", 0,
+        "colorMenuClickSent", false,
         "blackColorFound", false,
+        "blackItemFound", false,
         "invokeAvailable", false,
         "invokeSucceeded", false,
+        "blackItemInvokeSucceeded", false,
+        "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED",
+        "finalInsertionColorVisuallyValidated", false,
         "retryCount", 0,
         "uiaLibrary", "UIA-v2",
-        "uiaLibraryVersion", MedExAdapterOption(options, "uiaLibraryVersion", "UNKNOWN")
+        "uiaLibraryVersionPinned", MedExAdapterOption(options, "uiaLibraryVersionPinned", "UNKNOWN"),
+        "uiaLibraryVersionRuntime", "UNKNOWN"
     )
 
     try {
@@ -61,6 +71,7 @@ ResetMedExInsertionColor(options := 0) {
             context["processReason"] := "notInProvisionalCandidateList"
             return FinishMedExColorReset(false, ColorResetCode.WRONG_PROCESS, context, startedAt, options)
         }
+        context["provisionalProcessCandidateAccepted"] := true
 
         confirmedProcessName := MedExAdapterOption(
             options,
@@ -103,25 +114,19 @@ ResetMedExInsertionColor(options := 0) {
             return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
         }
 
-        documentElement := FindMedExDocument(windowElement, foregroundHwnd)
-        if !documentElement {
-            context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
-            return FinishMedExColorReset(false, ColorResetCode.DOCUMENT_NOT_FOUND, context, startedAt, options)
-        }
-
-        try context["documentRect"] := UiaRectangleToMap(documentElement.BoundingRectangle)
+        try context["uiaRootRect"] := UiaRectangleToMap(windowElement.BoundingRectangle)
         catch as err {
             AddSafeExceptionContext(context, err)
-            context["invalidRectangle"] := "documentRect"
+            context["invalidRectangle"] := "uiaRootRect"
             return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
         }
 
-        try fontSizeElement := documentElement.ElementExist({Name: "16px"})
+        try fontSizeElements := windowElement.FindElements({Name: "16px"})
         catch as err {
             AddSafeExceptionContext(context, err)
-            fontSizeElement := 0
+            fontSizeElements := []
         }
-        if !fontSizeElement {
+        if fontSizeElements.Length = 0 {
             context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
             return FinishMedExColorReset(
                 false,
@@ -132,12 +137,12 @@ ResetMedExInsertionColor(options := 0) {
             )
         }
 
-        try numberButtonElement := documentElement.ElementExist({Name: "①"})
+        try numberButtonElements := windowElement.FindElements({Name: "①"})
         catch as err {
             AddSafeExceptionContext(context, err)
-            numberButtonElement := 0
+            numberButtonElements := []
         }
-        if !numberButtonElement {
+        if numberButtonElements.Length = 0 {
             context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
             return FinishMedExColorReset(
                 false,
@@ -149,13 +154,15 @@ ResetMedExInsertionColor(options := 0) {
         }
 
         try {
-            context["fontSizeRect"] := UiaRectangleToMap(fontSizeElement.BoundingRectangle)
-            context["numberButtonRect"] := UiaRectangleToMap(numberButtonElement.BoundingRectangle)
+            fontSizeRects := UiaElementsToRectangles(fontSizeElements)
+            numberButtonRects := UiaElementsToRectangles(numberButtonElements)
         } catch as err {
             AddSafeExceptionContext(context, err)
             context["invalidRectangle"] := "anchorRect"
             return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
         }
+        context["fontSizeAnchorRects"] := fontSizeRects
+        context["numberButtonAnchorRects"] := numberButtonRects
         context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
 
         windowRect := GetWindowRectMap(foregroundHwnd)
@@ -195,20 +202,43 @@ ResetMedExInsertionColor(options := 0) {
                 MedExColorResetDefaults.ToolbarPadding
             )
         )
-        geometryResult := ValidateMedExColorResetGeometry(
-            context["documentRect"],
-            context["fontSizeRect"],
-            context["numberButtonRect"],
+        candidateResult := BuildMedExToolbarCandidates(fontSizeRects, numberButtonRects, geometryOptions)
+        MergeContext(context, candidateResult.context)
+        if !candidateResult.ok
+            return FinishMedExColorReset(false, candidateResult.code, context, startedAt, options)
+
+        ; Every accepted pair must share the validated root/window/client coordinate space.
+        for candidate in context["toolbarCandidates"] {
+            candidateGeometry := ValidateMedExColorResetGeometry(
+                context["uiaRootRect"],
+                candidate["fontSizeRect"],
+                candidate["numberButtonRect"],
+                windowRect,
+                clientRectScreen,
+                geometryOptions
+            )
+            if !candidateGeometry.ok {
+                MergeContext(context, candidateGeometry.context)
+                context["candidateGeometryToolbarY"] := candidate["toolbarY"]
+                return FinishMedExColorReset(false, candidateGeometry.code, context, startedAt, options)
+            }
+        }
+
+        selectedGeometry := ValidateMedExColorResetGeometry(
+            context["uiaRootRect"],
+            context["selectedFontSizeRect"],
+            context["selectedNumberButtonRect"],
             windowRect,
             clientRectScreen,
             geometryOptions
         )
-        MergeContext(context, geometryResult.context)
-        if !geometryResult.ok
-            return FinishMedExColorReset(false, geometryResult.code, context, startedAt, options)
+        MergeContext(context, selectedGeometry.context)
+        if !selectedGeometry.ok
+            return FinishMedExColorReset(false, selectedGeometry.code, context, startedAt, options)
 
         interactionResult := RunMedExColorMenuInteraction(
             foregroundHwnd,
+            foregroundProcess,
             windowElement,
             context["calculatedScreenPoint"],
             context,
@@ -227,7 +257,7 @@ ResetMedExInsertionColor(options := 0) {
     }
 }
 
-RunMedExColorMenuInteraction(foregroundHwnd, windowElement, screenPoint, context, options) {
+RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, screenPoint, context, options) {
     menuTimeoutMs := MedExAdapterOption(
         options,
         "menuOpenTimeoutMs",
@@ -256,7 +286,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, windowElement, screenPoint, context
         loop maxAttempts {
             attempt := A_Index
             context["retryCount"] := attempt - 1
-            if WinExist("A") != foregroundHwnd {
+            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
                 context["processReason"] := "foregroundWindowChangedBeforeTriggerClick"
                 return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
             }
@@ -264,6 +294,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, windowElement, screenPoint, context
             try {
                 Click screenPoint["x"], screenPoint["y"]
                 context["triggerClickCount"] := attempt
+                context["colorMenuClickSent"] := true
             } catch as err {
                 AddSafeExceptionContext(context, err)
                 return MakeColorResetResult(false, ColorResetCode.TRIGGER_CLICK_FAILED, context)
@@ -286,7 +317,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, windowElement, screenPoint, context
             if menuOpened
                 break
 
-            if attempt < maxAttempts && WinExist("A") != foregroundHwnd {
+            if attempt < maxAttempts && !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
                 context["processReason"] := "foregroundWindowChangedBeforeRetry"
                 return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
             }
@@ -299,6 +330,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, windowElement, screenPoint, context
             return MakeColorResetResult(false, ColorResetCode.BLACK_ITEM_NOT_FOUND, context)
 
         context["blackColorFound"] := true
+        context["blackItemFound"] := true
         try context["invokeAvailable"] := blackItem.IsInvokePatternAvailable = true
         catch as err {
             AddSafeExceptionContext(context, err)
@@ -307,7 +339,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, windowElement, screenPoint, context
         if !context["invokeAvailable"]
             return MakeColorResetResult(false, ColorResetCode.INVOKE_UNAVAILABLE, context)
 
-        if WinExist("A") != foregroundHwnd {
+        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
             context["processReason"] := "foregroundWindowChangedBeforeInvoke"
             return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
         }
@@ -315,12 +347,14 @@ RunMedExColorMenuInteraction(foregroundHwnd, windowElement, screenPoint, context
         try {
             blackItem.InvokePattern.Invoke()
             context["invokeSucceeded"] := true
+            context["blackItemInvokeSucceeded"] := true
+            context["automationChainResult"] := "AUTOMATION_CHAIN_OK"
         } catch as err {
             AddSafeExceptionContext(context, err)
             return MakeColorResetResult(false, ColorResetCode.INVOKE_FAILED, context)
         }
 
-        return MakeColorResetResult(true, ColorResetCode.OK, context)
+        return MakeColorResetResult(true, ColorResetCode.AUTOMATION_CHAIN_OK, context)
     } finally {
         if mouseCaptured
             MouseMove originalMouseX, originalMouseY, 0
@@ -413,6 +447,22 @@ MedExProcessNameIsApproved(processName, candidates) {
             return true
     }
     return false
+}
+
+MedExForegroundTargetMatches(expectedHwnd, expectedProcess) {
+    if WinExist("A") != expectedHwnd
+        return false
+    try currentProcess := WinGetProcessName("ahk_id " expectedHwnd)
+    catch
+        return false
+    return StrLower(currentProcess) = StrLower(expectedProcess)
+}
+
+UiaElementsToRectangles(elements) {
+    rectangles := []
+    for element in elements
+        rectangles.Push(UiaRectangleToMap(element.BoundingRectangle))
+    return rectangles
 }
 
 UiaRectangleToMap(rectangle) {

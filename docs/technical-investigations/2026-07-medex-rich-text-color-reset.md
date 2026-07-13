@@ -142,6 +142,16 @@ accessibility tree 为以下 anchors 暴露了可靠矩形：
 
 这说明即使 pointer hit testing 失败，UIA `BoundingRectangle` 数据仍然可用。
 
+2026-07-13 工作站现场测试进一步确认同一页面至少有三组同构 toolbar：
+
+| Toolbar | `16px` | `①` |
+| --- | --- | --- |
+| 病史信息 | `[502,112,529,126]` | `[953,111,967,127]` |
+| 检查所见 | `[502,290,529,304]` | `[953,289,967,305]` |
+| 检查结论 | `[502,735,529,749]` | `[953,734,967,750]` |
+
+Field debug 取到了第一组并计算 `(672,113)`，但操作者聚焦的是检查所见。黑色 item 查找与 Invoke 成功，因此证实了 automation mechanism，却没有证实目标 editor 的最终 insertion color。
+
 ## Color arrow positioning
 
 Window Spy 观察到的 client coordinates：
@@ -184,22 +194,24 @@ PasteRedFigureText()
 
 `ResetMedExInsertionColor()` 内部流程：
 
-1. 验证前台进程是 `medexworkstations.exe`。
-2. 使用 UIA 定位 `16px`。
-3. 使用 UIA 定位 `①`。
-4. 校验两个矩形及其相对几何关系。
-5. 使用 anchor rectangles 和比例公式计算颜色箭头位置。
-6. 点击计算得到的 trigger position。
-7. 等待颜色菜单出现。
-8. 查找 Name 为 `000000` 的 `Hyperlink`。
-9. 调用该元素的 `Invoke()`。
-10. 返回结构化成功或失败结果。
+1. 验证前台进程属于明确允许的 MedEx process candidates。
+2. 从 foreground MedEx window root，或经证据确认的报告区域父容器，分别枚举全部 `16px` 与 `①`；不得假设 toolbar anchors 是 focused `Document` 的 descendants。
+3. 按 vertical alignment、horizontal order 和 plausible gap 形成唯一 toolbar pairs。
+4. 要求至少两个唯一有效候选，按 Y 排序后选择第二个候选。
+5. 校验 rectangles、pairing、排序、relative geometry 和 coordinate space。
+6. 使用选中 pair 和比例公式计算颜色箭头位置。
+7. 点击计算得到的 trigger position并等待颜色菜单。
+8. 查找 Name 为 `000000` 的 `Hyperlink`，确认 InvokePattern 后调用 `Invoke()`。
+9. 返回 automation chain 的结构化结果；最终 insertion color 等待人工视觉验证。
+
+V2 才使用 focused editable `DocumentRect`，选择其最近上方的唯一 toolbar。V1 不提前依赖该关系。
 
 失败行为必须 fail-closed：
 
 - 前台进程错误时立即返回；
-- 任一 anchor 缺失时立即返回；
-- 几何关系无效时立即返回；
+- 第二候选缺失时立即返回；
+- 一个 anchor 可与多个 anchor 配对、候选 Y 无法稳定排序时立即返回；
+- rectangle、geometry 或 coordinate space 无效时立即返回；
 - 菜单未出现时停止；
 - 未找到 `000000` 时停止；
 - 绝不在校验失败后继续 blind clicks。
@@ -210,13 +222,16 @@ PasteRedFigureText()
 
 | Result code | Meaning |
 | --- | --- |
-| `COLOR_RESET_OK` | 黑色项目已成功 Invoke |
+| `COLOR_RESET_OK` | 现有兼容 code：黑色项目 Invoke 未抛错；不得解释为最终颜色已验证 |
 | `COLOR_RESET_WRONG_PROCESS` | 前台进程不是目标 MedEx 进程 |
 | `COLOR_RESET_PROCESS_NAME_UNCONFIRMED` | 命中 provisional candidate，但 target workstation 尚未确认 production process name |
 | `COLOR_RESET_UIA_UNAVAILABLE` | UIA-v2 未安装或无法初始化 |
 | `COLOR_RESET_DOCUMENT_NOT_FOUND` | foreground MedEx window 内未找到 report `Document` |
 | `COLOR_RESET_ANCHOR_FONT_SIZE_NOT_FOUND` | 未找到 `16px` anchor |
 | `COLOR_RESET_ANCHOR_NUMBER_BUTTON_NOT_FOUND` | 未找到 `①` anchor |
+| `COLOR_RESET_TOOLBAR_CANDIDATE_NOT_FOUND` | 唯一有效 toolbar candidates 少于两个，无法选择 V1 index 2 |
+| `COLOR_RESET_TOOLBAR_PAIRING_AMBIGUOUS` | 至少一个 anchor 可参与多个 plausible pairs |
+| `COLOR_RESET_TOOLBAR_SORT_AMBIGUOUS` | candidates 的 toolbar center Y 无法形成稳定唯一顺序 |
 | `COLOR_RESET_INVALID_RECTANGLE` | UIA/window rectangle 非有限数值或没有正 width/height |
 | `COLOR_RESET_INVALID_GEOMETRY` | anchor 矩形或相对位置无效 |
 | `COLOR_RESET_INVALID_COORDINATE_SPACE` | UIA screen coordinates 与 foreground window/client coordinate space 不一致 |
@@ -230,6 +245,10 @@ PasteRedFigureText()
 日志可包含：timestamp、action name、result code、executable/process name、anchor rectangles、calculated click coordinates、elapsed timing、retry count，以及在可安全检测时记录的 MedEx version。
 
 日志不得包含患者信息、报告文字或剪贴板内容。
+
+现场诊断必须分别记录：`ToolbarCandidateSelected`、`ColorMenuClickSent`、`BlackItemFound`、`BlackItemInvokeSucceeded` 和 `FinalInsertionColorVisuallyValidated`。
+
+自动化可报告 `AUTOMATION_CHAIN_OK`，同时保持 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。最后一项只能由 Windows 操作者在 approved non-clinical context 输入无害字符后确认，不能由 `Invoke()` 自动推导。Field debug 禁止 `MsgBox`；默认只写 clipboard/log，其他提示只有在现场确认不改变焦点和颜色状态后才允许启用。
 
 ## Architecture boundary
 
@@ -268,4 +287,4 @@ executeJavaScript()
 - Known limitation: The color dropdown trigger itself is not exposed as a usable UIA element.
 - Future replacement candidate: Direct editor command through Electron renderer, IPC, or the embedded editor API.
 
-Status: Investigation complete; V1 implementation approved.
+Status: Investigation complete; revised V1 implemented on the development machine, final insertion color pending workstation visual validation.

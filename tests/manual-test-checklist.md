@@ -56,7 +56,7 @@
 
 ### Field-debug 准备与执行
 
-Prerequisite：[ ] AutoHotkey v2 和 pinned UIA-v2 v1.1.3 已安装，standard `<UIA>` library path 可用，并已准备 approved non-clinical test context。
+Prerequisite：[ ] AutoHotkey v2 可用，field-debug 目录包含 pinned `debug/Lib/UIA.ahk` v1.1.3，并已准备 approved non-clinical test context。UIA-v2 不需要系统级安装，不要同时提供另一份全局版本。
 
 1. [ ] 启动 MedEx。
 2. [ ] Focus report editor。
@@ -65,20 +65,27 @@ Prerequisite：[ ] AutoHotkey v2 和 pinned UIA-v2 v1.1.3 已安装，standard `
 5. [ ] 记录 Windows resolution。
 6. [ ] 记录 display scaling。
 7. [ ] 启动 `debug/medex_color_reset_field_debug.ahk` 并按 Ctrl+Alt+F12 运行 diagnostic hotkey。
-8. [ ] 确认 color menu 是否打开。
-9. [ ] 确认 Name=`000000` 的 black item 是否被 Invoke。
-10. [ ] 手工输入一个 harmless test character，并确认它是 black。
-11. [ ] 将自动复制的完整 diagnostic result 带回 Mac development environment。
-12. [ ] 记录任何 mouse movement、focus loss、menu delay 或 unexpected side effect。
+8. [ ] 确认打开的是按 Y 排序后的第二组、即检查所见 toolbar，而不是第一组病史信息 toolbar。
+9. [ ] 确认 color menu 是否打开，以及 Name=`000000` 的 black item 是否被 Invoke。
+10. [ ] 确认全过程没有 `MsgBox` 或其他 focus-stealing feedback，MedEx editor focus 未改变。
+11. [ ] 在 approved non-clinical test context 手工输入一个 harmless test character，并确认它是 black；只有此步骤可将 `FinalInsertionColorVisuallyValidated` 记为 true。
+12. [ ] 将自动复制的完整 diagnostic result 带回 Mac development environment。
+13. [ ] 记录任何 mouse movement、focus loss、menu delay 或 unexpected side effect。
 
 严禁在 finalized patient report 中执行本测试。Diagnostic hotkey 不插入 test text，也不得记录 clinical content。
 
 - [ ] Foreground process 正确时进入 UIA lookup；错误时返回 `COLOR_RESET_WRONG_PROCESS` 且不点击。
 - [ ] Production process name 未确认时返回 `COLOR_RESET_PROCESS_NAME_UNCONFIRMED` 且不点击。
 - [ ] UIA-v2 缺失时返回 `COLOR_RESET_UIA_UNAVAILABLE` 且不点击。
-- [ ] 找不到 report `Document` 时返回 `COLOR_RESET_DOCUMENT_NOT_FOUND` 且不点击。
-- [ ] 找不到 `16px` 时返回 `COLOR_RESET_ANCHOR_FONT_SIZE_NOT_FOUND` 且不点击。
-- [ ] 找不到 `①` 时返回 `COLOR_RESET_ANCHOR_NUMBER_BUTTON_NOT_FOUND` 且不点击。
+- [ ] Anchor enumeration 以 foreground MedEx window root 或经确认的报告区域父容器为 scope，不要求 toolbar 是 focused `Document` descendant。
+- [ ] 找不到 `16px` 或 `①` 时返回对应 failure 且不点击。
+- [ ] 只有一个唯一 toolbar candidate、缺少第二候选时 fail closed 且不点击。
+- [ ] 缺少第二候选时返回 `COLOR_RESET_TOOLBAR_CANDIDATE_NOT_FOUND`。
+- [ ] 一个 anchor 可匹配多个 counterpart 时作为 pairing ambiguity fail closed。
+- [ ] Pairing ambiguity 返回 `COLOR_RESET_TOOLBAR_PAIRING_AMBIGUOUS`。
+- [ ] 两个候选 Y 相同或无法形成稳定排序时作为 sorting ambiguity fail closed。
+- [ ] Sorting ambiguity 返回 `COLOR_RESET_TOOLBAR_SORT_AMBIGUOUS`。
+- [ ] 候选多于三个时不自动失败；只要 pairs 唯一、geometry 有效且存在第二候选，仍选择排序后的第二个。
 - [ ] Rectangles 无效或相对位置异常时返回 `COLOR_RESET_INVALID_GEOMETRY` 且不点击。
 - [ ] Zero-width/non-finite rectangle 返回 `COLOR_RESET_INVALID_RECTANGLE`。
 - [ ] UIA screen coordinates 与 window/client bounds 不一致时返回 `COLOR_RESET_INVALID_COORDINATE_SPACE`。
@@ -89,7 +96,12 @@ Prerequisite：[ ] AutoHotkey v2 和 pinned UIA-v2 v1.1.3 已安装，standard `
 - [ ] Black item 不支持 InvokePattern 时返回 `COLOR_RESET_INVOKE_UNAVAILABLE`。
 - [ ] `Invoke()` 抛错或失败时返回 `COLOR_RESET_INVOKE_FAILED`。
 - [ ] 未分类异常返回 `COLOR_RESET_UNEXPECTED_ERROR`，不继续点击。
-- [ ] 成功时返回 `COLOR_RESET_OK`，随后输入恢复黑色。
+- [ ] 自动化字段分别记录 `ToolbarCandidateSelected`、`ColorMenuClickSent`、`BlackItemFound` 和 `BlackItemInvokeSucceeded`。
+- [ ] Invoke 成功时只报告 `AUTOMATION_CHAIN_OK` / `FINAL_COLOR_PENDING_VISUAL_VALIDATION`，不得自动报告最终成功。
+- [ ] `FinalInsertionColorVisuallyValidated` 初始为 false/unknown，人工确认无害字符为黑色后才单独记录 true。
+- [ ] `RetryCount` 输出为整数 `0` 或 `1`，不得序列化为 Boolean。
+- [ ] `ProcessNameConfirmed=false` 必须与 provisional candidate accepted 的含义分开记录。
+- [ ] Field debug 默认只写 clipboard/log，不显示成功提示；任何可选提示必须先证明不改变 focus 和颜色状态。
 - [ ] 最多执行一次 initial trigger click 和一次 bounded retry，不出现 repeated blind clicks。
 - [ ] Mouse position 在 interaction 结束后恢复。
 - [ ] 在目标 DPI、display scaling、resolution、window width 和 MedEx version 上重复测试。

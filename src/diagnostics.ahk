@@ -20,13 +20,25 @@ FormatMedExColorResetLogLine(result) {
         "timestamp=" SafeDiagnosticValue(MedExContextValue(context, "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"))),
         "action=MedExColorReset",
         "resultCode=" SafeDiagnosticValue(result.code),
+        "automationChainResult=" SafeDiagnosticValue(MedExContextValue(context, "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED")),
         "processName=" SafeDiagnosticValue(MedExContextValue(context, "foregroundProcess", "UNKNOWN")),
+        "provisionalProcessCandidateAccepted=" FormatDiagnosticBoolean(MedExContextValue(context, "provisionalProcessCandidateAccepted", false)),
+        "processNameConfirmed=" FormatDiagnosticBoolean(MedExContextValue(context, "processNameConfirmed", false)),
         "windowHandle=" SafeDiagnosticValue(MedExContextValue(context, "foregroundWindowHandle", "UNKNOWN")),
-        "documentRect=" FormatDiagnosticRect(MedExContextValue(context, "documentRect", 0)),
-        "fontSizeRect=" FormatDiagnosticRect(MedExContextValue(context, "fontSizeRect", 0)),
-        "numberButtonRect=" FormatDiagnosticRect(MedExContextValue(context, "numberButtonRect", 0)),
+        "uiaRootRect=" FormatDiagnosticRect(MedExContextValue(context, "uiaRootRect", 0)),
+        "fontSizeAnchorRects=" FormatDiagnosticRectList(MedExContextValue(context, "fontSizeAnchorRects", 0)),
+        "numberButtonAnchorRects=" FormatDiagnosticRectList(MedExContextValue(context, "numberButtonAnchorRects", 0)),
+        "toolbarCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "toolbarCandidateCount", 0)),
+        "toolbarCandidateSelected=" FormatDiagnosticBoolean(MedExContextValue(context, "toolbarCandidateSelected", false)),
+        "selectedToolbarIndex=" SafeDiagnosticValue(MedExContextValue(context, "selectedToolbarIndex", 0)),
+        "selectedFontSizeRect=" FormatDiagnosticRect(MedExContextValue(context, "selectedFontSizeRect", 0)),
+        "selectedNumberButtonRect=" FormatDiagnosticRect(MedExContextValue(context, "selectedNumberButtonRect", 0)),
         "calculatedScreenPoint=" FormatDiagnosticPoint(MedExContextValue(context, "calculatedScreenPoint", 0)),
         "calculatedClientPoint=" FormatDiagnosticPoint(MedExContextValue(context, "calculatedClientPoint", 0)),
+        "colorMenuClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "colorMenuClickSent", false)),
+        "blackItemFound=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemFound", false)),
+        "blackItemInvokeSucceeded=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemInvokeSucceeded", false)),
+        "finalInsertionColorVisuallyValidated=" FormatDiagnosticBoolean(MedExContextValue(context, "finalInsertionColorVisuallyValidated", false)),
         "retryCount=" SafeDiagnosticValue(MedExContextValue(context, "retryCount", 0)),
         "lookupElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "lookupElapsedMs", "UNKNOWN")),
         "elapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "elapsedMs", "UNKNOWN")),
@@ -34,7 +46,8 @@ FormatMedExColorResetLogLine(result) {
         "exceptionMessage=" SafeDiagnosticValue(MedExContextValue(context, "exceptionMessage", "")),
         "ahkVersion=" SafeDiagnosticValue(A_AhkVersion),
         "uiaLibrary=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibrary", "UNKNOWN")),
-        "uiaLibraryVersion=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibraryVersion", "UNKNOWN")),
+        "uiaLibraryVersionPinned=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibraryVersionPinned", "UNKNOWN")),
+        "uiaLibraryVersionRuntime=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibraryVersionRuntime", "UNKNOWN")),
         "uiaInterfaceVersion=" SafeDiagnosticValue(MedExContextValue(context, "uiaInterfaceVersion", "UNKNOWN"))
     ]
     return JoinDiagnosticFields(fields, " ")
@@ -44,29 +57,40 @@ FormatMedExFieldDebugResult(result) {
     context := result.context
     fields := [
         "Test=MedExColorReset",
-        "Result=" SafeDiagnosticValue(result.code),
+        "ResultCode=" SafeDiagnosticValue(result.code),
+        "AutomationChainResult=" SafeDiagnosticValue(MedExContextValue(context, "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED")),
+        "FinalValidationState=" (MedExContextValue(context, "finalInsertionColorVisuallyValidated", false) ? "VISUALLY_VALIDATED" : "FINAL_COLOR_PENDING_VISUAL_VALIDATION"),
         "Process=" SafeDiagnosticValue(MedExContextValue(context, "foregroundProcess", "UNKNOWN")),
-        "ProcessNameConfirmed=" SafeDiagnosticValue(MedExContextValue(context, "processNameConfirmed", false)),
+        "ProvisionalProcessCandidateAccepted=" FormatDiagnosticBoolean(MedExContextValue(context, "provisionalProcessCandidateAccepted", false)),
+        "ProcessNameConfirmed=" FormatDiagnosticBoolean(MedExContextValue(context, "processNameConfirmed", false)),
         "WindowHandle=" SafeDiagnosticValue(MedExContextValue(context, "foregroundWindowHandle", "UNKNOWN")),
         "Resolution=" SafeDiagnosticValue(MedExContextValue(context, "resolution", "UNKNOWN")),
         "Dpi=" SafeDiagnosticValue(MedExContextValue(context, "dpi", "UNKNOWN")),
         "DisplayScaling=" SafeDiagnosticValue(MedExContextValue(context, "displayScaling", "UNKNOWN")),
         "MedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "medExVersion", "UNKNOWN")),
-        "DocumentRect=" FormatDiagnosticRect(MedExContextValue(context, "documentRect", 0)),
-        "FontSizeRect=" FormatDiagnosticRect(MedExContextValue(context, "fontSizeRect", 0)),
-        "NumberButtonRect=" FormatDiagnosticRect(MedExContextValue(context, "numberButtonRect", 0)),
+        "UiaRootRect=" FormatDiagnosticRect(MedExContextValue(context, "uiaRootRect", 0)),
+        "FontSizeAnchorRects=" FormatDiagnosticRectList(MedExContextValue(context, "fontSizeAnchorRects", 0)),
+        "NumberButtonAnchorRects=" FormatDiagnosticRectList(MedExContextValue(context, "numberButtonAnchorRects", 0)),
+        "ToolbarCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "toolbarCandidateCount", 0)),
+        "ToolbarCandidateSelected=" FormatDiagnosticBoolean(MedExContextValue(context, "toolbarCandidateSelected", false)),
+        "SelectedToolbarIndex=" SafeDiagnosticValue(MedExContextValue(context, "selectedToolbarIndex", 0)),
+        "SelectedFontSizeRect=" FormatDiagnosticRect(MedExContextValue(context, "selectedFontSizeRect", 0)),
+        "SelectedNumberButtonRect=" FormatDiagnosticRect(MedExContextValue(context, "selectedNumberButtonRect", 0)),
         "Ratio=" SafeDiagnosticValue(MedExContextValue(context, "ratio", "UNKNOWN")),
         "CalculatedScreenPoint=" FormatDiagnosticPoint(MedExContextValue(context, "calculatedScreenPoint", 0)),
         "CalculatedClientPoint=" FormatDiagnosticPoint(MedExContextValue(context, "calculatedClientPoint", 0)),
-        "BlackColorFound=" SafeDiagnosticValue(MedExContextValue(context, "blackColorFound", false)),
-        "InvokeAvailable=" SafeDiagnosticValue(MedExContextValue(context, "invokeAvailable", false)),
-        "InvokeSucceeded=" SafeDiagnosticValue(MedExContextValue(context, "invokeSucceeded", false)),
+        "ColorMenuClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "colorMenuClickSent", false)),
+        "BlackItemFound=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemFound", false)),
+        "InvokeAvailable=" FormatDiagnosticBoolean(MedExContextValue(context, "invokeAvailable", false)),
+        "BlackItemInvokeSucceeded=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemInvokeSucceeded", false)),
+        "FinalInsertionColorVisuallyValidated=" FormatDiagnosticBoolean(MedExContextValue(context, "finalInsertionColorVisuallyValidated", false)),
         "RetryCount=" SafeDiagnosticValue(MedExContextValue(context, "retryCount", 0)),
         "LookupElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "lookupElapsedMs", "UNKNOWN")),
         "ElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "elapsedMs", "UNKNOWN")),
         "AHKVersion=" SafeDiagnosticValue(A_AhkVersion),
         "UIALibrary=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibrary", "UNKNOWN")),
-        "UIALibraryVersion=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibraryVersion", "UNKNOWN")),
+        "UIALibraryVersionPinned=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibraryVersionPinned", "UNKNOWN")),
+        "UIALibraryVersionRuntime=" SafeDiagnosticValue(MedExContextValue(context, "uiaLibraryVersionRuntime", "UNKNOWN")),
         "UIAInterfaceVersion=" SafeDiagnosticValue(MedExContextValue(context, "uiaInterfaceVersion", "UNKNOWN")),
         "ExceptionType=" SafeDiagnosticValue(MedExContextValue(context, "exceptionType", "")),
         "ExceptionMessage=" SafeDiagnosticValue(MedExContextValue(context, "exceptionMessage", ""))
@@ -96,12 +120,16 @@ FormatDiagnosticPoint(point) {
     return point["x"] "," point["y"]
 }
 
-SafeDiagnosticValue(value, maxLength := 240) {
-    if value = true
-        return "true"
-    if value = false
-        return "false"
+FormatDiagnosticRectList(rectangles) {
+    if Type(rectangles) != "Array"
+        return "UNKNOWN"
+    output := ""
+    for index, rect in rectangles
+        output .= (index = 1 ? "" : "|") FormatDiagnosticRect(rect)
+    return output = "" ? "NONE" : output
+}
 
+SafeDiagnosticValue(value, maxLength := 240) {
     safeValue := String(value)
     safeValue := StrReplace(safeValue, "`r", " ")
     safeValue := StrReplace(safeValue, "`n", " ")
@@ -109,6 +137,10 @@ SafeDiagnosticValue(value, maxLength := 240) {
     if StrLen(safeValue) > maxLength
         safeValue := SubStr(safeValue, 1, maxLength) "..."
     return safeValue
+}
+
+FormatDiagnosticBoolean(value) {
+    return value ? "true" : "false"
 }
 
 JoinDiagnosticFields(fields, delimiter) {

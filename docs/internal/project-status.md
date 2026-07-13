@@ -1,187 +1,143 @@
 # 项目状态与交接
 
-更新时间：2026-07-13（MedEx color-reset runtime implementation pass）
+更新时间：2026-07-13（M1 Color Reset V1 Mac-side implementation）
 
 ## 当前阶段
 
-项目已进入 `v0.5.0 — Internal Test Foundation`。MedEx color-reset runtime、report-editor orchestration、minimal development diagnostics、field-debug script 和 pure-logic reference tests 已实现；尚未在 Windows/MedEx 上验证，也没有生成或发布 internal-test executable。
+项目处于 `v0.5.0 — Internal Test Foundation` 的 M1 现场验证准备阶段。CF_HTML red-text insertion 已确认可用；Mac-side M1 已实现 window-root anchor enumeration、唯一 pairing、稳定排序和第二候选选择。Windows 尚未运行新版本，因此最终 insertion color 仍未完成有效人工验证。
 
-## 本次实现
+本轮只修改 color-reset adapter、pure logic、diagnostics、field-debug、tests 和对应文档。没有修改 legacy scripts，没有进入 HHKB、viewer、montage、caption、cover、measurement、configuration 或 packaging。
 
-- 新增 `src/adapters/medex_report_editor.ahk`，集中处理 foreground process、UIA、geometry、trigger click、menu lookup 和 `InvokePattern`。
-- 新增 centralized `ColorResetCode`，覆盖完整 structured failure states。
-- Production 默认要求 confirmed process name。由于目标工作站尚未确认，正常运行会返回 `COLOR_RESET_PROCESS_NAME_UNCONFIRMED`，不点击。
-- Field-debug 通过 explicit override 临时允许 `medexworkstation.exe` 和 `medexworkstations.exe` 两个 provisional candidates，并记录实际进程名。
-- `report_editor.ahk` 现在区分 paste failed、paste+reset succeeded、paste succeeded but reset failed，以及 clipboard restore failed。
-- Reset failure 不会自动删除或 undo 已插入文字。
-- `clipboard_html.ahk` 仍只负责 generic CF_HTML/clipboard transaction，没有引入 MedEx UIA logic。
-- Minimal logs 写入 `%TEMP%\MedExAHK\`，不建立最终 user-data/config architecture。
-- 选择 Descolada UIA-v2 v1.1.3；该依赖没有 vendored，Windows field machine 必须通过 standard `<UIA>` library path 提供。
-- 新增 `debug/medex_color_reset_field_debug.ahk`，dedicated hotkey 为 Ctrl+Alt+F12。
+## Repository 状态
 
-## 今日确认
+- Branch：`main`，相对 `origin/main` ahead 2。
+- 当前本地提交：`ff70bab`（pinned UIA-v2 field-debug dependency）和 `1d15a21`（color-reset runtime/field debug）。
+- 两个未跟踪现场目录必须原样保留：
+  - `debug/field-result-2026-07-13/`
+  - `debug/legacy-automation-survey-2026-07-13/`
+- 原始 evidence 不改写、不删除；durable conclusions 记录在 `docs/field-tests/2026-07-13-workstation-findings.md`。
 
-- Dynamic `CF_HTML` 已经可以在 MedEx report editor 中插入红色文字。
-- 剩余问题是 MedEx 继承最后插入字符颜色，后续用户输入保持红色。
-- MedEx 是 Electron/Chromium application，主窗口为 `ahk_class Chrome_WidgetWin_1`，report editor 暴露为 `Document`。
-- 当前版本无法通过 F12、Ctrl+Shift+I、remote-debugging port 或 pipe 直接连接 DevTools。
-- Editor `Document` 支持 `TextPattern`、`ValuePattern` 和 `LegacyAccessiblePattern`。
-- Color trigger 本身没有可直接查询的 UIA node。
-- Color menu 打开后，各颜色项暴露为支持 `InvokePattern` 的 `Hyperlink`；Name 为 `000000` 的 item 可以把当前 insertion color 改成 black。
-- `16px` 和 `①` 的 UIA `BoundingRectangle` 可作为可靠相对 anchors。
-- 原始 legacy 两个文件共包含 5 个报告 hotstrings，以及多组键盘、鼠标、阅片标注、测量/清除、封面图和 clipboard snapshot 行为。
-- 新项目与 `legacy/string_change.ahk` 存在 5 个直接 hotstring collisions；新项目尚未迁移任何实际 legacy viewer action。
+## 2026-07-13 已确认事项
 
-## 仍属 experimental
+### Verified behavior
 
-- 基于 anchors 的 `0.337` 水平比例只在当前观察 geometry 上成立，必须在目标工作站验证 DPI、缩放、窗口宽度和 MedEx layout variation。
-- Color trigger 仍需一个经过校验的 proportional coordinate click。
-- Menu appearance detection 和 retry policy 已进入源码，但仍未经过 Windows field validation。
-- `executeJavaScript()`、Electron IPC 和 embedded editor direct command 尚未证明可用。
-- Legacy `red_not.clip` 不在仓库内，无法确认其 visible text/format 与新项目完全等价。
-- UIA-v2 在目标 MedEx Electron version 上的 `ElementFromHandle`/`ElementFromChromium` tree shape 尚未验证。
-- 尚未确认 color menu 是否作为 foreground window subtree 的动态 `Hyperlink` 出现。
-- 尚未确认 `WinGetClientPos` screen origin 与 UIA `BoundingRectangle` 在目标 DPI awareness context 中保持一致。
-- Menu timeout 600 ms、poll interval 40 ms、最多 2 次 trigger attempts 都是 provisional field-test values。
+- MedEx 0.0.1.0 在 1920×1080、100% scaling、DPI 96 环境运行，现场进程名为 `medexworkstations.exe`。
+- CF_HTML 可插入红色文字。
+- ratio-derived click 可打开被选中 toolbar 的 color menu。
+- Name=`000000` 的 `Hyperlink` 可找到，InvokePattern 可用且调用未抛错。
+- 页面至少有病史信息、检查所见、检查结论三组同构 toolbar。
+- 现有 adapter 使用 first-match lookup，实际选择第一组病史信息 toolbar；目标工作流主要需要第二组检查所见。
 
-## Approved V1 color-reset route
+### User observation
 
-```text
-PasteRedFigureText()
-→ report_editor workflow
-→ ResetMedExInsertionColor()
-   → verify foreground process
-   → find 16px and ① anchors
-   → validate geometry
-   → calculate proportional trigger point
-   → click trigger
-   → wait for menu
-   → find Hyperlink Name=000000
-   → Invoke()
-   → return structured result
-```
+- 操作者聚焦检查所见，但脚本打开病史信息 toolbar。
+- black item Invoke 后，黑色激活看起来曾成功。
+- completion notification 改变焦点并干扰后续颜色状态，因此最终结果无效。
 
-所有失败分支 fail-closed，不执行 blind follow-up clicks。详细证据和 rejected approaches 见 `docs/technical-investigations/2026-07-medex-rich-text-color-reset.md`。
+### Implementation inference
 
-## Legacy coexistence requirement
+- Proportional trigger click 与 UIA Invoke 路线可继续作为 V1 基础。
+- 当前主要缺陷是 toolbar candidate selection 与 focus-interfering diagnostic feedback。
+- 六次现有 `COLOR_RESET_OK` 只证明 automation chain 走到 Invoke，不证明目标 editor 最终颜色正确。
 
-v0.5.0 内测期仍需同时运行新 executable 和 cleaned compatibility script。新 build 只接管完整、稳定且验证过的 capabilities；compatibility 只保留缺失功能。原始 legacy scripts 不修改、不删除。
+### Deferred investigation
 
-当前 `legacy/medex_legacy_compat.ahk` 是预备 scaffold，不应在 color reset 完成前被当成用户现有工作流的完整替代，因为它有意不注册 5 个重复 report hotstrings。正式切换和回滚规则见 `docs/migration/coexistence-plan.md`。
+- V1 第二候选策略对其他 DPI、缩放、窗口宽度、语言和 MedEx version 的适配性。
+- focused editable `DocumentRect` 与最近上方 toolbar 的稳定关联；这是 V2。
+- direct Electron renderer、IPC 或 embedded editor command。
 
-## v0.5.0 next implementation order
+## 关键矛盾和诊断缺陷
 
-1. Finish and validate MedEx color reset.
-2. Introduce centralized user configuration.
-3. Migrate existing new-project hotkeys and hotstrings to configuration.
-4. Add user-defined hotstring support.
-5. Add structured diagnostics and logging.
-6. Inventory legacy functionality.
-7. Produce a non-conflicting legacy compatibility script.
-8. Package the v0.5.0 internal-test executable.
-9. Write/update simple Chinese internal-test instructions.
-10. Begin internal testing.
-11. Only after stabilization, begin SUVmax and long/short-axis automation.
+- `Process=medexworkstations.exe` 与 `ProcessNameConfirmed=false` 并不矛盾：进程命中了 provisional candidate，但 production confirmed name 仍为空。M1 必须分开输出这两个状态。
+- `RetryCount=false` 是类型错误，M1 改为整数 `0`/`1`。
+- `UIALibraryVersion=EXPECTED_1.1.3_NOT_RUNTIME_DETECTED` 是 build/dependency metadata，不是运行时检测。
+- `COLOR_RESET_OK` 与用户最终观察冲突；M1 改用 automation/pending-visual-validation 双层语义。
+- Survey 目录没有预期的 `screenshots/` 和 `uia_dumps/`，除一张 toolbar screenshot 外没有额外视觉材料。缺失证据不补写、不推测。
 
-第 6 项已在本轮建立初版 inventory，第 7 项已创建预备 scaffold；在第 1–5 项实现完成后仍需重新核对它们，不能因此跳过顺序中的验证关卡。
+## Revised Color Reset V1
 
-## 当前 exact next task
+1. 验证 foreground MedEx process/window。
+2. 从 foreground window root，或经证据确认的报告区域父容器，枚举所有 `16px` 和 `①`。
+3. 不假设 anchors 是 focused `Document` descendants。
+4. 按 vertical alignment、horizontal order 和 plausible gap 形成唯一 pairs。
+5. 要求至少两个唯一有效候选，不要求总数严格等于三。
+6. 按 Y 排序并选择第二个候选。
+7. 缺少第二候选、pairing ambiguity、sorting ambiguity、invalid rectangle/geometry/coordinate space 时立即停止，不点击。
+8. 使用选中 pair 与 provisional ratio `0.337` 计算 trigger，不使用 absolute final point。
+9. Menu 打开后只对 exact Name=`000000` 且支持 InvokePattern 的 item 调用 Invoke。
+10. 默认只写 clipboard/log，不显示任何 completion feedback。
 
-下一项任务不是继续扩展代码，而是在目标 Windows 工作站执行 field-debug procedure，回传完整 diagnostic result，并据实际结果确认 process name、UIA tree、geometry、timing 和 Invoke behavior。
+V2 才通过 focused editable `DocumentRect` 选择最近上方的唯一 toolbar。
 
-Field test 成功后，下一次精确代码变更为：
+## Diagnostic contract
 
-1. 将确认的 executable name 写入 `MedExColorResetDefaults.ConfirmedProcessName`。
-2. 根据 diagnostic evidence 调整 ratio/timing/geometry ranges；没有证据不改。
-3. 在正常 report hotstrings 上完成 harmless non-clinical end-to-end validation。
-4. 只有 color reset 稳定后，才开始 centralized user configuration runtime。
+M1 分别记录：
 
-## 当前实现文件
+- `ToolbarCandidateSelected`
+- `ColorMenuClickSent`
+- `BlackItemFound`
+- `BlackItemInvokeSucceeded`
+- `FinalInsertionColorVisuallyValidated`
 
+Automation 可报告 `AUTOMATION_CHAIN_OK`，但在人工验证前必须同时保持 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。只有 Windows 操作者在 approved non-clinical context 输入无害字符并确认黑色后，才能记录最终视觉验证成功。
+
+Field debug 禁止 `MsgBox`。ToolTip、TrayTip 或其他提示也只有在目标工作站证明不改变 editor focus、不影响颜色状态后才允许启用；M1 默认完全不显示提示。
+
+## UIA dependency
+
+UIA-v2 v1.1.3 是当前 pinned、可复现版本，不表示其他版本严格不可用。Field debug 使用仓库内 `debug/Lib/UIA.ahk`，无需系统级安装，也不要同时放置另一份 global UIA library。未来 compiled EXE 把 pinned dependency 作为构建输入处理。
+
+## Legacy coexistence
+
+- 原始 legacy scripts 保持不变，compatibility 在对应新功能完成并通过现场验证前继续承接日常 viewer/report-image workflow。
+- RAlt+H/J/K/L 是正式、全局 HHKB navigation，M2 迁移时不得放入 MedEx-only `#HotIf`。
+- XButton1 notification 是历史测试项，不属于功能、用户依赖或迁移任务；仅在发现真实 hotkey conflict 时处理。
+- Body/Head/Lung、caption、screenshot、SUV/Arrow、cover 和 measurement 的已确认业务语义见 migration inventory 与 field-test document。
+
+## 首次有限内测硬门槛
+
+硬门槛为 M0、M1、M2、最小 M5 和 M6。M3 高频 viewer 与 M4 报告图 workflow 在 cleaned compatibility 稳定、无冲突地继续提供相应功能时不阻塞首次有限内测；如果 compatibility 缺失、不稳定或冲突，对应功能重新成为 blocker。
+
+## M1 Mac-side implementation status
+
+已完成：
+
+1. foreground UIA root anchor enumeration；
+2. unique pairing、geometry validation、Y sorting、second-candidate selection；
+3. candidate missing、pairing ambiguity 和 sorting ambiguity structured failures；
+4. foreground revalidation、provisional ratio 和 bounded interaction；
+5. 删除 focus-changing feedback，默认 clipboard/log only；
+6. integer RetryCount 和 process acceptance/confirmation 分离；
+7. automation fields 与 manual final-validation state；
+8. pure-logic tests 和 Windows manual retest preparation。
+
+Automation success code 现在是 `AUTOMATION_CHAIN_OK`，diagnostics 同时输出 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。现有 `COLOR_RESET_OK` 仅保留给内部 pure-geometry compatibility，不再作为 field-debug 最终结果。
+
+M1 实际代码和测试文件：
+
+- `src/adapters/medex_report_editor.ahk`
 - `src/medex_color_reset_logic.ahk`
 - `src/diagnostics.ahk`
-- `src/adapters/medex_report_editor.ahk`
-- `src/report_editor.ahk`
-- `src/clipboard_html.ahk`
-- `src/hotstrings.ahk`
 - `debug/medex_color_reset_field_debug.ahk`
 - `tests/test_medex_color_reset_logic.py`
+- `tests/manual-test-checklist.md` 及 M1 状态文档
 
-## Pure-logic test status
+没有修改 `report_editor.ahk`；现有 `{ok, code, context}` contract 足以承载 automation/pending-validation 状态。
 
-macOS 上运行 `python3 -m unittest discover -s tests -p 'test_*.py'`：13 tests passed。覆盖 CF_HTML 既有 tests，以及 ratio、valid geometry、reversed anchors、zero-width rectangle、invalid coordinate range、point outside target window、screen-to-client conversion、structured result construction 和 required result codes。
+## Windows M1 验收
 
-这不代表 Windows UIA、MedEx、mouse click 或 Invoke runtime 已测试。
+在 approved non-clinical context 聚焦检查所见，运行 diagnostic，确认第二组 toolbar 被选择、没有 focus-stealing feedback、`000000` Invoke 成功；随后手工输入一个无害字符并确认黑色。严禁在 finalized patient report 中测试。
 
-## Windows field-debug procedure
+## 当前风险
 
-Prerequisite：安装 AutoHotkey v2 和 pinned UIA-v2 v1.1.3，使 `#Include <UIA>` 可用；准备 approved non-clinical test context。
+- Color trigger 没有 usable UIA element，V1 仍需一次经过校验的 relative/proportional click。
+- 多组 toolbar 的 accessible names 相同，candidate pairing 和 ordering 必须 fail closed。
+- 多显示器、DPI、缩放和 MedEx layout/version variation 尚未覆盖。
+- 新旧进程没有 shared clipboard/mouse mutex；共存期不得并发触发相关动作。
+- Compatibility legacy coordinates 缺少 window guard，需继续保持明确风险和回滚路径。
 
-1. 启动 MedEx。
-2. Focus report editor。
-3. 用 Task Manager 或 Window Spy 记录 actual process name。
-4. 记录 MedEx version；不可见时写 `UNKNOWN`。
-5. 记录 Windows resolution。
-6. 记录 display scaling。
-7. 启动 `debug/medex_color_reset_field_debug.ahk`，按 Ctrl+Alt+F12 运行 diagnostic hotkey。
-8. 确认 color menu 是否打开。
-9. 确认 black item 是否被 Invoke。
-10. 手工输入一个 harmless test character，确认它是 black。
-11. 将自动复制的 diagnostic result 带回 Mac development environment。
-12. 记录 mouse movement、focus loss、menu delay 或任何 unexpected side effect。
+## 当前测试状态
 
-严禁在 finalized patient report 中执行 field test。Diagnostic hotkey 自身不粘贴或记录 clinical content。
+macOS pure-logic suite 基线为 13 tests passed，覆盖 CF_HTML 和现有 geometry/result-code helpers。这不代表 Windows UIA、MedEx click/Invoke 或最终 insertion color 已通过测试。
 
-## Implemented code changes
-
-1. 增加 `src/adapters/medex_report_editor.ahk`。
-2. 在该模块定义 stable result codes 或 result factory，返回 `{ ok, code, context }`，不得只返回 Boolean。
-3. 实现 `ResetMedExInsertionColor()`：
-   - 读取 foreground process，不主动激活其他窗口；
-   - 在 field-debug 中严格匹配两个 provisional candidates，production 在 confirmed name 缺失时 fail-closed；
-   - 使用选定的 AHK v2 UIA library 查找 Name=`16px` 和 Name=`①`；
-   - 提取并验证两个 `BoundingRectangle`；
-   - 使用 `arrowX = fontSizeRight + 0.337 * (numberButtonLeft - fontSizeRight)` 和 `arrowY = fontSizeTop + 1`；
-   - 将 screen/client coordinate conversion 作为显式步骤，不混用 coordinate spaces；
-   - 点击一次 trigger 后轮询 menu；
-   - 只对 ControlType=`Hyperlink` 且 Name=`000000` 的 element 调用 `Invoke()`；
-   - 所有异常映射到 documented result codes。
-4. 修改 `src/report_editor.ahk`，新增 editor-level workflow，例如 `InsertRedFigureTextAndRestoreState(text)`；它先调用 generic paste，再调用 MedEx adapter。
-5. 修改 `src/hotstrings.ahk`，让 4 个 red-text workflows 调用 editor-level workflow；保持现有 visible phrases 和 cursor movement 不变。
-6. 不在 `src/clipboard_html.ahk` 中加入任何 MedEx process、UIA、coordinate 或 menu code；只在需要时收紧其 generic transaction result contract。
-7. 增加不含临床文字的 unit/reference tests：geometry calculation、invalid rectangles、result-code mapping。
-8. 扩充 Windows manual checklist：wrong process、missing anchors、menu timeout、missing black item、Invoke failure、DPI/layout variation、clipboard restoration、cursor final position 和后续输入颜色。
-9. 验证通过后再生成 `release/report_assistant.ahk`；未验证前不制作正式 internal-test executable。
-
-## Known risks
-
-- Color trigger 没有独立 UIA element，V1 仍包含一次 coordinate click。
-- UIA accessible names `16px`、`①` 或 toolbar geometry 可能随 MedEx version、语言、DPI、窗口宽度变化。
-- 新旧进程没有 shared clipboard/mouse mutex；并发触发可能互相干扰。
-- Compatibility 中的 legacy coordinates 缺少 window guard，可能在错误窗口 blind click。
-- 新项目的 suspend/exit hotkeys 不控制 compatibility process。
-- 默认 AHK tray icons 相似，用户可能退出错误实例。
-- 当前 config keys `RED_TEXT_COLOR`、`RED_TEXT_RESET_TO_BLACK` 和示例 coordinates 尚未形成 centralized validated runtime config。
-- `src/config.example.ahk` 当前写的是 `medexworkstation.exe`，而调查确认的 V1 foreground process 是 `medexworkstations.exe`；实现前必须在目标工作站确认并统一，不能用 substring match 掩盖差异。
-
-## Deferred work
-
-- automatic SUVmax extraction；
-- automatic long-axis and short-axis extraction；
-- complete settings GUI；
-- Electron JavaScript injection；
-- automatic updater；
-- multi-editor support；
-- direct embedded-editor command；
-- 未经逐项校准和验证的 legacy viewer action migration。
-
-## Conservative migration decisions applied
-
-- 所有 legacy hotkeys 和 viewer actions 暂时视为仍然需要。
-- 保留 XButton1 notification。
-- 保留三组 fixed-parameter annotation workflows。
-- 原样保留 SUV 3000 ms 与 Arrow 1000 ms repeat-press clear semantics。
-- 不假设 `red_not.clip` 与新 CF_HTML functionally equivalent。
-- 本次没有删除或修改任何 additional legacy capability。
-
-当前只需要 Windows field evidence：actual executable name、MedEx version、resolution、display scaling、diagnostic result 和 observed side effects。
+下一步只是在 Windows 工作站执行 M1 验收。验收结果回传前不进入 M2，不 commit、不 push。

@@ -153,6 +153,22 @@ Explicitly deferred，除非已经实现且稳定：
 
 v0.5.0 的 MedEx color reset 采用已批准 V1：UIA anchors + proportional coordinate positioning + UIA Invoke。该方案属于可替换 adapter，不进入 generic clipboard module。
 
+## 首次有限内测里程碑
+
+| Milestone | Scope | Entry criteria | Exit criteria | Workstation validation | Blocks first limited test |
+| --- | --- | --- | --- | --- | --- |
+| M0 Evidence foundation | 固化 2026-07-13 证据、状态、架构、风险和测试计划 | 现场 artifacts 已回传 | 结论分类、矛盾和 M1 范围进入 durable docs；原始证据未修改 | 不需要新增工作站操作 | 是 |
+| M1 Color Reset V1 | root/parent-container anchor enumeration、第二候选、无焦点诊断 | M0 完成 | automation chain 可区分；目标 toolbar 正确；人工确认后续字符为黑色 | 1920×1080、100% baseline 必须通过 | 是 |
+| M2 Core retained behavior | 全局 HHKB navigation 与已稳定、无坐标的必要 legacy 行为 | M1 通过 | 新旧 hotkeys/hotstrings 无冲突，核心键盘行为通过回归 | 跨应用 HHKB 与共存 smoke test | 是 |
+| M3 High-frequency viewer migration | F12、SUV/Arrow、SUVMax/line measurement | M2 完成 | 每项 structured result、fail-closed 和现场验证完成 | 真实 viewer 必须逐项验证 | 否；稳定 compatibility 可临时承接 |
+| M4 Report-image workflows | montage、caption、cover images | 相应 UI survey 足够 | 参数、相对区域和业务输出逐项验证 | 真实 viewer/双屏验证 | 否；稳定 compatibility 可临时承接 |
+| M5 Minimum config/diagnostics | 独立 user config、safe defaults、必要日志和 feature ownership | M1/M2 interfaces 稳定 | 更新不覆盖配置；日志无临床内容；能禁用冲突入口 | 配置持久性和失败日志 smoke test | 最小范围是 |
+| M6 Package and rollback | compiled EXE、pinned dependency、版本、中文说明、回滚 | M0/M1/M2/最小 M5 完成 | 无管理员权限启动；dependency bundled；上一版可恢复 | compiled workstation smoke test | 是 |
+
+M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/clipboard 冲突地提供对应日常功能时才不阻塞首次有限内测。如果 compatibility 缺失、已知不稳定或与新 build 冲突，对应功能立即重新成为 blocker。
+
+相对节奏：M0 约 1 个工作会话；M1 约 1–2 个开发会话加 1 次现场验证；M2 约 1–2 个会话；最小 M5 约 2–3 个会话；M6 约 2 个会话加现场 smoke test。M3/M4 在首次有限内测前后按风险逐项迁移，不承诺未经证据支持的精确小时数。
+
 ## v0.5.x — Stabilization
 
 目标：处理内测暴露出的环境差异和可靠性问题。

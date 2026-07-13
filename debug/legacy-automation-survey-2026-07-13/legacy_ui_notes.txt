@@ -1,0 +1,495 @@
+﻿============================================================
+UI survey: Fixed-format montage workflow
+============================================================
+Related action:
+generate-fixed-report-montage
+------------------------------------------------------------
+Control class 1: Montage layout preset grid
+------------------------------------------------------------
+Known legacy click:
+MouseClick "left", 2208, 556
+Observed purpose:
+Select the predefined montage/layout template.
+Observed UIA representation:
+- The complete thumbnail grid is exposed as one Image element.
+- Individual layout thumbnails are not exposed as separate descendants.
+Observed outer Image rectangle:
+[l=1939,t=259,r=2243,b=604]
+Dimensions:
+- Width: 304
+- Height: 345
+Known target point:
+- Absolute point: (2208,556)
+- Relative X: 269
+- Relative Y: 297
+- Normalized X: approximately 0.8849
+- Normalized Y: approximately 0.8609
+Recommended implementation:
+- Locate the correct outer Image control.
+- Validate its geometry and parent window.
+- Compute the target from the normalized relative position.
+- Abort if the control cannot be uniquely identified or geometry is abnormal.
+------------------------------------------------------------
+Control class 2: Toolbar icon tab strip
+------------------------------------------------------------
+Known clicks:
+- Tab 3: (2073,628)
+- Tab 5: (2188,628)
+- Tab 4: (2133,623)
+Observed UIA representation:
+- The tab strip as a whole is exposed.
+- Individual icon buttons are not exposed separately.
+Recommended implementation:
+- Locate the tab-strip container.
+- Convert the existing absolute positions to tab-strip-relative positions.
+- Validate container geometry before clicking.
+- Do not search for separate child buttons if the application does not expose
+  them.
+------------------------------------------------------------
+Control class 3: Four-corner annotation dropdown open button
+------------------------------------------------------------
+Known legacy click:
+MouseClick "left", 2152, 1100
+Observed UIA properties:
+- Name: 打开
+- ControlType: Button
+- LocalizedControlType: 按钮
+- BoundingRectangle: [l=2147,t=1087,r=2162,b=1112]
+- AccessKey: Alt+向下键
+- IsKeyboardFocusable: False
+Recommended implementation order:
+1. Find the correct button within the expected parameter panel.
+2. Use InvokePattern if available.
+3. Use the associated keyboard expansion action if reliable.
+4. Use a relative click inside the button rectangle only as fallback.
+Safety note:
+Do not use the first globally matched Button named "打开", because multiple
+controls may share this name.
+------------------------------------------------------------
+Control class 4: Four-corner annotation dropdown item
+------------------------------------------------------------
+Known legacy click:
+MouseClick "left", 2031, 1202
+Purpose:
+Select NULL and remove image-corner annotations.
+Observed behavior:
+The dropdown options are exposed after the selector is expanded.
+Recommended implementation:
+Select the item by accessible Name="NULL" using an available Invoke,
+SelectionItem, or equivalent pattern.
+------------------------------------------------------------
+Control class 5: Numeric input fields
+------------------------------------------------------------
+Fields:
+- Slice thickness
+- Current slice count
+- Image scale
+Observed behavior:
+These input fields are exposed through UIA.
+Recommended implementation:
+Prefer ValuePattern for replacing their contents.
+Fallback:
+- focus the field;
+- select current content;
+- send the desired text.
+------------------------------------------------------------
+Control class 6: Parameter-application buttons
+------------------------------------------------------------
+Known legacy clicks:
+- Apply slice thickness: (2171,719)
+- Apply current slice count: (2175,801)
+Purpose:
+Apply the newly entered parameter values.
+Expected control type:
+Button.
+Recommended implementation:
+Use UIA Invoke when available.
+------------------------------------------------------------
+Control class 7: Lung window-preset dropdown
+------------------------------------------------------------
+Known legacy clicks:
+- Open window-preset dropdown: (2199,673)
+- Select lung window: (2132,754)
+Purpose:
+Explicitly restore lung window before generating the Lung montage.
+Clinical context:
+Thin-slice lung CT may previously have been displayed using bone window when
+reviewing osseous structures.
+Recommended implementation:
+- Locate the window-preset control under Tab 5.
+- Prefer ExpandCollapse or Invoke for opening the dropdown.
+- Select the lung-window option by accessible Name when available.
+- Use menu-relative clicking only if the item is not exposed.
+------------------------------------------------------------
+Survey conclusion
+------------------------------------------------------------
+The montage workflow contains mixed UI technologies:
+- Custom-rendered controls requiring relative clicks.
+- Standard UIA buttons suitable for Invoke.
+- Exposed input fields suitable for ValuePattern.
+- Accessible dropdown options suitable for named selection.
+The production implementation should evaluate each step independently rather
+than forcing the entire workflow into either pure coordinate automation or pure
+UIA automation.
+============================================================
+UI survey target: Report-image caption workflow
+============================================================
+Related action:
+copy-report-text-to-image-caption-and-advance
+Known absolute targets:
+- Caption editor click: (2821,1363)
+- Image-viewer center/reference point: (2884,704)
+Observed screen layout:
+- Primary monitor: report editing interface.
+- Secondary monitor: saved report-image collection and image-caption editor.
+- The image-caption editor is displayed below the current report image.
+- The right side contains the printable PET/CT report preview.
+- Page navigation controls such as "上一页" and "下一页" are visually present
+  near the top of the image collection.
+UI elements requiring later inspection:
+1. Image-caption editor
+   Determine:
+   - ControlType
+   - Name or surrounding label
+   - AutomationId
+   - BoundingRectangle
+   - IsKeyboardFocusable
+   - ValuePattern or TextPattern support
+   - whether losing focus commits the text
+2. Main report-image viewer
+   Determine:
+   - outer container rectangle
+   - whether it accepts focus
+   - whether wheel navigation depends on mouse location or keyboard focus
+   - whether clicking the image center is required to commit the caption
+3. Next-image/page control
+   Visually observed controls:
+   - 上一页
+   - 下一页
+   Determine:
+   - whether "下一页" is exposed as Button
+   - whether InvokePattern is supported
+   - whether this navigation corresponds exactly to the legacy WheelDown action
+Recommended migration order:
+1. UIA focus or ValuePattern for the caption editor.
+2. UIA Invoke on "下一页" if behavior matches the intended next-image action.
+3. Image-container-relative click only if explicit focus loss is required.
+4. Absolute coordinates only as temporary fallback.
+Open validation issue:
+The legacy code uses MouseMove to (2884,704), but the documented intended
+behavior is to click the image center before WheelDown. Verify whether:
+- MouseMove alone is sufficient because wheel input changes focus/commits text;
+- a MouseClick was omitted from the stored legacy code;
+- or the application saves the caption immediately on paste.
+Caption workflow validation update:
+Confirmed:
+- MouseMove to the image area is intentional.
+- No image click is required.
+- After the pointer leaves the caption field, WheelDown advances the image.
+- The current workflow avoids an unnecessary click.
+Revised fallback sequence:
+1. Focus caption editor.
+2. Paste caption text.
+3. Move pointer to a validated location within the image viewer.
+4. Send WheelDown.
+5. Restore original pointer position.
+Previous concern that a MouseClick might be missing is resolved.
+============================================================
+UI target: Screenshot button
+============================================================
+Related action:
+capture-current-viewer-image
+Known legacy click:
+MouseClick "left", 1981, 1350
+Observed UIA properties:
+- Name: Property does not exist
+- ControlType: Button (50000)
+- LocalizedControlType: 按钮
+- IsKeyboardFocusable: True
+- BoundingRectangle: [l=1934,t=1314,r=2028,b=1390]
+Accessibility interpretation:
+- The screenshot target is exposed as a standard UIA Button.
+- It has no useful accessible Name.
+- The surrounding interface contains multiple unnamed Button elements.
+- Identifying it only as the first unnamed Button is unsafe.
+Available activation methods:
+1. Official keyboard shortcut F12.
+2. UIA Invoke after reliable geometric or parent-container identification.
+3. Click inside the UIA Button rectangle.
+4. Absolute coordinate click as legacy fallback.
+Recommended priority:
+1. F12.
+2. UIA Invoke if a need for explicit button activation remains.
+3. Button-rectangle-relative click.
+4. Absolute coordinate only for diagnostics.
+Reason for preferring F12:
+- It is an application-defined shortcut.
+- It is independent of monitor coordinates and layout.
+- It avoids ambiguity among multiple unnamed buttons.
+- It has already been observed to work reliably.
+Feedback requirement:
+The legacy mouse excursion provided execution feedback.
+When moving to F12, replace this with a non-focus-stealing indicator rather
+than retaining coordinate clicking solely for visual feedback.
+Future survey target:
+Inspect whether screenshot creation causes an accessible change in:
+- thumbnail count;
+- report-image page count;
+- current image index;
+- or status text.
+============================================================
+UI survey targets: SUV ROI and arrow annotation workflows
+============================================================
+Related actions:
+- toggle-suv-roi-tool
+- toggle-arrow-annotation-tool
+Current assessment:
+The principal activation and clear buttons are exposed through UIA.
+Exact accessible properties still to collect:
+- Name
+- AutomationId
+- ControlType
+- BoundingRectangle
+- parent container
+- InvokePattern availability
+- enabled state
+- any selected or active-state property
+------------------------------------------------------------
+SUV targets
+------------------------------------------------------------
+Activate SUV 3D tool:
+- Legacy point: (2471,826)
+- Expected type: Button
+- Preferred migration: UIA Invoke
+SUV clear-tab selector:
+- Legacy point: (1963,627)
+- May belong to the custom-rendered icon tab strip
+- If the individual tab is not exposed, use outer tab-strip relative clicking
+Clear SUV measurement:
+- Legacy point: (2043,1113)
+- Expected type: Button
+- Preferred migration: UIA Invoke
+State-detection questions:
+- Does the SUV 3D button expose TogglePattern?
+- Does its selected/pressed visual state change an accessible property?
+- Does drawing an ROI create a new accessible object?
+- Does the clear button enabled state change when an ROI exists?
+- Is the displayed SUVmax text exposed through UIA?
+------------------------------------------------------------
+Arrow targets
+------------------------------------------------------------
+Activate arrow annotation tool:
+- Legacy point: (2470,651)
+- Expected type: Button
+- Preferred migration: UIA Invoke
+Arrow clear-tab selector:
+- Legacy point: (2079,626)
+- May belong to the same custom-rendered tab strip
+- Use outer-region relative clicking if the child tab is not exposed
+Clear arrow annotation:
+- Legacy point: (2170,989)
+- Expected type: Button
+- Preferred migration: UIA Invoke
+State-detection questions:
+- Does the arrow button expose TogglePattern?
+- Does the button expose a selected or pressed state?
+- Does an arrow annotation create an accessible object?
+- Does the clear button enabled state reflect annotation presence?
+------------------------------------------------------------
+Timing-state interpretation
+------------------------------------------------------------
+Current logic does not read application state.
+It infers the intended operation from the time since the previous press:
+- long interval: activate tool;
+- short interval: clear corresponding annotation.
+This should be treated as established user-interface behavior, not as an error.
+A future state-aware implementation is acceptable only if it is more reliable
+than the timing heuristic and does not increase latency.
+------------------------------------------------------------
+Safety and performance requirements
+------------------------------------------------------------
+- Do not activate a wrong tool if the target control cannot be uniquely found.
+- Avoid modal feedback.
+- Keep execution latency low enough for mouse-side-button use.
+- Restore the original pointer location.
+- Do not merge the SUV and arrow clear controls merely because MedEx can be
+  configured to clear all annotations from either button.
+- Preserve tool-specific clearing unless the user explicitly changes this
+  preference.
+============================================================
+UI survey target: PET report cover-image workflow
+============================================================
+Related action:
+generate-report-cover-images
+Purpose:
+Prepare the left MIP image and right coronal sectional/fusion image used on the
+first page of the printed PET/CT report.
+Observed control groups:
+1. Image-layout selector
+   Purpose:
+   Switch the viewer into the layout required for first-page image preparation.
+   Expected migration:
+   - Use UIA if the layout control is exposed.
+   - Otherwise locate the outer layout-selector region and use a relative click.
+2. MIP image pane
+   Purpose:
+   Select the MIP series/image before initialization and Left assignment.
+   Open questions:
+   - Is the image pane exposed as Image, Pane, or Custom?
+   - Can the MIP series be identified by Name or surrounding text?
+   - Does selection change any accessible state?
+3. Coronal image pane
+   Purpose:
+   Select the coronal sectional/fusion image before initialization and Right
+   assignment.
+   Open questions:
+   - Is the coronal pane exposed independently?
+   - Can it be identified by geometry, series label, or accessible text?
+   - Does the selected pane expose focus or selection state?
+4. Image initialization control
+   Purpose:
+   Reset the selected image to the required default display state before it is
+   assigned to the report.
+   Expected migration:
+   Prefer UIA Invoke if exposed as Button.
+5. Left assignment control
+   Visual label:
+   L
+   Purpose:
+   Assign the currently selected initialized MIP image to the left report-image
+   position.
+   Expected migration:
+   Prefer UIA Invoke.
+6. Right assignment control
+   Visual label:
+   R
+   Purpose:
+   Assign the currently selected initialized coronal image to the right
+   report-image position.
+   Expected migration:
+   Prefer UIA Invoke.
+Current legacy absolute points:
+- (2129,404)
+- (2073,628)
+- (2153,1099)
+- (2133,1123)
+- (3637,1084)
+- (1983,1204)
+- (2935,1081)
+- (2177,1289)
+- (2084,1202)
+Survey recommendation:
+Do not inspect every point individually during the current session.
+The annotated legacy script already preserves the business meaning.
+A later purpose-built diagnostic pass should:
+- enumerate exposed buttons around the initialization and L/R controls;
+- capture Name, AutomationId, ControlType, BoundingRectangle, and InvokePattern;
+- inspect whether the selected image pane exposes focus or selection state;
+- identify an outer container for any custom-rendered layout controls;
+- convert unavoidable image-pane clicks to container-relative positions.
+Likely final automation model:
+- UIA Invoke for standard buttons;
+- geometry-based pane selection for custom-rendered image areas;
+- explicit validation between major steps;
+- no modal completion dialogs.
+Evidence:
+- Viewer control screenshot.
+- Printed-report first-page screenshot showing left MIP and right coronal image.
+- Annotated legacy AHK script.
+============================================================
+UI survey: Viewer context-menu measurement controls
+============================================================
+Related actions:
+- copy-suvmax-value
+- copy-line-measurement-values
+Context:
+The controls appear after right-clicking inside the MedEx image viewer.
+Observed menu controls include:
+- 当前窗宽位调整
+- 保存当前选中图像
+- 保存右侧报告图像
+- 删除全部标注
+- 删除当前标注
+- 保存当前页面图像
+- 保存左侧报告图像
+- 复制当前轮廓
+- 复制标注值
+- 复制SUVMax值
+- 复制直线测量值
+- 引入直线测量值
+- 保存科研报告图像
+------------------------------------------------------------
+Target: Copy SUVMax
+------------------------------------------------------------
+Name:
+复制SUVMax值
+ControlType:
+Button (50000)
+LocalizedControlType:
+按钮
+IsKeyboardFocusable:
+True
+BoundingRectangle:
+[l=2916,t=984,r=3049,b=1013]
+Migration recommendation:
+- Find the exact Button by Name="复制SUVMax值".
+- Confirm it belongs to the expected viewer context menu.
+- Invoke using InvokePattern.
+- Avoid coordinate clicking.
+Clipboard behavior:
+- ROI present: outputs formatted value, for example "SUVMax: 2.143".
+- ROI absent: outputs "SUVMax: 0.000".
+State implication:
+Clipboard update alone does not establish that an ROI exists.
+------------------------------------------------------------
+Target: Copy line measurements
+------------------------------------------------------------
+Name:
+复制直线测量值
+ControlType:
+Button
+Migration recommendation:
+- Find the exact Button by Name="复制直线测量值".
+- Confirm parent context-menu relationship.
+- Invoke using InvokePattern.
+Clipboard behavior:
+- No measurement line: no new usable measurement string.
+- One line: one value.
+- Two lines: two values separated by "×".
+- Three lines: three values separated by "×".
+- Four or more lines: only the first three are returned.
+Output order:
+1. 长径
+2. 短径
+3. 上下径
+Important:
+The output order follows measurement creation order and should not be
+re-sorted automatically.
+------------------------------------------------------------
+Clipboard-detection requirement
+------------------------------------------------------------
+Because "复制直线测量值" may produce no output when no line exists, the
+implementation should not inspect only the final clipboard contents.
+Recommended method:
+1. Preserve ClipboardAll.
+2. Replace the clipboard with a unique sentinel or clear it.
+3. Invoke the target control.
+4. Wait for a clipboard sequence-number change or ClipWait timeout.
+5. Distinguish:
+   - updated with valid measurement text;
+   - updated with unexpected text;
+   - no clipboard update;
+   - invocation failure.
+6. Restore the original clipboard after the caller has consumed the result.
+For SUVMax:
+- "SUVMax: 0.000" is a valid updated clipboard result.
+For line measurements:
+- no update should map to NoMeasurement rather than ParseError.
+------------------------------------------------------------
+Survey conclusion
+------------------------------------------------------------
+These context-menu actions are strong UIA migration candidates because:
+- their controls expose exact, semantically meaningful Names;
+- they are standard Button elements;
+- the expected result is observable through the clipboard;
+- no absolute coordinate dependency is required.
