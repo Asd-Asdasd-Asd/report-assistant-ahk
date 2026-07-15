@@ -54,9 +54,17 @@
 
 ## v0.5.0 MedEx color reset staged tests
 
+### 2026-07-15 validated baseline
+
+- [x] MedEx 0.0.1.0 / 1920×1080 / 100% / DPI 96 automation chain 连续三次通过。
+- [x] `检查所见` region、dynamic `16px` local anchor、`672,297` point 和 exact `000000` Invoke 通过。
+- [x] 一次 region missing 安全中止，没有发送 click。
+- [x] 用户在 approved non-clinical context 人工确认后续字符为黑色。
+- [ ] 其他 DPI/scaling、resolution、multi-monitor/per-monitor DPI、MedEx version 和用户环境。
+
 ### Field-debug 准备与执行
 
-Prerequisite：[ ] AutoHotkey v2 可用，field-debug 目录包含 pinned `debug/Lib/UIA.ahk` v1.1.3，并已准备 approved non-clinical test context。UIA-v2 不需要系统级安装，不要同时提供另一份全局版本。
+Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共用的 pinned `src/Lib/UIA.ahk` v1.1.3，并已准备 approved non-clinical test context。UIA-v2 不需要系统级安装，不要同时提供另一份全局版本。
 
 1. [ ] 启动 MedEx。
 2. [ ] Focus report editor。

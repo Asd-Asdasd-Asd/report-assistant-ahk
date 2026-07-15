@@ -2,12 +2,13 @@
 #SingleInstance Force
 #Warn
 
+#Include app_metadata.ahk
 #Include config.example.ahk
 #Include *i config.local.ahk
 #Include window_guard.ahk
 #Include utils.ahk
 #Include clipboard_html.ahk
-#Include *i <UIA>
+#Include <UIA>
 #Include medex_color_reset_logic.ahk
 #Include diagnostics.ahk
 #Include adapters\medex_report_editor.ahk

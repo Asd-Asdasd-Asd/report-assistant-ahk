@@ -5,6 +5,7 @@ class MedExColorResetDefaults {
         "medexworkstations.exe"
     ]
     static ConfirmedProcessName := ""
+    static AllowProvisionalProcess := true
 
     ; Provisional bounded field-test timing values.
     static MenuOpenTimeoutMs := 600
@@ -17,6 +18,7 @@ ResetMedExInsertionColor(options := 0) {
     startedAt := A_TickCount
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "appVersion", AppMetadata.Version,
         "foregroundProcess", "UNKNOWN",
         "foregroundWindowHandle", "UNKNOWN",
         "provisionalProcessCandidateAccepted", false,
@@ -71,7 +73,11 @@ ResetMedExInsertionColor(options := 0) {
             "confirmedProcessName",
             MedExColorResetDefaults.ConfirmedProcessName
         )
-        allowProvisionalProcess := MedExAdapterOption(options, "allowProvisionalProcess", false)
+        allowProvisionalProcess := MedExAdapterOption(
+            options,
+            "allowProvisionalProcess",
+            MedExColorResetDefaults.AllowProvisionalProcess
+        )
         if confirmedProcessName != "" && StrLower(foregroundProcess) = StrLower(confirmedProcessName) {
             context["processNameConfirmed"] := true
         } else if !allowProvisionalProcess {
@@ -98,6 +104,9 @@ ResetMedExInsertionColor(options := 0) {
         try context["uiaInterfaceVersion"] := UIA.IUIAutomationVersion
         catch
             context["uiaInterfaceVersion"] := "UNKNOWN"
+        try context["uiaLibraryVersionRuntime"] := UIA.Version
+        catch
+            context["uiaLibraryVersionRuntime"] := "UNKNOWN"
 
         lookupStartedAt := A_TickCount
         try windowElement := UIA.ElementFromHandle(foregroundHwnd)
@@ -204,7 +213,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
             if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
                 context["processReason"] := "foregroundWindowChangedBeforeTriggerClick"
                 context["foregroundGuardReason"] := "foregroundTargetChangedBeforeTriggerClick"
-                return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
+                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
             }
 
             try {
@@ -228,7 +237,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
             if menuLookup["foregroundChanged"] {
                 context["processReason"] := "foregroundWindowChangedWhileWaitingForMenu"
                 context["foregroundGuardReason"] := "foregroundTargetChangedWhileWaitingForMenu"
-                return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
+                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
             }
 
             if menuOpened
@@ -237,7 +246,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
             if attempt < maxAttempts && !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
                 context["processReason"] := "foregroundWindowChangedBeforeRetry"
                 context["foregroundGuardReason"] := "foregroundTargetChangedBeforeRetry"
-                return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
+                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
             }
         }
 
@@ -260,7 +269,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
         if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
             context["processReason"] := "foregroundWindowChangedBeforeInvoke"
             context["foregroundGuardReason"] := "foregroundTargetChangedBeforeInvoke"
-            return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
+            return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
         }
 
         try {
@@ -440,10 +449,19 @@ CollectMedExEnvironmentContext(hwnd, context) {
 FinishMedExColorReset(ok, code, context, startedAt, options) {
     context["elapsedMs"] := A_TickCount - startedAt
     result := MakeColorResetResult(ok, code, context)
-    if MedExAdapterOption(options, "enableDevelopmentLog", true) {
+    diagnosticMode := MedExAdapterOption(options, "diagnosticMode", "production")
+    if diagnosticMode = "field" {
         try {
             logPath := MedExAdapterOption(options, "logPath", "")
             context["logPath"] := WriteMedExColorResetDiagnostic(result, logPath)
+        } catch as err {
+            context["diagnosticWriteFailed"] := true
+            context["diagnosticErrorType"] := Type(err)
+        }
+    } else if diagnosticMode = "production" && !ok {
+        try {
+            logPath := MedExAdapterOption(options, "logPath", "")
+            context["logPath"] := WriteMedExColorResetFailureDiagnostic(result, logPath)
         } catch as err {
             context["diagnosticWriteFailed"] := true
             context["diagnosticErrorType"] := Type(err)

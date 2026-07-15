@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### v0.5.0-alpha.0 — Field-validated production baseline
+
+- Integrated the validated semantic-anchor Color Reset V1 into the normal hotstring/report-editor call chain.
+- Accepted the exact provisional MedEx process allowlist in production while retaining `ProcessNameConfirmed=false`.
+- Added `COLOR_RESET_FOREGROUND_CHANGED` without renaming established result codes.
+- Split default failure-only production diagnostics from explicit full field diagnostics; both use the same adapter/resolver.
+- Removed ToolTip feedback from the red-paste/color-reset production path.
+- Centralized application version metadata and promoted pinned UIA-v2 v1.1.3 to a shared production/build dependency.
+- Generated a self-contained single-file AHK release and added production integration/path tests.
+- Recorded three successful automation runs and user-confirmed final black insertion color for the MedEx 0.0.1.0, 1920×1080, 100% baseline.
+- Did not implement full configuration, EXE packaging, GUI, updater, M2, or additional legacy migration.
+
 ### M1 — Semantic region/local-anchor redesign
 
 - Removed production dependency on user-configurable shortcut Name=`①`.

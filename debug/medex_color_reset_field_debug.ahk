@@ -2,13 +2,13 @@
 #SingleInstance Force
 #Warn
 
-; Source project version: v0.5.0-development
-; Source commit: 3457248 + uncommitted semantic-anchor redesign
+; Source project version and revision are read from AppMetadata.
 ; Test date: fill on target workstation
 ; Purpose: Validate the MedEx insertion-color reset without pasting report text.
 
-; Uses the repository-pinned debug\Lib\UIA.ahk v1.1.3 through <UIA> lookup.
-#Include *i <UIA>
+; Uses the same repository-pinned UIA-v2 dependency as production.
+#Include ..\src\app_metadata.ahk
+#Include ..\src\Lib\UIA.ahk
 #Include ..\src\medex_color_reset_logic.ahk
 #Include ..\src\diagnostics.ahk
 #Include ..\src\adapters\medex_report_editor.ahk
@@ -54,14 +54,14 @@ RunMedExColorResetFieldDebug() {
         "maxTriggerAttempts", DEBUG_MAX_TRIGGER_ATTEMPTS,
         "allowProvisionalProcess", DEBUG_ALLOW_PROVISIONAL_PROCESS,
         "confirmedProcessName", DEBUG_CONFIRMED_PROCESS_NAME,
-        "enableDevelopmentLog", true,
+        "diagnosticMode", "field",
         "logPath", DEBUG_LOG_FILE,
         "uiaLibraryVersionPinned", DEBUG_UIA_LIBRARY_VERSION_PINNED
     )
 
     result := ResetMedExInsertionColor(options)
-    header := "SourceProjectVersion=v0.5.0-development`r`n"
-        . "SourceCommit=3457248+uncommitted-semantic-anchor-redesign`r`n"
+    header := "SourceProjectVersion=" AppMetadata.Version "`r`n"
+        . "SourceRevision=" AppMetadata.SourceRevision "`r`n"
         . "TestDate=" FormatTime(, "yyyy-MM-dd HH:mm:ss") "`r`n"
         . "Purpose=MedExInsertionColorResetFieldValidation`r`n"
     output := header FormatMedExFieldDebugResult(result)

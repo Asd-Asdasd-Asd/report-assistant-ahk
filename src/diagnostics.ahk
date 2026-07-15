@@ -1,5 +1,9 @@
 DefaultMedExColorResetLogPath() {
-    return A_Temp "\MedExAHK\medex-color-reset-development.log"
+    return A_Temp "\MedExAHK\field\medex-color-reset-field.log"
+}
+
+DefaultMedExColorResetFailureLogPath() {
+    return A_Temp "\MedExAHK\logs\medex-color-reset-failures.log"
 }
 
 WriteMedExColorResetDiagnostic(result, logPath := "") {
@@ -14,10 +18,42 @@ WriteMedExColorResetDiagnostic(result, logPath := "") {
     return logPath
 }
 
+WriteMedExColorResetFailureDiagnostic(result, logPath := "") {
+    if logPath = ""
+        logPath := DefaultMedExColorResetFailureLogPath()
+
+    SplitPath logPath, , &logDirectory
+    if logDirectory != "" && !DirExist(logDirectory)
+        DirCreate logDirectory
+
+    FileAppend FormatMedExColorResetFailureLogLine(result) "`r`n", logPath, "UTF-8"
+    return logPath
+}
+
+FormatMedExColorResetFailureLogLine(result) {
+    context := result.context
+    fields := [
+        "timestamp=" SafeDiagnosticValue(MedExContextValue(context, "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"))),
+        "appVersion=" SafeDiagnosticValue(MedExContextValue(context, "appVersion", "UNKNOWN")),
+        "action=MedExColorReset",
+        "resultCode=" SafeDiagnosticValue(result.code),
+        "processName=" SafeDiagnosticValue(MedExContextValue(context, "foregroundProcess", "UNKNOWN")),
+        "windowHandle=" SafeDiagnosticValue(MedExContextValue(context, "foregroundWindowHandle", "UNKNOWN")),
+        "processReason=" SafeDiagnosticValue(MedExContextValue(context, "processReason", "")),
+        "anchorSelectionReason=" SafeDiagnosticValue(MedExContextValue(context, "anchorSelectionReason", "")),
+        "geometryReason=" SafeDiagnosticValue(MedExContextValue(context, "geometryReason", "")),
+        "coordinateSpaceReason=" SafeDiagnosticValue(MedExContextValue(context, "coordinateSpaceReason", "")),
+        "foregroundGuardReason=" SafeDiagnosticValue(MedExContextValue(context, "foregroundGuardReason", "")),
+        "elapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "elapsedMs", "UNKNOWN"))
+    ]
+    return JoinDiagnosticFields(fields, " ")
+}
+
 FormatMedExColorResetLogLine(result) {
     context := result.context
     fields := [
         "timestamp=" SafeDiagnosticValue(MedExContextValue(context, "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"))),
+        "appVersion=" SafeDiagnosticValue(MedExContextValue(context, "appVersion", "UNKNOWN")),
         "action=MedExColorReset",
         "resultCode=" SafeDiagnosticValue(result.code),
         "automationChainResult=" SafeDiagnosticValue(MedExContextValue(context, "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED")),
@@ -72,6 +108,7 @@ FormatMedExFieldDebugResult(result) {
     context := result.context
     fields := [
         "Test=MedExColorReset",
+        "AppVersion=" SafeDiagnosticValue(MedExContextValue(context, "appVersion", "UNKNOWN")),
         "ResultCode=" SafeDiagnosticValue(result.code),
         "AutomationChainResult=" SafeDiagnosticValue(MedExContextValue(context, "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED")),
         "FinalValidationState=" (MedExContextValue(context, "finalInsertionColorVisuallyValidated", false) ? "VISUALLY_VALIDATED" : "FINAL_COLOR_PENDING_VISUAL_VALIDATION"),

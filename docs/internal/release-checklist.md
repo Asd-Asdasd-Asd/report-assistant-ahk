@@ -3,9 +3,11 @@
 发布前逐项确认。
 
 - [ ] 确认版本 scope 与 `docs/internal/roadmap.md` 一致，没有混入 deferred features。
+- [ ] 确认 `src/app_metadata.ahk` 是唯一人工维护的 application version source。
 - [ ] 运行 automated/reference tests。
 - [ ] 运行 `python scripts/build_release.py`。
 - [ ] 检查 `release/report_assistant.ahk` 是否生成。
+- [ ] 检查 generated release 已包含 pinned UIA dependency，且不依赖 `debug/Lib`、source tree 或开发机 absolute paths。
 - [ ] 从 source truth 生成 internal-test executable，不手改生成产物。
 - [ ] 检查 executable/source release 不包含真实 `config.ini`、日志或 patient data。
 - [ ] 确认更新流程不会覆盖 `%LocalAppData%\MedExAHK\config.ini`。
@@ -17,7 +19,8 @@
 - [ ] 测试 `;red` 不破坏剪贴板。
 - [ ] 测试 `;red` 插入红色文字后，后续输入恢复黑色。
 - [ ] 测试 wrong process、missing anchors、invalid geometry、menu timeout、missing black item 和 Invoke failure 全部 fail-closed。
-- [ ] 检查 color-reset logs 只包含允许的 geometry/timing/result metadata，不包含报告文字或 clipboard content。
+- [ ] 检查 production success 不写 heavy field log；failure-only log 不含 geometry dump、报告文字或 clipboard content。
+- [ ] 检查 explicit field mode 仍能输出完整 privacy-safe diagnostic schema。
 - [ ] 测试 `;fzg`。
 - [ ] 检查没有自动提交、自动审核或自动最终发送功能。
 - [ ] 检查 new/compat hotkeys 和 hotstrings 没有重复注册。

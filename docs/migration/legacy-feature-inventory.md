@@ -15,7 +15,7 @@
 
 | Feature | Legacy location | New-project location | Migration status | User dependency | Conflict risk | Recommended action | Target version |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 红色 `（见图）` 插入：`;red` | `legacy/string_change.ahk:4-12` → `InsertRedText()` → `red_not.clip`；随后点击固定坐标恢复黑色 | `src/hotstrings.ahk:1-4` → `PasteRedFigureText()` → dynamic `CF_HTML` | 部分迁移：红字已确认可插入；新项目尚未恢复黑色 | 高 | 两个脚本注册同名热字符串，会重复触发或争抢触发；两种剪贴板路径也可能重叠 | v0.5.0 完成并验证 MedEx color reset 前保留 legacy 实现；验证后只启用新实现 | v0.5.0 |
+| 红色 `（见图）` 插入：`;red` | `legacy/string_change.ahk:4-12` → `InsertRedText()` → `red_not.clip`；随后点击固定坐标恢复黑色 | `src/hotstrings.ahk:1-4` → `InsertRedFigureTextAndRestoreState()` → dynamic `CF_HTML` → validated Color Reset V1 | 已迁移到 production source；2026-07-15 baseline workstation 已验证，仍待 packaged coexistence smoke test | 高 | 两个脚本注册同名热字符串，会重复触发或争抢触发；两种剪贴板路径也可能重叠 | internal-alpha coexistence 时禁用 legacy duplicate，只启用新实现；保留旧组合用于 rollback | v0.5.0 |
 | 增高短语：`;fzg` | `legacy/string_change.ahk:15-22`；固定短语 + `InsertRedText()` + 50 ms + Left 4 | `src/hotstrings.ahk:6-11`；相同固定短语 + `PasteRedFigureText()` 成功后 Left 4 | 部分迁移：文本和光标位移相同；富文本来源、sleep 和成功条件不同 | 高 | 同名热字符串直接冲突 | 保留新实现作为目标；Windows 验证红字、光标位置和失败分支后停用 legacy | v0.5.0 |
 | 未见明显增高短语：`;fwj` | `legacy/string_change.ahk:25-31` | `src/hotstrings.ahk:13-17` | 部分迁移：可见固定短语相同；富文本来源不同 | 高 | 同名热字符串直接冲突 | 完成 MedEx color reset 后验证完整输出，只保留新实现 | v0.5.0 |
 | 摄取降低短语：`;fjd` | `legacy/string_change.ahk:34-40` | `src/hotstrings.ahk:19-23` | 部分迁移：可见固定短语相同；富文本来源不同 | 高 | 同名热字符串直接冲突 | 完成 MedEx color reset 后验证完整输出，只保留新实现 | v0.5.0 |

@@ -20,7 +20,7 @@
 | Shift+Alt+R snapshot save | 原 legacy only，compatibility 不启用 | 只为旧 `red_not.clip` 流程服务；新项目验证后退役 |
 | Ctrl+Alt+Esc / Ctrl+Alt+Q | 新项目 | 注意它们不控制 compatibility 进程 |
 
-在 v0.5.0 color reset 尚未完成并验证前，不应把当前 compatibility scaffold 与新项目一起当作完整日常替代组合，因为 scaffold 已排除重复报告 hotstrings。当前生产性工作流应保持用户现有可回退组合。
+2026-07-15 Color Reset V1 已在 baseline workstation 完成验证，但 internal-alpha package、configuration 和完整 coexistence smoke test 尚未完成。因此当前 compatibility scaffold 与新项目仍不能直接视为完整日常替代组合；在下一里程碑明确 feature ownership 和回滚步骤前，保持用户现有可回退组合。
 
 ## 进程与启动顺序
 

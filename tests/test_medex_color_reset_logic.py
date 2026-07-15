@@ -339,6 +339,7 @@ class MedExColorResetLogicTests(unittest.TestCase):
     def test_foreground_guards_black_match_and_retry_remain(self) -> None:
         source = ADAPTER_SOURCE.read_text(encoding="utf-8")
         self.assertGreaterEqual(source.count("MedExForegroundTargetMatches("), 3)
+        self.assertGreaterEqual(source.count("ColorResetCode.FOREGROUND_CHANGED"), 4)
         self.assertIn('{Type: "Hyperlink", Name: "000000"}', source)
         self.assertIn("Min(2, Integer(maxAttempts))", source)
 

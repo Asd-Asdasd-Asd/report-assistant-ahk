@@ -1,6 +1,6 @@
 # MedEx 富文本插入后颜色复位技术调查
 
-日期：2026-07；最后修订：2026-07-15
+日期：2026-07；最后修订：2026-07-15 production baseline validation
 
 本文是 Technical Investigation。V1 是可替换的现场自动化方案，不是永久架构。
 
@@ -156,4 +156,6 @@ Diagnostics 记录 profile、region/font/optional anchor names 和 rectangles、
 - Known limitation: The color dropdown trigger itself is not exposed as a usable UIA element.
 - Future replacement candidate: Direct editor command through Electron renderer, IPC, or the embedded editor API.
 
-Status: Investigation complete; revised V1 implemented on the development machine, final insertion color pending workstation visual validation.
+2026-07-15 baseline validation 在 MedEx 0.0.1.0、1920×1080、100% scaling、DPI 96 环境获得三次连续 `AUTOMATION_CHAIN_OK`，并由用户人工确认后续输入为黑色。观察到的 process 是 provisional `medexworkstations.exe`。其他 DPI、resolution、multi-monitor/per-monitor DPI、MedEx version 和用户布局仍待验证。
+
+Status: Investigation complete; Color Reset V1 production baseline field-validated.

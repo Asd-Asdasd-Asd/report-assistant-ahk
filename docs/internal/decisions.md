@@ -135,3 +135,17 @@
 - 同一个 trigger 只能有一个 active owner。
 - 每次新 release 逐项缩减 compatibility，并提供中文 update notes 和 rollback method。
 - 在用户确认依赖和新实现 validation 之前，不删除 legacy capability。
+
+## Decision 009: 冻结 field-validated production baseline
+
+状态：Accepted for `0.5.0-alpha.0`
+
+背景：Color Reset V1 已在 MedEx 0.0.1.0、1920×1080、100% scaling 环境完成 automation 和人工最终颜色验证；下一步需要 packaging/configuration，但不能让 production 依赖 field-only paths。
+
+决策：`src/app_metadata.ahk` 作为唯一 app version source；pinned UIA-v2 放在 `src/Lib/` 并由 source、field debug 和 generated release 共用。Production 默认只写 failure-only lightweight diagnostics，完整 schema 只由 explicit field mode 启用。
+
+影响：
+
+- Generated release 可以 self-contained，不依赖 `debug/` 或 global UIA installation。
+- Field debug 与 production 不复制 resolver。
+- 正式 config/log paths 和 executable packaging 留到下一里程碑。

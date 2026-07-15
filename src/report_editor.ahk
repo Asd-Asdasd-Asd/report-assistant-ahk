@@ -18,7 +18,6 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
     ; never triggers automatic deletion or undo of report content.
     resetResult := ResetMedExInsertionColor(resetOptions)
     if !resetResult.ok {
-        Flash("红字已插入，但输入颜色复位失败：" resetResult.code, 3000)
         SoundBeep(650, 150)
         return {
             ok: false,

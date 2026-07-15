@@ -27,13 +27,8 @@ PasteHtmlFragmentDetailed(fragment) {
     pasteDispatched := transaction.actionSucceeded && transaction.restoreAttempted
 
     if !transaction.actionSucceeded {
-        message := "红字插入失败，请手动添加“（见图）”。"
-        if transaction.restoreAttempted && !transaction.restoreSucceeded
-            message .= " 剪贴板恢复失败，请检查剪贴板内容。"
-        Flash(message, 2500)
         SoundBeep(750, 120)
     } else if !transaction.restoreSucceeded {
-        Flash("红字粘贴命令已发送，但剪贴板恢复失败，请检查剪贴板内容。", 2500)
         SoundBeep(750, 120)
     }
 

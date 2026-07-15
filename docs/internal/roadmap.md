@@ -158,7 +158,7 @@ v0.5.0 的 MedEx color reset 采用已批准 V1：semantic region anchor + dynam
 | Milestone | Scope | Entry criteria | Exit criteria | Workstation validation | Blocks first limited test |
 | --- | --- | --- | --- | --- | --- |
 | M0 Evidence foundation | 固化 2026-07-13 证据、状态、架构、风险和测试计划 | 现场 artifacts 已回传 | 结论分类、矛盾和 M1 范围进入 durable docs；原始证据未修改 | 不需要新增工作站操作 | 是 |
-| M1 Color Reset V1 | semantic region anchor、dynamic local font anchor、local-offset click、无焦点诊断 | M0 完成 | automation chain 可区分；目标 toolbar 正确；人工确认后续字符为黑色 | 1920×1080、100% baseline 必须通过 | 是 |
+| M1 Color Reset V1 | semantic region anchor、dynamic local font anchor、local-offset click、无焦点诊断 | M0 完成 | 已完成：automation chain 与人工后续黑色确认通过 | 1920×1080、100% baseline 已通过 | 是（已满足） |
 | M2 Core retained behavior | 全局 HHKB navigation 与已稳定、无坐标的必要 legacy 行为 | M1 通过 | 新旧 hotkeys/hotstrings 无冲突，核心键盘行为通过回归 | 跨应用 HHKB 与共存 smoke test | 是 |
 | M3 High-frequency viewer migration | F12、SUV/Arrow、SUVMax/line measurement | M2 完成 | 每项 structured result、fail-closed 和现场验证完成 | 真实 viewer 必须逐项验证 | 否；稳定 compatibility 可临时承接 |
 | M4 Report-image workflows | montage、caption、cover images | 相应 UI survey 足够 | 参数、相对区域和业务输出逐项验证 | 真实 viewer/双屏验证 | 否；稳定 compatibility 可临时承接 |

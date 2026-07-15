@@ -68,7 +68,7 @@
 1. 日志报告 `COLOR_RESET_OK`，但操作了错误工具栏，且最终输入色未完成有效人工确认。最可能解释是现有 code 只表示 black item Invoke 未抛错，不表示目标 editor 最终状态正确。
 2. `Process=medexworkstations.exe` 同时出现 `ProcessNameConfirmed=false`。前者命中 provisional candidate；后者表示 production confirmed-name 尚为空，不表示进程名称读取失败。
 3. `RetryCount=false` 应为整数 `0`，属于 diagnostic serialization/type defect。
-4. `UIALibraryVersion=EXPECTED_1.1.3_NOT_RUNTIME_DETECTED` 只表示预期依赖版本，不是 runtime detection。当前仓库 pinned `debug/Lib/UIA.ahk` v1.1.3；没有证据证明其他版本绝对不可用。
+4. `UIALibraryVersion=EXPECTED_1.1.3_NOT_RUNTIME_DETECTED` 只表示当时的预期依赖版本，不是 runtime detection。2026-07-15 baseline freeze 后，repository-pinned dependency 已提升到 `src/Lib/UIA.ahk`；没有证据证明其他版本绝对不可用。
 5. 现场记录称完成通知改变焦点。无论具体来自 `MsgBox` 还是其他 UI，本轮 M1 默认不得显示反馈，只写 clipboard/log。
 
 ## V1 已批准安全边界

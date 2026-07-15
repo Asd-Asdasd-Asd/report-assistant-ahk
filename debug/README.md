@@ -4,21 +4,19 @@
 
 ## UIA 依赖
 
-本实现 pin Descolada UIA-v2 v1.1.3。仓库已包含该版本，field-debug 目录结构是：
+本实现 pin Descolada UIA-v2 v1.1.3。production 和 field debug 共用：
 
 ```text
-debug\
-├── medex_color_reset_field_debug.ahk
-└── Lib\
-    └── UIA.ahk
+src\Lib\UIA.ahk
+debug\medex_color_reset_field_debug.ahk
 ```
 
-这样 AutoHotkey v2 可以通过 `<UIA>` 找到 repository-pinned dependency。目标工作站无需系统级安装 UIA-v2，也不要同时 include 另一份 global library。
+Field script 使用 explicit relative include，production source 使用 `src/Lib` standard library lookup。目标工作站无需系统级安装 UIA-v2，也不要同时 include 另一份 global library。
 
 - Repository: `https://github.com/Descolada/UIA-v2`
 - Pinned release: `v1.1.3`
 
-如果依赖未安装，脚本仍可启动，但 diagnostic hotkey 会返回：
+如果 repository-pinned dependency 缺失，AHK 会在启动时明确报告 include failure；不要把缺失依赖降级成 optional include。运行中 UIA 初始化失败仍返回：
 
 ```text
 COLOR_RESET_UIA_UNAVAILABLE
