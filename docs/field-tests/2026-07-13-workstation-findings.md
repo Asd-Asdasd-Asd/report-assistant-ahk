@@ -1,5 +1,7 @@
 # 2026-07-13 MedEx 工作站现场证据
 
+> Historical evidence note (2026-07-15): 本文中的 `16px + ① + second candidate` 是当日被测实现和证据模型，不再是 production design。后续确认 `①` 可由用户修改，`16px` 是动态字号值；替代模型见 `2026-07-14-color-reset-validation.md`。
+
 本文固化 2026-07-13 Windows 工作站测试结论。原始材料保存在 `debug/field-result-2026-07-13/` 和 `debug/legacy-automation-survey-2026-07-13/`，作为只读历史证据；本文不替代或改写原始记录。
 
 环境：Windows 工作站，1920×1080，100% display scaling，DPI 96，AutoHotkey 2.0.18，MedEx 0.0.1.0。现场记录的进程名为 `medexworkstations.exe`。

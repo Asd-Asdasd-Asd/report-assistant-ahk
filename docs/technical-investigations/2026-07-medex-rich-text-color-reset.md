@@ -1,289 +1,158 @@
 # MedEx 富文本插入后颜色复位技术调查
 
-日期：2026-07
+日期：2026-07；最后修订：2026-07-15
 
-本文记录一次已经完成的 Technical Investigation。当前结论批准一个可实施的 V1 方案，但不把该方案描述为永久架构。
+本文是 Technical Investigation。V1 是可替换的现场自动化方案，不是永久架构。
 
 ## Objective
 
-`CF_HTML` 已确认可以在 MedEx 报告编辑器中正确插入红色文字。剩余问题是 MedEx 会继承最后一个已插入字符的颜色，导致用户随后键入的内容继续保持红色。
+`CF_HTML` 已确认可在 MedEx 报告编辑器插入红色文字。剩余问题是 MedEx 继承最后插入字符的颜色，导致后续输入仍为红色。目标是恢复黑色插入状态，同时：
 
-目标是在不改变以下契约的前提下，将当前插入颜色恢复为黑色：
-
-- 不修改报告中可见文字；
-- 不插入零宽字符或隐藏字符；
-- 不污染医疗报告内容；
+- 不修改可见报告文字；
+- 不插入零宽或隐藏字符；
+- 不污染医疗报告；
 - 不依赖 Word COM；
-- 不改变现有剪贴板恢复契约。
+- 不改变 clipboard restoration contract。
 
 ## Rejected approaches
 
-### 1. 在红色 span 后放置空的黑色 HTML span
-
-- Word 会忽略空 span。
-- MedEx 不会因此恢复插入颜色。
-- 结论：Rejected。
-
-### 2. 插入黑色零宽字符
-
-- 会污染报告内容。
-- 删除行为和光标行为不可预测。
-- 医疗报告中不接受隐藏字符。
-- 结论：Rejected。
-
-### 3. Word COM
-
-- `Selection.Font.Color = 0` 在 Word 中有效。
-- MedEx 不是 Word，不能依赖 Word 对象模型。
-- 结论：Rejected。
-
-### 4. 键盘格式快捷键
-
-- `Ctrl+B` 可以控制粗体格式。
-- 没有找到可靠的字体颜色复位快捷键。
-- `Ctrl+Shift+C`、`Ctrl+Space`、`Alt` 组合及类似尝试均未形成可用方案。
-- 结论：Rejected。
+1. 红色 span 后的空黑色 HTML span：Word 忽略，MedEx 不恢复颜色；Rejected。
+2. 黑色零宽字符：污染报告，删除和光标行为不可预测；Rejected。
+3. Word COM：`Selection.Font.Color = 0` 只证明 Word 行为，MedEx 不是 Word；Rejected。
+4. 键盘格式快捷键：`Ctrl+B` 可控制 bold，但 `Ctrl+Shift+C`、`Ctrl+Space`、`Alt` 组合等均不能可靠复位字体颜色；Rejected。
 
 ## Confirmed application architecture
 
-MedEx 已确认是 Electron/Chromium 应用。证据包括：
-
-- `LICENSE.electron.txt`；
-- `resources/app`；
-- `dist`；
-- `node_modules`；
-- Chromium 进程类型，包括 renderer、gpu-process、network 和 audio。
-
-主窗口使用：
-
-```text
-ahk_class Chrome_WidgetWin_1
-```
-
-报告编辑器暴露为：
-
-```text
-Document
-```
-
-因此，报告编辑器运行在 Chromium renderer 内。
+MedEx 是 Electron/Chromium 应用，证据包括 `LICENSE.electron.txt`、`resources/app`、`dist`、`node_modules`，以及 renderer、gpu-process、network、audio 等 Chromium processes。主窗口为 `ahk_class Chrome_WidgetWin_1`，报告编辑器暴露为 `Document`，运行于 Chromium renderer。
 
 ## DevTools investigation
 
-已确认：
-
-- `F12` 不会打开 DevTools；
-- `Ctrl+Shift+I` 不会打开 DevTools；
-- 未发现 `--remote-debugging-port` 参数；
-- 未发现 `--remote-debugging-pipe` 参数。
-
-因此，当前应用版本不能直接附加 Chromium DevTools。以下路线是 deferred，而不是永久 rejected：
-
-- Console inspection；
-- `executeJavaScript()`；
-- 直接调用嵌入式编辑器 JavaScript 命令。
+`F12` 和 `Ctrl+Shift+I` 均不打开 DevTools；未发现 `--remote-debugging-port` 或 `--remote-debugging-pipe`。因此当前版本不能直接附加 DevTools。Console inspection、`executeJavaScript()` 和 embedded-editor JavaScript command 是 deferred investigation，不是永久 rejected。
 
 ## UI Automation findings
 
-- Window Spy 报告 `Intermediate D3D Window1`，无法识别工具栏控件。
-- Accessibility Insights 可以检查相关 accessibility nodes。
-- Window Spy 与 Microsoft UI Automation 不是等价的检查机制。
+Window Spy 只报告 `Intermediate D3D Window1`，不能识别 formatting toolbar；Accessibility Insights 可检查相关 nodes，二者并不等价。报告 `Document` 支持 `TextPattern`、`ValuePattern` 和 `LegacyAccessiblePattern`。
 
-报告编辑器 `Document` 支持：
+颜色 trigger 本身没有可用 UIA node。菜单打开后，每个颜色项暴露为 `Hyperlink`，Name 包括 `000000`、`ff0000`、`95b3d7`，并支持 `InvokePattern`。对 exact Name=`000000` 调用 `Invoke()` 与点击黑色项具有相同自动化效果。这仍是调查中最重要的 confirmed finding。
 
-- `TextPattern`；
-- `ValuePattern`；
-- `LegacyAccessiblePattern`。
+普通暂存、保存、打印按钮暴露为支持 InvokePattern 的 `Button`；bold、italic、color 中间 formatting group 没有直接可选 node，hit testing 只落到周围 `Document`，不能使用 `FindElement("颜色")`。
 
-因此，报告编辑器已经通过 UIA 暴露。
+## Evidence classification
 
-## Color menu findings
+### Verified behavior
 
-颜色触发按钮本身没有独立且可用的 UIA node。
+- UIA `BoundingRectangle` 可用于 toolbar Text anchors，即使 pointer hit testing 失败。
+- 2026-07-13 现场存在病史信息、检查所见、检查结论三组同构 toolbar。
+- 旧模型能打开颜色菜单并 Invoke black item，但曾选择错误 toolbar。
+- 2026-07-14 旧模型正确选择 index 2 后，又因 UIA root `[-8,-8,1928,1048]` 不完全位于 client area 而 fail closed，未发送 click。
+- `检查所见`：Text，`[296,289,352,305]`。
+- 字号当前值：Text；`14px` 与 `16px` 均观察为 `[502,290,529,304]`。
 
-颜色菜单打开后，每个颜色项暴露为：
+### User observation
 
-- Control type：`Hyperlink`；
-- Name 示例：`000000`、`ff0000`、`95b3d7`；
-- 支持 `InvokePattern`。
+- `①` 是用户可配置的快捷符号内容，可改名、重排或移除。
+- 字号 leaf 的 Name 随当前字号改变。
+- completion notification 会干扰焦点和后续颜色验证。
 
-已确认行为：
+### Implementation inference
 
-- 对颜色项调用 `Invoke()` 与鼠标点击该颜色具有相同功能效果；
-- 调用 Name 为 `000000` 的项目会把当前插入颜色改为黑色。
+- `检查所见` 比候选行序号更适合定位目标语义行。
+- 同行动态字号 Text 是距离 color trigger 较近的局部几何基准。
+- 当前 supported layout profile 假设字号值与颜色 control 之间的局部水平布局稳定。
 
-**这是本次调查中最重要的已确认发现。**
+### Deferred investigation
 
-## Toolbar findings
+- 不同 DPI、缩放、窗口宽度和 MedEx 版本的 layout profiles。
+- 是否存在更稳定的报告区域父容器。
+- Electron renderer、IPC 或 embedded editor API 的直接命令。
 
-普通工具栏按钮，例如暂存、保存和打印，暴露为：
+## Invalidated anchor assumptions
 
-- `Button`；
-- 支持 `InvokePattern`。
+以下仅保留为历史证据，不得用于 production resolver：
 
-中间格式组中的粗体、斜体和颜色没有暴露对应的、可直接选择的 UIA nodes。鼠标 hover 和 hit testing 只能解析到周围的 `Document`。
+- exact `Name="①"`：它是用户可配置内容，不是稳定 anchor。
+- exact `Name="16px"`：它是当前字号值；`14px` 等同样合法。
+- `16px + ①` pairs 按 Y 排序后取第二组：插入其他 toolbar 或用户定制会破坏该假设。
+- 整个 UIA root 必须包含于 client area：Windows invisible resize frame 会产生合法负边界。
+- 旧 `0.337` 双锚点比例及 `fontSizeTop + 1` Y 公式：被新的 local-offset profile 取代。
 
-因此，当前不能使用以下直接查询定位颜色触发器：
+## Approved V1 anchor model
 
-```text
-FindElement("颜色")
-```
-
-## BoundingRectangle findings
-
-accessibility tree 为以下 anchors 暴露了可靠矩形：
-
-| Anchor | Observed rectangle values |
-| --- | --- |
-| `检查所见` | `l=296, r=352` |
-| `宋体` | `l=425, r=449` |
-| `16px` | `l=502, r=529` |
-| `①` | `l=953, r=967` |
-
-这说明即使 pointer hit testing 失败，UIA `BoundingRectangle` 数据仍然可用。
-
-2026-07-13 工作站现场测试进一步确认同一页面至少有三组同构 toolbar：
-
-| Toolbar | `16px` | `①` |
-| --- | --- | --- |
-| 病史信息 | `[502,112,529,126]` | `[953,111,967,127]` |
-| 检查所见 | `[502,290,529,304]` | `[953,289,967,305]` |
-| 检查结论 | `[502,735,529,749]` | `[953,734,967,750]` |
-
-Field debug 取到了第一组并计算 `(672,113)`，但操作者聚焦的是检查所见。黑色 item 查找与 Invoke 成功，因此证实了 automation mechanism，却没有证实目标 editor 的最终 insertion color。
-
-## Color arrow positioning
-
-Window Spy 观察到的 client coordinates：
+`MedExColorResetLayoutProfile` 集中定义：
 
 ```text
-x=672
-y=291
+ProfileName=medex-0.0.1-baseline
+RegionAnchorName=检查所见
+FontSizeNamePattern=^\d+(?:\.\d+)?px$
+OptionalRightAnchorName=rAI
+ColorArrowOffsetX=143
+ColorArrowOffsetY=0
+MinVerticalOverlapRatio=0.5
 ```
 
-使用：
+Required `RegionAnchor` 是 exact Text Name=`检查所见`，用于唯一定位目标行。Required `FontSizeAnchor` 是其右侧、垂直有效重叠、Name 匹配集中 pattern 的唯一 Text。`rAI` 只用于 diagnostics/layout fingerprint；缺失、改名或歧义均不阻塞。
+
+生产流程：
+
+1. 验证 foreground MedEx hwnd/process。
+2. 从 foreground window root 或已确认的报告区域父容器枚举 Text elements。
+3. 找到 client area 内唯一有效的 `检查所见`。
+4. 找到该行右侧唯一动态字号 Text。
+5. 验证 rectangles、vertical overlap、relative order 和 client coordinate space。
+6. 以 local offsets 计算 color trigger。
+7. 点击前再次验证 foreground hwnd/process。
+8. 发送一次 validated click；只有菜单未出现且 foreground 不变时允许一次 bounded retry。
+9. 查找 exact Name=`000000` 的 `Hyperlink`，确认 InvokePattern 后调用 `Invoke()`。
+10. 输出 automation-chain result，等待人工最终颜色验证。
+
+失败时不点击或停止后续动作：region 缺失/歧义、font anchor 缺失/歧义、invalid rectangle/geometry/coordinate space、foreground 改变、菜单未打开、black item 缺失、Invoke 不可用/失败。没有 guessed black-coordinate fallback，也没有 absolute screen-coordinate fallback。
+
+## Click-point calculation
+
+V1 使用：
 
 ```text
-fontSizeRight = 529
-numberButtonLeft = 953
+arrowX = fontRect.r + ColorArrowOffsetX
+arrowY = Round((fontRect.t + fontRect.b) / 2) + ColorArrowOffsetY
 ```
 
-估算水平比例约为：
+baseline 为 `529 + 143 = 672`、`Round((290 + 304) / 2) + 0 = 297`。工具栏整体沿 Y 移动时，font rectangle 与 click point 同步移动相同 delta。位置校准只有 `ColorArrowOffsetX/Y` 两个集中值，不需要重写 resolver。
 
-```text
-0.337
-```
+## Recalibration procedure
 
-V1 临时公式：
+MedEx 小版本改变局部布局后：
 
-```text
-arrowX = fontSizeRight + 0.337 * (numberButtonLeft - fontSizeRight)
-arrowY = fontSizeTop + 1
-```
+1. 在 approved non-clinical context 记录字号 Text rectangle。
+2. 记录 color-arrow 目标 screen point。
+3. 计算 `ColorArrowOffsetX = targetX - fontRect.r`。
+4. 计算 `ColorArrowOffsetY = targetY - Round((fontRect.t + fontRect.b) / 2)`。
+5. 仅在 field-debug overrides 中试验新值。
+6. Windows 人工验证通过后，为新 MedEx layout 新增/更新 profile 并发布；不要改 core resolver。
 
-这是基于 UIA anchors 的比例坐标计算，不是固定 absolute-pixel coordinate。
+## Structured results and diagnostics
 
-## Approved V1 implementation direction
+核心新增失败码为 `COLOR_RESET_REGION_ANCHOR_NOT_FOUND`、`COLOR_RESET_REGION_ANCHOR_AMBIGUOUS`、`COLOR_RESET_FONT_SIZE_ANCHOR_NOT_FOUND`、`COLOR_RESET_FONT_SIZE_ANCHOR_AMBIGUOUS`。既有 process/UIA/rectangle/geometry/coordinate/click/menu/black-item/invoke/unexpected failure codes 保持。
 
-推荐调用流：
+Diagnostics 记录 profile、region/font/optional anchor names 和 rectangles、font candidate count、offsets、screen/client point、selection/geometry/coordinate/foreground reasons、timing/retry、process/window 和 UIA metadata；不得记录患者信息、报告文字或 clipboard payload。
 
-```text
-PasteRedFigureText()
-→ ResetMedExInsertionColor()
-```
-
-`ResetMedExInsertionColor()` 内部流程：
-
-1. 验证前台进程属于明确允许的 MedEx process candidates。
-2. 从 foreground MedEx window root，或经证据确认的报告区域父容器，分别枚举全部 `16px` 与 `①`；不得假设 toolbar anchors 是 focused `Document` 的 descendants。
-3. 按 vertical alignment、horizontal order 和 plausible gap 形成唯一 toolbar pairs。
-4. 要求至少两个唯一有效候选，按 Y 排序后选择第二个候选。
-5. 校验 rectangles、pairing、排序、relative geometry 和 coordinate space。
-6. 使用选中 pair 和比例公式计算颜色箭头位置。
-7. 点击计算得到的 trigger position并等待颜色菜单。
-8. 查找 Name 为 `000000` 的 `Hyperlink`，确认 InvokePattern 后调用 `Invoke()`。
-9. 返回 automation chain 的结构化结果；最终 insertion color 等待人工视觉验证。
-
-V2 才使用 focused editable `DocumentRect`，选择其最近上方的唯一 toolbar。V1 不提前依赖该关系。
-
-失败行为必须 fail-closed：
-
-- 前台进程错误时立即返回；
-- 第二候选缺失时立即返回；
-- 一个 anchor 可与多个 anchor 配对、候选 Y 无法稳定排序时立即返回；
-- rectangle、geometry 或 coordinate space 无效时立即返回；
-- 菜单未出现时停止；
-- 未找到 `000000` 时停止；
-- 绝不在校验失败后继续 blind clicks。
-
-## Structured diagnostic results
-
-颜色复位不能只返回无信息量的 Boolean。V1 至少应返回以下 result codes：
-
-| Result code | Meaning |
-| --- | --- |
-| `COLOR_RESET_OK` | 现有兼容 code：黑色项目 Invoke 未抛错；不得解释为最终颜色已验证 |
-| `COLOR_RESET_WRONG_PROCESS` | 前台进程不是目标 MedEx 进程 |
-| `COLOR_RESET_PROCESS_NAME_UNCONFIRMED` | 命中 provisional candidate，但 target workstation 尚未确认 production process name |
-| `COLOR_RESET_UIA_UNAVAILABLE` | UIA-v2 未安装或无法初始化 |
-| `COLOR_RESET_DOCUMENT_NOT_FOUND` | foreground MedEx window 内未找到 report `Document` |
-| `COLOR_RESET_ANCHOR_FONT_SIZE_NOT_FOUND` | 未找到 `16px` anchor |
-| `COLOR_RESET_ANCHOR_NUMBER_BUTTON_NOT_FOUND` | 未找到 `①` anchor |
-| `COLOR_RESET_TOOLBAR_CANDIDATE_NOT_FOUND` | 唯一有效 toolbar candidates 少于两个，无法选择 V1 index 2 |
-| `COLOR_RESET_TOOLBAR_PAIRING_AMBIGUOUS` | 至少一个 anchor 可参与多个 plausible pairs |
-| `COLOR_RESET_TOOLBAR_SORT_AMBIGUOUS` | candidates 的 toolbar center Y 无法形成稳定唯一顺序 |
-| `COLOR_RESET_INVALID_RECTANGLE` | UIA/window rectangle 非有限数值或没有正 width/height |
-| `COLOR_RESET_INVALID_GEOMETRY` | anchor 矩形或相对位置无效 |
-| `COLOR_RESET_INVALID_COORDINATE_SPACE` | UIA screen coordinates 与 foreground window/client coordinate space 不一致 |
-| `COLOR_RESET_TRIGGER_CLICK_FAILED` | validated trigger click 抛出错误 |
-| `COLOR_RESET_MENU_NOT_OPENED` | 点击 trigger 后未检测到颜色菜单 |
-| `COLOR_RESET_BLACK_ITEM_NOT_FOUND` | 菜单中未找到 Name 为 `000000` 的项目 |
-| `COLOR_RESET_INVOKE_UNAVAILABLE` | Black item 不支持 InvokePattern |
-| `COLOR_RESET_INVOKE_FAILED` | 找到黑色项目但 `Invoke()` 失败 |
-| `COLOR_RESET_UNEXPECTED_ERROR` | 未预期异常被 adapter boundary 捕获 |
-
-日志可包含：timestamp、action name、result code、executable/process name、anchor rectangles、calculated click coordinates、elapsed timing、retry count，以及在可安全检测时记录的 MedEx version。
-
-日志不得包含患者信息、报告文字或剪贴板内容。
-
-现场诊断必须分别记录：`ToolbarCandidateSelected`、`ColorMenuClickSent`、`BlackItemFound`、`BlackItemInvokeSucceeded` 和 `FinalInsertionColorVisuallyValidated`。
-
-自动化可报告 `AUTOMATION_CHAIN_OK`，同时保持 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。最后一项只能由 Windows 操作者在 approved non-clinical context 输入无害字符后确认，不能由 `Invoke()` 自动推导。Field debug 禁止 `MsgBox`；默认只写 clipboard/log，其他提示只有在现场确认不改变焦点和颜色状态后才允许启用。
+自动化输出分别包含 `ColorMenuClickSent`、`BlackItemFound`、`BlackItemInvokeSucceeded` 和 `FinalInsertionColorVisuallyValidated`。`AUTOMATION_CHAIN_OK` 只表示 Invoke 链路未失败，同时必须保持 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。最终字段只能由 Windows 操作者在非临床测试环境手工输入无害字符后确认。Field debug 不显示 `MsgBox`、`ToolTip` 或 `TrayTip`，只写 clipboard/log/file。
 
 ## Architecture boundary
 
-必须保留以下职责分离：
+- `clipboard_html.ahk` 只负责 generic CF_HTML、clipboard writing、paste 和 restoration。
+- `report_editor.ahk` 负责 formatted-text workflow orchestration 和 partial-failure contract。
+- `medex_report_editor.ahk` 负责 MedEx process/UIA/menu interaction。
+- `medex_color_reset_logic.ahk` 负责可测试的 profile、selection 和 geometry。
 
-- `clipboard_html.ahk`
-  - 只负责通用 `CF_HTML` 构造、剪贴板写入、paste execution 和 clipboard restoration；
-- `report_editor.ahk`
-  - 负责 editor-level operations，例如插入格式化报告文字和恢复 insertion state；
-- MedEx-specific logic
-  - 放入专用 MedEx adapter/module，不得混入通用 clipboard module。
-
-该边界必须保留未来对 Word、browser editors 或其他 HIS applications 的支持空间。
+未来 Word、browser editor 或其他 HIS 必须使用独立 adapter，不能把 MedEx UIA 混入 generic clipboard module。
 
 ## Future investigation
 
-当前 V1 足以进入实现，但以下路线仍是未来 replacement candidate：
-
-- 检查 `resources/app`；
-- 确认使用 TinyMCE、Vue、其他 editor framework，还是 Electron IPC；
-- 找到最终改变 font color 的 JavaScript command；
-- 调查 direct renderer/editor command 能否替代 coordinate clicking。
-
-未来概念路线示例：
-
-```text
-executeJavaScript()
-→ editor.setColor("#000000")
-```
-
-这只是调查方向，不表示 `editor.setColor()` API 当前存在。
+继续检查 `resources/app`，识别 TinyMCE、Vue、其他 editor framework 或 Electron IPC，并调查 direct renderer/editor command。概念路线 `executeJavaScript() → editor.setColor("#000000")` 只表示方向，不声明该 API 当前存在。
 
 ## Investigation conclusion
 
-- Current implementation direction: UIA anchors + proportional coordinate positioning + UIA Invoke
+- Current implementation direction: semantic region anchor + dynamic local font anchor + local calibrated offsets + UIA Invoke
 - Known limitation: The color dropdown trigger itself is not exposed as a usable UIA element.
 - Future replacement candidate: Direct editor command through Electron renderer, IPC, or the embedded editor API.
 

@@ -5,6 +5,11 @@ class ColorResetCode {
     static PROCESS_NAME_UNCONFIRMED := "COLOR_RESET_PROCESS_NAME_UNCONFIRMED"
     static UIA_UNAVAILABLE := "COLOR_RESET_UIA_UNAVAILABLE"
     static DOCUMENT_NOT_FOUND := "COLOR_RESET_DOCUMENT_NOT_FOUND"
+    static REGION_ANCHOR_NOT_FOUND := "COLOR_RESET_REGION_ANCHOR_NOT_FOUND"
+    static REGION_ANCHOR_AMBIGUOUS := "COLOR_RESET_REGION_ANCHOR_AMBIGUOUS"
+    static FONT_SIZE_ANCHOR_NOT_FOUND := "COLOR_RESET_FONT_SIZE_ANCHOR_NOT_FOUND"
+    static FONT_SIZE_ANCHOR_AMBIGUOUS := "COLOR_RESET_FONT_SIZE_ANCHOR_AMBIGUOUS"
+    ; Retained for historical diagnostic compatibility; the production resolver no longer uses them.
     static ANCHOR_FONT_SIZE_NOT_FOUND := "COLOR_RESET_ANCHOR_FONT_SIZE_NOT_FOUND"
     static ANCHOR_NUMBER_BUTTON_NOT_FOUND := "COLOR_RESET_ANCHOR_NUMBER_BUTTON_NOT_FOUND"
     static TOOLBAR_CANDIDATE_NOT_FOUND := "COLOR_RESET_TOOLBAR_CANDIDATE_NOT_FOUND"
@@ -28,188 +33,53 @@ class RedTextOperationCode {
     static RESET_FAILED := "RED_TEXT_RESET_FAILED"
 }
 
+class MedExColorResetLayoutProfile {
+    static ProfileName := "medex-0.0.1-baseline"
+    static RegionAnchorName := "检查所见"
+    static FontSizeNamePattern := "^\d+(?:\.\d+)?px$"
+    static OptionalRightAnchorName := "rAI"
+    static ColorArrowOffsetX := 143
+    static ColorArrowOffsetY := 0
+    static MinVerticalOverlapRatio := 0.5
+    static ToolbarPadding := 4
+}
+
 MakeColorResetResult(ok, code, context := 0) {
     if Type(context) != "Map"
         context := Map()
-
-    return {
-        ok: ok = true,
-        code: String(code),
-        context: context
-    }
+    return {ok: ok = true, code: String(code), context: context}
 }
 
 MakeRect(left, top, right, bottom) {
-    return Map(
-        "l", left,
-        "t", top,
-        "r", right,
-        "b", bottom
-    )
+    return Map("l", left, "t", top, "r", right, "b", bottom)
+}
+
+MakeTextAnchor(name, rect) {
+    return Map("name", String(name), "rect", rect)
 }
 
 IsFiniteCoordinate(value, absoluteLimit := 10000000) {
     if !IsNumber(value)
         return false
-
     numericValue := value + 0
     if numericValue != numericValue
         return false
-
     return Abs(numericValue) <= absoluteLimit
 }
 
 IsValidRect(rect) {
     if Type(rect) != "Map"
         return false
-
     for key in ["l", "t", "r", "b"] {
         if !rect.Has(key) || !IsFiniteCoordinate(rect[key])
             return false
     }
-
     return rect["r"] > rect["l"] && rect["b"] > rect["t"]
 }
 
-RectWidth(rect) {
-    return rect["r"] - rect["l"]
-}
-
-RectHeight(rect) {
-    return rect["b"] - rect["t"]
-}
-
-RectCenterY(rect) {
-    return rect["t"] + RectHeight(rect) / 2
-}
-
-MedExToolbarPairIsPlausible(fontSizeRect, numberButtonRect, options := 0) {
-    minHorizontalGap := MedExLogicOption(options, "minHorizontalGap", 100)
-    maxHorizontalGap := MedExLogicOption(options, "maxHorizontalGap", 1200)
-    maxVerticalDelta := MedExLogicOption(options, "maxVerticalDelta", 24)
-
-    if !IsValidRect(fontSizeRect) || !IsValidRect(numberButtonRect)
-        return false
-
-    horizontalGap := numberButtonRect["l"] - fontSizeRect["r"]
-    verticalDelta := Abs(RectCenterY(fontSizeRect) - RectCenterY(numberButtonRect))
-    return horizontalGap >= minHorizontalGap
-        && horizontalGap <= maxHorizontalGap
-        && verticalDelta <= maxVerticalDelta
-}
-
-BuildMedExToolbarCandidates(fontSizeRects, numberButtonRects, options := 0) {
-    context := Map(
-        "fontSizeAnchorCount", Type(fontSizeRects) = "Array" ? fontSizeRects.Length : 0,
-        "numberButtonAnchorCount", Type(numberButtonRects) = "Array" ? numberButtonRects.Length : 0,
-        "toolbarCandidateCount", 0,
-        "selectedToolbarIndex", 0
-    )
-    if Type(fontSizeRects) != "Array" || Type(numberButtonRects) != "Array"
-        return MakeColorResetResult(false, ColorResetCode.INVALID_RECTANGLE, context)
-
-    for rect in fontSizeRects {
-        if !IsValidRect(rect) {
-            context["invalidRectangle"] := "fontSizeAnchor"
-            return MakeColorResetResult(false, ColorResetCode.INVALID_RECTANGLE, context)
-        }
-    }
-    for rect in numberButtonRects {
-        if !IsValidRect(rect) {
-            context["invalidRectangle"] := "numberButtonAnchor"
-            return MakeColorResetResult(false, ColorResetCode.INVALID_RECTANGLE, context)
-        }
-    }
-
-    fontMatches := []
-    numberMatches := []
-    loop fontSizeRects.Length
-        fontMatches.Push([])
-    loop numberButtonRects.Length
-        numberMatches.Push([])
-
-    for fontIndex, fontRect in fontSizeRects {
-        for numberIndex, numberRect in numberButtonRects {
-            if MedExToolbarPairIsPlausible(fontRect, numberRect, options) {
-                fontMatches[fontIndex].Push(numberIndex)
-                numberMatches[numberIndex].Push(fontIndex)
-            }
-        }
-    }
-
-    for matches in fontMatches {
-        if matches.Length > 1 {
-            context["pairingReason"] := "fontSizeAnchorMatchesMultipleNumberButtons"
-            return MakeColorResetResult(false, ColorResetCode.TOOLBAR_PAIRING_AMBIGUOUS, context)
-        }
-    }
-    for matches in numberMatches {
-        if matches.Length > 1 {
-            context["pairingReason"] := "numberButtonAnchorMatchesMultipleFontSizeAnchors"
-            return MakeColorResetResult(false, ColorResetCode.TOOLBAR_PAIRING_AMBIGUOUS, context)
-        }
-    }
-
-    candidates := []
-    for fontIndex, matches in fontMatches {
-        if matches.Length != 1
-            continue
-        numberIndex := matches[1]
-        if numberMatches[numberIndex].Length != 1
-            continue
-        fontRect := fontSizeRects[fontIndex]
-        numberRect := numberButtonRects[numberIndex]
-        candidates.Push(Map(
-            "fontSizeIndex", fontIndex,
-            "numberButtonIndex", numberIndex,
-            "fontSizeRect", fontRect,
-            "numberButtonRect", numberRect,
-            "toolbarY", (RectCenterY(fontRect) + RectCenterY(numberRect)) / 2
-        ))
-    }
-
-    ; Stable insertion sort by the geometry-derived toolbar center Y.
-    sortedCandidates := []
-    for candidate in candidates {
-        inserted := false
-        for index, existing in sortedCandidates {
-            if candidate["toolbarY"] < existing["toolbarY"] {
-                sortedCandidates.InsertAt(index, candidate)
-                inserted := true
-                break
-            }
-        }
-        if !inserted
-            sortedCandidates.Push(candidate)
-    }
-
-    minToolbarYSeparation := MedExLogicOption(options, "minToolbarYSeparation", 2)
-    if sortedCandidates.Length > 1 {
-        loop sortedCandidates.Length - 1 {
-            if Abs(sortedCandidates[A_Index + 1]["toolbarY"] - sortedCandidates[A_Index]["toolbarY"])
-                < minToolbarYSeparation {
-                context["sortingReason"] := "toolbarYValuesNotUnique"
-                context["toolbarCandidateCount"] := sortedCandidates.Length
-                return MakeColorResetResult(false, ColorResetCode.TOOLBAR_SORT_AMBIGUOUS, context)
-            }
-        }
-    }
-
-    context["toolbarCandidateCount"] := sortedCandidates.Length
-    if sortedCandidates.Length < 2 {
-        context["candidateReason"] := "secondToolbarCandidateMissing"
-        return MakeColorResetResult(false, ColorResetCode.TOOLBAR_CANDIDATE_NOT_FOUND, context)
-    }
-
-    selected := sortedCandidates[2]
-    context["toolbarCandidates"] := sortedCandidates
-    context["toolbarCandidateSelected"] := true
-    context["selectedToolbarIndex"] := 2
-    context["selectedToolbarY"] := selected["toolbarY"]
-    context["selectedFontSizeRect"] := selected["fontSizeRect"]
-    context["selectedNumberButtonRect"] := selected["numberButtonRect"]
-    return MakeColorResetResult(true, ColorResetCode.OK, context)
-}
+RectWidth(rect) => rect["r"] - rect["l"]
+RectHeight(rect) => rect["b"] - rect["t"]
+RectCenterY(rect) => rect["t"] + RectHeight(rect) / 2
 
 RectContainsPoint(rect, point, tolerance := 0) {
     return point["x"] >= rect["l"] - tolerance
@@ -225,16 +95,21 @@ RectContainsRect(outerRect, innerRect, tolerance := 0) {
         && innerRect["b"] <= outerRect["b"] + tolerance
 }
 
-CalculateMedExColorArrowPoint(fontSizeRect, numberButtonRect, ratio := 0.337) {
-    rawX := fontSizeRect["r"] + ratio * (numberButtonRect["l"] - fontSizeRect["r"])
-    rawY := fontSizeRect["t"] + 1
+VerticalOverlapHeight(firstRect, secondRect) {
+    return Max(0, Min(firstRect["b"], secondRect["b"]) - Max(firstRect["t"], secondRect["t"]))
+}
 
+VerticalOverlapRatio(firstRect, secondRect) {
+    shorterHeight := Min(RectHeight(firstRect), RectHeight(secondRect))
+    return shorterHeight > 0 ? VerticalOverlapHeight(firstRect, secondRect) / shorterHeight : 0
+}
+
+CalculateMedExColorArrowPoint(fontSizeRect, offsetX, offsetY) {
     return Map(
-        "x", Round(rawX),
-        "y", Round(rawY),
-        "rawX", rawX,
-        "rawY", rawY,
-        "ratio", ratio
+        "x", Round(fontSizeRect["r"] + offsetX),
+        "y", Round(RectCenterY(fontSizeRect) + offsetY),
+        "offsetX", offsetX,
+        "offsetY", offsetY
     )
 }
 
@@ -245,100 +120,167 @@ ConvertScreenPointToClient(screenPoint, clientRectScreen) {
     )
 }
 
-ValidateMedExColorResetGeometry(scopeRect, fontSizeRect, numberButtonRect, windowRect, clientRectScreen, options := 0) {
-    minHorizontalGap := MedExLogicOption(options, "minHorizontalGap", 100)
-    maxHorizontalGap := MedExLogicOption(options, "maxHorizontalGap", 1200)
-    maxVerticalDelta := MedExLogicOption(options, "maxVerticalDelta", 24)
-    coordinateTolerance := MedExLogicOption(options, "coordinateTolerance", 4)
-    toolbarPadding := MedExLogicOption(options, "toolbarPadding", 12)
-    ratio := MedExLogicOption(options, "ratio", 0.337)
+ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
+    profileName := MedExLogicOption(options, "profileName", MedExColorResetLayoutProfile.ProfileName)
+    regionAnchorName := MedExLogicOption(options, "regionAnchorName", MedExColorResetLayoutProfile.RegionAnchorName)
+    fontSizeNamePattern := MedExLogicOption(options, "fontSizeNamePattern", MedExColorResetLayoutProfile.FontSizeNamePattern)
+    optionalRightAnchorName := MedExLogicOption(options, "optionalRightAnchorName", MedExColorResetLayoutProfile.OptionalRightAnchorName)
+    offsetX := MedExLogicOption(options, "colorArrowOffsetX", MedExColorResetLayoutProfile.ColorArrowOffsetX)
+    offsetY := MedExLogicOption(options, "colorArrowOffsetY", MedExColorResetLayoutProfile.ColorArrowOffsetY)
+    minOverlapRatio := MedExLogicOption(options, "minVerticalOverlapRatio", MedExColorResetLayoutProfile.MinVerticalOverlapRatio)
+    toolbarPadding := MedExLogicOption(options, "toolbarPadding", MedExColorResetLayoutProfile.ToolbarPadding)
     context := Map(
-        "ratio", ratio,
-        "minHorizontalGap", minHorizontalGap,
-        "maxHorizontalGap", maxHorizontalGap,
-        "maxVerticalDelta", maxVerticalDelta
+        "layoutProfileName", profileName,
+        "regionAnchorName", regionAnchorName,
+        "regionAnchorFound", false,
+        "fontSizeAnchorPattern", fontSizeNamePattern,
+        "fontSizeAnchorFound", false,
+        "fontSizeCandidateCount", 0,
+        "optionalRightAnchorName", optionalRightAnchorName,
+        "optionalRightAnchorFound", false,
+        "colorArrowOffsetX", offsetX,
+        "colorArrowOffsetY", offsetY,
+        "minVerticalOverlapRatio", minOverlapRatio,
+        "ignoredTextAnchorCount", 0
     )
 
-    for entry in [
-        ["scopeRect", scopeRect],
-        ["fontSizeRect", fontSizeRect],
-        ["numberButtonRect", numberButtonRect],
-        ["windowRect", windowRect],
-        ["clientRectScreen", clientRectScreen]
-    ] {
-        if !IsValidRect(entry[2]) {
-            context["invalidRectangle"] := entry[1]
-            return MakeColorResetResult(false, ColorResetCode.INVALID_RECTANGLE, context)
+    if Type(textAnchors) != "Array" || !IsValidRect(clientRectScreen) {
+        context["invalidRectangle"] := "clientRectScreenOrTextAnchors"
+        return MakeColorResetResult(false, ColorResetCode.INVALID_RECTANGLE, context)
+    }
+
+    regionCandidates := []
+    for anchor in textAnchors {
+        if !IsValidTextAnchor(anchor) {
+            context["ignoredTextAnchorCount"] += 1
+            continue
         }
+        if anchor["name"] = regionAnchorName && RectContainsRect(clientRectScreen, anchor["rect"])
+            regionCandidates.Push(anchor)
+    }
+    context["regionAnchorCandidateCount"] := regionCandidates.Length
+    if regionCandidates.Length = 0 {
+        context["anchorSelectionReason"] := "regionAnchorNotFound"
+        return MakeColorResetResult(false, ColorResetCode.REGION_ANCHOR_NOT_FOUND, context)
+    }
+    if regionCandidates.Length > 1 {
+        context["anchorSelectionReason"] := "multipleRegionAnchors"
+        return MakeColorResetResult(false, ColorResetCode.REGION_ANCHOR_AMBIGUOUS, context)
     }
 
-    if !RectContainsRect(windowRect, scopeRect, coordinateTolerance)
-        || !RectContainsRect(windowRect, fontSizeRect, coordinateTolerance)
-        || !RectContainsRect(windowRect, numberButtonRect, coordinateTolerance)
-        || !RectContainsRect(clientRectScreen, scopeRect, coordinateTolerance)
-        || !RectContainsRect(clientRectScreen, fontSizeRect, coordinateTolerance)
-        || !RectContainsRect(clientRectScreen, numberButtonRect, coordinateTolerance) {
-        context["coordinateSpaceReason"] := "uiaRectOutsideForegroundWindowClientArea"
-        return MakeColorResetResult(false, ColorResetCode.INVALID_COORDINATE_SPACE, context)
+    regionAnchor := regionCandidates[1]
+    regionRect := regionAnchor["rect"]
+    context["regionAnchorFound"] := true
+    context["regionAnchorRect"] := regionRect
+
+    fontCandidates := []
+    for anchor in textAnchors {
+        if !IsValidTextAnchor(anchor) || !RegExMatch(anchor["name"], fontSizeNamePattern)
+            continue
+        rect := anchor["rect"]
+        if !RectContainsRect(clientRectScreen, rect)
+            continue
+        if rect["l"] <= regionRect["r"]
+            continue
+        overlapRatio := VerticalOverlapRatio(regionRect, rect)
+        if overlapRatio < minOverlapRatio
+            continue
+        candidate := MakeTextAnchor(anchor["name"], rect)
+        candidate["verticalOverlapRatio"] := overlapRatio
+        fontCandidates.Push(candidate)
     }
 
-    if !RectContainsRect(scopeRect, fontSizeRect, coordinateTolerance)
-        || !RectContainsRect(scopeRect, numberButtonRect, coordinateTolerance) {
-        context["coordinateSpaceReason"] := "anchorOutsideValidatedUiaRoot"
-        return MakeColorResetResult(false, ColorResetCode.INVALID_COORDINATE_SPACE, context)
+    context["fontSizeCandidateCount"] := fontCandidates.Length
+    if fontCandidates.Length = 0 {
+        context["anchorSelectionReason"] := "alignedFontSizeAnchorNotFound"
+        return MakeColorResetResult(false, ColorResetCode.FONT_SIZE_ANCHOR_NOT_FOUND, context)
+    }
+    if fontCandidates.Length > 1 {
+        context["anchorSelectionReason"] := "multipleAlignedFontSizeAnchors"
+        return MakeColorResetResult(false, ColorResetCode.FONT_SIZE_ANCHOR_AMBIGUOUS, context)
     }
 
-    horizontalGap := numberButtonRect["l"] - fontSizeRect["r"]
-    context["horizontalGap"] := horizontalGap
-    if horizontalGap <= 0 {
-        context["geometryReason"] := "fontSizeAnchorNotLeftOfNumberButton"
+    fontAnchor := fontCandidates[1]
+    fontRect := fontAnchor["rect"]
+    context["fontSizeAnchorFound"] := true
+    context["fontSizeAnchorMatchedName"] := fontAnchor["name"]
+    context["fontSizeAnchorRect"] := fontRect
+    context["verticalOverlapHeight"] := VerticalOverlapHeight(regionRect, fontRect)
+    context["verticalOverlapRatio"] := fontAnchor["verticalOverlapRatio"]
+    context["regionToFontDistance"] := fontRect["l"] - regionRect["r"]
+    context["anchorSelectionReason"] := "uniqueAlignedFontSizeAnchor"
+
+    if !IsFiniteCoordinate(offsetX) || !IsFiniteCoordinate(offsetY) || offsetX <= 0 {
+        context["geometryReason"] := "invalidColorArrowOffsets"
         return MakeColorResetResult(false, ColorResetCode.INVALID_GEOMETRY, context)
     }
 
-    if horizontalGap < minHorizontalGap || horizontalGap > maxHorizontalGap {
-        context["geometryReason"] := "horizontalGapOutsidePlausibleRange"
-        return MakeColorResetResult(false, ColorResetCode.INVALID_GEOMETRY, context)
-    }
-
-    verticalDelta := Abs(RectCenterY(fontSizeRect) - RectCenterY(numberButtonRect))
-    context["verticalCenterDelta"] := verticalDelta
-    if verticalDelta > maxVerticalDelta {
-        context["geometryReason"] := "anchorVerticalAlignmentImplausible"
-        return MakeColorResetResult(false, ColorResetCode.INVALID_GEOMETRY, context)
-    }
-
-    screenPoint := CalculateMedExColorArrowPoint(fontSizeRect, numberButtonRect, ratio)
+    screenPoint := CalculateMedExColorArrowPoint(fontRect, offsetX, offsetY)
     clientPoint := ConvertScreenPointToClient(screenPoint, clientRectScreen)
-    toolbarRect := MakeRect(
-        fontSizeRect["r"],
-        Min(fontSizeRect["t"], numberButtonRect["t"]) - toolbarPadding,
-        numberButtonRect["l"],
-        Max(fontSizeRect["b"], numberButtonRect["b"]) + toolbarPadding
+    toolbarBand := MakeRect(
+        regionRect["l"],
+        Min(regionRect["t"], fontRect["t"]) - toolbarPadding,
+        clientRectScreen["r"],
+        Max(regionRect["b"], fontRect["b"]) + toolbarPadding
     )
-
     context["calculatedScreenPoint"] := screenPoint
     context["calculatedClientPoint"] := clientPoint
-    context["toolbarRect"] := toolbarRect
+    context["toolbarBandRect"] := toolbarBand
 
-    if !RectContainsPoint(windowRect, screenPoint)
-        || !RectContainsPoint(clientRectScreen, screenPoint)
-        || !RectContainsPoint(scopeRect, screenPoint) {
-        context["coordinateSpaceReason"] := "calculatedPointOutsideValidatedWindowOrUiaRoot"
+    if screenPoint["x"] <= fontRect["r"] {
+        context["geometryReason"] := "calculatedPointNotRightOfFontSizeAnchor"
+        return MakeColorResetResult(false, ColorResetCode.INVALID_GEOMETRY, context)
+    }
+    if !RectContainsPoint(toolbarBand, screenPoint) {
+        context["geometryReason"] := "calculatedPointOutsideTargetToolbarBand"
+        return MakeColorResetResult(false, ColorResetCode.INVALID_GEOMETRY, context)
+    }
+    if !RectContainsPoint(clientRectScreen, screenPoint) {
+        context["coordinateSpaceReason"] := "calculatedPointOutsideForegroundClientArea"
         return MakeColorResetResult(false, ColorResetCode.INVALID_COORDINATE_SPACE, context)
     }
-
     clientBounds := MakeRect(0, 0, RectWidth(clientRectScreen), RectHeight(clientRectScreen))
     if !RectContainsPoint(clientBounds, clientPoint) {
         context["coordinateSpaceReason"] := "calculatedClientPointOutsideClientBounds"
         return MakeColorResetResult(false, ColorResetCode.INVALID_COORDINATE_SPACE, context)
     }
 
-    if !RectContainsPoint(toolbarRect, screenPoint) {
-        context["geometryReason"] := "calculatedPointOutsideValidatedToolbarRegion"
-        return MakeColorResetResult(false, ColorResetCode.INVALID_GEOMETRY, context)
-    }
-
+    ResolveOptionalRightAnchor(textAnchors, regionRect, fontRect, optionalRightAnchorName, minOverlapRatio, clientRectScreen, context)
     return MakeColorResetResult(true, ColorResetCode.OK, context)
+}
+
+ResolveOptionalRightAnchor(textAnchors, regionRect, fontRect, optionalName, minOverlapRatio, clientRectScreen, context) {
+    candidates := []
+    if optionalName != "" {
+        for anchor in textAnchors {
+            if !IsValidTextAnchor(anchor) || anchor["name"] != optionalName
+                continue
+            rect := anchor["rect"]
+            if rect["l"] <= fontRect["r"] || !RectContainsRect(clientRectScreen, rect)
+                continue
+            if VerticalOverlapRatio(regionRect, rect) >= minOverlapRatio
+                candidates.Push(anchor)
+        }
+    }
+    context["optionalRightAnchorCandidateCount"] := candidates.Length
+    if candidates.Length = 1 {
+        optionalRect := candidates[1]["rect"]
+        context["optionalRightAnchorFound"] := true
+        context["optionalRightAnchorRect"] := optionalRect
+        context["fontToOptionalRightDistance"] := optionalRect["l"] - fontRect["r"]
+        context["optionalRightAnchorReason"] := "uniqueAlignedOptionalAnchor"
+    } else if candidates.Length = 0 {
+        context["optionalRightAnchorReason"] := "optionalAnchorAbsent"
+    } else {
+        context["optionalRightAnchorReason"] := "optionalAnchorAmbiguousIgnored"
+    }
+}
+
+IsValidTextAnchor(anchor) {
+    return Type(anchor) = "Map"
+        && anchor.Has("name")
+        && anchor.Has("rect")
+        && IsValidRect(anchor["rect"])
 }
 
 MedExLogicOption(options, key, defaultValue) {

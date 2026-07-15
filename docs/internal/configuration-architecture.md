@@ -197,13 +197,15 @@ Diagnostics.Enabled=true
 
 ```ini
 [MedExColorReset]
-ArrowHorizontalRatio=0.337
+LayoutProfile=medex-0.0.1-baseline
+ColorArrowOffsetX=143
+ColorArrowOffsetY=0
 MenuOpenTimeoutMs=500
 MenuPollIntervalMs=25
 MaxRetries=1
 ```
 
-这些数值必须限制范围。错误配置不得导致 blind clicks。
+首个内测版本可以把 layout profile 保持为受版本控制的 adapter profile，而不向普通用户开放位置校准。若后续开放 override，上述数值必须限制范围；错误配置不得导致 blind clicks。旧 `ArrowHorizontalRatio=0.337` 属于已废弃的双锚点模型，不再是生产配置候选。
 
 ## Diagnostics
 
@@ -221,15 +223,20 @@ appVersion
 action
 resultCode
 processName
+layoutProfileName
+regionAnchorRect
 fontSizeRect
-numberButtonRect
+fontSizeMatchedName
+optionalRightAnchorRect
+colorArrowOffsetX
+colorArrowOffsetY
 calculatedPoint
 elapsedMs
 retryCount
 medExVersion
 ```
 
-不得记录 report text、hotstring replacement、clipboard payload、患者标识、窗口正文或 screenshot。日志关闭时，critical failure 仍可通过 Tooltip/Beep 告知用户，但不写磁盘。
+不得记录 report text、hotstring replacement、clipboard payload、患者标识、窗口正文或 screenshot。M1 field debug 不显示任何提示，只写 clipboard/log/file；未来 ordinary runtime 是否采用非模态提示需另行验证其不会干扰 MedEx focus 和 insertion state。
 
 ## Update preservation
 

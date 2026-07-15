@@ -65,12 +65,14 @@ Prerequisite：[ ] AutoHotkey v2 可用，field-debug 目录包含 pinned `debug
 5. [ ] 记录 Windows resolution。
 6. [ ] 记录 display scaling。
 7. [ ] 启动 `debug/medex_color_reset_field_debug.ahk` 并按 Ctrl+Alt+F12 运行 diagnostic hotkey。
-8. [ ] 确认打开的是按 Y 排序后的第二组、即检查所见 toolbar，而不是第一组病史信息 toolbar。
-9. [ ] 确认 color menu 是否打开，以及 Name=`000000` 的 black item 是否被 Invoke。
-10. [ ] 确认全过程没有 `MsgBox` 或其他 focus-stealing feedback，MedEx editor focus 未改变。
-11. [ ] 在 approved non-clinical test context 手工输入一个 harmless test character，并确认它是 black；只有此步骤可将 `FinalInsertionColorVisuallyValidated` 记为 true。
-12. [ ] 将自动复制的完整 diagnostic result 带回 Mac development environment。
-13. [ ] 记录任何 mouse movement、focus loss、menu delay 或 unexpected side effect。
+8. [ ] 确认 exact Text Name=`检查所见` 被唯一选为 region anchor。
+9. [ ] 确认同行右侧动态字号 Text（如 `14px`/`16px`）被唯一选为 local anchor。
+10. [ ] 确认 calculated screen point 与 color arrow 对齐；baseline evidence 期望 `(672,297)`。
+11. [ ] 确认 color menu 是否打开，以及 Name=`000000` 的 black item 是否被 Invoke。
+12. [ ] 确认全过程没有 `MsgBox`、`ToolTip`、`TrayTip` 或其他 focus-stealing feedback，MedEx editor focus 未改变。
+13. [ ] 在 approved non-clinical test context 手工输入一个 harmless test character，并确认它是 black；只有此步骤可将 `FinalInsertionColorVisuallyValidated` 记为 true。
+14. [ ] 将自动复制的完整 diagnostic result 带回 Mac development environment。
+15. [ ] 记录任何 mouse movement、focus loss、menu delay 或 unexpected side effect。
 
 严禁在 finalized patient report 中执行本测试。Diagnostic hotkey 不插入 test text，也不得记录 clinical content。
 
@@ -78,25 +80,29 @@ Prerequisite：[ ] AutoHotkey v2 可用，field-debug 目录包含 pinned `debug
 - [ ] Production process name 未确认时返回 `COLOR_RESET_PROCESS_NAME_UNCONFIRMED` 且不点击。
 - [ ] UIA-v2 缺失时返回 `COLOR_RESET_UIA_UNAVAILABLE` 且不点击。
 - [ ] Anchor enumeration 以 foreground MedEx window root 或经确认的报告区域父容器为 scope，不要求 toolbar 是 focused `Document` descendant。
-- [ ] 找不到 `16px` 或 `①` 时返回对应 failure 且不点击。
-- [ ] 只有一个唯一 toolbar candidate、缺少第二候选时 fail closed 且不点击。
-- [ ] 缺少第二候选时返回 `COLOR_RESET_TOOLBAR_CANDIDATE_NOT_FOUND`。
-- [ ] 一个 anchor 可匹配多个 counterpart 时作为 pairing ambiguity fail closed。
-- [ ] Pairing ambiguity 返回 `COLOR_RESET_TOOLBAR_PAIRING_AMBIGUOUS`。
-- [ ] 两个候选 Y 相同或无法形成稳定排序时作为 sorting ambiguity fail closed。
-- [ ] Sorting ambiguity 返回 `COLOR_RESET_TOOLBAR_SORT_AMBIGUOUS`。
-- [ ] 候选多于三个时不自动失败；只要 pairs 唯一、geometry 有效且存在第二候选，仍选择排序后的第二个。
+- [ ] 不使用 exact `16px` 或 shortcut `①` 作为 production lookup。
+- [ ] Region anchor 缺失返回 `COLOR_RESET_REGION_ANCHOR_NOT_FOUND` 且不点击。
+- [ ] 多个有效 `检查所见` 返回 `COLOR_RESET_REGION_ANCHOR_AMBIGUOUS` 且不点击。
+- [ ] 同行没有匹配 `^\d+(?:\.\d+)?px$` 的字号 Text，返回 `COLOR_RESET_FONT_SIZE_ANCHOR_NOT_FOUND`。
+- [ ] 同行存在多个匹配字号 Text，返回 `COLOR_RESET_FONT_SIZE_ANCHOR_AMBIGUOUS`。
+- [ ] 其他 toolbar 全局存在多个字号 Text 时，只要目标行唯一，仍可正确选择。
+- [ ] `①` 缺失、改名或出现多个 shortcut symbols 不影响 normal path。
+- [ ] optional `rAI` 存在时输出 fingerprint；缺失、改名或歧义时不阻塞。
 - [ ] Rectangles 无效或相对位置异常时返回 `COLOR_RESET_INVALID_GEOMETRY` 且不点击。
 - [ ] Zero-width/non-finite rectangle 返回 `COLOR_RESET_INVALID_RECTANGLE`。
-- [ ] UIA screen coordinates 与 window/client bounds 不一致时返回 `COLOR_RESET_INVALID_COORDINATE_SPACE`。
+- [ ] Calculated point 位于 client area 和 local toolbar band；否则 fail closed。
+- [ ] 不要求整个 UIA root rectangle 位于 client area。
+- [ ] 字号 value 从 `16px` 改为 `14px`、rectangle 不变时，point 不变。
+- [ ] 工具栏整体沿 Y 移动时，calculated Y 移动相同 delta。
+- [ ] `ColorArrowOffsetX/Y` 改变时 point 按相同 delta 改变，不修改 resolver。
 - [ ] Trigger click exception 返回 `COLOR_RESET_TRIGGER_CLICK_FAILED`。
-- [ ] 计算点与观察到的 color arrow 对齐，并记录 coordinate space。
+- [ ] Click 前 foreground hwnd/process 改变时停止且不点击。
 - [ ] Menu 未出现时返回 `COLOR_RESET_MENU_NOT_OPENED`，不继续 blind click。
 - [ ] Menu 中没有 Name=`000000` 时返回 `COLOR_RESET_BLACK_ITEM_NOT_FOUND`。
 - [ ] Black item 不支持 InvokePattern 时返回 `COLOR_RESET_INVOKE_UNAVAILABLE`。
 - [ ] `Invoke()` 抛错或失败时返回 `COLOR_RESET_INVOKE_FAILED`。
 - [ ] 未分类异常返回 `COLOR_RESET_UNEXPECTED_ERROR`，不继续点击。
-- [ ] 自动化字段分别记录 `ToolbarCandidateSelected`、`ColorMenuClickSent`、`BlackItemFound` 和 `BlackItemInvokeSucceeded`。
+- [ ] 自动化字段记录 region/font/optional anchor、active profile/offsets、`ColorMenuClickSent`、`BlackItemFound` 和 `BlackItemInvokeSucceeded`。
 - [ ] Invoke 成功时只报告 `AUTOMATION_CHAIN_OK` / `FINAL_COLOR_PENDING_VISUAL_VALIDATION`，不得自动报告最终成功。
 - [ ] `FinalInsertionColorVisuallyValidated` 初始为 false/unknown，人工确认无害字符为黑色后才单独记录 true。
 - [ ] `RetryCount` 输出为整数 `0` 或 `1`，不得序列化为 Boolean。
@@ -107,7 +113,7 @@ Prerequisite：[ ] AutoHotkey v2 可用，field-debug 目录包含 pinned `debug
 - [ ] 在目标 DPI、display scaling、resolution、window width 和 MedEx version 上重复测试。
 - [ ] Logs 只包含 timestamp、action、result code、process、rectangles、point、timing、retry 和安全检测到的 version。
 - [ ] Logs 不包含患者信息、report text、hotstring replacement 或 clipboard payload。
-- [ ] Copied field result 包含 process、window handle、DPI/scaling、rectangles、screen/client point、Invoke flags 和 elapsed timings。
+- [ ] Copied field result 包含 process、window handle、DPI/scaling、profile、region/font/optional rectangles、screen/client point、Invoke flags 和 elapsed timings。
 
 ## v0.5.0 configuration staged tests
 

@@ -6,19 +6,11 @@ class MedExColorResetDefaults {
     ]
     static ConfirmedProcessName := ""
 
-    ; Derived from the 2026-07 field investigation, not a permanent layout constant.
-    static ProvisionalArrowHorizontalRatio := 0.337
-
     ; Provisional bounded field-test timing values.
     static MenuOpenTimeoutMs := 600
     static MenuPollIntervalMs := 40
     static MaxTriggerAttempts := 2
 
-    static MinHorizontalGap := 100
-    static MaxHorizontalGap := 1200
-    static MaxVerticalDelta := 24
-    static CoordinateTolerance := 4
-    static ToolbarPadding := 12
 }
 
 ResetMedExInsertionColor(options := 0) {
@@ -29,9 +21,10 @@ ResetMedExInsertionColor(options := 0) {
         "foregroundWindowHandle", "UNKNOWN",
         "provisionalProcessCandidateAccepted", false,
         "processNameConfirmed", false,
-        "toolbarCandidateCount", 0,
-        "toolbarCandidateSelected", false,
-        "selectedToolbarIndex", 0,
+        "documentFound", false,
+        "regionAnchorFound", false,
+        "fontSizeAnchorFound", false,
+        "optionalRightAnchorFound", false,
         "colorMenuClickSent", false,
         "blackColorFound", false,
         "blackItemFound", false,
@@ -121,48 +114,30 @@ ResetMedExInsertionColor(options := 0) {
             return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
         }
 
-        try fontSizeElements := windowElement.FindElements({Name: "16px"})
-        catch as err {
-            AddSafeExceptionContext(context, err)
-            fontSizeElements := []
+        documentElement := FindMedExDocument(windowElement, foregroundHwnd)
+        if !documentElement {
+            context["uiaReason"] := "reportDocumentNotFoundInForegroundWindow"
+            return FinishMedExColorReset(false, ColorResetCode.DOCUMENT_NOT_FOUND, context, startedAt, options)
         }
-        if fontSizeElements.Length = 0 {
-            context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
-            return FinishMedExColorReset(
-                false,
-                ColorResetCode.ANCHOR_FONT_SIZE_NOT_FOUND,
-                context,
-                startedAt,
-                options
-            )
-        }
+        context["documentFound"] := true
+        try context["documentRect"] := UiaRectangleToMap(documentElement.BoundingRectangle)
+        catch
+            context["documentRect"] := "UNKNOWN"
 
-        try numberButtonElements := windowElement.FindElements({Name: "①"})
+        try textElements := windowElement.FindElements({Type: "Text"})
         catch as err {
             AddSafeExceptionContext(context, err)
-            numberButtonElements := []
-        }
-        if numberButtonElements.Length = 0 {
-            context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
-            return FinishMedExColorReset(
-                false,
-                ColorResetCode.ANCHOR_NUMBER_BUTTON_NOT_FOUND,
-                context,
-                startedAt,
-                options
-            )
+            context["uiaReason"] := "TextElementEnumerationFailed"
+            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
         }
 
         try {
-            fontSizeRects := UiaElementsToRectangles(fontSizeElements)
-            numberButtonRects := UiaElementsToRectangles(numberButtonElements)
+            textAnchors := UiaTextElementsToAnchors(textElements)
         } catch as err {
             AddSafeExceptionContext(context, err)
-            context["invalidRectangle"] := "anchorRect"
+            context["invalidRectangle"] := "textAnchorRect"
             return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
         }
-        context["fontSizeAnchorRects"] := fontSizeRects
-        context["numberButtonAnchorRects"] := numberButtonRects
         context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
 
         windowRect := GetWindowRectMap(foregroundHwnd)
@@ -170,71 +145,11 @@ ResetMedExInsertionColor(options := 0) {
         context["windowRect"] := windowRect
         context["clientRectScreen"] := clientRectScreen
 
-        geometryOptions := Map(
-            "ratio", MedExAdapterOption(
-                options,
-                "ratio",
-                MedExColorResetDefaults.ProvisionalArrowHorizontalRatio
-            ),
-            "minHorizontalGap", MedExAdapterOption(
-                options,
-                "minHorizontalGap",
-                MedExColorResetDefaults.MinHorizontalGap
-            ),
-            "maxHorizontalGap", MedExAdapterOption(
-                options,
-                "maxHorizontalGap",
-                MedExColorResetDefaults.MaxHorizontalGap
-            ),
-            "maxVerticalDelta", MedExAdapterOption(
-                options,
-                "maxVerticalDelta",
-                MedExColorResetDefaults.MaxVerticalDelta
-            ),
-            "coordinateTolerance", MedExAdapterOption(
-                options,
-                "coordinateTolerance",
-                MedExColorResetDefaults.CoordinateTolerance
-            ),
-            "toolbarPadding", MedExAdapterOption(
-                options,
-                "toolbarPadding",
-                MedExColorResetDefaults.ToolbarPadding
-            )
-        )
-        candidateResult := BuildMedExToolbarCandidates(fontSizeRects, numberButtonRects, geometryOptions)
-        MergeContext(context, candidateResult.context)
-        if !candidateResult.ok
-            return FinishMedExColorReset(false, candidateResult.code, context, startedAt, options)
-
-        ; Every accepted pair must share the validated root/window/client coordinate space.
-        for candidate in context["toolbarCandidates"] {
-            candidateGeometry := ValidateMedExColorResetGeometry(
-                context["uiaRootRect"],
-                candidate["fontSizeRect"],
-                candidate["numberButtonRect"],
-                windowRect,
-                clientRectScreen,
-                geometryOptions
-            )
-            if !candidateGeometry.ok {
-                MergeContext(context, candidateGeometry.context)
-                context["candidateGeometryToolbarY"] := candidate["toolbarY"]
-                return FinishMedExColorReset(false, candidateGeometry.code, context, startedAt, options)
-            }
-        }
-
-        selectedGeometry := ValidateMedExColorResetGeometry(
-            context["uiaRootRect"],
-            context["selectedFontSizeRect"],
-            context["selectedNumberButtonRect"],
-            windowRect,
-            clientRectScreen,
-            geometryOptions
-        )
-        MergeContext(context, selectedGeometry.context)
-        if !selectedGeometry.ok
-            return FinishMedExColorReset(false, selectedGeometry.code, context, startedAt, options)
+        layoutOptions := BuildMedExColorResetLayoutOptions(options)
+        layoutResult := ResolveMedExColorResetLayout(textAnchors, clientRectScreen, layoutOptions)
+        MergeContext(context, layoutResult.context)
+        if !layoutResult.ok
+            return FinishMedExColorReset(false, layoutResult.code, context, startedAt, options)
 
         interactionResult := RunMedExColorMenuInteraction(
             foregroundHwnd,
@@ -288,6 +203,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
             context["retryCount"] := attempt - 1
             if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
                 context["processReason"] := "foregroundWindowChangedBeforeTriggerClick"
+                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeTriggerClick"
                 return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
             }
 
@@ -311,6 +227,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
             context["menuDetectionElapsedMs"] := menuLookup["elapsedMs"]
             if menuLookup["foregroundChanged"] {
                 context["processReason"] := "foregroundWindowChangedWhileWaitingForMenu"
+                context["foregroundGuardReason"] := "foregroundTargetChangedWhileWaitingForMenu"
                 return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
             }
 
@@ -319,6 +236,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
 
             if attempt < maxAttempts && !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
                 context["processReason"] := "foregroundWindowChangedBeforeRetry"
+                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeRetry"
                 return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
             }
         }
@@ -341,6 +259,7 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
 
         if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
             context["processReason"] := "foregroundWindowChangedBeforeInvoke"
+            context["foregroundGuardReason"] := "foregroundTargetChangedBeforeInvoke"
             return MakeColorResetResult(false, ColorResetCode.WRONG_PROCESS, context)
         }
 
@@ -458,15 +377,29 @@ MedExForegroundTargetMatches(expectedHwnd, expectedProcess) {
     return StrLower(currentProcess) = StrLower(expectedProcess)
 }
 
-UiaElementsToRectangles(elements) {
-    rectangles := []
-    for element in elements
-        rectangles.Push(UiaRectangleToMap(element.BoundingRectangle))
-    return rectangles
+UiaTextElementsToAnchors(elements) {
+    anchors := []
+    for element in elements {
+        try anchors.Push(MakeTextAnchor(element.Name, UiaRectangleToMap(element.BoundingRectangle)))
+    }
+    return anchors
 }
 
 UiaRectangleToMap(rectangle) {
     return MakeRect(rectangle.l, rectangle.t, rectangle.r, rectangle.b)
+}
+
+BuildMedExColorResetLayoutOptions(options) {
+    return Map(
+        "profileName", MedExAdapterOption(options, "layoutProfileName", MedExColorResetLayoutProfile.ProfileName),
+        "regionAnchorName", MedExAdapterOption(options, "regionAnchorName", MedExColorResetLayoutProfile.RegionAnchorName),
+        "fontSizeNamePattern", MedExAdapterOption(options, "fontSizeNamePattern", MedExColorResetLayoutProfile.FontSizeNamePattern),
+        "optionalRightAnchorName", MedExAdapterOption(options, "optionalRightAnchorName", MedExColorResetLayoutProfile.OptionalRightAnchorName),
+        "colorArrowOffsetX", MedExAdapterOption(options, "colorArrowOffsetX", MedExColorResetLayoutProfile.ColorArrowOffsetX),
+        "colorArrowOffsetY", MedExAdapterOption(options, "colorArrowOffsetY", MedExColorResetLayoutProfile.ColorArrowOffsetY),
+        "minVerticalOverlapRatio", MedExAdapterOption(options, "minVerticalOverlapRatio", MedExColorResetLayoutProfile.MinVerticalOverlapRatio),
+        "toolbarPadding", MedExAdapterOption(options, "toolbarPadding", MedExColorResetLayoutProfile.ToolbarPadding)
+    )
 }
 
 GetWindowRectMap(hwnd) {

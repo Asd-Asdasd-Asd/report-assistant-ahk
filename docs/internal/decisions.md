@@ -99,7 +99,7 @@
 
 背景：`CF_HTML` 可以插入红色文字，但 MedEx 会把后续输入保持为红色。颜色菜单黑色项目可通过 UIA `Invoke()` 工作，而 color trigger 本身没有可用 UIA node。
 
-决策：V1 使用 UIA anchors、proportional coordinate positioning 和 UIA Invoke，并把实现限制在 MedEx-specific adapter 中。
+决策：V1 使用 semantic region anchor、dynamic local font anchor、centralized local-offset positioning 和 UIA Invoke，并把实现限制在 MedEx-specific adapter 中。早期 `16px + ①` proportional model 已由 2026-07-14 证据废弃。
 
 影响：
 

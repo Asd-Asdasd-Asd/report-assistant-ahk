@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### M1 — Semantic region/local-anchor redesign
+
+- Removed production dependency on user-configurable shortcut Name=`①`.
+- Replaced exact Name=`16px` with centralized dynamic font-size pattern matching.
+- Replaced second-sorted-toolbar selection with exact Text Name=`检查所见` row selection.
+- Added `MedExColorResetLayoutProfile` with centralized anchor rules and `ColorArrowOffsetX/Y` calibration.
+- Changed click calculation to local font-anchor offsets; baseline point is `(672,297)`.
+- Added optional non-blocking `rAI` layout diagnostics.
+- Removed entire-UIA-root-inside-client validation that rejected maximized Windows resize frames.
+- Added semantic-anchor failure codes, profile diagnostics, recalibration documentation, and pure-logic coverage.
+- Preserved exact black-item Invoke, bounded retry, foreground guards, and no-modal field debugging.
+- Did not modify legacy behavior or enter M2.
+
 ### M1 — Color Reset V1 Mac-side implementation
 
 - Replaced first-match anchor lookup with foreground-window-root enumeration of all `16px` and `①` elements.

@@ -52,7 +52,8 @@ Ctrl+Alt+F12
 
 只编辑脚本顶部以下 constants：
 
-- `DEBUG_RATIO`
+- `DEBUG_COLOR_ARROW_OFFSET_X`
+- `DEBUG_COLOR_ARROW_OFFSET_Y`
 - `DEBUG_MENU_OPEN_TIMEOUT_MS`
 - `DEBUG_MENU_POLL_INTERVAL_MS`
 - `DEBUG_MAX_TRIGGER_ATTEMPTS`
@@ -60,6 +61,17 @@ Ctrl+Alt+F12
 - `DEBUG_CONFIRMED_PROCESS_NAME`
 
 `DEBUG_MAX_TRIGGER_ATTEMPTS` 在 adapter 内始终限制为 1–2，不能通过 debug override 形成无限或重复 blind clicks。
+
+## Minor layout recalibration
+
+在 MedEx 小版本只改变工具栏局部间距时，先用 Accessibility Insights 记录目标字号 `Text` rectangle，再用 Window Spy/现场观察记录颜色箭头目标点。计算：
+
+```text
+ColorArrowOffsetX = targetScreenX - fontRect.r
+ColorArrowOffsetY = targetScreenY - Round((fontRect.t + fontRect.b) / 2)
+```
+
+只修改 field-debug 顶部两个 override 并在 non-clinical context 复测。验证通过后，再把相同值写入 `MedExColorResetLayoutProfile` 的新 profile/release；不要改 resolver，也不要加入 absolute-coordinate fallback。
 
 ## 安全限制
 
