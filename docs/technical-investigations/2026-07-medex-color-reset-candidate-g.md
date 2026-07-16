@@ -49,7 +49,7 @@ Pixel signature 至少包含：
 2. popup 浅色 background 或 border sample；
 3. 用于排除 no-popup editor background 的 control sample。
 
-颜色、sample offsets 和 tolerance 必须由 Windows field calibration 得出；本文件不猜测阈值。允许一次 short settle 和最多一次只读 signature retry，禁止第二次 arrow click。
+2026-07-16 Windows G1 calibration 已在多个 toolbar Y 位置完成。自动计算的 arrow point 均能打开菜单，且 popup 从 `t=0` 到 `t=80 ms` 保持稳定。G2 允许一次 immediate sample 和失败后的单次 20 ms passive sample；禁止第二次 arrow click。
 
 ## Proposed runtime contract
 
@@ -85,7 +85,7 @@ SignatureRetryDelayMs
 PopupPixelSignature
 ```
 
-拟议结果状态：
+G2 result states：
 
 ```text
 COLOR_RESET_POPUP_SIGNATURE_MISMATCH
@@ -127,4 +127,46 @@ Supported initial environment 限定为 MedEx 0.0.1.0、1920×1080、100% scalin
 
 Pixel grid 仅保存 screen coordinate 与 RGB，不保存截图或文字。结果写入 clipboard 和 `%TEMP%\MedExAHK\candidate_g_calibration.txt`。
 
-Status: G1 implemented for calibration only; field validation pending.
+## G1 field result and G2 profile
+
+Clipboard sentinel gate 已通过。多位置 region rectangles 包括 Y≈200、309、340、353、689；每次 exact region query 均得到一个 geometry-valid toolbar candidate。人工指针测量有 1–5 px 抖动，但自动 profile point 在所有位置均实际打开 popup，因此 G2 使用经过点击验证的：
+
+```text
+ArrowOffsetX=320
+ArrowOffsetY=0
+BlackOffsetX=6
+BlackOffsetY=83
+```
+
+G2 popup signature 要求四点全部匹配：
+
+```text
+(6,16)  = #FFFFFF tolerance 4
+(6,83)  = #000000 tolerance 8
+(20,83) = #EEEDE2 tolerance 12
+(40,83) = #22447A tolerance 12
+```
+
+closed probes 在 black/beige/blue 位置为 white，且 toolbar background 与 popup light point 不同；因此 signature mismatch 会阻止 black click。`(64,83)` 因 closed state 可能与下方内容颜色重合，不进入 required signature。
+
+Status: G2 controlled interaction, caret-order A/B, and the final generated-release validation passed on the supported Windows profile. `relativeMousePixelValidated` is the production mainline; `uiaInvoke` remains an explicit comparison/rollback strategy with no automatic fallback.
+
+## Final mainline validation
+
+2026-07-16 用户确认 generated `release/report_assistant.ahk` 完整验证通过。被验证 artifact 的 SHA-256 为：
+
+```text
+761a6c4261246a4bc14f44597e30eef4564db0bd1e48e92a31c1ac1e41f8ef11
+```
+
+验证结论覆盖 normal Candidate G color reset、`relativeMousePixelValidated` default dispatch、phrase-specific no-reset `;fzg` caret workflow，以及测试清单中的 mainline interaction/safety checks。该结论只适用于当前 supported profile：MedEx 0.0.1.0、1920×1080、100% scaling、DPI 96。其他环境仍须 fail closed 并单独校准。
+
+红字插入后仍有轻微延迟，但不影响本次 mainline acceptance。延迟优化必须在后续独立提交中进行，每次只改变一个 named wait，并重新验证 clipboard sentinel、caret 和 immediate typing；不得顺带修改 Candidate G geometry 或 pixel signature。
+
+## Caret-order discrepancy
+
+Legacy `;fzg` does not run the black-color reset: it pastes `red_not.clip`, waits 50 ms, and sends `Left 4`. Only legacy `;red` performs the two fixed black-reset clicks. The current `;fzg` instead completes clipboard restoration and the selected Color Reset strategy before the same 50 ms / `Left 4` sequence. Field logs prove `CursorRestoreRequestedCount=4` and `CursorRestoreCommandSent=true`, but the visible caret remains one position late.
+
+The first controlled discriminator therefore keeps the current CF_HTML payload constant and changes only execution order: current G2 reset path versus no-reset legacy order. If no-reset restores the correct caret, `;fzg` should become a phrase-specific workflow rather than inheriting `;red` reset orchestration. If both remain wrong, investigation moves to CF_HTML/Chromium caret boundaries. Arbitrary `Left 5` and speculative focus restoration remain prohibited until this A/B result is known.
+
+Windows result：带 G2 reset 的 control 仍表现为少一次有效 caret movement；no-reset legacy-order candidate 连续 6 次记录 paste/clipboard restoration 成功、请求并发送 `Left 4`，且用户确认最终 caret 正确。因此根因是把 standalone `;red` 的 reset tail 错误复用于 `;fzg`，而不是 `Left 4` 常量或当前 CF_HTML caret boundary。Production fix 保持 `Left 4`，不增加 focus restoration，也不改变 Candidate G geometry/signature。

@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOGIC = ROOT / "src" / "medex_candidate_g_logic.ahk"
 ADAPTER = ROOT / "src" / "adapters" / "medex_report_editor.ahk"
 DEBUG = ROOT / "debug" / "medex_candidate_g_calibration.ahk"
+G2_TEST = ROOT / "debug" / "medex_candidate_g2_test.ahk"
 BUILD = ROOT / "scripts" / "build_release.py"
 RELEASE = ROOT / "release" / "report_assistant.ahk"
 
@@ -82,6 +83,26 @@ def resolve(anchors: list[dict[str, object]]) -> dict[str, object]:
     return {"ok": True, "selected": selected, "arrow": arrow, "black": black}
 
 
+def rgb_matches(actual: int, expected: int, tolerance: int) -> bool:
+    return all(
+        abs(((actual >> shift) & 0xFF) - ((expected >> shift) & 0xFF)) <= tolerance
+        for shift in (16, 8, 0)
+    )
+
+
+def signature_matches(samples: dict[str, int]) -> bool:
+    required = {
+        "popupLight": (0xFFFFFF, 4),
+        "blackSwatch": (0x000000, 8),
+        "beigeSwatch": (0xEEEDE2, 12),
+        "blueSwatch": (0x22447A, 12),
+    }
+    return all(
+        name in samples and rgb_matches(samples[name], expected, tolerance)
+        for name, (expected, tolerance) in required.items()
+    )
+
+
 class CandidateGLogicTests(unittest.TestCase):
     def setUp(self) -> None:
         self.toolbar = anchor("检查所见", rect(296, 289, 352, 305))
@@ -129,13 +150,41 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertEqual(result["arrow"]["y"], original["arrow"]["y"] + 200)
         self.assertEqual(result["black"]["y"], original["black"]["y"] + 200)
 
-    def test_profile_and_estimates_are_centralized(self) -> None:
+    def test_profiles_and_runtime_calibration_are_centralized(self) -> None:
         source = LOGIC.read_text(encoding="utf-8")
         self.assertIn("class CandidateGCalibrationProfile", source)
+        self.assertIn("class CandidateGRelativeMouseProfile", source)
         self.assertIn("static EstimatedArrowOffsetX := 320", source)
         self.assertIn("static EstimatedArrowOffsetY := 0", source)
         self.assertIn("static EstimatedBlackOffsetX := 6", source)
         self.assertIn("static EstimatedBlackOffsetY := 83", source)
+        self.assertIn("static ArrowOffsetX := 320", source)
+        self.assertIn("static ArrowOffsetY := 0", source)
+        self.assertIn("static BlackOffsetX := 6", source)
+        self.assertIn("static BlackOffsetY := 83", source)
+
+    def test_field_signature_matches_open_popup_evidence(self) -> None:
+        self.assertTrue(signature_matches({
+            "popupLight": 0xFFFFFF,
+            "blackSwatch": 0x000000,
+            "beigeSwatch": 0xEEEDE2,
+            "blueSwatch": 0x22447A,
+        }))
+
+    def test_closed_popup_signature_fails(self) -> None:
+        self.assertFalse(signature_matches({
+            "popupLight": 0xF6F8FB,
+            "blackSwatch": 0xFFFFFF,
+            "beigeSwatch": 0xFFFFFF,
+            "blueSwatch": 0xFFFFFF,
+        }))
+
+    def test_signature_requires_every_pixel(self) -> None:
+        self.assertFalse(signature_matches({
+            "popupLight": 0xFFFFFF,
+            "blackSwatch": 0x000000,
+            "beigeSwatch": 0xEEEDE2,
+        }))
 
     def test_debug_harness_never_clicks_black_or_uses_popup_uia(self) -> None:
         source = DEBUG.read_text(encoding="utf-8")
@@ -152,20 +201,110 @@ class CandidateGLogicTests(unittest.TestCase):
         for forbidden in ("MsgBox", "ToolTip", "TrayTip"):
             self.assertNotIn(forbidden, executable)
 
-    def test_strategy_default_remains_uia_without_fallback(self) -> None:
+    def test_strategy_default_is_candidate_g_without_fallback(self) -> None:
         adapter = ADAPTER.read_text(encoding="utf-8")
+        self.assertIn(
+            "static ColorResetStrategy := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED",
+            adapter,
+        )
         dispatcher = adapter.split("ResetMedExInsertionColor(options := 0)", 1)[1].split(
             "RunMedExUiaInvokeColorReset(options := 0)", 1
         )[0]
         self.assertIn("MedExColorResetStrategy.UIA_INVOKE", dispatcher)
-        self.assertIn("ColorResetCode.STRATEGY_NOT_IMPLEMENTED", dispatcher)
+        self.assertIn("RunMedExRelativeMousePixelValidatedColorReset(options)", dispatcher)
         self.assertEqual(dispatcher.count("RunMedExUiaInvokeColorReset(options)"), 1)
+        relative_branch = dispatcher.split(
+            "MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED", 1
+        )[1]
+        self.assertNotIn("RunMedExUiaInvokeColorReset(options)", relative_branch)
 
-    def test_g1_calibration_logic_is_not_in_production_release(self) -> None:
-        self.assertNotIn("medex_candidate_g_logic.ahk", BUILD.read_text(encoding="utf-8"))
+    def test_g2_logic_is_bundled_as_default(self) -> None:
+        self.assertIn("medex_candidate_g_logic.ahk", BUILD.read_text(encoding="utf-8"))
         release = RELEASE.read_text(encoding="utf-8")
-        self.assertNotIn("class CandidateGCalibrationProfile", release)
+        self.assertIn("class CandidateGRelativeMouseProfile", release)
+        self.assertIn(
+            "static ColorResetStrategy := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED",
+            release,
+        )
         self.assertNotIn("RunCandidateGOpenPixelProbe", release)
+
+    def test_g2_chain_is_bounded_and_has_no_popup_uia_or_fallback(self) -> None:
+        adapter = ADAPTER.read_text(encoding="utf-8")
+        body = adapter.split(
+            "RunMedExRelativeMousePixelValidatedColorReset(options := 0)", 1
+        )[1].split("\nRunMedExUiaInvokeColorReset(options := 0)", 1)[0]
+        self.assertEqual(body.count('Click arrowPoint["x"], arrowPoint["y"]'), 1)
+        self.assertEqual(body.count('Click blackPoint["x"], blackPoint["y"]'), 1)
+        self.assertIn("SampleAndEvaluateCandidateGPopupSignature", body)
+        self.assertIn("ColorResetCode.POPUP_SIGNATURE_MISMATCH", body)
+        self.assertIn("ColorResetCode.BLACK_CLICK_FAILED", body)
+        self.assertNotIn('"000000"', body)
+        self.assertNotIn("InvokePattern", body)
+        self.assertNotIn("RunMedExUiaInvokeColorReset", body)
+
+    def test_g2_safety_guards_precede_clicks(self) -> None:
+        adapter = ADAPTER.read_text(encoding="utf-8")
+        body = adapter.split(
+            "RunMedExRelativeMousePixelValidatedColorReset(options := 0)", 1
+        )[1].split("\nRunMedExUiaInvokeColorReset(options := 0)", 1)[0]
+        arrow_click = body.index('Click arrowPoint["x"], arrowPoint["y"]')
+        black_click = body.index('Click blackPoint["x"], blackPoint["y"]')
+        self.assertLess(body.index("ValidateCandidateGRuntimeProfile"), arrow_click)
+        self.assertLess(body.index("RectContainsPoint(clientRectScreen, arrowPoint)"), arrow_click)
+        self.assertLess(body.index("RectContainsPoint(clientRectScreen, blackPoint)"), arrow_click)
+        self.assertLess(body.index('if !signature["matched"]'), black_click)
+        self.assertGreaterEqual(body.count("MedExForegroundTargetMatches"), 3)
+        self.assertIn("MouseMove originalMouseX, originalMouseY, 0", body)
+
+    def test_g2_debug_uses_real_dispatcher_and_no_production_hotstrings(self) -> None:
+        source = DEBUG.read_text(encoding="utf-8")
+        self.assertIn("F12::RunCandidateG2ControlledReset()", source)
+        self.assertIn("F7::RunCandidateG2ClosedSignatureGate()", source)
+        self.assertIn('"candidateGSkipArrowClickForClosedSignatureTest", true', source)
+        self.assertIn("ResetMedExInsertionColor(Map(", source)
+        self.assertIn("MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED", source)
+        self.assertNotIn(":*?:;red::", source)
+        self.assertNotIn(":*?:;fzg::", source)
+
+    def test_closed_signature_debug_gate_cannot_click_black_on_closed_popup(self) -> None:
+        adapter = ADAPTER.read_text(encoding="utf-8")
+        body = adapter.split(
+            "RunMedExRelativeMousePixelValidatedColorReset(options := 0)", 1
+        )[1].split("\nRunMedExUiaInvokeColorReset(options := 0)", 1)[0]
+        self.assertIn("candidateGSkipArrowClickForClosedSignatureTest", body)
+        self.assertIn("if !skipArrowClickForClosedSignatureTest", body)
+        signature_gate = body.index('if !signature["matched"]')
+        black_click = body.index('Click blackPoint["x"], blackPoint["y"]')
+        self.assertLess(signature_gate, black_click)
+
+    def test_g2_test_build_uses_shared_orchestration(self) -> None:
+        source = G2_TEST.read_text(encoding="utf-8")
+        self.assertIn("InsertRedFigureTextAndRestoreState", source)
+        self.assertIn("RunFzgInsertion", source)
+        self.assertIn("ResetMedExInsertionColor", source)
+        self.assertIn("MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED", source)
+        self.assertNotIn("PixelGetColor", source)
+        self.assertNotIn('Click arrowPoint', source)
+        self.assertNotIn('Click blackPoint', source)
+        self.assertNotIn('"000000"', source)
+        self.assertNotIn("InvokePattern", source)
+        for forbidden in ("MsgBox", "ToolTip", "TrayTip"):
+            self.assertNotIn(forbidden, source)
+
+    def test_caret_ab_keeps_left_four_and_changes_only_reset_order(self) -> None:
+        source = G2_TEST.read_text(encoding="utf-8")
+        self.assertIn("^!F8::", source)
+        self.assertIn("RunCandidateG2FzgWithColorResetDiagnostic()", source)
+        self.assertIn("^!F9::RunCandidateG2FzgWithoutColorResetDiagnostic()", source)
+        candidate = source.split(
+            "\nRunCandidateG2FzgWithoutColorResetDiagnostic() {", 1
+        )[1].split("\nWriteCandidateG2TestOperation", 1)[0]
+        self.assertIn("PasteRedFigureTextDetailed", candidate)
+        self.assertIn("ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs", candidate)
+        self.assertEqual(candidate.count('Send("{Left 4}")'), 1)
+        self.assertNotIn("ResetMedExInsertionColor", candidate)
+        self.assertNotIn("RunMedExRelativeMousePixelValidatedColorReset", candidate)
+        self.assertNotIn("{Left 5}", source)
 
 
 if __name__ == "__main__":

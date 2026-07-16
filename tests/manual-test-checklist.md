@@ -38,6 +38,32 @@
 - [ ] open/closed probes 至少产生三个稳定区分点，且 popup 状态在 80 ms 内稳定。
 - [ ] 所有结果 `BlackClickSent=false`，不执行最终颜色验证。
 
+## Candidate G2 controlled interaction（TEST CHECKPOINT 3）
+
+- [ ] 完全退出 generated release 和其他 AHK scripts，只运行 `debug/medex_candidate_g_calibration.ahk`。
+- [ ] 确认 F12 输出 `ColorResetStrategy=relativeMousePixelValidated`。
+- [ ] Wrong region：F12 不发送 arrow/black click。
+- [ ] 在 report content 输入无害“检查所见”：真实 toolbar row 被选择；无法唯一消歧时 fail closed。
+- [ ] Popup-missing：保持菜单关闭并按 F7，确认 `ClosedSignatureTestMode=true`、`ArrowClickSent=false`、`COLOR_RESET_POPUP_SIGNATURE_MISMATCH` 且 `BlackClickSent=false`。
+- [ ] Unsupported profile：改变 resolution/scaling 测试时返回 `COLOR_RESET_UNSUPPORTED_PROFILE`，且两个 click count 均为 0。
+- [ ] High/middle/low toolbar Y 位置各执行 F12 5 次；每次 `ArrowClickCount=1`、`PopupSignatureMatched=true`、`BlackClickCount=1`、`MouseRestored=true`。
+- [ ] 每次确认 `RELATIVE_MOUSE_CHAIN_OK` 仅表示 click chain；在 approved non-clinical context 人工确认后续无害字符为黑色。
+- [x] 完全退出 calibration harness 后，只运行 `debug/medex_candidate_g2_test.ahk` 完成 G2 controlled validation；该 checkpoint 当时不修改 production default。
+- [x] Candidate G 提升后只运行 generated `release/report_assistant.ahk`，完成 `;red`、`;fzg` 和 immediate punctuation 的最终 mainline validation。
+- [x] `;fzg` 最终 caret 为 `|（见图）`；实现保持 `Left 4`，没有使用 `Left 5` 补偿。
+- [x] 2026-07-16 用户确认最终 generated release 完整通过；验证 artifact SHA-256=`761a6c4261246a4bc14f44597e30eef4564db0bd1e48e92a31c1ac1e41f8ef11`。
+- [x] 全程不得同时运行 release 与 debug harness，不得在 finalized patient report 测试。
+
+### Candidate G2 caret-order A/B
+
+- [ ] 只运行 `debug/medex_candidate_g2_test.ahk`，在同一 approved non-clinical editor state 测试。
+- [ ] `Ctrl+Alt+F8` 运行当前顺序：CF_HTML → G2 reset → 50 ms → Left 4；重复 5 次。
+- [ ] `Ctrl+Alt+F9` 运行 legacy 顺序：CF_HTML → no reset → 50 ms → Left 4；重复 5 次。
+- [ ] 两组都记录最终 caret 是否为 `|（见图）`，并在 caret 处输入一个无害字符确认实际继承颜色。
+- [ ] F9 必须记录 `ColorResetStrategy=SKIPPED_FOR_LEGACY_ORDER_AB`、`CursorRestoreRequestedCount=4`；不得用于 finalized report。
+- [ ] 若只有 F9 正确，则将 `;fzg` 设计为 phrase-specific no-reset workflow；若两组都差一位，则继续调查 CF_HTML caret boundary，不实施 `Left 5`。
+- [x] 2026-07-16：F9 no-reset legacy order 连续 6 次正确；production `;fzg` 已切换为同一顺序，等待 regenerated production-path smoke test。
+
 - [ ] Script 正常启动。
 - [ ] Ctrl+Alt+Esc 可以暂停和恢复 new-project hotkeys/hotstrings。
 - [ ] Ctrl+Alt+Q 可以退出新项目。
@@ -153,12 +179,12 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 10. [ ] 分别连续输入、插入普通字符、使用方向键/鼠标打断 `;fzg` 前缀，记录哪些事件会重置 AHK hotstring recognition buffer；该结果单独处理，不与 Color Reset 修复耦合。
 11. [ ] 在错误 region 测试一次，确认 no menu click、no Invoke、明确 fail-closed result。
 
-#### Candidate G activation gate（当前不执行）
+#### Candidate G activation gate（已完成；历史记录）
 
 - [ ] Control/Candidate A/B 已完成。
 - [ ] `检查所见` localization 重复稳定。
 - [ ] 剩余主要失败明确位于 popup UIA lookup/Invoke。
-- [ ] 用户明确批准 Candidate G calibration milestone。
+- [x] 用户明确批准 Candidate G calibration milestone。
 - [ ] calibration 前没有把 estimated arrow/black offsets 或 pixel thresholds 写入 production。
 - [ ] 如果启动 calibration，popup absent signature 必须失败且不得发送 black click。
 - [ ] 严禁在 finalized patient report 中校准或验证。

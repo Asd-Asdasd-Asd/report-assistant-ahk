@@ -11,7 +11,7 @@ RunFzgInsertion(resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
     SendText("放射性摄取增高，SUVmax约")
-    operation := InsertRedFigureTextAndRestoreState("（见图）", resetOptions)
+    operation := InsertRedFigureTextForCaretRelocation("（见图）", performanceContext)
     if operation.ok {
         Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs
         if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
@@ -37,6 +37,49 @@ RunFzgInsertion(resetOptions := 0) {
     }
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringReturnMs")
     return operation
+}
+
+InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext := 0) {
+    pasteResult := PasteRedFigureTextDetailed(text, performanceContext)
+    if !pasteResult.pasteDispatched {
+        return {
+            ok: false,
+            code: RedTextOperationCode.PASTE_FAILED,
+            pasteDispatched: false,
+            clipboardRestoreSucceeded: pasteResult.clipboardRestoreSucceeded,
+            reset: 0
+        }
+    }
+    if !pasteResult.clipboardRestoreSucceeded {
+        return {
+            ok: false,
+            code: RedTextOperationCode.CLIPBOARD_RESTORE_FAILED,
+            pasteDispatched: true,
+            clipboardRestoreSucceeded: false,
+            reset: 0
+        }
+    }
+
+    foregroundHwnd := WinExist("A")
+    resetContext := Map(
+        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "appVersion", AppMetadata.Version,
+        "colorResetStrategy", "notRequiredForCaretRelocation",
+        "colorResetReason", "caretMovesBeforeRedMarker",
+        "foregroundWindowHandle", foregroundHwnd
+            ? Format("0x{:X}", foregroundHwnd)
+            : "UNKNOWN",
+        "automationChainResult", ColorResetCode.NOT_REQUIRED,
+        "finalValidationState", "NOT_APPLICABLE",
+        "finalInsertionColorVisuallyValidated", false
+    )
+    return {
+        ok: true,
+        code: RedTextOperationCode.OK,
+        pasteDispatched: true,
+        clipboardRestoreSucceeded: true,
+        reset: MakeColorResetResult(true, ColorResetCode.NOT_REQUIRED, resetContext)
+    }
 }
 
 InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {

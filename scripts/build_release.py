@@ -17,6 +17,7 @@ ORDER = [
     "utils.ahk",
     "clipboard_html.ahk",
     "medex_color_reset_logic.ahk",
+    "medex_candidate_g_logic.ahk",
     "diagnostics.ahk",
     "adapters/medex_report_editor.ahk",
     "report_editor.ahk",

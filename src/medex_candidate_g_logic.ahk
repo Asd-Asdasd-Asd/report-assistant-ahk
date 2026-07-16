@@ -35,6 +35,40 @@ class CandidateGCalibrationProfile {
     static CorroboratorMaxRegionToFontDistance := 240
 }
 
+class CandidateGRelativeMouseProfile {
+    static ProfileName := "medex-0.0.1-1920x1080-100-relative-mouse-v1"
+    static SupportedMedExVersion := "0.0.1.0"
+    static SupportedScreenWidth := 1920
+    static SupportedScreenHeight := 1080
+    static SupportedDpi := 96
+    static SupportedDisplayScaling := "100%"
+
+    static RegionAnchorName := "检查所见"
+    static ArrowOffsetX := 320
+    static ArrowOffsetY := 0
+    static BlackOffsetX := 6
+    static BlackOffsetY := 83
+    static SignatureSecondSampleDelayMs := 20
+
+    ; Privacy-safe popup signature calibrated on the supported workstation.
+    static PopupLightOffsetX := 6
+    static PopupLightOffsetY := 16
+    static PopupLightColor := 0xFFFFFF
+    static PopupLightTolerance := 4
+    static BlackSwatchOffsetX := 6
+    static BlackSwatchOffsetY := 83
+    static BlackSwatchColor := 0x000000
+    static BlackSwatchTolerance := 8
+    static BeigeSwatchOffsetX := 20
+    static BeigeSwatchOffsetY := 83
+    static BeigeSwatchColor := 0xEEEDE2
+    static BeigeSwatchTolerance := 12
+    static BlueSwatchOffsetX := 40
+    static BlueSwatchOffsetY := 83
+    static BlueSwatchColor := 0x22447A
+    static BlueSwatchTolerance := 12
+}
+
 ValidateCandidateGSupportedProfile(environment, options := 0) {
     context := Map(
         "candidateGProfileName", CandidateGLogicOption(
@@ -70,6 +104,93 @@ ValidateCandidateGSupportedProfile(environment, options := 0) {
 
     context["supportedProfile"] := true
     return MakeCandidateGResult(true, CandidateGCalibrationCode.ROW_OK, context)
+}
+
+BuildCandidateGRuntimeLayoutOptions(options := 0) {
+    return Map(
+        "profileName", CandidateGLogicOption(options, "profileName", CandidateGRelativeMouseProfile.ProfileName),
+        "regionAnchorName", CandidateGLogicOption(options, "regionAnchorName", CandidateGRelativeMouseProfile.RegionAnchorName),
+        "arrowOffsetX", CandidateGLogicOption(options, "arrowOffsetX", CandidateGRelativeMouseProfile.ArrowOffsetX),
+        "arrowOffsetY", CandidateGLogicOption(options, "arrowOffsetY", CandidateGRelativeMouseProfile.ArrowOffsetY),
+        "blackOffsetX", CandidateGLogicOption(options, "blackOffsetX", CandidateGRelativeMouseProfile.BlackOffsetX),
+        "blackOffsetY", CandidateGLogicOption(options, "blackOffsetY", CandidateGRelativeMouseProfile.BlackOffsetY)
+    )
+}
+
+ValidateCandidateGRuntimeProfile(environment, options := 0) {
+    runtimeOptions := Map(
+        "profileName", CandidateGLogicOption(options, "profileName", CandidateGRelativeMouseProfile.ProfileName)
+    )
+    context := Map(
+        "candidateGProfileName", runtimeOptions["profileName"],
+        "supportedProfile", false,
+        "unsupportedProfileReason", ""
+    )
+    if Type(environment) != "Map" {
+        context["unsupportedProfileReason"] := "environmentUnavailable"
+        return MakeColorResetResult(false, ColorResetCode.UNSUPPORTED_PROFILE, context)
+    }
+    expected := Map(
+        "medExVersion", CandidateGRelativeMouseProfile.SupportedMedExVersion,
+        "screenWidth", CandidateGRelativeMouseProfile.SupportedScreenWidth,
+        "screenHeight", CandidateGRelativeMouseProfile.SupportedScreenHeight,
+        "dpi", CandidateGRelativeMouseProfile.SupportedDpi,
+        "displayScaling", CandidateGRelativeMouseProfile.SupportedDisplayScaling
+    )
+    for key, value in expected {
+        if !environment.Has(key) || String(environment[key]) != String(value) {
+            context["unsupportedProfileReason"] := key "Mismatch"
+            return MakeColorResetResult(false, ColorResetCode.UNSUPPORTED_PROFILE, context)
+        }
+    }
+    context["supportedProfile"] := true
+    return MakeColorResetResult(true, ColorResetCode.OK, context)
+}
+
+CandidateGPopupSignatureSample(arrowPoint) {
+    CoordMode "Pixel", "Screen"
+    points := Map(
+        "popupLight", Map("x", CandidateGRelativeMouseProfile.PopupLightOffsetX, "y", CandidateGRelativeMouseProfile.PopupLightOffsetY),
+        "blackSwatch", Map("x", CandidateGRelativeMouseProfile.BlackSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlackSwatchOffsetY),
+        "beigeSwatch", Map("x", CandidateGRelativeMouseProfile.BeigeSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BeigeSwatchOffsetY),
+        "blueSwatch", Map("x", CandidateGRelativeMouseProfile.BlueSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlueSwatchOffsetY)
+    )
+    samples := Map()
+    for name, offset in points {
+        try samples[name] := PixelGetColor(
+            arrowPoint["x"] + offset["x"],
+            arrowPoint["y"] + offset["y"],
+            "RGB"
+        ) & 0xFFFFFF
+        catch
+            samples[name] := "UNKNOWN"
+    }
+    return samples
+}
+
+EvaluateCandidateGPopupSignature(samples) {
+    expected := [
+        ["popupLight", CandidateGRelativeMouseProfile.PopupLightColor, CandidateGRelativeMouseProfile.PopupLightTolerance],
+        ["blackSwatch", CandidateGRelativeMouseProfile.BlackSwatchColor, CandidateGRelativeMouseProfile.BlackSwatchTolerance],
+        ["beigeSwatch", CandidateGRelativeMouseProfile.BeigeSwatchColor, CandidateGRelativeMouseProfile.BeigeSwatchTolerance],
+        ["blueSwatch", CandidateGRelativeMouseProfile.BlueSwatchColor, CandidateGRelativeMouseProfile.BlueSwatchTolerance]
+    ]
+    if Type(samples) != "Map"
+        return Map("matched", false, "reason", "samplesUnavailable")
+    for requirement in expected {
+        name := requirement[1]
+        if !samples.Has(name) || !CandidateGRgbWithinTolerance(samples[name], requirement[2], requirement[3])
+            return Map("matched", false, "reason", name "Mismatch")
+    }
+    return Map("matched", true, "reason", "allRequiredPixelsMatched")
+}
+
+CandidateGRgbWithinTolerance(actual, expected, tolerance) {
+    if !IsNumber(actual) || !IsNumber(expected) || !IsNumber(tolerance)
+        return false
+    return Abs(((actual >> 16) & 0xFF) - ((expected >> 16) & 0xFF)) <= tolerance
+        && Abs(((actual >> 8) & 0xFF) - ((expected >> 8) & 0xFF)) <= tolerance
+        && Abs((actual & 0xFF) - (expected & 0xFF)) <= tolerance
 }
 
 ResolveCandidateGToolbarRow(textAnchors, clientRectScreen, options := 0) {

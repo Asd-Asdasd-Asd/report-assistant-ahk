@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-16 12:45:30 UTC
+; Generated at: 2026-07-16 13:53:55 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -8363,6 +8363,13 @@ class ColorResetCode {
     static BLACK_ITEM_NOT_FOUND := "COLOR_RESET_BLACK_ITEM_NOT_FOUND"
     static INVOKE_UNAVAILABLE := "COLOR_RESET_INVOKE_UNAVAILABLE"
     static INVOKE_FAILED := "COLOR_RESET_INVOKE_FAILED"
+    static UNSUPPORTED_PROFILE := "COLOR_RESET_UNSUPPORTED_PROFILE"
+    static INVALID_ARROW_POINT := "COLOR_RESET_INVALID_ARROW_POINT"
+    static INVALID_BLACK_POINT := "COLOR_RESET_INVALID_BLACK_POINT"
+    static POPUP_SIGNATURE_MISMATCH := "COLOR_RESET_POPUP_SIGNATURE_MISMATCH"
+    static BLACK_CLICK_FAILED := "COLOR_RESET_BLACK_CLICK_FAILED"
+    static RELATIVE_MOUSE_CHAIN_OK := "RELATIVE_MOUSE_CHAIN_OK"
+    static NOT_REQUIRED := "COLOR_RESET_NOT_REQUIRED"
     static STRATEGY_NOT_IMPLEMENTED := "COLOR_RESET_STRATEGY_NOT_IMPLEMENTED"
     static UNKNOWN_STRATEGY := "COLOR_RESET_UNKNOWN_STRATEGY"
     static UNEXPECTED_ERROR := "COLOR_RESET_UNEXPECTED_ERROR"
@@ -8670,6 +8677,408 @@ MedExLogicOption(options, key, defaultValue) {
 }
 
 ; --- END medex_color_reset_logic.ahk ---
+
+; --- BEGIN medex_candidate_g_logic.ahk ---
+class CandidateGCalibrationCode {
+    static ROW_OK := "CANDIDATE_G_ROW_OK"
+    static UNSUPPORTED_PROFILE := "CANDIDATE_G_UNSUPPORTED_PROFILE"
+    static REGION_NOT_FOUND := "CANDIDATE_G_REGION_ANCHOR_NOT_FOUND"
+    static REGION_AMBIGUOUS := "CANDIDATE_G_REGION_ANCHOR_AMBIGUOUS"
+    static INVALID_GEOMETRY := "CANDIDATE_G_INVALID_GEOMETRY"
+}
+
+class CandidateGCalibrationProfile {
+    static ProfileName := "medex-0.0.1-1920x1080-100-calibration"
+    static SupportedMedExVersion := "0.0.1.0"
+    static SupportedScreenWidth := 1920
+    static SupportedScreenHeight := 1080
+    static SupportedDpi := 96
+    static SupportedDisplayScaling := "100%"
+
+    static RegionAnchorName := "检查所见"
+    static RegionLeftMin := 272
+    static RegionLeftMax := 320
+    static RegionWidthMin := 40
+    static RegionWidthMax := 80
+    static RegionHeightMin := 10
+    static RegionHeightMax := 28
+    static RegionRowPadding := 6
+
+    ; Calibration estimates only. They are not production constants.
+    static EstimatedArrowOffsetX := 320
+    static EstimatedArrowOffsetY := 0
+    static EstimatedBlackOffsetX := 6
+    static EstimatedBlackOffsetY := 83
+
+    static FontSizeNamePattern := "^\d+(?:\.\d+)?px$"
+    static OptionalRightAnchorName := "rAI"
+    static CorroboratorMinVerticalOverlapRatio := 0.5
+    static CorroboratorMaxRegionToFontDistance := 240
+}
+
+class CandidateGRelativeMouseProfile {
+    static ProfileName := "medex-0.0.1-1920x1080-100-relative-mouse-v1"
+    static SupportedMedExVersion := "0.0.1.0"
+    static SupportedScreenWidth := 1920
+    static SupportedScreenHeight := 1080
+    static SupportedDpi := 96
+    static SupportedDisplayScaling := "100%"
+
+    static RegionAnchorName := "检查所见"
+    static ArrowOffsetX := 320
+    static ArrowOffsetY := 0
+    static BlackOffsetX := 6
+    static BlackOffsetY := 83
+    static SignatureSecondSampleDelayMs := 20
+
+    ; Privacy-safe popup signature calibrated on the supported workstation.
+    static PopupLightOffsetX := 6
+    static PopupLightOffsetY := 16
+    static PopupLightColor := 0xFFFFFF
+    static PopupLightTolerance := 4
+    static BlackSwatchOffsetX := 6
+    static BlackSwatchOffsetY := 83
+    static BlackSwatchColor := 0x000000
+    static BlackSwatchTolerance := 8
+    static BeigeSwatchOffsetX := 20
+    static BeigeSwatchOffsetY := 83
+    static BeigeSwatchColor := 0xEEEDE2
+    static BeigeSwatchTolerance := 12
+    static BlueSwatchOffsetX := 40
+    static BlueSwatchOffsetY := 83
+    static BlueSwatchColor := 0x22447A
+    static BlueSwatchTolerance := 12
+}
+
+ValidateCandidateGSupportedProfile(environment, options := 0) {
+    context := Map(
+        "candidateGProfileName", CandidateGLogicOption(
+            options,
+            "profileName",
+            CandidateGCalibrationProfile.ProfileName
+        ),
+        "supportedProfile", false,
+        "unsupportedProfileReason", ""
+    )
+    if Type(environment) != "Map" {
+        context["unsupportedProfileReason"] := "environmentUnavailable"
+        return MakeCandidateGResult(false, CandidateGCalibrationCode.UNSUPPORTED_PROFILE, context)
+    }
+
+    expected := Map(
+        "medExVersion", CandidateGCalibrationProfile.SupportedMedExVersion,
+        "screenWidth", CandidateGCalibrationProfile.SupportedScreenWidth,
+        "screenHeight", CandidateGCalibrationProfile.SupportedScreenHeight,
+        "dpi", CandidateGCalibrationProfile.SupportedDpi,
+        "displayScaling", CandidateGCalibrationProfile.SupportedDisplayScaling
+    )
+    for key, value in expected {
+        if !environment.Has(key) || String(environment[key]) != String(value) {
+            context["unsupportedProfileReason"] := key "Mismatch"
+            return MakeCandidateGResult(
+                false,
+                CandidateGCalibrationCode.UNSUPPORTED_PROFILE,
+                context
+            )
+        }
+    }
+
+    context["supportedProfile"] := true
+    return MakeCandidateGResult(true, CandidateGCalibrationCode.ROW_OK, context)
+}
+
+BuildCandidateGRuntimeLayoutOptions(options := 0) {
+    return Map(
+        "profileName", CandidateGLogicOption(options, "profileName", CandidateGRelativeMouseProfile.ProfileName),
+        "regionAnchorName", CandidateGLogicOption(options, "regionAnchorName", CandidateGRelativeMouseProfile.RegionAnchorName),
+        "arrowOffsetX", CandidateGLogicOption(options, "arrowOffsetX", CandidateGRelativeMouseProfile.ArrowOffsetX),
+        "arrowOffsetY", CandidateGLogicOption(options, "arrowOffsetY", CandidateGRelativeMouseProfile.ArrowOffsetY),
+        "blackOffsetX", CandidateGLogicOption(options, "blackOffsetX", CandidateGRelativeMouseProfile.BlackOffsetX),
+        "blackOffsetY", CandidateGLogicOption(options, "blackOffsetY", CandidateGRelativeMouseProfile.BlackOffsetY)
+    )
+}
+
+ValidateCandidateGRuntimeProfile(environment, options := 0) {
+    runtimeOptions := Map(
+        "profileName", CandidateGLogicOption(options, "profileName", CandidateGRelativeMouseProfile.ProfileName)
+    )
+    context := Map(
+        "candidateGProfileName", runtimeOptions["profileName"],
+        "supportedProfile", false,
+        "unsupportedProfileReason", ""
+    )
+    if Type(environment) != "Map" {
+        context["unsupportedProfileReason"] := "environmentUnavailable"
+        return MakeColorResetResult(false, ColorResetCode.UNSUPPORTED_PROFILE, context)
+    }
+    expected := Map(
+        "medExVersion", CandidateGRelativeMouseProfile.SupportedMedExVersion,
+        "screenWidth", CandidateGRelativeMouseProfile.SupportedScreenWidth,
+        "screenHeight", CandidateGRelativeMouseProfile.SupportedScreenHeight,
+        "dpi", CandidateGRelativeMouseProfile.SupportedDpi,
+        "displayScaling", CandidateGRelativeMouseProfile.SupportedDisplayScaling
+    )
+    for key, value in expected {
+        if !environment.Has(key) || String(environment[key]) != String(value) {
+            context["unsupportedProfileReason"] := key "Mismatch"
+            return MakeColorResetResult(false, ColorResetCode.UNSUPPORTED_PROFILE, context)
+        }
+    }
+    context["supportedProfile"] := true
+    return MakeColorResetResult(true, ColorResetCode.OK, context)
+}
+
+CandidateGPopupSignatureSample(arrowPoint) {
+    CoordMode "Pixel", "Screen"
+    points := Map(
+        "popupLight", Map("x", CandidateGRelativeMouseProfile.PopupLightOffsetX, "y", CandidateGRelativeMouseProfile.PopupLightOffsetY),
+        "blackSwatch", Map("x", CandidateGRelativeMouseProfile.BlackSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlackSwatchOffsetY),
+        "beigeSwatch", Map("x", CandidateGRelativeMouseProfile.BeigeSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BeigeSwatchOffsetY),
+        "blueSwatch", Map("x", CandidateGRelativeMouseProfile.BlueSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlueSwatchOffsetY)
+    )
+    samples := Map()
+    for name, offset in points {
+        try samples[name] := PixelGetColor(
+            arrowPoint["x"] + offset["x"],
+            arrowPoint["y"] + offset["y"],
+            "RGB"
+        ) & 0xFFFFFF
+        catch
+            samples[name] := "UNKNOWN"
+    }
+    return samples
+}
+
+EvaluateCandidateGPopupSignature(samples) {
+    expected := [
+        ["popupLight", CandidateGRelativeMouseProfile.PopupLightColor, CandidateGRelativeMouseProfile.PopupLightTolerance],
+        ["blackSwatch", CandidateGRelativeMouseProfile.BlackSwatchColor, CandidateGRelativeMouseProfile.BlackSwatchTolerance],
+        ["beigeSwatch", CandidateGRelativeMouseProfile.BeigeSwatchColor, CandidateGRelativeMouseProfile.BeigeSwatchTolerance],
+        ["blueSwatch", CandidateGRelativeMouseProfile.BlueSwatchColor, CandidateGRelativeMouseProfile.BlueSwatchTolerance]
+    ]
+    if Type(samples) != "Map"
+        return Map("matched", false, "reason", "samplesUnavailable")
+    for requirement in expected {
+        name := requirement[1]
+        if !samples.Has(name) || !CandidateGRgbWithinTolerance(samples[name], requirement[2], requirement[3])
+            return Map("matched", false, "reason", name "Mismatch")
+    }
+    return Map("matched", true, "reason", "allRequiredPixelsMatched")
+}
+
+CandidateGRgbWithinTolerance(actual, expected, tolerance) {
+    if !IsNumber(actual) || !IsNumber(expected) || !IsNumber(tolerance)
+        return false
+    return Abs(((actual >> 16) & 0xFF) - ((expected >> 16) & 0xFF)) <= tolerance
+        && Abs(((actual >> 8) & 0xFF) - ((expected >> 8) & 0xFF)) <= tolerance
+        && Abs((actual & 0xFF) - (expected & 0xFF)) <= tolerance
+}
+
+ResolveCandidateGToolbarRow(textAnchors, clientRectScreen, options := 0) {
+    regionName := CandidateGLogicOption(
+        options,
+        "regionAnchorName",
+        CandidateGCalibrationProfile.RegionAnchorName
+    )
+    context := Map(
+        "candidateGProfileName", CandidateGLogicOption(
+            options,
+            "profileName",
+            CandidateGCalibrationProfile.ProfileName
+        ),
+        "regionAnchorName", regionName,
+        "rawRegionAnchorCandidateCount", 0,
+        "geometryValidRegionCandidateCount", 0,
+        "toolbarRowCorroborationCount", 0,
+        "toolbarRowSelectionReason", "",
+        "regionCandidateIgnoredReasons", [],
+        "regionAnchorFound", false
+    )
+    if Type(textAnchors) != "Array" || !IsValidRect(clientRectScreen) {
+        context["toolbarRowSelectionReason"] := "invalidInput"
+        return MakeCandidateGResult(false, CandidateGCalibrationCode.INVALID_GEOMETRY, context)
+    }
+
+    rawCandidates := []
+    for anchor in textAnchors {
+        if Type(anchor) = "Map" && anchor.Has("name") && anchor["name"] = regionName
+            rawCandidates.Push(anchor)
+    }
+    context["rawRegionAnchorCandidateCount"] := rawCandidates.Length
+    if rawCandidates.Length = 0 {
+        context["toolbarRowSelectionReason"] := "regionAnchorNotFound"
+        return MakeCandidateGResult(false, CandidateGCalibrationCode.REGION_NOT_FOUND, context)
+    }
+
+    geometryCandidates := []
+    for index, anchor in rawCandidates {
+        reason := CandidateGRegionGeometryReason(anchor, clientRectScreen, options)
+        if reason != "" {
+            context["regionCandidateIgnoredReasons"].Push(index ":" reason)
+            continue
+        }
+        candidate := Map(
+            "anchor", anchor,
+            "corroborationCount", CandidateGToolbarRowCorroborationCount(
+                anchor,
+                textAnchors,
+                options
+            )
+        )
+        geometryCandidates.Push(candidate)
+    }
+    context["geometryValidRegionCandidateCount"] := geometryCandidates.Length
+    if geometryCandidates.Length = 0 {
+        context["toolbarRowSelectionReason"] := "noGeometryValidRegionAnchor"
+        return MakeCandidateGResult(false, CandidateGCalibrationCode.INVALID_GEOMETRY, context)
+    }
+
+    selected := 0
+    if geometryCandidates.Length = 1 {
+        selected := geometryCandidates[1]
+        context["toolbarRowSelectionReason"] := "uniqueGeometryValidRegionAnchor"
+    } else {
+        highestScore := -1
+        highestCandidates := []
+        for candidate in geometryCandidates {
+            score := candidate["corroborationCount"]
+            if score > highestScore {
+                highestScore := score
+                highestCandidates := [candidate]
+            } else if score = highestScore {
+                highestCandidates.Push(candidate)
+            }
+        }
+        if highestScore < 1 || highestCandidates.Length != 1 {
+            context["toolbarRowSelectionReason"] := highestScore < 1
+                ? "multipleCandidatesWithoutCorroboration"
+                : "corroborationTie"
+            return MakeCandidateGResult(
+                false,
+                CandidateGCalibrationCode.REGION_AMBIGUOUS,
+                context
+            )
+        }
+        selected := highestCandidates[1]
+        context["toolbarRowSelectionReason"] := "uniqueCorroboratedRegionAnchor"
+    }
+
+    regionAnchor := selected["anchor"]
+    regionRect := regionAnchor["rect"]
+    arrowPoint := CalculateCandidateGArrowPoint(regionRect, options)
+    blackPoint := CalculateCandidateGBlackPoint(arrowPoint, options)
+    context["toolbarRowCorroborationCount"] := selected["corroborationCount"]
+    context["regionAnchorFound"] := true
+    context["regionAnchorRect"] := regionRect
+    context["estimatedArrowPoint"] := arrowPoint
+    context["estimatedBlackPoint"] := blackPoint
+    context["estimatedArrowOffsetX"] := arrowPoint["offsetX"]
+    context["estimatedArrowOffsetY"] := arrowPoint["offsetY"]
+    context["estimatedBlackOffsetX"] := blackPoint["offsetX"]
+    context["estimatedBlackOffsetY"] := blackPoint["offsetY"]
+    return MakeCandidateGResult(
+        true,
+        CandidateGCalibrationCode.ROW_OK,
+        context,
+        regionAnchor
+    )
+}
+
+CandidateGRegionGeometryReason(anchor, clientRectScreen, options := 0) {
+    if Type(anchor) != "Map" || !anchor.Has("rect") || !IsValidRect(anchor["rect"])
+        return "invalidRectangle"
+    rect := anchor["rect"]
+    if !RectContainsRect(clientRectScreen, rect)
+        return "outsideClient"
+
+    leftMin := CandidateGLogicOption(options, "regionLeftMin", CandidateGCalibrationProfile.RegionLeftMin)
+    leftMax := CandidateGLogicOption(options, "regionLeftMax", CandidateGCalibrationProfile.RegionLeftMax)
+    widthMin := CandidateGLogicOption(options, "regionWidthMin", CandidateGCalibrationProfile.RegionWidthMin)
+    widthMax := CandidateGLogicOption(options, "regionWidthMax", CandidateGCalibrationProfile.RegionWidthMax)
+    heightMin := CandidateGLogicOption(options, "regionHeightMin", CandidateGCalibrationProfile.RegionHeightMin)
+    heightMax := CandidateGLogicOption(options, "regionHeightMax", CandidateGCalibrationProfile.RegionHeightMax)
+    if rect["l"] < leftMin || rect["l"] > leftMax
+        return "leftOutsideProfile"
+    if RectWidth(rect) < widthMin || RectWidth(rect) > widthMax
+        return "widthOutsideProfile"
+    if RectHeight(rect) < heightMin || RectHeight(rect) > heightMax
+        return "heightOutsideProfile"
+
+    arrowPoint := CalculateCandidateGArrowPoint(rect, options)
+    if !RectContainsPoint(clientRectScreen, arrowPoint)
+        return "arrowPointOutsideClient"
+    padding := CandidateGLogicOption(options, "regionRowPadding", CandidateGCalibrationProfile.RegionRowPadding)
+    rowBand := MakeRect(rect["l"], rect["t"] - padding, clientRectScreen["r"], rect["b"] + padding)
+    if !RectContainsPoint(rowBand, arrowPoint)
+        return "arrowPointOutsideToolbarBand"
+    return ""
+}
+
+CandidateGToolbarRowCorroborationCount(regionAnchor, textAnchors, options := 0) {
+    if Type(regionAnchor) != "Map" || !regionAnchor.Has("rect")
+        return 0
+    regionRect := regionAnchor["rect"]
+    fontPattern := CandidateGLogicOption(options, "fontSizeNamePattern", CandidateGCalibrationProfile.FontSizeNamePattern)
+    optionalRightName := CandidateGLogicOption(options, "optionalRightAnchorName", CandidateGCalibrationProfile.OptionalRightAnchorName)
+    minOverlap := CandidateGLogicOption(options, "corroboratorMinVerticalOverlapRatio", CandidateGCalibrationProfile.CorroboratorMinVerticalOverlapRatio)
+    maxFontDistance := CandidateGLogicOption(options, "corroboratorMaxRegionToFontDistance", CandidateGCalibrationProfile.CorroboratorMaxRegionToFontDistance)
+    fontFound := false
+    optionalRightFound := false
+    for anchor in textAnchors {
+        if !IsValidTextAnchor(anchor)
+            continue
+        rect := anchor["rect"]
+        if rect["l"] <= regionRect["r"] || VerticalOverlapRatio(regionRect, rect) < minOverlap
+            continue
+        if !fontFound && RegExMatch(anchor["name"], fontPattern)
+            && rect["l"] - regionRect["r"] <= maxFontDistance
+            fontFound := true
+        if !optionalRightFound && anchor["name"] = optionalRightName
+            optionalRightFound := true
+    }
+    return (fontFound ? 1 : 0) + (optionalRightFound ? 1 : 0)
+}
+
+CalculateCandidateGArrowPoint(regionRect, options := 0) {
+    offsetX := CandidateGLogicOption(options, "arrowOffsetX", CandidateGCalibrationProfile.EstimatedArrowOffsetX)
+    offsetY := CandidateGLogicOption(options, "arrowOffsetY", CandidateGCalibrationProfile.EstimatedArrowOffsetY)
+    return Map(
+        "x", Round(regionRect["r"] + offsetX),
+        "y", Round(RectCenterY(regionRect) + offsetY),
+        "offsetX", offsetX,
+        "offsetY", offsetY
+    )
+}
+
+CalculateCandidateGBlackPoint(arrowPoint, options := 0) {
+    offsetX := CandidateGLogicOption(options, "blackOffsetX", CandidateGCalibrationProfile.EstimatedBlackOffsetX)
+    offsetY := CandidateGLogicOption(options, "blackOffsetY", CandidateGCalibrationProfile.EstimatedBlackOffsetY)
+    return Map(
+        "x", Round(arrowPoint["x"] + offsetX),
+        "y", Round(arrowPoint["y"] + offsetY),
+        "offsetX", offsetX,
+        "offsetY", offsetY
+    )
+}
+
+MakeCandidateGResult(ok, code, context := 0, selectedRegionAnchor := 0) {
+    if Type(context) != "Map"
+        context := Map()
+    return {
+        ok: ok = true,
+        code: String(code),
+        context: context,
+        selectedRegionAnchor: selectedRegionAnchor
+    }
+}
+
+CandidateGLogicOption(options, key, defaultValue) {
+    if Type(options) = "Map" && options.Has(key)
+        return options[key]
+    return defaultValue
+}
+
+; --- END medex_candidate_g_logic.ahk ---
 
 ; --- BEGIN diagnostics.ahk ---
 DefaultMedExColorResetLogPath() {
@@ -9079,7 +9488,7 @@ class MedExColorResetDefaults {
     ]
     static ConfirmedProcessName := ""
     static AllowProvisionalProcess := true
-    static ColorResetStrategy := MedExColorResetStrategy.UIA_INVOKE
+    static ColorResetStrategy := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED
 
     ; Field-validated control semantics: one trigger click followed by bounded
     ; adaptive polling for the exact black item.
@@ -9108,19 +9517,245 @@ ResetMedExInsertionColor(options := 0) {
     if selectedStrategy = MedExColorResetStrategy.UIA_INVOKE
         return RunMedExUiaInvokeColorReset(options)
 
+    if selectedStrategy = MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED
+        return RunMedExRelativeMousePixelValidatedColorReset(options)
+
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "appVersion", AppMetadata.Version,
         "colorResetStrategy", selectedStrategy,
         "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED"
     )
-    if selectedStrategy = MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED {
-        context["strategyReason"] := "candidateGDeferredUntilCalibration"
-        return MakeColorResetResult(false, ColorResetCode.STRATEGY_NOT_IMPLEMENTED, context)
-    }
-
     context["strategyReason"] := "unknownColorResetStrategy"
     return MakeColorResetResult(false, ColorResetCode.UNKNOWN_STRATEGY, context)
+}
+
+RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
+    startedAt := A_TickCount
+    context := Map(
+        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "appVersion", AppMetadata.Version,
+        "colorResetStrategy", MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED,
+        "candidateGProfileName", CandidateGRelativeMouseProfile.ProfileName,
+        "foregroundProcess", "UNKNOWN",
+        "foregroundWindowHandle", "UNKNOWN",
+        "supportedProfile", false,
+        "arrowClickSent", false,
+        "arrowClickCount", 0,
+        "popupSignatureMatched", false,
+        "popupSignatureSampleCount", 0,
+        "blackClickSent", false,
+        "blackClickCount", 0,
+        "mouseRestored", false,
+        "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED",
+        "finalValidationState", "FINAL_COLOR_PENDING_VISUAL_VALIDATION",
+        "finalInsertionColorVisuallyValidated", false
+    )
+    mouseCaptured := false
+
+    try {
+        foregroundHwnd := WinExist("A")
+        context["foregroundWindowHandle"] := foregroundHwnd
+            ? Format("0x{:X}", foregroundHwnd)
+            : "UNKNOWN"
+        if !foregroundHwnd {
+            context["foregroundGuardReason"] := "noForegroundWindow"
+            return FinishMedExColorReset(false, ColorResetCode.WRONG_PROCESS,
+                context, startedAt, options)
+        }
+        try foregroundProcess := WinGetProcessName("ahk_id " foregroundHwnd)
+        catch as err {
+            AddSafeExceptionContext(context, err)
+            context["foregroundGuardReason"] := "processLookupFailed"
+            return FinishMedExColorReset(false, ColorResetCode.WRONG_PROCESS,
+                context, startedAt, options)
+        }
+        context["foregroundProcess"] := foregroundProcess
+        provisionalNames := MedExAdapterOption(
+            options,
+            "processCandidates",
+            MedExColorResetDefaults.ProvisionalProcessNames
+        )
+        if !MedExProcessNameIsApproved(foregroundProcess, provisionalNames) {
+            context["foregroundGuardReason"] := "notInProvisionalCandidateList"
+            return FinishMedExColorReset(false, ColorResetCode.WRONG_PROCESS,
+                context, startedAt, options)
+        }
+
+        environmentContext := Map()
+        CollectMedExEnvironmentContext(foregroundHwnd, environmentContext)
+        MergeContext(context, environmentContext)
+        environment := Map(
+            "medExVersion", MedExContextValue(context, "medExVersion", "UNKNOWN"),
+            "screenWidth", A_ScreenWidth,
+            "screenHeight", A_ScreenHeight,
+            "dpi", MedExContextValue(context, "dpi", "UNKNOWN"),
+            "displayScaling", MedExContextValue(context, "displayScaling", "UNKNOWN")
+        )
+        profileResult := ValidateCandidateGRuntimeProfile(environment, options)
+        MergeContext(context, profileResult.context)
+        if !profileResult.ok
+            return FinishMedExColorReset(false, profileResult.code,
+                context, startedAt, options)
+
+        global UIA
+        if !IsSet(UIA) {
+            context["uiaReason"] := "UIA-v2NotIncluded"
+            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE,
+                context, startedAt, options)
+        }
+        try windowElement := UIA.ElementFromHandle(foregroundHwnd)
+        catch as err {
+            AddSafeExceptionContext(context, err)
+            context["uiaReason"] := "ElementFromHandleFailed"
+            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE,
+                context, startedAt, options)
+        }
+
+        clientRectScreen := GetClientRectScreenMap(foregroundHwnd)
+        context["clientRectScreen"] := clientRectScreen
+        queryStartedAt := A_TickCount
+        try regionElements := windowElement.FindElements({
+            Type: "Text",
+            Name: CandidateGRelativeMouseProfile.RegionAnchorName
+        })
+        catch as err {
+            AddSafeExceptionContext(context, err)
+            context["uiaReason"] := "RegionExactQueryFailed"
+            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE,
+                context, startedAt, options)
+        }
+        context["regionExactQueryDurationMs"] := A_TickCount - queryStartedAt
+        conversion := UiaTextElementsToAnchors(regionElements, false)
+        textAnchors := conversion.anchors
+        context["regionExactPropertyReadFailureCount"] := conversion.propertyReadFailureCount
+        context["corroboratorSnapshotCollected"] := false
+        if textAnchors.Length > 1 {
+            corroboratorSnapshot := CollectMedExTextAnchorSnapshot(windowElement, false)
+            textAnchors := corroboratorSnapshot.anchors
+            context["corroboratorSnapshotCollected"] := true
+            MergeContext(context, corroboratorSnapshot.context)
+        }
+
+        layoutOptions := BuildCandidateGRuntimeLayoutOptions(options)
+        rowResult := ResolveCandidateGToolbarRow(textAnchors, clientRectScreen, layoutOptions)
+        MergeContext(context, rowResult.context)
+        if !rowResult.ok
+            return FinishMedExColorReset(false, CandidateGRowFailureCode(rowResult.code),
+                context, startedAt, options)
+
+        arrowPoint := context["estimatedArrowPoint"]
+        blackPoint := context["estimatedBlackPoint"]
+        context["arrowPoint"] := arrowPoint
+        context["blackPoint"] := blackPoint
+        if !RectContainsPoint(clientRectScreen, arrowPoint)
+            return FinishMedExColorReset(false, ColorResetCode.INVALID_ARROW_POINT,
+                context, startedAt, options)
+        if !RectContainsPoint(clientRectScreen, blackPoint)
+            return FinishMedExColorReset(false, ColorResetCode.INVALID_BLACK_POINT,
+                context, startedAt, options)
+
+        CoordMode "Mouse", "Screen"
+        MouseGetPos &originalMouseX, &originalMouseY
+        mouseCaptured := true
+        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+            context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGArrowClick"
+            return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
+                context, startedAt, options)
+        }
+        skipArrowClickForClosedSignatureTest := MedExAdapterOption(
+            options,
+            "candidateGSkipArrowClickForClosedSignatureTest",
+            false
+        ) = true
+        context["closedSignatureTestMode"] := skipArrowClickForClosedSignatureTest
+        if !skipArrowClickForClosedSignatureTest {
+            try {
+                Click arrowPoint["x"], arrowPoint["y"]
+                context["arrowClickSent"] := true
+                context["arrowClickCount"] := 1
+            } catch as err {
+                AddSafeExceptionContext(context, err)
+                return FinishMedExColorReset(false, ColorResetCode.TRIGGER_CLICK_FAILED,
+                    context, startedAt, options)
+            }
+        }
+
+        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint)
+        context["popupSignatureSampleCount"] := 1
+        context["popupSignatureFirstReason"] := signature["reason"]
+        context["popupSignatureFirstSamples"] := signature["samples"]
+        if !signature["matched"] {
+            delayMs := Max(0, Min(100, Integer(MedExAdapterOption(
+                options,
+                "signatureSecondSampleDelayMs",
+                CandidateGRelativeMouseProfile.SignatureSecondSampleDelayMs
+            ))))
+            context["signatureSecondSampleDelayMs"] := delayMs
+            if delayMs > 0
+                Sleep delayMs
+            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+                context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGSecondSignatureSample"
+                return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
+                    context, startedAt, options)
+            }
+            signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint)
+            context["popupSignatureSampleCount"] := 2
+            context["popupSignatureSecondReason"] := signature["reason"]
+            context["popupSignatureSecondSamples"] := signature["samples"]
+        }
+        context["popupSignatureMatched"] := signature["matched"]
+        context["popupSignatureReason"] := signature["reason"]
+        if !signature["matched"]
+            return FinishMedExColorReset(false, ColorResetCode.POPUP_SIGNATURE_MISMATCH,
+                context, startedAt, options)
+
+        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+            context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGBlackClick"
+            return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
+                context, startedAt, options)
+        }
+        try {
+            Click blackPoint["x"], blackPoint["y"]
+            context["blackClickSent"] := true
+            context["blackClickCount"] := 1
+        } catch as err {
+            AddSafeExceptionContext(context, err)
+            return FinishMedExColorReset(false, ColorResetCode.BLACK_CLICK_FAILED,
+                context, startedAt, options)
+        }
+        context["automationChainResult"] := ColorResetCode.RELATIVE_MOUSE_CHAIN_OK
+        return FinishMedExColorReset(true, ColorResetCode.RELATIVE_MOUSE_CHAIN_OK,
+            context, startedAt, options)
+    } catch as err {
+        AddSafeExceptionContext(context, err)
+        return FinishMedExColorReset(false, ColorResetCode.UNEXPECTED_ERROR,
+            context, startedAt, options)
+    } finally {
+        if mouseCaptured {
+            try {
+                MouseMove originalMouseX, originalMouseY, 0
+                context["mouseRestored"] := true
+            } catch {
+                context["mouseRestored"] := false
+            }
+        }
+    }
+}
+
+SampleAndEvaluateCandidateGPopupSignature(arrowPoint) {
+    samples := CandidateGPopupSignatureSample(arrowPoint)
+    evaluation := EvaluateCandidateGPopupSignature(samples)
+    evaluation["samples"] := samples
+    return evaluation
+}
+
+CandidateGRowFailureCode(candidateCode) {
+    if candidateCode = CandidateGCalibrationCode.REGION_NOT_FOUND
+        return ColorResetCode.REGION_ANCHOR_NOT_FOUND
+    if candidateCode = CandidateGCalibrationCode.REGION_AMBIGUOUS
+        return ColorResetCode.REGION_ANCHOR_AMBIGUOUS
+    return ColorResetCode.INVALID_GEOMETRY
 }
 
 RunMedExUiaInvokeColorReset(options := 0) {
@@ -9925,7 +10560,7 @@ RunFzgInsertion(resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
     SendText("放射性摄取增高，SUVmax约")
-    operation := InsertRedFigureTextAndRestoreState("（见图）", resetOptions)
+    operation := InsertRedFigureTextForCaretRelocation("（见图）", performanceContext)
     if operation.ok {
         Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs
         if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
@@ -9951,6 +10586,49 @@ RunFzgInsertion(resetOptions := 0) {
     }
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringReturnMs")
     return operation
+}
+
+InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext := 0) {
+    pasteResult := PasteRedFigureTextDetailed(text, performanceContext)
+    if !pasteResult.pasteDispatched {
+        return {
+            ok: false,
+            code: RedTextOperationCode.PASTE_FAILED,
+            pasteDispatched: false,
+            clipboardRestoreSucceeded: pasteResult.clipboardRestoreSucceeded,
+            reset: 0
+        }
+    }
+    if !pasteResult.clipboardRestoreSucceeded {
+        return {
+            ok: false,
+            code: RedTextOperationCode.CLIPBOARD_RESTORE_FAILED,
+            pasteDispatched: true,
+            clipboardRestoreSucceeded: false,
+            reset: 0
+        }
+    }
+
+    foregroundHwnd := WinExist("A")
+    resetContext := Map(
+        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "appVersion", AppMetadata.Version,
+        "colorResetStrategy", "notRequiredForCaretRelocation",
+        "colorResetReason", "caretMovesBeforeRedMarker",
+        "foregroundWindowHandle", foregroundHwnd
+            ? Format("0x{:X}", foregroundHwnd)
+            : "UNKNOWN",
+        "automationChainResult", ColorResetCode.NOT_REQUIRED,
+        "finalValidationState", "NOT_APPLICABLE",
+        "finalInsertionColorVisuallyValidated", false
+    )
+    return {
+        ok: true,
+        code: RedTextOperationCode.OK,
+        pasteDispatched: true,
+        clipboardRestoreSucceeded: true,
+        reset: MakeColorResetResult(true, ColorResetCode.NOT_REQUIRED, resetContext)
+    }
 }
 
 InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {

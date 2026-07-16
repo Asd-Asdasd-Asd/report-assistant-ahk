@@ -30,7 +30,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         hotstrings = source("src/hotstrings.ahk")
         report_editor = source("src/report_editor.ahk")
         fzg = report_editor.split("RunFzgInsertion(resetOptions := 0)", 1)[1].split(
-            "\n\nInsertRedFigureTextAndRestoreState(text :=", 1
+            "\n\nInsertRedFigureTextForCaretRelocation(text :=", 1
         )[0]
         self.assertIn("static FzgCursorRestoreDelayMs := 50", report_editor)
         self.assertIn("Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs", fzg)
@@ -38,6 +38,21 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertNotIn('Send("{Left 3}")', hotstrings + report_editor)
         self.assertIn('Send("{Left 4}")', report_editor)
         self.assertNotIn('Send("{Left 4}")', source("src/adapters/medex_report_editor.ahk"))
+        self.assertIn("InsertRedFigureTextForCaretRelocation", fzg)
+        self.assertNotIn("InsertRedFigureTextAndRestoreState", fzg)
+        self.assertNotIn("ResetMedExInsertionColor", fzg)
+
+    def test_fzg_caret_relocation_skips_color_reset_with_structured_status(self) -> None:
+        report_editor = source("src/report_editor.ahk")
+        logic = source("src/medex_color_reset_logic.ahk")
+        body = report_editor.split(
+            "InsertRedFigureTextForCaretRelocation(text :=", 1
+        )[1].split("\n\nInsertRedFigureTextAndRestoreState(text :=", 1)[0]
+        self.assertIn("PasteRedFigureTextDetailed(text, performanceContext)", body)
+        self.assertIn("ColorResetCode.NOT_REQUIRED", body)
+        self.assertIn('"colorResetReason", "caretMovesBeforeRedMarker"', body)
+        self.assertNotIn("ResetMedExInsertionColor", body)
+        self.assertIn('static NOT_REQUIRED := "COLOR_RESET_NOT_REQUIRED"', logic)
 
     def test_orchestration_pastes_then_resets_and_preserves_partial_failure(self) -> None:
         report_editor = source("src/report_editor.ahk")
@@ -205,10 +220,16 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
             'static RELATIVE_MOUSE_PIXEL_VALIDATED := "relativeMousePixelValidated"',
             logic,
         )
-        self.assertIn("static ColorResetStrategy := MedExColorResetStrategy.UIA_INVOKE", adapter)
+        self.assertIn(
+            "static ColorResetStrategy := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED",
+            adapter,
+        )
         self.assertIn("RunMedExUiaInvokeColorReset(options)", dispatcher)
-        self.assertIn("ColorResetCode.STRATEGY_NOT_IMPLEMENTED", dispatcher)
-        self.assertNotIn("RunMedExUiaInvokeColorReset(options)", dispatcher.split("STRATEGY_NOT_IMPLEMENTED", 1)[1])
+        self.assertIn("RunMedExRelativeMousePixelValidatedColorReset(options)", dispatcher)
+        relative_branch = dispatcher.split(
+            "MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED", 1
+        )[1]
+        self.assertNotIn("RunMedExUiaInvokeColorReset(options)", relative_branch)
 
     def test_field_debug_uses_explicit_uia_strategy_override(self) -> None:
         field_debug = source("debug/medex_color_reset_field_debug.ahk")

@@ -32,11 +32,13 @@ MedEx 现场验证已经确认 `CF_HTML` 可以插入红色文字。仍未解决
 
 现有 `uiaInvoke` strategy 在 paste transaction 完成后，从 foreground MedEx window root 枚举 `Text` elements，以 exact Name=`检查所见` 定位目标语义行，再选择同一行的 dynamic font-size local anchor。它按 profile 计算 trigger point，并对 exact Name=`000000` 的 `Hyperlink` 调用 `Invoke()`。2026-07-16 production 测试确认 semantic/static localization 可用，但 Chromium popup traversal 延迟高且间歇失败，因此该 strategy 只保留为显式 comparison/rollback，不再是首选开发方向。
 
-`ResetMedExInsertionColor()` 是统一 strategy dispatcher。当前有 `uiaInvoke` 和已声明但未实现的 `relativeMousePixelValidated`；两者不得自动互相 fallback。Candidate G 将继续复用 report/clipboard orchestration，只把 MedEx interaction strategy 替换为 UIA toolbar-row localization、profile geometry、popup pixel validation 和 relative mouse clicks。G1 calibration 完成前不得加入未校准坐标、像素阈值或 black click。
+`ResetMedExInsertionColor()` 是统一 strategy dispatcher。当前有 `uiaInvoke` 和 `relativeMousePixelValidated`；两者不得自动互相 fallback。Candidate G 继续复用 report/clipboard orchestration，只把 MedEx interaction strategy 替换为 UIA toolbar-row localization、profile geometry、popup pixel validation 和 relative mouse clicks。Windows G2 controlled interaction 与 caret-order A/B 通过后，production default 已提升为 `relativeMousePixelValidated`；`uiaInvoke` 仅保留为显式 comparison/rollback strategy。
 
-G1 的 `medex_candidate_g_logic.ahk` 只提供 pure toolbar-row selection、supported-profile validation 和 relative point calculations。它不接入 generated production release。独立 calibration harness 使用 exact region query；只有出现多个 geometry-valid region candidates 时才收集 full Text snapshot 进行 same-row corroboration。open probe 最多点击 arrow 一次，之后仅执行 `PixelGetColor`，black interaction 保持不可达。
+`medex_candidate_g_logic.ahk` 集中提供 toolbar-row selection、supported-profile validation、relative point calculations 和 field-calibrated popup signature。独立 calibration harness 使用 exact region query；只有出现多个 geometry-valid region candidates 时才收集 full Text snapshot 进行 same-row corroboration。F8–F11 保持 G1 行为；F12 经统一 dispatcher 执行 G2，arrow 和 black 各最多点击一次，signature 失败时 black interaction 不可达。
 
 红字实现仍必须包裹在 clipboard save/restore transaction 中，最终行为必须插入红色 `（见图）`、恢复用户原始剪贴板，并让后续输入恢复黑色。颜色复位不得插入可见、零宽或隐藏字符，也不得改变 clipboard restoration contract。
+
+`Color Reset` 是 phrase-specific orchestration，而不是所有红色 marker 的无条件尾处理。Standalone `;red` 的 caret 留在 marker 后方，因此需要 adapter reset；`;fzg` 的 caret 必须移动到 marker 前方，Windows A/B 已验证其正确顺序是 paste/clipboard restore → 50 ms → `Left 4`，不经过 toolbar reset。该路径返回 `COLOR_RESET_NOT_REQUIRED`，不能伪报 `AUTOMATION_CHAIN_OK`。
 
 所有报告书写辅助都必须保留人工确认，不默认执行最终提交、审核或发送。
 
@@ -71,7 +73,7 @@ MxNMSoft 测量值读取计划通过未来的 `ContextMeasurementProvider` adapt
 - `clipboard_html.ahk`：构造 CF_HTML、调用 Windows Clipboard API、派发粘贴命令并恢复用户剪贴板。返回成功只表示粘贴命令已派发且恢复已尝试，不代表目标编辑器已经确认渲染结果。
 - `report_editor.ahk`：editor-level orchestration，例如插入格式化报告文字、调用目标 editor adapter 恢复 insertion state、处理 workflow result；不得包含 generic clipboard wire-format implementation。
 - `medex_color_reset_logic.ahk`：layout profile、pure anchor selection、rectangle/geometry、local-offset calculation、screen/client conversion 和 structured result definitions。
-- `adapters/medex_report_editor.ahk`：MedEx-specific strategy dispatch、target validation 和 interaction。`uiaInvoke` 暂存于该 adapter；Candidate G 进入实现阶段时可按真实复杂度再拆分，但不得复制 clipboard/report orchestration。
+- `adapters/medex_report_editor.ahk`：MedEx-specific strategy dispatch、target validation 和 interaction。`relativeMousePixelValidated` 是 production mainline；`uiaInvoke` 暂存于同一 adapter 作为显式 comparison/rollback。后续如按真实复杂度拆分文件，不得复制 clipboard/report orchestration。
 - `diagnostics.ahk`：区分 production failure-only lightweight log 与 explicit field schema；不得记录报告内容、replacement text 或 clipboard payload。
 - `Lib/UIA.ahk`：production、field debug 和 release build 共用的 pinned UIA-v2 dependency；不得在 debug tree 维护第二份实现。
 - `viewer_actions.ahk`：阅片窗口动作，未来逐步迁移经过校准的坐标操作。
@@ -97,7 +99,7 @@ hotstring workflow
    └── editor adapter
        └── medex_report_editor.ahk
            ├── uiaInvoke (comparison/rollback)
-           └── relativeMousePixelValidated (declared; not implemented)
+           └── relativeMousePixelValidated (G2 controlled; explicit override only)
 ```
 
 未来 Word、browser editor 或其他 HIS 必须通过新的 adapter 接入。不能通过向 generic clipboard module 添加 MedEx 条件分支实现 multi-editor support。

@@ -10,6 +10,7 @@
 #Include clipboard_html.ahk
 #Include <UIA>
 #Include medex_color_reset_logic.ahk
+#Include medex_candidate_g_logic.ahk
 #Include diagnostics.ahk
 #Include adapters\medex_report_editor.ahk
 #Include report_editor.ahk

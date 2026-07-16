@@ -2,8 +2,9 @@
 #SingleInstance Force
 #Warn
 
-; Candidate G1 calibration only. This script never clicks the black swatch and
-; never registers production hotstrings.
+; Candidate G calibration and controlled G2 validation. Only F12 may click the
+; black swatch, and only after the field-calibrated popup signature matches.
+; This script never registers production hotstrings.
 #Include ..\src\app_metadata.ahk
 #Include ..\src\config.example.ahk
 #Include ..\src\window_guard.ahk
@@ -34,6 +35,31 @@ F10::RunCandidateGClosedPixelProbe()
 ; Click the validated estimated arrow once and sample at 0/20/40/80 ms.
 ; The script never clicks black.
 F11::RunCandidateGOpenPixelProbe()
+
+; Controlled Candidate G2 reset-only test. This uses the production strategy
+; dispatcher with an explicit override so calibration behavior is independent of the production default.
+F12::RunCandidateG2ControlledReset()
+
+; Closed-popup safety gate. It resolves the real row but deliberately skips the
+; arrow click; the signature must fail and black must remain unreachable.
+F7::RunCandidateG2ClosedSignatureGate()
+
+RunCandidateG2ControlledReset() {
+    result := ResetMedExInsertionColor(Map(
+        "colorResetStrategy", MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED,
+        "diagnosticMode", "candidateG2"
+    ))
+    WriteCandidateG2ControlledResult(result)
+}
+
+RunCandidateG2ClosedSignatureGate() {
+    result := ResetMedExInsertionColor(Map(
+        "colorResetStrategy", MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED,
+        "diagnosticMode", "candidateG2",
+        "candidateGSkipArrowClickForClosedSignatureTest", true
+    ))
+    WriteCandidateG2ControlledResult(result)
+}
 
 CaptureCandidateGObservedArrow() {
     global CANDIDATE_G_LAST_OBSERVED_ARROW_POINT
@@ -347,6 +373,7 @@ FormatCandidateGCalibrationResult(result) {
         "CorroboratorSnapshotCollected=" FormatDiagnosticBoolean(MedExContextValue(context, "corroboratorSnapshotCollected", false)),
         "ArrowClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "arrowClickSent", false)),
         "ArrowClickCount=" SafeDiagnosticValue(MedExContextValue(context, "arrowClickCount", 0)),
+        "ClosedSignatureTestMode=" FormatDiagnosticBoolean(MedExContextValue(context, "closedSignatureTestMode", false)),
         "PopupSignatureSampleCount=" SafeDiagnosticValue(MedExContextValue(context, "popupSignatureSampleCount", 0)),
         "BlackClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "blackClickSent", false)),
         "MouseRestored=" FormatDiagnosticBoolean(MedExContextValue(context, "mouseRestored", false)),
@@ -360,6 +387,74 @@ FormatCandidateGCalibrationResult(result) {
 WriteCandidateGCalibrationResult(result) {
     global CANDIDATE_G_RESULT_FILE
     output := FormatCandidateGCalibrationResult(result)
+    A_Clipboard := output
+    ClipWait(1)
+    try {
+        SplitPath CANDIDATE_G_RESULT_FILE, , &resultDirectory
+        if resultDirectory != "" && !DirExist(resultDirectory)
+            DirCreate resultDirectory
+        FileAppend "---`r`n" output, CANDIDATE_G_RESULT_FILE, "UTF-8"
+    }
+}
+
+FormatCandidateG2ControlledResult(result) {
+    context := result.context
+    fields := [
+        "Test=MedExCandidateG2ControlledReset",
+        "AppVersion=" SafeDiagnosticValue(MedExContextValue(context, "appVersion", "UNKNOWN")),
+        "SourceRevision=" SafeDiagnosticValue(AppMetadata.SourceRevision),
+        "Timestamp=" SafeDiagnosticValue(MedExContextValue(context, "timestamp", "UNKNOWN")),
+        "ResultCode=" SafeDiagnosticValue(result.code),
+        "ColorResetStrategy=" SafeDiagnosticValue(MedExContextValue(context, "colorResetStrategy", "UNKNOWN")),
+        "CandidateGProfileName=" SafeDiagnosticValue(MedExContextValue(context, "candidateGProfileName", "UNKNOWN")),
+        "SupportedProfile=" FormatDiagnosticBoolean(MedExContextValue(context, "supportedProfile", false)),
+        "UnsupportedProfileReason=" SafeDiagnosticValue(MedExContextValue(context, "unsupportedProfileReason", "")),
+        "Process=" SafeDiagnosticValue(MedExContextValue(context, "foregroundProcess", "UNKNOWN")),
+        "WindowHandle=" SafeDiagnosticValue(MedExContextValue(context, "foregroundWindowHandle", "UNKNOWN")),
+        "Resolution=" SafeDiagnosticValue(MedExContextValue(context, "resolution", "UNKNOWN")),
+        "Dpi=" SafeDiagnosticValue(MedExContextValue(context, "dpi", "UNKNOWN")),
+        "DisplayScaling=" SafeDiagnosticValue(MedExContextValue(context, "displayScaling", "UNKNOWN")),
+        "MedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "medExVersion", "UNKNOWN")),
+        "RawRegionAnchorCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "rawRegionAnchorCandidateCount", 0)),
+        "GeometryValidRegionCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "geometryValidRegionCandidateCount", 0)),
+        "ToolbarRowCorroborationCount=" SafeDiagnosticValue(MedExContextValue(context, "toolbarRowCorroborationCount", 0)),
+        "ToolbarRowSelectionReason=" SafeDiagnosticValue(MedExContextValue(context, "toolbarRowSelectionReason", "")),
+        "RegionAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "regionAnchorRect", 0)),
+        "ArrowPoint=" FormatDiagnosticPoint(MedExContextValue(context, "arrowPoint", 0)),
+        "BlackPoint=" FormatDiagnosticPoint(MedExContextValue(context, "blackPoint", 0)),
+        "ArrowClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "arrowClickSent", false)),
+        "ArrowClickCount=" SafeDiagnosticValue(MedExContextValue(context, "arrowClickCount", 0)),
+        "PopupSignatureMatched=" FormatDiagnosticBoolean(MedExContextValue(context, "popupSignatureMatched", false)),
+        "PopupSignatureReason=" SafeDiagnosticValue(MedExContextValue(context, "popupSignatureReason", "")),
+        "PopupSignatureSampleCount=" SafeDiagnosticValue(MedExContextValue(context, "popupSignatureSampleCount", 0)),
+        "PopupSignatureFirstSamples=" FormatCandidateGSignatureSamples(MedExContextValue(context, "popupSignatureFirstSamples", 0)),
+        "PopupSignatureSecondSamples=" FormatCandidateGSignatureSamples(MedExContextValue(context, "popupSignatureSecondSamples", 0)),
+        "BlackClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "blackClickSent", false)),
+        "BlackClickCount=" SafeDiagnosticValue(MedExContextValue(context, "blackClickCount", 0)),
+        "MouseRestored=" FormatDiagnosticBoolean(MedExContextValue(context, "mouseRestored", false)),
+        "ForegroundGuardReason=" SafeDiagnosticValue(MedExContextValue(context, "foregroundGuardReason", "")),
+        "AutomationChainResult=" SafeDiagnosticValue(MedExContextValue(context, "automationChainResult", "UNKNOWN")),
+        "FinalValidationState=" SafeDiagnosticValue(MedExContextValue(context, "finalValidationState", "UNKNOWN")),
+        "FinalInsertionColorVisuallyValidated=MANUAL_REQUIRED",
+        "ElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "elapsedMs", "UNKNOWN"))
+    ]
+    return JoinDiagnosticFields(fields, "`r`n") "`r`n"
+}
+
+FormatCandidateGSignatureSamples(samples) {
+    if Type(samples) != "Map"
+        return "UNKNOWN"
+    parts := []
+    for name, color in samples {
+        colorText := IsNumber(color) ? Format("#{:06X}", color & 0xFFFFFF) : color
+        parts.Push(name ":" colorText)
+    }
+    return FormatDiagnosticList(parts)
+}
+
+WriteCandidateG2ControlledResult(result) {
+    global CANDIDATE_G_RESULT_FILE
+    output := FormatCandidateG2ControlledResult(result)
     A_Clipboard := output
     ClipWait(1)
     try {

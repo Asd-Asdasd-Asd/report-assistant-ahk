@@ -64,7 +64,17 @@ F12 是 reset-only field diagnostic；F11 是完整 production-chain timing diag
 - `DEBUG_ALLOW_PROVISIONAL_PROCESS`
 - `DEBUG_CONFIRMED_PROCESS_NAME`
 
-当前 reconciled control 的 `DEBUG_COLOR_RESET_STRATEGY` 必须保持 `uiaInvoke`。`relativeMousePixelValidated` 仅已声明，尚未进入 Candidate G1 calibration，调用时会 fail closed 并返回 `COLOR_RESET_STRATEGY_NOT_IMPLEMENTED`。
+现有 `medex_color_reset_field_debug.ahk` 继续固定测试 `uiaInvoke`，作为 comparison/rollback。Candidate G 使用独立 `medex_candidate_g_calibration.ahk`：F8–F11 用于 G1 calibration，F12 经 production dispatcher 显式调用 `relativeMousePixelValidated`。Windows G2、caret-order A/B 与最终 generated-release 验证通过后，正常 release 的颜色复位默认 strategy 已提升为后续 production mainline；两种 strategy 之间没有 automatic fallback。
+
+Candidate G2 F12 只在 MedEx 0.0.1.0、1920×1080、100%、DPI 96 profile 匹配、toolbar row 唯一、arrow/black points 有效、foreground 未变化且 popup 四点 signature 匹配时发送一次 black click。结果复制到 clipboard 并写入 `%TEMP%\MedExAHK\candidate_g_calibration.txt`；不显示 modal 或 non-modal UI。
+
+同一脚本的 F7 是 closed-popup safety gate：它故意不点击 arrow，只验证关闭状态 signature 必须失败且 black click 不可达。F7 只用于现场安全验证，不是 production fallback 或 interaction strategy。
+
+`medex_candidate_g2_test.ahk` 是独立 G2 production-path test build，注册 `;red`、`;fzg` 和 reset-only F12，并为每次操作追加 privacy-safe 行到 `%TEMP%\MedExAHK\candidate_g2_test.txt`。它必须单独运行；不得同时运行 generated release、calibration harness 或 legacy script。
+
+同一 test build 提供 caret-order A/B：`Ctrl+Alt+F8` 执行当前 G2 reset 后 `Left 4`，`Ctrl+Alt+F9` 使用当前 CF_HTML 但完全跳过颜色复位，再按 legacy 顺序等待 50 ms 并发送 `Left 4`。两者都不使用 `Left 5`；F9 仅用于确定问题来自 reset interaction 还是 CF_HTML caret boundary。
+
+2026-07-16 A/B 结果确认 F9 连续 6 次正确。Normal `;fzg` 已采用同一 no-reset caret-relocation workflow；F8 继续保留为历史对照。旧 `medex_color_reset_field_debug.ahk` 的 F11 仍调用真实 production `RunFzgInsertion()`，因此现在会报告 `COLOR_RESET_NOT_REQUIRED`，不再执行 UIA Color Reset。
 
 ## Minor layout recalibration
 

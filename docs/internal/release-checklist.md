@@ -27,6 +27,9 @@
 - [ ] 检查 production success 不写 heavy field log；failure-only log 不含 geometry dump、报告文字或 clipboard content。
 - [ ] 检查 explicit field mode 仍能输出完整 privacy-safe diagnostic schema。
 - [ ] Windows 上完成 10 次 `;red` 与 10 次 `;fzg` reliability run，并保存 staged anchor/query/focus diagnostics。
+- [x] Candidate G2 promotion 前单独运行 `debug/medex_candidate_g2_test.ahk`，完成 controlled interaction 与 caret-order validation；未与 generated release 同时运行。
+- [x] 确认 generated release 的 default strategy 为 `relativeMousePixelValidated`，`uiaInvoke` 仅能通过显式 override 使用，且不存在 cross-strategy automatic fallback。
+- [x] 2026-07-16 在目标 Windows supported profile 上完成最终 generated-release mainline validation。
 - [ ] 确认 source、F11 harness 与 generated release 的 cursor restore request 均为 `Left 4`；若视觉位置不符，先验证 focused element，不使用任意额外 Left 补偿。
 - [ ] 测试 `;fzg`。
 - [ ] 检查没有自动提交、自动审核或自动最终发送功能。
