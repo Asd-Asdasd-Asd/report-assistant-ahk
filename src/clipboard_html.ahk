@@ -1,3 +1,9 @@
+class ClipboardTransactionDefaults {
+    ; Provisional production value. This is the only fixed wait between the
+    ; Ctrl+V dispatch and transactional clipboard restoration.
+    static HtmlPasteSettleMs := 50
+}
+
 PastePlainText(text) {
     transaction := WithClipboardRestore(() => PastePlainTextWithoutRestore(text))
     if !transaction.actionSucceeded
@@ -11,19 +17,22 @@ PasteRedFigureText(text := "（见图）") {
     return PasteRedFigureTextDetailed(text).pasteDispatched
 }
 
-PasteRedFigureTextDetailed(text := "（见图）") {
+PasteRedFigureTextDetailed(text := "（见图）", performanceContext := 0) {
     ; The black wrapper is intentionally empty of boundary/sentinel characters.
     escapedText := HtmlEscape(text)
     fragment := "<span style=`"color:#000000`"><span style=`"color:#ff0000`">" . escapedText . "</span></span>"
-    return PasteHtmlFragmentDetailed(fragment)
+    return PasteHtmlFragmentDetailed(fragment, performanceContext)
 }
 
 PasteHtmlFragment(fragment) {
     return PasteHtmlFragmentDetailed(fragment).pasteDispatched
 }
 
-PasteHtmlFragmentDetailed(fragment) {
-    transaction := WithClipboardRestore(() => PasteHtmlFragmentWithoutRestore(fragment))
+PasteHtmlFragmentDetailed(fragment, performanceContext := 0) {
+    transaction := WithClipboardRestore(
+        () => PasteHtmlFragmentWithoutRestore(fragment, performanceContext),
+        performanceContext
+    )
     pasteDispatched := transaction.actionSucceeded && transaction.restoreAttempted
 
     if !transaction.actionSucceeded {
@@ -101,7 +110,7 @@ SetClipboardHtml(cfHtml) {
     }
 }
 
-WithClipboardRestore(callback) {
+WithClipboardRestore(callback, performanceContext := 0) {
     result := {
         actionSucceeded: false,
         restoreAttempted: false,
@@ -126,10 +135,12 @@ WithClipboardRestore(callback) {
         if clipboardSaved {
             result.restoreAttempted := true
             try {
-                Sleep 100
                 A_Clipboard := savedClipboard
-                Sleep 100
                 result.restoreSucceeded := true
+                RecordOptionalPerformanceTimestamp(
+                    performanceContext,
+                    "ClipboardRestoreCompletedMs"
+                )
             } catch as restoreErr {
                 result.restoreError := restoreErr.Message
             }
@@ -139,7 +150,7 @@ WithClipboardRestore(callback) {
     return result
 }
 
-PasteHtmlFragmentWithoutRestore(fragment) {
+PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
     cfHtml := BuildCfHtml(fragment)
     htmlFormat := SetClipboardHtml(cfHtml)
     if !htmlFormat
@@ -149,7 +160,8 @@ PasteHtmlFragmentWithoutRestore(fragment) {
         return false
 
     Send("^v")
-    Sleep 200
+    RecordOptionalPerformanceTimestamp(performanceContext, "PasteSentMs")
+    Sleep ClipboardTransactionDefaults.HtmlPasteSettleMs
     return true
 }
 
@@ -187,6 +199,11 @@ WaitForClipboardFormat(format, timeoutMs := 500) {
             return false
         Sleep 20
     }
+}
+
+RecordOptionalPerformanceTimestamp(performanceContext, key) {
+    if Type(performanceContext) = "Map"
+        performanceContext[key] := A_TickCount
 }
 
 SetClipboardBuffer(format, source) {

@@ -150,11 +150,15 @@ Diagnostics 记录 profile、region/font/optional anchor names 和 rectangles、
 
 继续检查 `resources/app`，识别 TinyMCE、Vue、其他 editor framework 或 Electron IPC，并调查 direct renderer/editor command。概念路线 `executeJavaScript() → editor.setColor("#000000")` 只表示方向，不声明该 API 当前存在。
 
+Candidate G 已成为批准的下一阶段路线：UIA 仅定位 semantic `检查所见` toolbar row，arrow/black interaction 使用经过 profile 校准的相对鼠标位置，并在 black click 前执行 popup pixel signature guard。2026-07-16 evidence 已确认 localization 可用而 popup UIA 不可靠；G1 仍须等待 reconciled release smoke test，且只进行 calibration。详见 `2026-07-medex-color-reset-candidate-g.md`。
+
 ## Investigation conclusion
 
-- Current implementation direction: semantic region anchor + dynamic local font anchor + local calibrated offsets + UIA Invoke
+- Current control implementation: `uiaInvoke`, retained for comparison/rollback only
+- Preferred next investigation: Candidate G semantic UIA localization + pixel-validated relative mouse interaction
 - Known limitation: The color dropdown trigger itself is not exposed as a usable UIA element.
 - Future replacement candidate: Direct editor command through Electron renderer, IPC, or the embedded editor API.
+- Candidate G status: G1 approved after reconciled release smoke test; no runtime calibration or clicks implemented yet.
 
 2026-07-15 baseline validation 在 MedEx 0.0.1.0、1920×1080、100% scaling、DPI 96 环境获得三次连续 `AUTOMATION_CHAIN_OK`，并由用户人工确认后续输入为黑色。观察到的 process 是 provisional `medexworkstations.exe`。其他 DPI、resolution、multi-monitor/per-monitor DPI、MedEx version 和用户布局仍待验证。
 

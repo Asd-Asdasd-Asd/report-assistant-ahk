@@ -109,6 +109,7 @@ FormatMedExFieldDebugResult(result) {
     fields := [
         "Test=MedExColorReset",
         "AppVersion=" SafeDiagnosticValue(MedExContextValue(context, "appVersion", "UNKNOWN")),
+        "ColorResetStrategy=" SafeDiagnosticValue(MedExContextValue(context, "colorResetStrategy", "UNKNOWN")),
         "ResultCode=" SafeDiagnosticValue(result.code),
         "AutomationChainResult=" SafeDiagnosticValue(MedExContextValue(context, "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED")),
         "FinalValidationState=" (MedExContextValue(context, "finalInsertionColorVisuallyValidated", false) ? "VISUALLY_VALIDATED" : "FINAL_COLOR_PENDING_VISUAL_VALIDATION"),
@@ -123,17 +124,42 @@ FormatMedExFieldDebugResult(result) {
         "UiaRootRect=" FormatDiagnosticRect(MedExContextValue(context, "uiaRootRect", 0)),
         "DocumentFound=" FormatDiagnosticBoolean(MedExContextValue(context, "documentFound", false)),
         "DocumentRect=" FormatDiagnosticRect(MedExContextValue(context, "documentRect", 0)),
+        "DocumentLookupPath=" SafeDiagnosticValue(MedExContextValue(context, "documentLookupPath", "UNKNOWN")),
+        "DocumentLookupDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "documentLookupDurationMs", "UNKNOWN")),
         "WindowRect=" FormatDiagnosticRect(MedExContextValue(context, "windowRect", 0)),
         "ClientRectScreen=" FormatDiagnosticRect(MedExContextValue(context, "clientRectScreen", 0)),
         "LayoutProfileName=" SafeDiagnosticValue(MedExContextValue(context, "layoutProfileName", "UNKNOWN")),
         "RegionAnchorName=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorName", "UNKNOWN")),
         "RegionAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "regionAnchorFound", false)),
         "RegionAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "regionAnchorRect", 0)),
+        "RegionFilterDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "regionFilterDurationMs", "UNKNOWN")),
         "FontSizeAnchorPattern=" SafeDiagnosticValue(MedExContextValue(context, "fontSizeAnchorPattern", "UNKNOWN")),
         "FontSizeCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "fontSizeCandidateCount", 0)),
         "FontSizeAnchorMatchedName=" SafeDiagnosticValue(MedExContextValue(context, "fontSizeAnchorMatchedName", "UNKNOWN")),
         "FontSizeAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "fontSizeAnchorFound", false)),
         "FontSizeAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "fontSizeAnchorRect", 0)),
+        "RawFontSizePatternMatchCount=" SafeDiagnosticValue(MedExContextValue(context, "rawFontSizePatternMatchCount", 0)),
+        "RawFontSizeMatchedNames=" FormatDiagnosticList(MedExContextValue(context, "rawFontSizeMatchedNames", 0)),
+        "ValidFontSizeRectCount=" SafeDiagnosticValue(MedExContextValue(context, "validFontSizeRectCount", 0)),
+        "AlignedFontSizeCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "alignedFontSizeCandidateCount", 0)),
+        "SelectedFontSizeAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "selectedFontSizeAnchorFound", false)),
+        "IgnoredFontSizeAnchorCount=" SafeDiagnosticValue(MedExContextValue(context, "ignoredFontSizeAnchorCount", 0)),
+        "IgnoredFontSizeReasons=" FormatDiagnosticList(MedExContextValue(context, "ignoredFontSizeReasons", 0)),
+        "FontFilterDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "fontFilterDurationMs", "UNKNOWN")),
+        "AnchorSnapshotScope=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotScope", "UNKNOWN")),
+        "AnchorSnapshotMode=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotMode", "UNKNOWN")),
+        "UseCachedAnchorSnapshot=" FormatDiagnosticBoolean(MedExContextValue(context, "useCachedAnchorSnapshot", false)),
+        "AnchorSnapshotAttemptCount=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotAttemptCount", 0)),
+        "AnchorSnapshotTextElementCount=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotTextElementCount", 0)),
+        "AnchorSnapshotQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotQueryDurationMs", "UNKNOWN")),
+        "AnchorSnapshotConversionDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotConversionDurationMs", "UNKNOWN")),
+        "AnchorSnapshotPropertyReadFailureCount=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotPropertyReadFailureCount", 0)),
+        "FontAnchorRetryEligible=" FormatDiagnosticBoolean(MedExContextValue(context, "fontAnchorRetryEligible", false)),
+        "FontAnchorRetryEnabled=" FormatDiagnosticBoolean(MedExContextValue(context, "fontAnchorRetryEnabled", false)),
+        "FontAnchorRetryUsed=" FormatDiagnosticBoolean(MedExContextValue(context, "fontAnchorRetryUsed", false)),
+        "FontAnchorRetryDelayMs=" SafeDiagnosticValue(MedExContextValue(context, "fontAnchorRetryDelayMs", 0)),
+        "FirstAnchorSnapshotQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "firstAnchorSnapshotQueryDurationMs", "UNKNOWN")),
+        "FontAnchorRetryQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "fontAnchorRetryQueryDurationMs", "UNKNOWN")),
         "OptionalRightAnchorName=" SafeDiagnosticValue(MedExContextValue(context, "optionalRightAnchorName", "")),
         "OptionalRightAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "optionalRightAnchorFound", false)),
         "OptionalRightAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "optionalRightAnchorRect", 0)),
@@ -149,11 +175,34 @@ FormatMedExFieldDebugResult(result) {
         "CoordinateSpaceReason=" SafeDiagnosticValue(MedExContextValue(context, "coordinateSpaceReason", "")),
         "ForegroundGuardReason=" SafeDiagnosticValue(MedExContextValue(context, "foregroundGuardReason", "")),
         "ColorMenuClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "colorMenuClickSent", false)),
+        "TriggerClickCount=" SafeDiagnosticValue(MedExContextValue(context, "triggerClickCount", 0)),
+        "TriggerRetryCount=" SafeDiagnosticValue(MedExContextValue(context, "triggerRetryCount", 0)),
         "BlackItemFound=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemFound", false)),
         "InvokeAvailable=" FormatDiagnosticBoolean(MedExContextValue(context, "invokeAvailable", false)),
         "BlackItemInvokeSucceeded=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemInvokeSucceeded", false)),
         "FinalInsertionColorVisuallyValidated=" FormatDiagnosticBoolean(MedExContextValue(context, "finalInsertionColorVisuallyValidated", false)),
         "RetryCount=" SafeDiagnosticValue(MedExContextValue(context, "retryCount", 0)),
+        "ImmediateLookupSucceeded=" FormatDiagnosticBoolean(MedExContextValue(context, "immediateLookupSucceeded", false)),
+        "RetryUsed=" FormatDiagnosticBoolean(MedExContextValue(context, "retryUsed", false)),
+        "BlackLookupAttemptCount=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupAttemptCount", 0)),
+        "BlackLookupScope=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupScope", "UNKNOWN")),
+        "MenuLookupStrategy=" SafeDiagnosticValue(MedExContextValue(context, "menuLookupStrategy", "UNKNOWN")),
+        "MenuOpenTimeoutMs=" SafeDiagnosticValue(MedExContextValue(context, "menuOpenTimeoutMs", "UNKNOWN")),
+        "MenuPollIntervalMs=" SafeDiagnosticValue(MedExContextValue(context, "menuPollIntervalMs", "UNKNOWN")),
+        "MenuPreLookupSettleMs=" SafeDiagnosticValue(MedExContextValue(context, "menuPreLookupSettleMs", 0)),
+        "BlackLookupFirstRootDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupFirstRootDurationMs", "UNKNOWN")),
+        "BlackLookupFirstQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupFirstQueryDurationMs", "UNKNOWN")),
+        "BlackLookupRetryRootDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupRetryRootDurationMs", "UNKNOWN")),
+        "BlackLookupRetryQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupRetryQueryDurationMs", "UNKNOWN")),
+        "BeforeMenuClickFocusedElementControlType=" SafeDiagnosticValue(MedExContextValue(context, "beforeMenuClickFocusedElementControlType", "UNKNOWN")),
+        "AfterBlackInvokeFocusedElementControlType=" SafeDiagnosticValue(MedExContextValue(context, "afterBlackInvokeFocusedElementControlType", "UNKNOWN")),
+        "BeforeCursorRestoreFocusedElementControlType=" SafeDiagnosticValue(MedExContextValue(context, "beforeCursorRestoreFocusedElementControlType", "UNKNOWN")),
+        "FocusedElementBeforeCursorRestore=" FormatFocusedElementSummary(context, "beforeCursorRestore"),
+        "CursorRestoreRequestedCount=" SafeDiagnosticValue(MedExContextValue(context, "cursorRestoreRequestedCount", "UNKNOWN")),
+        "CursorRestoreCommandSent=" FormatDiagnosticBoolean(MedExContextValue(context, "cursorRestoreCommandSent", false)),
+        "ForegroundHwndBeforeCursorRestore=" SafeDiagnosticValue(MedExContextValue(context, "foregroundHwndBeforeCursorRestore", "UNKNOWN")),
+        "CursorRestoreTargetHwnd=" SafeDiagnosticValue(MedExContextValue(context, "cursorRestoreTargetHwnd", "UNKNOWN")),
+        "MenuDetectionElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "menuDetectionElapsedMs", "UNKNOWN")),
         "LookupElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "lookupElapsedMs", "UNKNOWN")),
         "ElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "elapsedMs", "UNKNOWN")),
         "AHKVersion=" SafeDiagnosticValue(A_AhkVersion),
@@ -165,6 +214,107 @@ FormatMedExFieldDebugResult(result) {
         "ExceptionMessage=" SafeDiagnosticValue(MedExContextValue(context, "exceptionMessage", ""))
     ]
     return JoinDiagnosticFields(fields, "`r`n") "`r`n"
+}
+
+FormatMedExPerformanceTimingResult(operation, performanceContext) {
+    resetContext := Map()
+    if IsObject(operation) && operation.HasOwnProp("reset")
+        && IsObject(operation.reset) && operation.reset.HasOwnProp("context")
+        && Type(operation.reset.context) = "Map" {
+        resetContext := operation.reset.context
+    }
+
+    fields := [
+        "Test=MedExProductionInsertionTiming",
+        "AppVersion=" AppMetadata.Version,
+        "OperationResult=" SafeDiagnosticValue(IsObject(operation) && operation.HasOwnProp("code") ? operation.code : "UNKNOWN"),
+        "ColorResetResult=" SafeDiagnosticValue(IsObject(operation) && operation.HasOwnProp("reset") && IsObject(operation.reset) ? operation.reset.code : "UNKNOWN"),
+        "ColorResetStrategy=" SafeDiagnosticValue(MedExContextValue(resetContext, "colorResetStrategy", "UNKNOWN")),
+        "ClipboardRestoreSucceeded=" FormatDiagnosticBoolean(IsObject(operation) && operation.HasOwnProp("clipboardRestoreSucceeded") ? operation.clipboardRestoreSucceeded : false),
+        "ImmediateLookupSucceeded=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "immediateLookupSucceeded", false)),
+        "RetryUsed=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "retryUsed", false)),
+        "RegionQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "anchorSnapshotQueryDurationMs", "UNKNOWN")),
+        "AnchorSnapshotMode=" SafeDiagnosticValue(MedExContextValue(resetContext, "anchorSnapshotMode", "UNKNOWN")),
+        "UseCachedAnchorSnapshot=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "useCachedAnchorSnapshot", false)),
+        "FontQueryDurationMs=SHARED_SNAPSHOT",
+        "FontFilterDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "fontFilterDurationMs", "UNKNOWN")),
+        "RawFontSizePatternMatchCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "rawFontSizePatternMatchCount", 0)),
+        "FontAnchorRetryUsed=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "fontAnchorRetryUsed", false)),
+        "FontAnchorRetryEnabled=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "fontAnchorRetryEnabled", false)),
+        "MenuLookupStrategy=" SafeDiagnosticValue(MedExContextValue(resetContext, "menuLookupStrategy", "UNKNOWN")),
+        "MenuOpenTimeoutMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "menuOpenTimeoutMs", "UNKNOWN")),
+        "MenuPollIntervalMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "menuPollIntervalMs", "UNKNOWN")),
+        "TriggerClickCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "triggerClickCount", 0)),
+        "BlackLookupAttemptCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupAttemptCount", 0)),
+        "BlackLookupScope=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupScope", "UNKNOWN")),
+        "BlackLookupFirstQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupFirstQueryDurationMs", "UNKNOWN")),
+        "BlackLookupRetryQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupRetryQueryDurationMs", "UNKNOWN")),
+        "FocusedElementBeforeCursorRestore=" FormatFocusedElementSummary(resetContext, "beforeCursorRestore"),
+        "FocusedElementAfterBlackInvoke=" FormatFocusedElementSummary(resetContext, "afterBlackInvoke"),
+        "CursorRestoreRequestedCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "cursorRestoreRequestedCount", "UNKNOWN")),
+        "CursorRestoreCommandSent=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "cursorRestoreCommandSent", false)),
+        "ForegroundHwndBeforeCursorRestore=" SafeDiagnosticValue(MedExContextValue(resetContext, "foregroundHwndBeforeCursorRestore", "UNKNOWN")),
+        "CursorRestoreTargetHwnd=" SafeDiagnosticValue(MedExContextValue(resetContext, "cursorRestoreTargetHwnd", "UNKNOWN")),
+        "FinalInsertionColorVisuallyValidated=MANUAL_REQUIRED",
+        "CursorPositionVisuallyValidated=MANUAL_REQUIRED",
+        "ImmediateContinuedTypingRemainedBlack=MANUAL_REQUIRED",
+        "HotstringStartMs=" PerformanceTimestampValue(performanceContext, "HotstringStartMs"),
+        "PasteSentMs=" PerformanceTimestampValue(performanceContext, "PasteSentMs"),
+        "ClipboardRestoreCompletedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreCompletedMs"),
+        "ColorResetStartMs=" PerformanceTimestampValue(performanceContext, "ColorResetStartMs"),
+        "ColorResetReturnedMs=" PerformanceTimestampValue(performanceContext, "ColorResetReturnedMs"),
+        "FailureFeedbackStartedMs=" PerformanceTimestampValue(performanceContext, "FailureFeedbackStartedMs"),
+        "FailureFeedbackCompletedMs=" PerformanceTimestampValue(performanceContext, "FailureFeedbackCompletedMs"),
+        "AnchorResolutionCompletedMs=" PerformanceTimestampValue(performanceContext, "AnchorResolutionCompletedMs"),
+        "MenuClickSentMs=" PerformanceTimestampValue(performanceContext, "MenuClickSentMs"),
+        "ImmediateBlackLookupCompletedMs=" PerformanceTimestampValue(performanceContext, "ImmediateBlackLookupCompletedMs"),
+        "RetryLookupCompletedMs=" PerformanceTimestampValue(performanceContext, "RetryLookupCompletedMs"),
+        "BlackInvokeCompletedMs=" PerformanceTimestampValue(performanceContext, "BlackInvokeCompletedMs"),
+        "CursorRestoreSentMs=" PerformanceTimestampValue(performanceContext, "CursorRestoreSentMs"),
+        "HotstringReturnMs=" PerformanceTimestampValue(performanceContext, "HotstringReturnMs"),
+        "PasteStageMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "PasteSentMs"),
+        "ClipboardRestoreMs=" PerformanceDuration(performanceContext, "PasteSentMs", "ClipboardRestoreCompletedMs"),
+        "AnchorResolutionMs=" PerformanceDuration(performanceContext, "ColorResetStartMs", "AnchorResolutionCompletedMs"),
+        "ColorResetCoreMs=" PerformanceDuration(performanceContext, "ColorResetStartMs", "ColorResetReturnedMs"),
+        "FailureFeedbackMs=" PerformanceDuration(performanceContext, "FailureFeedbackStartedMs", "FailureFeedbackCompletedMs"),
+        "ClickToLookupMs=" PerformanceDuration(performanceContext, "MenuClickSentMs", "ImmediateBlackLookupCompletedMs"),
+        "BlackLookupMs=" PerformanceDurationToFirstAvailable(performanceContext, "MenuClickSentMs", ["RetryLookupCompletedMs", "ImmediateBlackLookupCompletedMs"]),
+        "InvokeMs=" PerformanceDurationFromFirstAvailable(performanceContext, ["RetryLookupCompletedMs", "ImmediateBlackLookupCompletedMs"], "BlackInvokeCompletedMs"),
+        "PostInvokeToCursorMs=" PerformanceDuration(performanceContext, "BlackInvokeCompletedMs", "CursorRestoreSentMs"),
+        "TotalHotstringMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
+        "TotalHotstringDurationMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs")
+    ]
+    return JoinDiagnosticFields(fields, "`r`n") "`r`n"
+}
+
+PerformanceTimestampValue(context, key) {
+    return Type(context) = "Map" && context.Has(key) ? context[key] : "UNKNOWN"
+}
+
+PerformanceDuration(context, startKey, endKey) {
+    if Type(context) != "Map" || !context.Has(startKey) || !context.Has(endKey)
+        return "UNKNOWN"
+    return context[endKey] - context[startKey]
+}
+
+PerformanceDurationToFirstAvailable(context, startKey, endKeys) {
+    if Type(context) != "Map" || !context.Has(startKey)
+        return "UNKNOWN"
+    for key in endKeys {
+        if context.Has(key)
+            return context[key] - context[startKey]
+    }
+    return "UNKNOWN"
+}
+
+PerformanceDurationFromFirstAvailable(context, startKeys, endKey) {
+    if Type(context) != "Map" || !context.Has(endKey)
+        return "UNKNOWN"
+    for key in startKeys {
+        if context.Has(key)
+            return context[endKey] - context[key]
+    }
+    return "UNKNOWN"
 }
 
 MedExContextValue(context, key, defaultValue) {
@@ -196,6 +346,29 @@ FormatDiagnosticRectList(rectangles) {
     for index, rect in rectangles
         output .= (index = 1 ? "" : "|") FormatDiagnosticRect(rect)
     return output = "" ? "NONE" : output
+}
+
+FormatDiagnosticList(values) {
+    if Type(values) != "Array"
+        return "UNKNOWN"
+    output := ""
+    for index, value in values
+        output .= (index = 1 ? "" : "|") SafeDiagnosticValue(value, 80)
+    return output = "" ? "NONE" : output
+}
+
+FormatFocusedElementSummary(context, prefix) {
+    if !MedExContextValue(context, prefix "FocusedElementCaptured", false)
+        return "UNKNOWN"
+    return "ControlType:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementControlType", "UNKNOWN"), 40
+    ) ",ClassName:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementClassName", "UNKNOWN"), 80
+    ) ",AutomationId:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementAutomationId", "UNKNOWN"), 80
+    ) ",Hwnd:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementNativeWindowHandle", "UNKNOWN"), 40
+    )
 }
 
 SafeDiagnosticValue(value, maxLength := 240) {

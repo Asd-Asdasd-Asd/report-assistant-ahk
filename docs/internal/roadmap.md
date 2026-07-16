@@ -153,6 +153,8 @@ Explicitly deferred，除非已经实现且稳定：
 
 v0.5.0 的 MedEx color reset 采用已批准 V1：semantic region anchor + dynamic local font anchor + centralized local-offset positioning + UIA Invoke。该方案属于可替换 adapter，不进入 generic clipboard module。
 
+2026-07-16 field evidence 已满足 Candidate G 的启动条件：semantic localization 稳定，而 popup UIA traversal/Invoke 延迟高且可靠性不可接受。Candidate G 因此成为下一条首选开发路线，但仍按 G1 calibration → G2 controlled interaction → explicit promotion 分阶段执行。G1 前不得写入未校准 offsets/pixel thresholds；G2 前不得自动点击 black；任何阶段都不得自动 fallback 到 `uiaInvoke`。
+
 ## 首次有限内测里程碑
 
 | Milestone | Scope | Entry criteria | Exit criteria | Workstation validation | Blocks first limited test |
@@ -209,6 +211,7 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 - import/export of user configuration；
 - automatic update support；
 - possible replacement of coordinate interaction with a direct Electron/editor command；
+- 如果当前 popup UIA 路线持续不可靠，评估经过现场校准的 Candidate G relative-mouse profile；
 - workstation profiles and calibration；
 - 经过逐项验证的其他 viewer actions。
 

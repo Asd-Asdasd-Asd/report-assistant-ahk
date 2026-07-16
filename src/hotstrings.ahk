@@ -5,10 +5,7 @@
 
 :*?:;fzg::
 {
-    SendText("放射性摄取增高，SUVmax约")
-    operation := InsertRedFigureTextAndRestoreState()
-    if operation.ok
-        Send("{Left 4}")
+    RunFzgInsertion()
 }
 
 :*?:;fwj::

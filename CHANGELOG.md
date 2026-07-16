@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Declared explicit `uiaInvoke` and `relativeMousePixelValidated` strategy names without automatic fallback; Candidate G runtime, uncalibrated geometry, and pixel thresholds remain absent.
+- Removed production hotstring registration from the field-debug process; F11 now calls the shared `RunFzgInsertion()` workflow directly, avoiding duplicate `;red`/`;fzg` handlers when comparing release and debug paths.
+- Recorded 2026-07-16 evidence that semantic localization is usable while popup UIA traversal is too slow and unreliable for the preferred production route; `uiaInvoke` remains a comparison/rollback strategy.
+- Prepared an uncommitted Color Reset reconciliation candidate: restored one-click bounded adaptive black-item polling, isolated cached Text snapshots and zero-raw-match font retries behind independent disabled-by-default switches, and retained staged privacy-safe diagnostics. Windows A/B validation is still required.
+- Hoisted required AutoHotkey directives to the beginning of the generated self-contained release while preserving BOM-safe generation.
+- Stripped only the leading UTF-8 BOM from each release component before merging, preventing embedded U+FEFF parser errors in the self-contained AHK release.
+- Added a zero-U+FEFF build guard and BOM regression coverage while preserving the original source content beyond its first character.
+- Reduced the red-insertion clipboard success path from 400 ms of fixed waits to one named 50 ms paste-settle interval while preserving transactional restoration.
+- Preserved the fixed-attempt lookup implementation only as an explicit diagnostic experiment; it is not the production default.
+- Restored the legacy `;fzg` 50 ms caret-settle interval while retaining phrase-specific `Left 4` behavior.
+- Added an explicit full-production timing diagnostic hotkey and stage timestamps without enabling heavy diagnostics on the normal success path.
+
 ### v0.5.0-alpha.0 — Field-validated production baseline
 
 - Integrated the validated semantic-anchor Color Reset V1 into the normal hotstring/report-editor call chain.

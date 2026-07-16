@@ -8,6 +8,11 @@
 - [ ] 运行 `python scripts/build_release.py`。
 - [ ] 检查 `release/report_assistant.ahk` 是否生成。
 - [ ] 检查 generated release 已包含 pinned UIA dependency，且不依赖 `debug/Lib`、source tree 或开发机 absolute paths。
+- [ ] 检查 generated release 使用 UTF-8 without BOM，完整文件中 U+FEFF count 为 0。
+- [ ] 在 Windows 上直接用目标 AutoHotkey v2 启动 generated `.ahk`，确认无 parser/startup error；静态扫描不能替代本步骤。
+- [ ] Windows smoke test 前完全退出所有 release、legacy 和 field-debug AHK instances；测试期间一次只运行一个脚本。
+- [ ] 记录实际启动的 `release/report_assistant.ahk` 路径和 SHA-256，避免把 stale NAS/local copy 当作当前生成物。
+- [ ] 分别在 release-only 与 debug-only 状态测试；确认 field-debug 不注册 `;red`/`;fzg`，F11 通过 shared `RunFzgInsertion()` 调用同一 strategy dispatcher。
 - [ ] 从 source truth 生成 internal-test executable，不手改生成产物。
 - [ ] 检查 executable/source release 不包含真实 `config.ini`、日志或 patient data。
 - [ ] 确认更新流程不会覆盖 `%LocalAppData%\MedExAHK\config.ini`。
@@ -21,6 +26,8 @@
 - [ ] 测试 wrong process、missing anchors、invalid geometry、menu timeout、missing black item 和 Invoke failure 全部 fail-closed。
 - [ ] 检查 production success 不写 heavy field log；failure-only log 不含 geometry dump、报告文字或 clipboard content。
 - [ ] 检查 explicit field mode 仍能输出完整 privacy-safe diagnostic schema。
+- [ ] Windows 上完成 10 次 `;red` 与 10 次 `;fzg` reliability run，并保存 staged anchor/query/focus diagnostics。
+- [ ] 确认 source、F11 harness 与 generated release 的 cursor restore request 均为 `Left 4`；若视觉位置不符，先验证 focused element，不使用任意额外 Left 补偿。
 - [ ] 测试 `;fzg`。
 - [ ] 检查没有自动提交、自动审核或自动最终发送功能。
 - [ ] 检查 new/compat hotkeys 和 hotstrings 没有重复注册。

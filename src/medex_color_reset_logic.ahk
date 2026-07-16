@@ -24,7 +24,14 @@ class ColorResetCode {
     static BLACK_ITEM_NOT_FOUND := "COLOR_RESET_BLACK_ITEM_NOT_FOUND"
     static INVOKE_UNAVAILABLE := "COLOR_RESET_INVOKE_UNAVAILABLE"
     static INVOKE_FAILED := "COLOR_RESET_INVOKE_FAILED"
+    static STRATEGY_NOT_IMPLEMENTED := "COLOR_RESET_STRATEGY_NOT_IMPLEMENTED"
+    static UNKNOWN_STRATEGY := "COLOR_RESET_UNKNOWN_STRATEGY"
     static UNEXPECTED_ERROR := "COLOR_RESET_UNEXPECTED_ERROR"
+}
+
+class MedExColorResetStrategy {
+    static UIA_INVOKE := "uiaInvoke"
+    static RELATIVE_MOUSE_PIXEL_VALIDATED := "relativeMousePixelValidated"
 }
 
 class RedTextOperationCode {
@@ -137,6 +144,7 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
         "fontSizeAnchorPattern", fontSizeNamePattern,
         "fontSizeAnchorFound", false,
         "fontSizeCandidateCount", 0,
+        "selectedFontSizeAnchorFound", false,
         "optionalRightAnchorName", optionalRightAnchorName,
         "optionalRightAnchorFound", false,
         "colorArrowOffsetX", offsetX,
@@ -150,6 +158,7 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
         return MakeColorResetResult(false, ColorResetCode.INVALID_RECTANGLE, context)
     }
 
+    regionFilterStartedAt := A_TickCount
     regionCandidates := []
     for anchor in textAnchors {
         if !IsValidTextAnchor(anchor) {
@@ -159,6 +168,7 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
         if anchor["name"] = regionAnchorName && RectContainsRect(clientRectScreen, anchor["rect"])
             regionCandidates.Push(anchor)
     }
+    context["regionFilterDurationMs"] := A_TickCount - regionFilterStartedAt
     context["regionAnchorCandidateCount"] := regionCandidates.Length
     if regionCandidates.Length = 0 {
         context["anchorSelectionReason"] := "regionAnchorNotFound"
@@ -174,23 +184,50 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
     context["regionAnchorFound"] := true
     context["regionAnchorRect"] := regionRect
 
+    fontFilterStartedAt := A_TickCount
+    rawFontNames := []
+    validFontRectCount := 0
+    ignoredFontReasons := []
     fontCandidates := []
     for anchor in textAnchors {
-        if !IsValidTextAnchor(anchor) || !RegExMatch(anchor["name"], fontSizeNamePattern)
+        if Type(anchor) != "Map" || !anchor.Has("name")
             continue
+        if !RegExMatch(anchor["name"], fontSizeNamePattern)
+            continue
+
+        rawFontNames.Push(anchor["name"])
+        if !anchor.Has("rect") || !IsValidRect(anchor["rect"]) {
+            ignoredFontReasons.Push(anchor["name"] ":invalidRectangle")
+            continue
+        }
+
+        validFontRectCount += 1
         rect := anchor["rect"]
-        if !RectContainsRect(clientRectScreen, rect)
+        if !RectContainsRect(clientRectScreen, rect) {
+            ignoredFontReasons.Push(anchor["name"] ":outsideClient")
             continue
-        if rect["l"] <= regionRect["r"]
+        }
+        if rect["l"] <= regionRect["r"] {
+            ignoredFontReasons.Push(anchor["name"] ":notRightOfRegion")
             continue
+        }
         overlapRatio := VerticalOverlapRatio(regionRect, rect)
-        if overlapRatio < minOverlapRatio
+        if overlapRatio < minOverlapRatio {
+            ignoredFontReasons.Push(anchor["name"] ":insufficientVerticalOverlap")
             continue
+        }
         candidate := MakeTextAnchor(anchor["name"], rect)
         candidate["verticalOverlapRatio"] := overlapRatio
         fontCandidates.Push(candidate)
     }
 
+    context["rawFontSizePatternMatchCount"] := rawFontNames.Length
+    context["rawFontSizeMatchedNames"] := rawFontNames
+    context["validFontSizeRectCount"] := validFontRectCount
+    context["ignoredFontSizeAnchorCount"] := ignoredFontReasons.Length
+    context["ignoredFontSizeReasons"] := ignoredFontReasons
+    context["fontFilterDurationMs"] := A_TickCount - fontFilterStartedAt
+    context["alignedFontSizeCandidateCount"] := fontCandidates.Length
     context["fontSizeCandidateCount"] := fontCandidates.Length
     if fontCandidates.Length = 0 {
         context["anchorSelectionReason"] := "alignedFontSizeAnchorNotFound"
@@ -204,6 +241,9 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
     fontAnchor := fontCandidates[1]
     fontRect := fontAnchor["rect"]
     context["fontSizeAnchorFound"] := true
+    context["selectedFontSizeAnchorFound"] := true
+    context["selectedFontSizeAnchorName"] := fontAnchor["name"]
+    context["selectedFontSizeAnchorRect"] := fontRect
     context["fontSizeAnchorMatchedName"] := fontAnchor["name"]
     context["fontSizeAnchorRect"] := fontRect
     context["verticalOverlapHeight"] := VerticalOverlapHeight(regionRect, fontRect)

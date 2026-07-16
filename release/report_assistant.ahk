@@ -1,6 +1,10 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-15 06:11:16 UTC
+; Generated at: 2026-07-16 12:07:58 UTC
+
+#Requires AutoHotkey v2.0
+#SingleInstance Force
+#Warn
 
 ; --- BEGIN app_metadata.ahk ---
 class AppMetadata {
@@ -12,7 +16,7 @@ class AppMetadata {
 ; --- END app_metadata.ahk ---
 
 ; --- BEGIN Lib/UIA.ahk ---
-﻿/*
+/*
     Introduction & credits
     This library implements Microsoft's UI Automation framework.
     Microsoft's official documentation:: https://docs.microsoft.com/en-us/windows/win32/winauto/entry-uiauto-win32
@@ -8065,6 +8069,12 @@ ClickPoint(name, clicks := 1) {
 ; --- END utils.ahk ---
 
 ; --- BEGIN clipboard_html.ahk ---
+class ClipboardTransactionDefaults {
+    ; Provisional production value. This is the only fixed wait between the
+    ; Ctrl+V dispatch and transactional clipboard restoration.
+    static HtmlPasteSettleMs := 50
+}
+
 PastePlainText(text) {
     transaction := WithClipboardRestore(() => PastePlainTextWithoutRestore(text))
     if !transaction.actionSucceeded
@@ -8078,19 +8088,22 @@ PasteRedFigureText(text := "（见图）") {
     return PasteRedFigureTextDetailed(text).pasteDispatched
 }
 
-PasteRedFigureTextDetailed(text := "（见图）") {
+PasteRedFigureTextDetailed(text := "（见图）", performanceContext := 0) {
     ; The black wrapper is intentionally empty of boundary/sentinel characters.
     escapedText := HtmlEscape(text)
     fragment := "<span style=`"color:#000000`"><span style=`"color:#ff0000`">" . escapedText . "</span></span>"
-    return PasteHtmlFragmentDetailed(fragment)
+    return PasteHtmlFragmentDetailed(fragment, performanceContext)
 }
 
 PasteHtmlFragment(fragment) {
     return PasteHtmlFragmentDetailed(fragment).pasteDispatched
 }
 
-PasteHtmlFragmentDetailed(fragment) {
-    transaction := WithClipboardRestore(() => PasteHtmlFragmentWithoutRestore(fragment))
+PasteHtmlFragmentDetailed(fragment, performanceContext := 0) {
+    transaction := WithClipboardRestore(
+        () => PasteHtmlFragmentWithoutRestore(fragment, performanceContext),
+        performanceContext
+    )
     pasteDispatched := transaction.actionSucceeded && transaction.restoreAttempted
 
     if !transaction.actionSucceeded {
@@ -8168,7 +8181,7 @@ SetClipboardHtml(cfHtml) {
     }
 }
 
-WithClipboardRestore(callback) {
+WithClipboardRestore(callback, performanceContext := 0) {
     result := {
         actionSucceeded: false,
         restoreAttempted: false,
@@ -8193,10 +8206,12 @@ WithClipboardRestore(callback) {
         if clipboardSaved {
             result.restoreAttempted := true
             try {
-                Sleep 100
                 A_Clipboard := savedClipboard
-                Sleep 100
                 result.restoreSucceeded := true
+                RecordOptionalPerformanceTimestamp(
+                    performanceContext,
+                    "ClipboardRestoreCompletedMs"
+                )
             } catch as restoreErr {
                 result.restoreError := restoreErr.Message
             }
@@ -8206,7 +8221,7 @@ WithClipboardRestore(callback) {
     return result
 }
 
-PasteHtmlFragmentWithoutRestore(fragment) {
+PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
     cfHtml := BuildCfHtml(fragment)
     htmlFormat := SetClipboardHtml(cfHtml)
     if !htmlFormat
@@ -8216,7 +8231,8 @@ PasteHtmlFragmentWithoutRestore(fragment) {
         return false
 
     Send("^v")
-    Sleep 200
+    RecordOptionalPerformanceTimestamp(performanceContext, "PasteSentMs")
+    Sleep ClipboardTransactionDefaults.HtmlPasteSettleMs
     return true
 }
 
@@ -8254,6 +8270,11 @@ WaitForClipboardFormat(format, timeoutMs := 500) {
             return false
         Sleep 20
     }
+}
+
+RecordOptionalPerformanceTimestamp(performanceContext, key) {
+    if Type(performanceContext) = "Map"
+        performanceContext[key] := A_TickCount
 }
 
 SetClipboardBuffer(format, source) {
@@ -8329,7 +8350,14 @@ class ColorResetCode {
     static BLACK_ITEM_NOT_FOUND := "COLOR_RESET_BLACK_ITEM_NOT_FOUND"
     static INVOKE_UNAVAILABLE := "COLOR_RESET_INVOKE_UNAVAILABLE"
     static INVOKE_FAILED := "COLOR_RESET_INVOKE_FAILED"
+    static STRATEGY_NOT_IMPLEMENTED := "COLOR_RESET_STRATEGY_NOT_IMPLEMENTED"
+    static UNKNOWN_STRATEGY := "COLOR_RESET_UNKNOWN_STRATEGY"
     static UNEXPECTED_ERROR := "COLOR_RESET_UNEXPECTED_ERROR"
+}
+
+class MedExColorResetStrategy {
+    static UIA_INVOKE := "uiaInvoke"
+    static RELATIVE_MOUSE_PIXEL_VALIDATED := "relativeMousePixelValidated"
 }
 
 class RedTextOperationCode {
@@ -8442,6 +8470,7 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
         "fontSizeAnchorPattern", fontSizeNamePattern,
         "fontSizeAnchorFound", false,
         "fontSizeCandidateCount", 0,
+        "selectedFontSizeAnchorFound", false,
         "optionalRightAnchorName", optionalRightAnchorName,
         "optionalRightAnchorFound", false,
         "colorArrowOffsetX", offsetX,
@@ -8455,6 +8484,7 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
         return MakeColorResetResult(false, ColorResetCode.INVALID_RECTANGLE, context)
     }
 
+    regionFilterStartedAt := A_TickCount
     regionCandidates := []
     for anchor in textAnchors {
         if !IsValidTextAnchor(anchor) {
@@ -8464,6 +8494,7 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
         if anchor["name"] = regionAnchorName && RectContainsRect(clientRectScreen, anchor["rect"])
             regionCandidates.Push(anchor)
     }
+    context["regionFilterDurationMs"] := A_TickCount - regionFilterStartedAt
     context["regionAnchorCandidateCount"] := regionCandidates.Length
     if regionCandidates.Length = 0 {
         context["anchorSelectionReason"] := "regionAnchorNotFound"
@@ -8479,23 +8510,50 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
     context["regionAnchorFound"] := true
     context["regionAnchorRect"] := regionRect
 
+    fontFilterStartedAt := A_TickCount
+    rawFontNames := []
+    validFontRectCount := 0
+    ignoredFontReasons := []
     fontCandidates := []
     for anchor in textAnchors {
-        if !IsValidTextAnchor(anchor) || !RegExMatch(anchor["name"], fontSizeNamePattern)
+        if Type(anchor) != "Map" || !anchor.Has("name")
             continue
+        if !RegExMatch(anchor["name"], fontSizeNamePattern)
+            continue
+
+        rawFontNames.Push(anchor["name"])
+        if !anchor.Has("rect") || !IsValidRect(anchor["rect"]) {
+            ignoredFontReasons.Push(anchor["name"] ":invalidRectangle")
+            continue
+        }
+
+        validFontRectCount += 1
         rect := anchor["rect"]
-        if !RectContainsRect(clientRectScreen, rect)
+        if !RectContainsRect(clientRectScreen, rect) {
+            ignoredFontReasons.Push(anchor["name"] ":outsideClient")
             continue
-        if rect["l"] <= regionRect["r"]
+        }
+        if rect["l"] <= regionRect["r"] {
+            ignoredFontReasons.Push(anchor["name"] ":notRightOfRegion")
             continue
+        }
         overlapRatio := VerticalOverlapRatio(regionRect, rect)
-        if overlapRatio < minOverlapRatio
+        if overlapRatio < minOverlapRatio {
+            ignoredFontReasons.Push(anchor["name"] ":insufficientVerticalOverlap")
             continue
+        }
         candidate := MakeTextAnchor(anchor["name"], rect)
         candidate["verticalOverlapRatio"] := overlapRatio
         fontCandidates.Push(candidate)
     }
 
+    context["rawFontSizePatternMatchCount"] := rawFontNames.Length
+    context["rawFontSizeMatchedNames"] := rawFontNames
+    context["validFontSizeRectCount"] := validFontRectCount
+    context["ignoredFontSizeAnchorCount"] := ignoredFontReasons.Length
+    context["ignoredFontSizeReasons"] := ignoredFontReasons
+    context["fontFilterDurationMs"] := A_TickCount - fontFilterStartedAt
+    context["alignedFontSizeCandidateCount"] := fontCandidates.Length
     context["fontSizeCandidateCount"] := fontCandidates.Length
     if fontCandidates.Length = 0 {
         context["anchorSelectionReason"] := "alignedFontSizeAnchorNotFound"
@@ -8509,6 +8567,9 @@ ResolveMedExColorResetLayout(textAnchors, clientRectScreen, options := 0) {
     fontAnchor := fontCandidates[1]
     fontRect := fontAnchor["rect"]
     context["fontSizeAnchorFound"] := true
+    context["selectedFontSizeAnchorFound"] := true
+    context["selectedFontSizeAnchorName"] := fontAnchor["name"]
+    context["selectedFontSizeAnchorRect"] := fontRect
     context["fontSizeAnchorMatchedName"] := fontAnchor["name"]
     context["fontSizeAnchorRect"] := fontRect
     context["verticalOverlapHeight"] := VerticalOverlapHeight(regionRect, fontRect)
@@ -8709,6 +8770,7 @@ FormatMedExFieldDebugResult(result) {
     fields := [
         "Test=MedExColorReset",
         "AppVersion=" SafeDiagnosticValue(MedExContextValue(context, "appVersion", "UNKNOWN")),
+        "ColorResetStrategy=" SafeDiagnosticValue(MedExContextValue(context, "colorResetStrategy", "UNKNOWN")),
         "ResultCode=" SafeDiagnosticValue(result.code),
         "AutomationChainResult=" SafeDiagnosticValue(MedExContextValue(context, "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED")),
         "FinalValidationState=" (MedExContextValue(context, "finalInsertionColorVisuallyValidated", false) ? "VISUALLY_VALIDATED" : "FINAL_COLOR_PENDING_VISUAL_VALIDATION"),
@@ -8723,17 +8785,42 @@ FormatMedExFieldDebugResult(result) {
         "UiaRootRect=" FormatDiagnosticRect(MedExContextValue(context, "uiaRootRect", 0)),
         "DocumentFound=" FormatDiagnosticBoolean(MedExContextValue(context, "documentFound", false)),
         "DocumentRect=" FormatDiagnosticRect(MedExContextValue(context, "documentRect", 0)),
+        "DocumentLookupPath=" SafeDiagnosticValue(MedExContextValue(context, "documentLookupPath", "UNKNOWN")),
+        "DocumentLookupDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "documentLookupDurationMs", "UNKNOWN")),
         "WindowRect=" FormatDiagnosticRect(MedExContextValue(context, "windowRect", 0)),
         "ClientRectScreen=" FormatDiagnosticRect(MedExContextValue(context, "clientRectScreen", 0)),
         "LayoutProfileName=" SafeDiagnosticValue(MedExContextValue(context, "layoutProfileName", "UNKNOWN")),
         "RegionAnchorName=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorName", "UNKNOWN")),
         "RegionAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "regionAnchorFound", false)),
         "RegionAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "regionAnchorRect", 0)),
+        "RegionFilterDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "regionFilterDurationMs", "UNKNOWN")),
         "FontSizeAnchorPattern=" SafeDiagnosticValue(MedExContextValue(context, "fontSizeAnchorPattern", "UNKNOWN")),
         "FontSizeCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "fontSizeCandidateCount", 0)),
         "FontSizeAnchorMatchedName=" SafeDiagnosticValue(MedExContextValue(context, "fontSizeAnchorMatchedName", "UNKNOWN")),
         "FontSizeAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "fontSizeAnchorFound", false)),
         "FontSizeAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "fontSizeAnchorRect", 0)),
+        "RawFontSizePatternMatchCount=" SafeDiagnosticValue(MedExContextValue(context, "rawFontSizePatternMatchCount", 0)),
+        "RawFontSizeMatchedNames=" FormatDiagnosticList(MedExContextValue(context, "rawFontSizeMatchedNames", 0)),
+        "ValidFontSizeRectCount=" SafeDiagnosticValue(MedExContextValue(context, "validFontSizeRectCount", 0)),
+        "AlignedFontSizeCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "alignedFontSizeCandidateCount", 0)),
+        "SelectedFontSizeAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "selectedFontSizeAnchorFound", false)),
+        "IgnoredFontSizeAnchorCount=" SafeDiagnosticValue(MedExContextValue(context, "ignoredFontSizeAnchorCount", 0)),
+        "IgnoredFontSizeReasons=" FormatDiagnosticList(MedExContextValue(context, "ignoredFontSizeReasons", 0)),
+        "FontFilterDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "fontFilterDurationMs", "UNKNOWN")),
+        "AnchorSnapshotScope=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotScope", "UNKNOWN")),
+        "AnchorSnapshotMode=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotMode", "UNKNOWN")),
+        "UseCachedAnchorSnapshot=" FormatDiagnosticBoolean(MedExContextValue(context, "useCachedAnchorSnapshot", false)),
+        "AnchorSnapshotAttemptCount=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotAttemptCount", 0)),
+        "AnchorSnapshotTextElementCount=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotTextElementCount", 0)),
+        "AnchorSnapshotQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotQueryDurationMs", "UNKNOWN")),
+        "AnchorSnapshotConversionDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotConversionDurationMs", "UNKNOWN")),
+        "AnchorSnapshotPropertyReadFailureCount=" SafeDiagnosticValue(MedExContextValue(context, "anchorSnapshotPropertyReadFailureCount", 0)),
+        "FontAnchorRetryEligible=" FormatDiagnosticBoolean(MedExContextValue(context, "fontAnchorRetryEligible", false)),
+        "FontAnchorRetryEnabled=" FormatDiagnosticBoolean(MedExContextValue(context, "fontAnchorRetryEnabled", false)),
+        "FontAnchorRetryUsed=" FormatDiagnosticBoolean(MedExContextValue(context, "fontAnchorRetryUsed", false)),
+        "FontAnchorRetryDelayMs=" SafeDiagnosticValue(MedExContextValue(context, "fontAnchorRetryDelayMs", 0)),
+        "FirstAnchorSnapshotQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "firstAnchorSnapshotQueryDurationMs", "UNKNOWN")),
+        "FontAnchorRetryQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "fontAnchorRetryQueryDurationMs", "UNKNOWN")),
         "OptionalRightAnchorName=" SafeDiagnosticValue(MedExContextValue(context, "optionalRightAnchorName", "")),
         "OptionalRightAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "optionalRightAnchorFound", false)),
         "OptionalRightAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "optionalRightAnchorRect", 0)),
@@ -8749,11 +8836,34 @@ FormatMedExFieldDebugResult(result) {
         "CoordinateSpaceReason=" SafeDiagnosticValue(MedExContextValue(context, "coordinateSpaceReason", "")),
         "ForegroundGuardReason=" SafeDiagnosticValue(MedExContextValue(context, "foregroundGuardReason", "")),
         "ColorMenuClickSent=" FormatDiagnosticBoolean(MedExContextValue(context, "colorMenuClickSent", false)),
+        "TriggerClickCount=" SafeDiagnosticValue(MedExContextValue(context, "triggerClickCount", 0)),
+        "TriggerRetryCount=" SafeDiagnosticValue(MedExContextValue(context, "triggerRetryCount", 0)),
         "BlackItemFound=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemFound", false)),
         "InvokeAvailable=" FormatDiagnosticBoolean(MedExContextValue(context, "invokeAvailable", false)),
         "BlackItemInvokeSucceeded=" FormatDiagnosticBoolean(MedExContextValue(context, "blackItemInvokeSucceeded", false)),
         "FinalInsertionColorVisuallyValidated=" FormatDiagnosticBoolean(MedExContextValue(context, "finalInsertionColorVisuallyValidated", false)),
         "RetryCount=" SafeDiagnosticValue(MedExContextValue(context, "retryCount", 0)),
+        "ImmediateLookupSucceeded=" FormatDiagnosticBoolean(MedExContextValue(context, "immediateLookupSucceeded", false)),
+        "RetryUsed=" FormatDiagnosticBoolean(MedExContextValue(context, "retryUsed", false)),
+        "BlackLookupAttemptCount=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupAttemptCount", 0)),
+        "BlackLookupScope=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupScope", "UNKNOWN")),
+        "MenuLookupStrategy=" SafeDiagnosticValue(MedExContextValue(context, "menuLookupStrategy", "UNKNOWN")),
+        "MenuOpenTimeoutMs=" SafeDiagnosticValue(MedExContextValue(context, "menuOpenTimeoutMs", "UNKNOWN")),
+        "MenuPollIntervalMs=" SafeDiagnosticValue(MedExContextValue(context, "menuPollIntervalMs", "UNKNOWN")),
+        "MenuPreLookupSettleMs=" SafeDiagnosticValue(MedExContextValue(context, "menuPreLookupSettleMs", 0)),
+        "BlackLookupFirstRootDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupFirstRootDurationMs", "UNKNOWN")),
+        "BlackLookupFirstQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupFirstQueryDurationMs", "UNKNOWN")),
+        "BlackLookupRetryRootDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupRetryRootDurationMs", "UNKNOWN")),
+        "BlackLookupRetryQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(context, "blackLookupRetryQueryDurationMs", "UNKNOWN")),
+        "BeforeMenuClickFocusedElementControlType=" SafeDiagnosticValue(MedExContextValue(context, "beforeMenuClickFocusedElementControlType", "UNKNOWN")),
+        "AfterBlackInvokeFocusedElementControlType=" SafeDiagnosticValue(MedExContextValue(context, "afterBlackInvokeFocusedElementControlType", "UNKNOWN")),
+        "BeforeCursorRestoreFocusedElementControlType=" SafeDiagnosticValue(MedExContextValue(context, "beforeCursorRestoreFocusedElementControlType", "UNKNOWN")),
+        "FocusedElementBeforeCursorRestore=" FormatFocusedElementSummary(context, "beforeCursorRestore"),
+        "CursorRestoreRequestedCount=" SafeDiagnosticValue(MedExContextValue(context, "cursorRestoreRequestedCount", "UNKNOWN")),
+        "CursorRestoreCommandSent=" FormatDiagnosticBoolean(MedExContextValue(context, "cursorRestoreCommandSent", false)),
+        "ForegroundHwndBeforeCursorRestore=" SafeDiagnosticValue(MedExContextValue(context, "foregroundHwndBeforeCursorRestore", "UNKNOWN")),
+        "CursorRestoreTargetHwnd=" SafeDiagnosticValue(MedExContextValue(context, "cursorRestoreTargetHwnd", "UNKNOWN")),
+        "MenuDetectionElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "menuDetectionElapsedMs", "UNKNOWN")),
         "LookupElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "lookupElapsedMs", "UNKNOWN")),
         "ElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "elapsedMs", "UNKNOWN")),
         "AHKVersion=" SafeDiagnosticValue(A_AhkVersion),
@@ -8765,6 +8875,107 @@ FormatMedExFieldDebugResult(result) {
         "ExceptionMessage=" SafeDiagnosticValue(MedExContextValue(context, "exceptionMessage", ""))
     ]
     return JoinDiagnosticFields(fields, "`r`n") "`r`n"
+}
+
+FormatMedExPerformanceTimingResult(operation, performanceContext) {
+    resetContext := Map()
+    if IsObject(operation) && operation.HasOwnProp("reset")
+        && IsObject(operation.reset) && operation.reset.HasOwnProp("context")
+        && Type(operation.reset.context) = "Map" {
+        resetContext := operation.reset.context
+    }
+
+    fields := [
+        "Test=MedExProductionInsertionTiming",
+        "AppVersion=" AppMetadata.Version,
+        "OperationResult=" SafeDiagnosticValue(IsObject(operation) && operation.HasOwnProp("code") ? operation.code : "UNKNOWN"),
+        "ColorResetResult=" SafeDiagnosticValue(IsObject(operation) && operation.HasOwnProp("reset") && IsObject(operation.reset) ? operation.reset.code : "UNKNOWN"),
+        "ColorResetStrategy=" SafeDiagnosticValue(MedExContextValue(resetContext, "colorResetStrategy", "UNKNOWN")),
+        "ClipboardRestoreSucceeded=" FormatDiagnosticBoolean(IsObject(operation) && operation.HasOwnProp("clipboardRestoreSucceeded") ? operation.clipboardRestoreSucceeded : false),
+        "ImmediateLookupSucceeded=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "immediateLookupSucceeded", false)),
+        "RetryUsed=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "retryUsed", false)),
+        "RegionQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "anchorSnapshotQueryDurationMs", "UNKNOWN")),
+        "AnchorSnapshotMode=" SafeDiagnosticValue(MedExContextValue(resetContext, "anchorSnapshotMode", "UNKNOWN")),
+        "UseCachedAnchorSnapshot=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "useCachedAnchorSnapshot", false)),
+        "FontQueryDurationMs=SHARED_SNAPSHOT",
+        "FontFilterDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "fontFilterDurationMs", "UNKNOWN")),
+        "RawFontSizePatternMatchCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "rawFontSizePatternMatchCount", 0)),
+        "FontAnchorRetryUsed=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "fontAnchorRetryUsed", false)),
+        "FontAnchorRetryEnabled=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "fontAnchorRetryEnabled", false)),
+        "MenuLookupStrategy=" SafeDiagnosticValue(MedExContextValue(resetContext, "menuLookupStrategy", "UNKNOWN")),
+        "MenuOpenTimeoutMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "menuOpenTimeoutMs", "UNKNOWN")),
+        "MenuPollIntervalMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "menuPollIntervalMs", "UNKNOWN")),
+        "TriggerClickCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "triggerClickCount", 0)),
+        "BlackLookupAttemptCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupAttemptCount", 0)),
+        "BlackLookupScope=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupScope", "UNKNOWN")),
+        "BlackLookupFirstQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupFirstQueryDurationMs", "UNKNOWN")),
+        "BlackLookupRetryQueryDurationMs=" SafeDiagnosticValue(MedExContextValue(resetContext, "blackLookupRetryQueryDurationMs", "UNKNOWN")),
+        "FocusedElementBeforeCursorRestore=" FormatFocusedElementSummary(resetContext, "beforeCursorRestore"),
+        "FocusedElementAfterBlackInvoke=" FormatFocusedElementSummary(resetContext, "afterBlackInvoke"),
+        "CursorRestoreRequestedCount=" SafeDiagnosticValue(MedExContextValue(resetContext, "cursorRestoreRequestedCount", "UNKNOWN")),
+        "CursorRestoreCommandSent=" FormatDiagnosticBoolean(MedExContextValue(resetContext, "cursorRestoreCommandSent", false)),
+        "ForegroundHwndBeforeCursorRestore=" SafeDiagnosticValue(MedExContextValue(resetContext, "foregroundHwndBeforeCursorRestore", "UNKNOWN")),
+        "CursorRestoreTargetHwnd=" SafeDiagnosticValue(MedExContextValue(resetContext, "cursorRestoreTargetHwnd", "UNKNOWN")),
+        "FinalInsertionColorVisuallyValidated=MANUAL_REQUIRED",
+        "CursorPositionVisuallyValidated=MANUAL_REQUIRED",
+        "ImmediateContinuedTypingRemainedBlack=MANUAL_REQUIRED",
+        "HotstringStartMs=" PerformanceTimestampValue(performanceContext, "HotstringStartMs"),
+        "PasteSentMs=" PerformanceTimestampValue(performanceContext, "PasteSentMs"),
+        "ClipboardRestoreCompletedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreCompletedMs"),
+        "ColorResetStartMs=" PerformanceTimestampValue(performanceContext, "ColorResetStartMs"),
+        "ColorResetReturnedMs=" PerformanceTimestampValue(performanceContext, "ColorResetReturnedMs"),
+        "FailureFeedbackStartedMs=" PerformanceTimestampValue(performanceContext, "FailureFeedbackStartedMs"),
+        "FailureFeedbackCompletedMs=" PerformanceTimestampValue(performanceContext, "FailureFeedbackCompletedMs"),
+        "AnchorResolutionCompletedMs=" PerformanceTimestampValue(performanceContext, "AnchorResolutionCompletedMs"),
+        "MenuClickSentMs=" PerformanceTimestampValue(performanceContext, "MenuClickSentMs"),
+        "ImmediateBlackLookupCompletedMs=" PerformanceTimestampValue(performanceContext, "ImmediateBlackLookupCompletedMs"),
+        "RetryLookupCompletedMs=" PerformanceTimestampValue(performanceContext, "RetryLookupCompletedMs"),
+        "BlackInvokeCompletedMs=" PerformanceTimestampValue(performanceContext, "BlackInvokeCompletedMs"),
+        "CursorRestoreSentMs=" PerformanceTimestampValue(performanceContext, "CursorRestoreSentMs"),
+        "HotstringReturnMs=" PerformanceTimestampValue(performanceContext, "HotstringReturnMs"),
+        "PasteStageMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "PasteSentMs"),
+        "ClipboardRestoreMs=" PerformanceDuration(performanceContext, "PasteSentMs", "ClipboardRestoreCompletedMs"),
+        "AnchorResolutionMs=" PerformanceDuration(performanceContext, "ColorResetStartMs", "AnchorResolutionCompletedMs"),
+        "ColorResetCoreMs=" PerformanceDuration(performanceContext, "ColorResetStartMs", "ColorResetReturnedMs"),
+        "FailureFeedbackMs=" PerformanceDuration(performanceContext, "FailureFeedbackStartedMs", "FailureFeedbackCompletedMs"),
+        "ClickToLookupMs=" PerformanceDuration(performanceContext, "MenuClickSentMs", "ImmediateBlackLookupCompletedMs"),
+        "BlackLookupMs=" PerformanceDurationToFirstAvailable(performanceContext, "MenuClickSentMs", ["RetryLookupCompletedMs", "ImmediateBlackLookupCompletedMs"]),
+        "InvokeMs=" PerformanceDurationFromFirstAvailable(performanceContext, ["RetryLookupCompletedMs", "ImmediateBlackLookupCompletedMs"], "BlackInvokeCompletedMs"),
+        "PostInvokeToCursorMs=" PerformanceDuration(performanceContext, "BlackInvokeCompletedMs", "CursorRestoreSentMs"),
+        "TotalHotstringMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
+        "TotalHotstringDurationMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs")
+    ]
+    return JoinDiagnosticFields(fields, "`r`n") "`r`n"
+}
+
+PerformanceTimestampValue(context, key) {
+    return Type(context) = "Map" && context.Has(key) ? context[key] : "UNKNOWN"
+}
+
+PerformanceDuration(context, startKey, endKey) {
+    if Type(context) != "Map" || !context.Has(startKey) || !context.Has(endKey)
+        return "UNKNOWN"
+    return context[endKey] - context[startKey]
+}
+
+PerformanceDurationToFirstAvailable(context, startKey, endKeys) {
+    if Type(context) != "Map" || !context.Has(startKey)
+        return "UNKNOWN"
+    for key in endKeys {
+        if context.Has(key)
+            return context[key] - context[startKey]
+    }
+    return "UNKNOWN"
+}
+
+PerformanceDurationFromFirstAvailable(context, startKeys, endKey) {
+    if Type(context) != "Map" || !context.Has(endKey)
+        return "UNKNOWN"
+    for key in startKeys {
+        if context.Has(key)
+            return context[endKey] - context[key]
+    }
+    return "UNKNOWN"
 }
 
 MedExContextValue(context, key, defaultValue) {
@@ -8796,6 +9007,29 @@ FormatDiagnosticRectList(rectangles) {
     for index, rect in rectangles
         output .= (index = 1 ? "" : "|") FormatDiagnosticRect(rect)
     return output = "" ? "NONE" : output
+}
+
+FormatDiagnosticList(values) {
+    if Type(values) != "Array"
+        return "UNKNOWN"
+    output := ""
+    for index, value in values
+        output .= (index = 1 ? "" : "|") SafeDiagnosticValue(value, 80)
+    return output = "" ? "NONE" : output
+}
+
+FormatFocusedElementSummary(context, prefix) {
+    if !MedExContextValue(context, prefix "FocusedElementCaptured", false)
+        return "UNKNOWN"
+    return "ControlType:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementControlType", "UNKNOWN"), 40
+    ) ",ClassName:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementClassName", "UNKNOWN"), 80
+    ) ",AutomationId:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementAutomationId", "UNKNOWN"), 80
+    ) ",Hwnd:" SafeDiagnosticValue(
+        MedExContextValue(context, prefix "FocusedElementNativeWindowHandle", "UNKNOWN"), 40
+    )
 }
 
 SafeDiagnosticValue(value, maxLength := 240) {
@@ -8830,19 +9064,57 @@ class MedExColorResetDefaults {
     ]
     static ConfirmedProcessName := ""
     static AllowProvisionalProcess := true
+    static ColorResetStrategy := MedExColorResetStrategy.UIA_INVOKE
 
-    ; Provisional bounded field-test timing values.
+    ; Field-validated control semantics: one trigger click followed by bounded
+    ; adaptive polling for the exact black item.
+    static MenuLookupStrategy := "adaptivePolling"
     static MenuOpenTimeoutMs := 600
     static MenuPollIntervalMs := 40
-    static MaxTriggerAttempts := 2
+
+    ; Experimental fixed-attempt strategy. It is never the production default.
+    static BlackLookupRetryDelayMs := 20
+    static BlackLookupMaxAttempts := 2
+    static MenuPreLookupSettleMs := 0
+
+    ; Anchor experiments are independently switchable for single-variable A/B tests.
+    static UseCachedAnchorSnapshot := false
+    static EnableFontAnchorRetry := false
+    static FontAnchorRetryDelayMs := 20
 
 }
 
 ResetMedExInsertionColor(options := 0) {
-    startedAt := A_TickCount
+    selectedStrategy := MedExAdapterOption(
+        options,
+        "colorResetStrategy",
+        MedExColorResetDefaults.ColorResetStrategy
+    )
+    if selectedStrategy = MedExColorResetStrategy.UIA_INVOKE
+        return RunMedExUiaInvokeColorReset(options)
+
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "appVersion", AppMetadata.Version,
+        "colorResetStrategy", selectedStrategy,
+        "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED"
+    )
+    if selectedStrategy = MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED {
+        context["strategyReason"] := "candidateGDeferredUntilCalibration"
+        return MakeColorResetResult(false, ColorResetCode.STRATEGY_NOT_IMPLEMENTED, context)
+    }
+
+    context["strategyReason"] := "unknownColorResetStrategy"
+    return MakeColorResetResult(false, ColorResetCode.UNKNOWN_STRATEGY, context)
+}
+
+RunMedExUiaInvokeColorReset(options := 0) {
+    startedAt := A_TickCount
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
+    context := Map(
+        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "appVersion", AppMetadata.Version,
+        "colorResetStrategy", MedExColorResetStrategy.UIA_INVOKE,
         "foregroundProcess", "UNKNOWN",
         "foregroundWindowHandle", "UNKNOWN",
         "provisionalProcessCandidateAccepted", false,
@@ -8860,6 +9132,10 @@ ResetMedExInsertionColor(options := 0) {
         "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED",
         "finalInsertionColorVisuallyValidated", false,
         "retryCount", 0,
+        "fontAnchorRetryEligible", false,
+        "fontAnchorRetryEnabled", false,
+        "fontAnchorRetryUsed", false,
+        "anchorSnapshotAttemptCount", 0,
         "uiaLibrary", "UIA-v2",
         "uiaLibraryVersionPinned", MedExAdapterOption(options, "uiaLibraryVersionPinned", "UNKNOWN"),
         "uiaLibraryVersionRuntime", "UNKNOWN"
@@ -8917,7 +9193,9 @@ ResetMedExInsertionColor(options := 0) {
             )
         }
 
-        CollectMedExEnvironmentContext(foregroundHwnd, context)
+        diagnosticMode := MedExAdapterOption(options, "diagnosticMode", "production")
+        if diagnosticMode = "field"
+            CollectMedExEnvironmentContext(foregroundHwnd, context)
 
         global UIA
         if !IsSet(UIA) {
@@ -8947,7 +9225,7 @@ ResetMedExInsertionColor(options := 0) {
             return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
         }
 
-        documentElement := FindMedExDocument(windowElement, foregroundHwnd)
+        documentElement := FindMedExDocument(windowElement, foregroundHwnd, context)
         if !documentElement {
             context["uiaReason"] := "reportDocumentNotFoundInForegroundWindow"
             return FinishMedExColorReset(false, ColorResetCode.DOCUMENT_NOT_FOUND, context, startedAt, options)
@@ -8957,32 +9235,103 @@ ResetMedExInsertionColor(options := 0) {
         catch
             context["documentRect"] := "UNKNOWN"
 
-        try textElements := windowElement.FindElements({Type: "Text"})
-        catch as err {
-            AddSafeExceptionContext(context, err)
-            context["uiaReason"] := "TextElementEnumerationFailed"
-            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
-        }
-
-        try {
-            textAnchors := UiaTextElementsToAnchors(textElements)
-        } catch as err {
-            AddSafeExceptionContext(context, err)
-            context["invalidRectangle"] := "textAnchorRect"
-            return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
-        }
-        context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
-
         windowRect := GetWindowRectMap(foregroundHwnd)
         clientRectScreen := GetClientRectScreenMap(foregroundHwnd)
         context["windowRect"] := windowRect
         context["clientRectScreen"] := clientRectScreen
 
         layoutOptions := BuildMedExColorResetLayoutOptions(options)
-        layoutResult := ResolveMedExColorResetLayout(textAnchors, clientRectScreen, layoutOptions)
+        useCachedAnchorSnapshot := MedExAdapterOption(
+            options,
+            "useCachedAnchorSnapshot",
+            MedExColorResetDefaults.UseCachedAnchorSnapshot
+        ) = true
+        context["useCachedAnchorSnapshot"] := useCachedAnchorSnapshot
+        try anchorSnapshot := CollectMedExTextAnchorSnapshot(
+            windowElement,
+            useCachedAnchorSnapshot
+        )
+        catch as err {
+            AddSafeExceptionContext(context, err)
+            context["uiaReason"] := "TextElementSnapshotFailed"
+            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
+        }
+        context["anchorSnapshotAttemptCount"] := 1
+        MergeContext(context, anchorSnapshot.context)
+
+        layoutResult := ResolveMedExColorResetLayout(anchorSnapshot.anchors, clientRectScreen, layoutOptions)
         MergeContext(context, layoutResult.context)
+        retryEligible := !layoutResult.ok
+            && layoutResult.code = ColorResetCode.FONT_SIZE_ANCHOR_NOT_FOUND
+            && MedExContextValue(layoutResult.context, "rawFontSizePatternMatchCount", 0) = 0
+        context["fontAnchorRetryEligible"] := retryEligible
+        enableFontAnchorRetry := MedExAdapterOption(
+            options,
+            "enableFontAnchorRetry",
+            MedExColorResetDefaults.EnableFontAnchorRetry
+        ) = true
+        context["fontAnchorRetryEnabled"] := enableFontAnchorRetry
+
+        if retryEligible && enableFontAnchorRetry {
+            retryDelayMs := MedExAdapterOption(
+                options,
+                "fontAnchorRetryDelayMs",
+                MedExColorResetDefaults.FontAnchorRetryDelayMs
+            )
+            retryDelayMs := Max(0, Min(100, Integer(retryDelayMs)))
+            context["fontAnchorRetryUsed"] := true
+            context["fontAnchorRetryDelayMs"] := retryDelayMs
+            context["firstAnchorSnapshotQueryDurationMs"] := MedExContextValue(
+                anchorSnapshot.context,
+                "anchorSnapshotQueryDurationMs",
+                "UNKNOWN"
+            )
+            context["firstRawFontSizePatternMatchCount"] := MedExContextValue(
+                layoutResult.context,
+                "rawFontSizePatternMatchCount",
+                0
+            )
+
+            if retryDelayMs > 0
+                Sleep retryDelayMs
+            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeFontAnchorRetry"
+                return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED, context, startedAt, options)
+            }
+
+            try windowElement := UIA.ElementFromHandle(foregroundHwnd)
+            catch as err {
+                AddSafeExceptionContext(context, err)
+                context["uiaReason"] := "ElementFromHandleFailedBeforeFontAnchorRetry"
+                return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
+            }
+            try retrySnapshot := CollectMedExTextAnchorSnapshot(
+                windowElement,
+                useCachedAnchorSnapshot
+            )
+            catch as err {
+                AddSafeExceptionContext(context, err)
+                context["uiaReason"] := "FontAnchorRetrySnapshotFailed"
+                return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
+            }
+            context["anchorSnapshotAttemptCount"] := 2
+            context["fontAnchorRetryQueryDurationMs"] := MedExContextValue(
+                retrySnapshot.context,
+                "anchorSnapshotQueryDurationMs",
+                "UNKNOWN"
+            )
+            MergeContext(context, retrySnapshot.context)
+            layoutResult := ResolveMedExColorResetLayout(retrySnapshot.anchors, clientRectScreen, layoutOptions)
+            MergeContext(context, layoutResult.context)
+        }
+
+        context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
         if !layoutResult.ok
             return FinishMedExColorReset(false, layoutResult.code, context, startedAt, options)
+        RecordOptionalPerformanceTimestamp(
+            performanceContext,
+            "AnchorResolutionCompletedMs"
+        )
 
         interactionResult := RunMedExColorMenuInteraction(
             foregroundHwnd,
@@ -9006,22 +9355,43 @@ ResetMedExInsertionColor(options := 0) {
 }
 
 RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, screenPoint, context, options) {
+    menuLookupStrategy := MedExAdapterOption(
+        options,
+        "menuLookupStrategy",
+        MedExColorResetDefaults.MenuLookupStrategy
+    )
     menuTimeoutMs := MedExAdapterOption(
         options,
         "menuOpenTimeoutMs",
         MedExColorResetDefaults.MenuOpenTimeoutMs
     )
-    pollIntervalMs := MedExAdapterOption(
+    menuTimeoutMs := Max(100, Min(2000, Integer(menuTimeoutMs)))
+    menuPollIntervalMs := MedExAdapterOption(
         options,
         "menuPollIntervalMs",
         MedExColorResetDefaults.MenuPollIntervalMs
     )
-    maxAttempts := MedExAdapterOption(
+    menuPollIntervalMs := Max(10, Min(200, Integer(menuPollIntervalMs)))
+    retryDelayMs := MedExAdapterOption(
         options,
-        "maxTriggerAttempts",
-        MedExColorResetDefaults.MaxTriggerAttempts
+        "blackLookupRetryDelayMs",
+        MedExColorResetDefaults.BlackLookupRetryDelayMs
     )
-    maxAttempts := Max(1, Min(2, Integer(maxAttempts)))
+    retryDelayMs := Max(0, Min(100, Integer(retryDelayMs)))
+    preLookupSettleMs := MedExAdapterOption(
+        options,
+        "menuPreLookupSettleMs",
+        MedExColorResetDefaults.MenuPreLookupSettleMs
+    )
+    preLookupSettleMs := Max(0, Min(100, Integer(preLookupSettleMs)))
+    maxLookupAttempts := MedExAdapterOption(
+        options,
+        "blackLookupMaxAttempts",
+        MedExColorResetDefaults.BlackLookupMaxAttempts
+    )
+    maxLookupAttempts := Max(1, Min(2, Integer(maxLookupAttempts)))
+    collectFocusDiagnostics := MedExAdapterOption(options, "collectFocusDiagnostics", false)
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
     mouseCaptured := false
 
     try {
@@ -9029,49 +9399,65 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
         MouseGetPos &originalMouseX, &originalMouseY
         mouseCaptured := true
 
-        blackItem := 0
-        menuOpened := false
-        loop maxAttempts {
-            attempt := A_Index
-            context["retryCount"] := attempt - 1
-            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
-                context["processReason"] := "foregroundWindowChangedBeforeTriggerClick"
-                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeTriggerClick"
-                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
-            }
+        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+            context["processReason"] := "foregroundWindowChangedBeforeTriggerClick"
+            context["foregroundGuardReason"] := "foregroundTargetChangedBeforeTriggerClick"
+            return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
+        }
 
-            try {
-                Click screenPoint["x"], screenPoint["y"]
-                context["triggerClickCount"] := attempt
-                context["colorMenuClickSent"] := true
-            } catch as err {
-                AddSafeExceptionContext(context, err)
-                return MakeColorResetResult(false, ColorResetCode.TRIGGER_CLICK_FAILED, context)
-            }
+        if collectFocusDiagnostics
+            MergeContext(context, CaptureMedExFocusedElementContext("beforeMenuClick"))
 
+        try {
+            Click screenPoint["x"], screenPoint["y"]
+            context["triggerClickCount"] := 1
+            context["triggerRetryCount"] := 0
+            context["colorMenuClickSent"] := true
+            RecordOptionalPerformanceTimestamp(performanceContext, "MenuClickSentMs")
+        } catch as err {
+            AddSafeExceptionContext(context, err)
+            return MakeColorResetResult(false, ColorResetCode.TRIGGER_CLICK_FAILED, context)
+        }
+
+        if menuLookupStrategy = "fixedAttempts" {
+            menuLookup := WaitForMedExColorMenuFixedAttempts(
+                foregroundHwnd,
+                windowElement,
+                preLookupSettleMs,
+                retryDelayMs,
+                maxLookupAttempts,
+                performanceContext
+            )
+        } else {
+            menuLookupStrategy := "adaptivePolling"
             menuLookup := WaitForMedExColorMenu(
                 foregroundHwnd,
                 windowElement,
                 menuTimeoutMs,
-                pollIntervalMs
+                menuPollIntervalMs,
+                performanceContext
             )
-            menuOpened := menuLookup["opened"]
-            blackItem := menuLookup["blackItem"]
-            context["menuDetectionElapsedMs"] := menuLookup["elapsedMs"]
-            if menuLookup["foregroundChanged"] {
-                context["processReason"] := "foregroundWindowChangedWhileWaitingForMenu"
-                context["foregroundGuardReason"] := "foregroundTargetChangedWhileWaitingForMenu"
-                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
-            }
-
-            if menuOpened
-                break
-
-            if attempt < maxAttempts && !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
-                context["processReason"] := "foregroundWindowChangedBeforeRetry"
-                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeRetry"
-                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
-            }
+        }
+        menuOpened := menuLookup["opened"]
+        blackItem := menuLookup["blackItem"]
+        context["menuDetectionElapsedMs"] := menuLookup["elapsedMs"]
+        context["immediateLookupSucceeded"] := menuLookup["immediateLookupSucceeded"]
+        context["retryUsed"] := menuLookup["retryUsed"]
+        context["blackLookupAttemptCount"] := menuLookup["lookupAttemptCount"]
+        context["menuLookupStrategy"] := menuLookupStrategy
+        context["menuOpenTimeoutMs"] := menuTimeoutMs
+        context["menuPollIntervalMs"] := menuPollIntervalMs
+        context["blackLookupScope"] := menuLookup["scope"]
+        context["menuPreLookupSettleMs"] := menuLookup["preLookupSettleMs"]
+        context["blackLookupFirstRootDurationMs"] := menuLookup["firstRootDurationMs"]
+        context["blackLookupFirstQueryDurationMs"] := menuLookup["firstQueryDurationMs"]
+        context["blackLookupRetryRootDurationMs"] := menuLookup["retryRootDurationMs"]
+        context["blackLookupRetryQueryDurationMs"] := menuLookup["retryQueryDurationMs"]
+        context["retryCount"] := menuLookup["retryUsed"] ? 1 : 0
+        if menuLookup["foregroundChanged"] {
+            context["processReason"] := "foregroundWindowChangedWhileWaitingForMenu"
+            context["foregroundGuardReason"] := "foregroundTargetChangedWhileWaitingForMenu"
+            return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
         }
 
         if !menuOpened
@@ -9098,9 +9484,12 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
 
         try {
             blackItem.InvokePattern.Invoke()
+            RecordOptionalPerformanceTimestamp(performanceContext, "BlackInvokeCompletedMs")
             context["invokeSucceeded"] := true
             context["blackItemInvokeSucceeded"] := true
             context["automationChainResult"] := "AUTOMATION_CHAIN_OK"
+            if collectFocusDiagnostics
+                MergeContext(context, CaptureMedExFocusedElementContext("afterBlackInvoke"))
         } catch as err {
             AddSafeExceptionContext(context, err)
             return MakeColorResetResult(false, ColorResetCode.INVOKE_FAILED, context)
@@ -9113,82 +9502,226 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
     }
 }
 
-WaitForMedExColorMenu(foregroundHwnd, windowElement, timeoutMs, pollIntervalMs) {
-    global UIA
-
+WaitForMedExColorMenu(foregroundHwnd, windowElement, timeoutMs, pollIntervalMs,
+    performanceContext := 0) {
     startedAt := A_TickCount
-    knownColorNames := ["000000", "ff0000", "95b3d7"]
-    menuObserved := false
+    lookupAttemptCount := 0
+    firstRootDurationMs := "UNKNOWN"
+    firstQueryDurationMs := "UNKNOWN"
+    lastRootDurationMs := "UNKNOWN"
+    lastQueryDurationMs := "UNKNOWN"
+    currentWindowElement := windowElement
+
     loop {
         if WinExist("A") != foregroundHwnd
-            return Map(
-                "opened", false,
-                "blackItem", 0,
-                "elapsedMs", A_TickCount - startedAt,
-                "foregroundChanged", true
+            return MakeMedExMenuLookupResult(false, 0, startedAt, true, false,
+                lookupAttemptCount > 1, lookupAttemptCount, 0,
+                firstRootDurationMs, firstQueryDurationMs,
+                lastRootDurationMs, lastQueryDurationMs)
+
+        rootStartedAt := A_TickCount
+        currentWindowElement := RefreshMedExWindowElement(foregroundHwnd, windowElement)
+        rootDurationMs := A_TickCount - rootStartedAt
+        queryStartedAt := A_TickCount
+        blackItem := FindExactMedExColorItem(currentWindowElement, "000000")
+        queryDurationMs := A_TickCount - queryStartedAt
+        lookupAttemptCount += 1
+
+        if lookupAttemptCount = 1 {
+            firstRootDurationMs := rootDurationMs
+            firstQueryDurationMs := queryDurationMs
+            RecordOptionalPerformanceTimestamp(
+                performanceContext,
+                "ImmediateBlackLookupCompletedMs"
             )
-
-        ; Refresh the root so a newly-created Chromium popup is not missed.
-        try currentWindowElement := UIA.ElementFromHandle(foregroundHwnd)
-        catch
-            currentWindowElement := windowElement
-
-        try blackItem := currentWindowElement.ElementExist({Type: "Hyperlink", Name: "000000"})
-        catch
-            blackItem := 0
-        if blackItem
-            return Map(
-                "opened", true,
-                "blackItem", blackItem,
-                "elapsedMs", A_TickCount - startedAt,
-                "foregroundChanged", false
-            )
-
-        for colorName in knownColorNames {
-            if colorName = "000000"
-                continue
-            try colorItem := currentWindowElement.ElementExist({Type: "Hyperlink", Name: colorName})
-            catch
-                colorItem := 0
-            if colorItem
-                menuObserved := true
+        } else {
+            lastRootDurationMs := rootDurationMs
+            lastQueryDurationMs := queryDurationMs
+            RecordOptionalPerformanceTimestamp(performanceContext, "RetryLookupCompletedMs")
         }
 
-        if A_TickCount - startedAt >= timeoutMs
-            return Map(
-                "opened", menuObserved,
-                "blackItem", 0,
-                "elapsedMs", A_TickCount - startedAt,
-                "foregroundChanged", false
-            )
-        Sleep Max(10, pollIntervalMs)
+        if blackItem
+            return MakeMedExMenuLookupResult(true, blackItem, startedAt, false,
+                lookupAttemptCount = 1, lookupAttemptCount > 1, lookupAttemptCount, 0,
+                firstRootDurationMs, firstQueryDurationMs,
+                lastRootDurationMs, lastQueryDurationMs)
+
+        if A_TickCount - startedAt >= timeoutMs {
+            ; Auxiliary items are queried only after the exact-black polling
+            ; window expires, so they do not multiply normal-path tree scans.
+            menuObserved := FindExactMedExColorItem(currentWindowElement, "ff0000")
+                || FindExactMedExColorItem(currentWindowElement, "95b3d7")
+            return MakeMedExMenuLookupResult(menuObserved, 0, startedAt, false,
+                false, lookupAttemptCount > 1, lookupAttemptCount, 0,
+                firstRootDurationMs, firstQueryDurationMs,
+                lastRootDurationMs, lastQueryDurationMs)
+        }
+        Sleep pollIntervalMs
     }
 }
 
-FindMedExDocument(windowElement, foregroundHwnd) {
+WaitForMedExColorMenuFixedAttempts(foregroundHwnd, windowElement, preLookupSettleMs, retryDelayMs,
+    maxLookupAttempts, performanceContext := 0) {
     global UIA
 
+    startedAt := A_TickCount
+    if WinExist("A") != foregroundHwnd
+        return MakeMedExMenuLookupResult(false, 0, startedAt, true, false, false, 0,
+            preLookupSettleMs)
+
+    if preLookupSettleMs > 0
+        Sleep preLookupSettleMs
+
+    rootStartedAt := A_TickCount
+    currentWindowElement := RefreshMedExWindowElement(foregroundHwnd, windowElement)
+    firstRootDurationMs := A_TickCount - rootStartedAt
+    queryStartedAt := A_TickCount
+    blackItem := FindExactMedExColorItem(currentWindowElement, "000000")
+    firstQueryDurationMs := A_TickCount - queryStartedAt
+    RecordOptionalPerformanceTimestamp(
+        performanceContext,
+        "ImmediateBlackLookupCompletedMs"
+    )
+    if blackItem
+        return MakeMedExMenuLookupResult(true, blackItem, startedAt, false, true, false, 1,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs)
+
+    if maxLookupAttempts < 2
+        return MakeMedExMenuLookupResult(false, 0, startedAt, false, false, false, 1,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs)
+
+    if retryDelayMs > 0
+        Sleep retryDelayMs
+
+    if WinExist("A") != foregroundHwnd
+        return MakeMedExMenuLookupResult(false, 0, startedAt, true, false, true, 1,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs)
+
+    retryRootStartedAt := A_TickCount
+    currentWindowElement := RefreshMedExWindowElement(foregroundHwnd, windowElement)
+    retryRootDurationMs := A_TickCount - retryRootStartedAt
+    retryQueryStartedAt := A_TickCount
+    blackItem := FindExactMedExColorItem(currentWindowElement, "000000")
+    retryQueryDurationMs := A_TickCount - retryQueryStartedAt
+    RecordOptionalPerformanceTimestamp(performanceContext, "RetryLookupCompletedMs")
+    if blackItem
+        return MakeMedExMenuLookupResult(true, blackItem, startedAt, false, false, true, 2,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs,
+            retryRootDurationMs, retryQueryDurationMs)
+
+    ; Auxiliary colors are queried only on failure to distinguish an opened
+    ; menu with a missing black item from a menu that was not exposed at all.
+    menuObserved := FindExactMedExColorItem(currentWindowElement, "ff0000")
+        || FindExactMedExColorItem(currentWindowElement, "95b3d7")
+    return MakeMedExMenuLookupResult(menuObserved, 0, startedAt, false, false, true, 2,
+        preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs,
+        retryRootDurationMs, retryQueryDurationMs)
+}
+
+RefreshMedExWindowElement(foregroundHwnd, fallbackElement) {
+    global UIA
+    try return UIA.ElementFromHandle(foregroundHwnd)
+    catch
+        return fallbackElement
+}
+
+FindExactMedExColorItem(windowElement, colorName) {
+    try return windowElement.ElementExist({Type: "Hyperlink", Name: colorName})
+    catch
+        return 0
+}
+
+MakeMedExMenuLookupResult(opened, blackItem, startedAt, foregroundChanged,
+    immediateLookupSucceeded, retryUsed, lookupAttemptCount, preLookupSettleMs,
+    firstRootDurationMs := "UNKNOWN", firstQueryDurationMs := "UNKNOWN",
+    retryRootDurationMs := "UNKNOWN", retryQueryDurationMs := "UNKNOWN") {
+    return Map(
+        "opened", opened = true,
+        "blackItem", blackItem,
+        "elapsedMs", A_TickCount - startedAt,
+        "foregroundChanged", foregroundChanged = true,
+        "immediateLookupSucceeded", immediateLookupSucceeded = true,
+        "retryUsed", retryUsed = true,
+        "lookupAttemptCount", lookupAttemptCount,
+        "scope", "foregroundWindowDescendants",
+        "preLookupSettleMs", preLookupSettleMs,
+        "firstRootDurationMs", firstRootDurationMs,
+        "firstQueryDurationMs", firstQueryDurationMs,
+        "retryRootDurationMs", retryRootDurationMs,
+        "retryQueryDurationMs", retryQueryDurationMs
+    )
+}
+
+FindMedExDocument(windowElement, foregroundHwnd, context := 0) {
+    global UIA
+    startedAt := A_TickCount
+
     try {
-        if windowElement.Type = UIA.ControlType.Document
+        if windowElement.Type = UIA.ControlType.Document {
+            RecordMedExDocumentLookup(context, "foregroundRoot", startedAt)
             return windowElement
+        }
     }
     try {
-        if documentElement := windowElement.ElementExist({Type: "Document"})
+        if documentElement := windowElement.ElementExist({Type: "Document"}) {
+            RecordMedExDocumentLookup(context, "foregroundRootDescendant", startedAt)
             return documentElement
+        }
     }
 
     ; Chromium fallback remains scoped to the same foreground window.
     try chromiumElement := UIA.ElementFromChromium("ahk_id " foregroundHwnd)
-    catch
+    catch {
+        RecordMedExDocumentLookup(context, "chromiumRootUnavailable", startedAt)
         return 0
+    }
 
     try {
-        if chromiumElement.Type = UIA.ControlType.Document
+        if chromiumElement.Type = UIA.ControlType.Document {
+            RecordMedExDocumentLookup(context, "chromiumRoot", startedAt)
             return chromiumElement
+        }
     }
-    try return chromiumElement.ElementExist({Type: "Document"})
-    catch
+    try {
+        documentElement := chromiumElement.ElementExist({Type: "Document"})
+        RecordMedExDocumentLookup(context,
+            documentElement ? "chromiumRootDescendant" : "notFound", startedAt)
+        return documentElement
+    } catch {
+        RecordMedExDocumentLookup(context, "chromiumDescendantQueryFailed", startedAt)
         return 0
+    }
+}
+
+RecordMedExDocumentLookup(context, path, startedAt) {
+    if Type(context) = "Map" {
+        context["documentLookupPath"] := path
+        context["documentLookupDurationMs"] := A_TickCount - startedAt
+    }
+}
+
+CaptureMedExFocusedElementContext(prefix) {
+    global UIA
+    context := Map()
+    startedAt := A_TickCount
+    context[prefix "FocusedElementCaptured"] := false
+    try {
+        element := UIA.GetFocusedElement()
+        context[prefix "FocusedElementCaptured"] := true
+        for propertyName in ["ControlType", "ClassName", "AutomationId", "NativeWindowHandle", "ProcessId"] {
+            try context[prefix "FocusedElement" propertyName] := element.%propertyName%
+            catch
+                context[prefix "FocusedElement" propertyName] := "UNKNOWN"
+        }
+        try context[prefix "FocusedElementRect"] := UiaRectangleToMap(element.BoundingRectangle)
+        catch
+            context[prefix "FocusedElementRect"] := "UNKNOWN"
+    } catch as err {
+        context[prefix "FocusedElementReason"] := "focusedElementQueryFailed"
+        context[prefix "FocusedElementExceptionType"] := Type(err)
+    }
+    context[prefix "FocusedElementQueryDurationMs"] := A_TickCount - startedAt
+    return context
 }
 
 MedExProcessNameIsApproved(processName, candidates) {
@@ -9210,12 +9743,58 @@ MedExForegroundTargetMatches(expectedHwnd, expectedProcess) {
     return StrLower(currentProcess) = StrLower(expectedProcess)
 }
 
-UiaTextElementsToAnchors(elements) {
-    anchors := []
-    for element in elements {
-        try anchors.Push(MakeTextAnchor(element.Name, UiaRectangleToMap(element.BoundingRectangle)))
+CollectMedExTextAnchorSnapshot(windowElement, useCachedProperties := false) {
+    global UIA
+
+    queryStartedAt := A_TickCount
+    if useCachedProperties {
+        cacheRequest := UIA.CreateCacheRequest(["Name", "BoundingRectangle"])
+        textElements := windowElement.FindElements({Type: "Text"}, 4, 0, 0, cacheRequest)
+    } else {
+        textElements := windowElement.FindElements({Type: "Text"})
     }
-    return anchors
+    queryCompletedAt := A_TickCount
+    conversion := UiaTextElementsToAnchors(textElements, useCachedProperties)
+    context := Map(
+        "anchorSnapshotScope", "foregroundWindowDescendants",
+        "anchorSnapshotShared", true,
+        "anchorSnapshotMode", useCachedProperties ? "cachedProperties" : "liveProperties",
+        "anchorSnapshotTextElementCount", textElements.Length,
+        "anchorSnapshotQueryDurationMs", queryCompletedAt - queryStartedAt,
+        "anchorSnapshotConversionDurationMs", A_TickCount - queryCompletedAt,
+        "anchorSnapshotPropertyReadFailureCount", conversion.propertyReadFailureCount,
+        "anchorSnapshotPropertyReadFailureReasons", conversion.propertyReadFailureReasons
+    )
+    return {anchors: conversion.anchors, context: context}
+}
+
+UiaTextElementsToAnchors(elements, useCachedProperties := false) {
+    anchors := []
+    propertyReadFailureCount := 0
+    propertyReadFailureReasons := []
+    for element in elements {
+        try name := useCachedProperties ? element.CachedName : element.Name
+        catch {
+            propertyReadFailureCount += 1
+            propertyReadFailureReasons.Push("nameReadFailed")
+            continue
+        }
+
+        try rect := UiaRectangleToMap(
+            useCachedProperties ? element.CachedBoundingRectangle : element.BoundingRectangle
+        )
+        catch {
+            propertyReadFailureCount += 1
+            propertyReadFailureReasons.Push("rectangleReadFailed")
+            rect := 0
+        }
+        anchors.Push(MakeTextAnchor(name, rect))
+    }
+    return {
+        anchors: anchors,
+        propertyReadFailureCount: propertyReadFailureCount,
+        propertyReadFailureReasons: propertyReadFailureReasons
+    }
 }
 
 UiaRectangleToMap(rectangle) {
@@ -9272,6 +9851,8 @@ CollectMedExEnvironmentContext(hwnd, context) {
 
 FinishMedExColorReset(ok, code, context, startedAt, options) {
     context["elapsedMs"] := A_TickCount - startedAt
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
+    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetCompletedMs")
     result := MakeColorResetResult(ok, code, context)
     diagnosticMode := MedExAdapterOption(options, "diagnosticMode", "production")
     if diagnosticMode = "field" {
@@ -9320,8 +9901,46 @@ FocusReportEditor() {
     return RequireReportEditor()
 }
 
+class ReportHotstringTimingDefaults {
+    ; Preserve the legacy ;fzg caret-settle interval after editor automation.
+    static FzgCursorRestoreDelayMs := 50
+}
+
+RunFzgInsertion(resetOptions := 0) {
+    performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
+    RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
+    SendText("放射性摄取增高，SUVmax约")
+    operation := InsertRedFigureTextAndRestoreState("（见图）", resetOptions)
+    if operation.ok {
+        Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs
+        if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
+            && Type(operation.reset.context) = "Map" {
+            operation.reset.context["cursorRestoreRequestedCount"] := 4
+            operation.reset.context["foregroundHwndBeforeCursorRestore"] := Format(
+                "0x{:X}", WinExist("A")
+            )
+            operation.reset.context["cursorRestoreTargetHwnd"] := MedExContextValue(
+                operation.reset.context,
+                "foregroundWindowHandle",
+                "UNKNOWN"
+            )
+            if MedExAdapterOption(resetOptions, "collectFocusDiagnostics", false)
+                MergeContext(operation.reset.context,
+                    CaptureMedExFocusedElementContext("beforeCursorRestore"))
+        }
+        Send("{Left 4}")
+        if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
+            && Type(operation.reset.context) = "Map"
+            operation.reset.context["cursorRestoreCommandSent"] := true
+        RecordOptionalPerformanceTimestamp(performanceContext, "CursorRestoreSentMs")
+    }
+    RecordOptionalPerformanceTimestamp(performanceContext, "HotstringReturnMs")
+    return operation
+}
+
 InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
-    pasteResult := PasteRedFigureTextDetailed(text)
+    performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
+    pasteResult := PasteRedFigureTextDetailed(text, performanceContext)
     if !pasteResult.pasteDispatched {
         return {
             ok: false,
@@ -9334,9 +9953,13 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
 
     ; The text is already present at this point. A reset failure is reported but
     ; never triggers automatic deletion or undo of report content.
+    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetStartMs")
     resetResult := ResetMedExInsertionColor(resetOptions)
+    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetReturnedMs")
     if !resetResult.ok {
+        RecordOptionalPerformanceTimestamp(performanceContext, "FailureFeedbackStartedMs")
         SoundBeep(650, 150)
+        RecordOptionalPerformanceTimestamp(performanceContext, "FailureFeedbackCompletedMs")
         return {
             ok: false,
             code: RedTextOperationCode.RESET_FAILED,
@@ -9402,10 +10025,7 @@ ExampleCalibratedViewerClick() {
 
 :*?:;fzg::
 {
-    SendText("放射性摄取增高，SUVmax约")
-    operation := InsertRedFigureTextAndRestoreState()
-    if operation.ok
-        Send("{Left 4}")
+    RunFzgInsertion()
 }
 
 :*?:;fwj::
@@ -9429,9 +10049,6 @@ ExampleCalibratedViewerClick() {
 ; --- END hotstrings.ahk ---
 
 ; --- BEGIN main.ahk ---
-#Requires AutoHotkey v2.0
-#SingleInstance Force
-#Warn
 
 
 #SuspendExempt

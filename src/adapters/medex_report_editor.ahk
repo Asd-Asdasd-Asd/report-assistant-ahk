@@ -6,19 +6,57 @@ class MedExColorResetDefaults {
     ]
     static ConfirmedProcessName := ""
     static AllowProvisionalProcess := true
+    static ColorResetStrategy := MedExColorResetStrategy.UIA_INVOKE
 
-    ; Provisional bounded field-test timing values.
+    ; Field-validated control semantics: one trigger click followed by bounded
+    ; adaptive polling for the exact black item.
+    static MenuLookupStrategy := "adaptivePolling"
     static MenuOpenTimeoutMs := 600
     static MenuPollIntervalMs := 40
-    static MaxTriggerAttempts := 2
+
+    ; Experimental fixed-attempt strategy. It is never the production default.
+    static BlackLookupRetryDelayMs := 20
+    static BlackLookupMaxAttempts := 2
+    static MenuPreLookupSettleMs := 0
+
+    ; Anchor experiments are independently switchable for single-variable A/B tests.
+    static UseCachedAnchorSnapshot := false
+    static EnableFontAnchorRetry := false
+    static FontAnchorRetryDelayMs := 20
 
 }
 
 ResetMedExInsertionColor(options := 0) {
-    startedAt := A_TickCount
+    selectedStrategy := MedExAdapterOption(
+        options,
+        "colorResetStrategy",
+        MedExColorResetDefaults.ColorResetStrategy
+    )
+    if selectedStrategy = MedExColorResetStrategy.UIA_INVOKE
+        return RunMedExUiaInvokeColorReset(options)
+
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "appVersion", AppMetadata.Version,
+        "colorResetStrategy", selectedStrategy,
+        "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED"
+    )
+    if selectedStrategy = MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED {
+        context["strategyReason"] := "candidateGDeferredUntilCalibration"
+        return MakeColorResetResult(false, ColorResetCode.STRATEGY_NOT_IMPLEMENTED, context)
+    }
+
+    context["strategyReason"] := "unknownColorResetStrategy"
+    return MakeColorResetResult(false, ColorResetCode.UNKNOWN_STRATEGY, context)
+}
+
+RunMedExUiaInvokeColorReset(options := 0) {
+    startedAt := A_TickCount
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
+    context := Map(
+        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "appVersion", AppMetadata.Version,
+        "colorResetStrategy", MedExColorResetStrategy.UIA_INVOKE,
         "foregroundProcess", "UNKNOWN",
         "foregroundWindowHandle", "UNKNOWN",
         "provisionalProcessCandidateAccepted", false,
@@ -36,6 +74,10 @@ ResetMedExInsertionColor(options := 0) {
         "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED",
         "finalInsertionColorVisuallyValidated", false,
         "retryCount", 0,
+        "fontAnchorRetryEligible", false,
+        "fontAnchorRetryEnabled", false,
+        "fontAnchorRetryUsed", false,
+        "anchorSnapshotAttemptCount", 0,
         "uiaLibrary", "UIA-v2",
         "uiaLibraryVersionPinned", MedExAdapterOption(options, "uiaLibraryVersionPinned", "UNKNOWN"),
         "uiaLibraryVersionRuntime", "UNKNOWN"
@@ -93,7 +135,9 @@ ResetMedExInsertionColor(options := 0) {
             )
         }
 
-        CollectMedExEnvironmentContext(foregroundHwnd, context)
+        diagnosticMode := MedExAdapterOption(options, "diagnosticMode", "production")
+        if diagnosticMode = "field"
+            CollectMedExEnvironmentContext(foregroundHwnd, context)
 
         global UIA
         if !IsSet(UIA) {
@@ -123,7 +167,7 @@ ResetMedExInsertionColor(options := 0) {
             return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
         }
 
-        documentElement := FindMedExDocument(windowElement, foregroundHwnd)
+        documentElement := FindMedExDocument(windowElement, foregroundHwnd, context)
         if !documentElement {
             context["uiaReason"] := "reportDocumentNotFoundInForegroundWindow"
             return FinishMedExColorReset(false, ColorResetCode.DOCUMENT_NOT_FOUND, context, startedAt, options)
@@ -133,32 +177,103 @@ ResetMedExInsertionColor(options := 0) {
         catch
             context["documentRect"] := "UNKNOWN"
 
-        try textElements := windowElement.FindElements({Type: "Text"})
-        catch as err {
-            AddSafeExceptionContext(context, err)
-            context["uiaReason"] := "TextElementEnumerationFailed"
-            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
-        }
-
-        try {
-            textAnchors := UiaTextElementsToAnchors(textElements)
-        } catch as err {
-            AddSafeExceptionContext(context, err)
-            context["invalidRectangle"] := "textAnchorRect"
-            return FinishMedExColorReset(false, ColorResetCode.INVALID_RECTANGLE, context, startedAt, options)
-        }
-        context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
-
         windowRect := GetWindowRectMap(foregroundHwnd)
         clientRectScreen := GetClientRectScreenMap(foregroundHwnd)
         context["windowRect"] := windowRect
         context["clientRectScreen"] := clientRectScreen
 
         layoutOptions := BuildMedExColorResetLayoutOptions(options)
-        layoutResult := ResolveMedExColorResetLayout(textAnchors, clientRectScreen, layoutOptions)
+        useCachedAnchorSnapshot := MedExAdapterOption(
+            options,
+            "useCachedAnchorSnapshot",
+            MedExColorResetDefaults.UseCachedAnchorSnapshot
+        ) = true
+        context["useCachedAnchorSnapshot"] := useCachedAnchorSnapshot
+        try anchorSnapshot := CollectMedExTextAnchorSnapshot(
+            windowElement,
+            useCachedAnchorSnapshot
+        )
+        catch as err {
+            AddSafeExceptionContext(context, err)
+            context["uiaReason"] := "TextElementSnapshotFailed"
+            return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
+        }
+        context["anchorSnapshotAttemptCount"] := 1
+        MergeContext(context, anchorSnapshot.context)
+
+        layoutResult := ResolveMedExColorResetLayout(anchorSnapshot.anchors, clientRectScreen, layoutOptions)
         MergeContext(context, layoutResult.context)
+        retryEligible := !layoutResult.ok
+            && layoutResult.code = ColorResetCode.FONT_SIZE_ANCHOR_NOT_FOUND
+            && MedExContextValue(layoutResult.context, "rawFontSizePatternMatchCount", 0) = 0
+        context["fontAnchorRetryEligible"] := retryEligible
+        enableFontAnchorRetry := MedExAdapterOption(
+            options,
+            "enableFontAnchorRetry",
+            MedExColorResetDefaults.EnableFontAnchorRetry
+        ) = true
+        context["fontAnchorRetryEnabled"] := enableFontAnchorRetry
+
+        if retryEligible && enableFontAnchorRetry {
+            retryDelayMs := MedExAdapterOption(
+                options,
+                "fontAnchorRetryDelayMs",
+                MedExColorResetDefaults.FontAnchorRetryDelayMs
+            )
+            retryDelayMs := Max(0, Min(100, Integer(retryDelayMs)))
+            context["fontAnchorRetryUsed"] := true
+            context["fontAnchorRetryDelayMs"] := retryDelayMs
+            context["firstAnchorSnapshotQueryDurationMs"] := MedExContextValue(
+                anchorSnapshot.context,
+                "anchorSnapshotQueryDurationMs",
+                "UNKNOWN"
+            )
+            context["firstRawFontSizePatternMatchCount"] := MedExContextValue(
+                layoutResult.context,
+                "rawFontSizePatternMatchCount",
+                0
+            )
+
+            if retryDelayMs > 0
+                Sleep retryDelayMs
+            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeFontAnchorRetry"
+                return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED, context, startedAt, options)
+            }
+
+            try windowElement := UIA.ElementFromHandle(foregroundHwnd)
+            catch as err {
+                AddSafeExceptionContext(context, err)
+                context["uiaReason"] := "ElementFromHandleFailedBeforeFontAnchorRetry"
+                return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
+            }
+            try retrySnapshot := CollectMedExTextAnchorSnapshot(
+                windowElement,
+                useCachedAnchorSnapshot
+            )
+            catch as err {
+                AddSafeExceptionContext(context, err)
+                context["uiaReason"] := "FontAnchorRetrySnapshotFailed"
+                return FinishMedExColorReset(false, ColorResetCode.UIA_UNAVAILABLE, context, startedAt, options)
+            }
+            context["anchorSnapshotAttemptCount"] := 2
+            context["fontAnchorRetryQueryDurationMs"] := MedExContextValue(
+                retrySnapshot.context,
+                "anchorSnapshotQueryDurationMs",
+                "UNKNOWN"
+            )
+            MergeContext(context, retrySnapshot.context)
+            layoutResult := ResolveMedExColorResetLayout(retrySnapshot.anchors, clientRectScreen, layoutOptions)
+            MergeContext(context, layoutResult.context)
+        }
+
+        context["lookupElapsedMs"] := A_TickCount - lookupStartedAt
         if !layoutResult.ok
             return FinishMedExColorReset(false, layoutResult.code, context, startedAt, options)
+        RecordOptionalPerformanceTimestamp(
+            performanceContext,
+            "AnchorResolutionCompletedMs"
+        )
 
         interactionResult := RunMedExColorMenuInteraction(
             foregroundHwnd,
@@ -182,22 +297,43 @@ ResetMedExInsertionColor(options := 0) {
 }
 
 RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, screenPoint, context, options) {
+    menuLookupStrategy := MedExAdapterOption(
+        options,
+        "menuLookupStrategy",
+        MedExColorResetDefaults.MenuLookupStrategy
+    )
     menuTimeoutMs := MedExAdapterOption(
         options,
         "menuOpenTimeoutMs",
         MedExColorResetDefaults.MenuOpenTimeoutMs
     )
-    pollIntervalMs := MedExAdapterOption(
+    menuTimeoutMs := Max(100, Min(2000, Integer(menuTimeoutMs)))
+    menuPollIntervalMs := MedExAdapterOption(
         options,
         "menuPollIntervalMs",
         MedExColorResetDefaults.MenuPollIntervalMs
     )
-    maxAttempts := MedExAdapterOption(
+    menuPollIntervalMs := Max(10, Min(200, Integer(menuPollIntervalMs)))
+    retryDelayMs := MedExAdapterOption(
         options,
-        "maxTriggerAttempts",
-        MedExColorResetDefaults.MaxTriggerAttempts
+        "blackLookupRetryDelayMs",
+        MedExColorResetDefaults.BlackLookupRetryDelayMs
     )
-    maxAttempts := Max(1, Min(2, Integer(maxAttempts)))
+    retryDelayMs := Max(0, Min(100, Integer(retryDelayMs)))
+    preLookupSettleMs := MedExAdapterOption(
+        options,
+        "menuPreLookupSettleMs",
+        MedExColorResetDefaults.MenuPreLookupSettleMs
+    )
+    preLookupSettleMs := Max(0, Min(100, Integer(preLookupSettleMs)))
+    maxLookupAttempts := MedExAdapterOption(
+        options,
+        "blackLookupMaxAttempts",
+        MedExColorResetDefaults.BlackLookupMaxAttempts
+    )
+    maxLookupAttempts := Max(1, Min(2, Integer(maxLookupAttempts)))
+    collectFocusDiagnostics := MedExAdapterOption(options, "collectFocusDiagnostics", false)
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
     mouseCaptured := false
 
     try {
@@ -205,49 +341,65 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
         MouseGetPos &originalMouseX, &originalMouseY
         mouseCaptured := true
 
-        blackItem := 0
-        menuOpened := false
-        loop maxAttempts {
-            attempt := A_Index
-            context["retryCount"] := attempt - 1
-            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
-                context["processReason"] := "foregroundWindowChangedBeforeTriggerClick"
-                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeTriggerClick"
-                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
-            }
+        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+            context["processReason"] := "foregroundWindowChangedBeforeTriggerClick"
+            context["foregroundGuardReason"] := "foregroundTargetChangedBeforeTriggerClick"
+            return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
+        }
 
-            try {
-                Click screenPoint["x"], screenPoint["y"]
-                context["triggerClickCount"] := attempt
-                context["colorMenuClickSent"] := true
-            } catch as err {
-                AddSafeExceptionContext(context, err)
-                return MakeColorResetResult(false, ColorResetCode.TRIGGER_CLICK_FAILED, context)
-            }
+        if collectFocusDiagnostics
+            MergeContext(context, CaptureMedExFocusedElementContext("beforeMenuClick"))
 
+        try {
+            Click screenPoint["x"], screenPoint["y"]
+            context["triggerClickCount"] := 1
+            context["triggerRetryCount"] := 0
+            context["colorMenuClickSent"] := true
+            RecordOptionalPerformanceTimestamp(performanceContext, "MenuClickSentMs")
+        } catch as err {
+            AddSafeExceptionContext(context, err)
+            return MakeColorResetResult(false, ColorResetCode.TRIGGER_CLICK_FAILED, context)
+        }
+
+        if menuLookupStrategy = "fixedAttempts" {
+            menuLookup := WaitForMedExColorMenuFixedAttempts(
+                foregroundHwnd,
+                windowElement,
+                preLookupSettleMs,
+                retryDelayMs,
+                maxLookupAttempts,
+                performanceContext
+            )
+        } else {
+            menuLookupStrategy := "adaptivePolling"
             menuLookup := WaitForMedExColorMenu(
                 foregroundHwnd,
                 windowElement,
                 menuTimeoutMs,
-                pollIntervalMs
+                menuPollIntervalMs,
+                performanceContext
             )
-            menuOpened := menuLookup["opened"]
-            blackItem := menuLookup["blackItem"]
-            context["menuDetectionElapsedMs"] := menuLookup["elapsedMs"]
-            if menuLookup["foregroundChanged"] {
-                context["processReason"] := "foregroundWindowChangedWhileWaitingForMenu"
-                context["foregroundGuardReason"] := "foregroundTargetChangedWhileWaitingForMenu"
-                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
-            }
-
-            if menuOpened
-                break
-
-            if attempt < maxAttempts && !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
-                context["processReason"] := "foregroundWindowChangedBeforeRetry"
-                context["foregroundGuardReason"] := "foregroundTargetChangedBeforeRetry"
-                return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
-            }
+        }
+        menuOpened := menuLookup["opened"]
+        blackItem := menuLookup["blackItem"]
+        context["menuDetectionElapsedMs"] := menuLookup["elapsedMs"]
+        context["immediateLookupSucceeded"] := menuLookup["immediateLookupSucceeded"]
+        context["retryUsed"] := menuLookup["retryUsed"]
+        context["blackLookupAttemptCount"] := menuLookup["lookupAttemptCount"]
+        context["menuLookupStrategy"] := menuLookupStrategy
+        context["menuOpenTimeoutMs"] := menuTimeoutMs
+        context["menuPollIntervalMs"] := menuPollIntervalMs
+        context["blackLookupScope"] := menuLookup["scope"]
+        context["menuPreLookupSettleMs"] := menuLookup["preLookupSettleMs"]
+        context["blackLookupFirstRootDurationMs"] := menuLookup["firstRootDurationMs"]
+        context["blackLookupFirstQueryDurationMs"] := menuLookup["firstQueryDurationMs"]
+        context["blackLookupRetryRootDurationMs"] := menuLookup["retryRootDurationMs"]
+        context["blackLookupRetryQueryDurationMs"] := menuLookup["retryQueryDurationMs"]
+        context["retryCount"] := menuLookup["retryUsed"] ? 1 : 0
+        if menuLookup["foregroundChanged"] {
+            context["processReason"] := "foregroundWindowChangedWhileWaitingForMenu"
+            context["foregroundGuardReason"] := "foregroundTargetChangedWhileWaitingForMenu"
+            return MakeColorResetResult(false, ColorResetCode.FOREGROUND_CHANGED, context)
         }
 
         if !menuOpened
@@ -274,9 +426,12 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
 
         try {
             blackItem.InvokePattern.Invoke()
+            RecordOptionalPerformanceTimestamp(performanceContext, "BlackInvokeCompletedMs")
             context["invokeSucceeded"] := true
             context["blackItemInvokeSucceeded"] := true
             context["automationChainResult"] := "AUTOMATION_CHAIN_OK"
+            if collectFocusDiagnostics
+                MergeContext(context, CaptureMedExFocusedElementContext("afterBlackInvoke"))
         } catch as err {
             AddSafeExceptionContext(context, err)
             return MakeColorResetResult(false, ColorResetCode.INVOKE_FAILED, context)
@@ -289,82 +444,226 @@ RunMedExColorMenuInteraction(foregroundHwnd, foregroundProcess, windowElement, s
     }
 }
 
-WaitForMedExColorMenu(foregroundHwnd, windowElement, timeoutMs, pollIntervalMs) {
-    global UIA
-
+WaitForMedExColorMenu(foregroundHwnd, windowElement, timeoutMs, pollIntervalMs,
+    performanceContext := 0) {
     startedAt := A_TickCount
-    knownColorNames := ["000000", "ff0000", "95b3d7"]
-    menuObserved := false
+    lookupAttemptCount := 0
+    firstRootDurationMs := "UNKNOWN"
+    firstQueryDurationMs := "UNKNOWN"
+    lastRootDurationMs := "UNKNOWN"
+    lastQueryDurationMs := "UNKNOWN"
+    currentWindowElement := windowElement
+
     loop {
         if WinExist("A") != foregroundHwnd
-            return Map(
-                "opened", false,
-                "blackItem", 0,
-                "elapsedMs", A_TickCount - startedAt,
-                "foregroundChanged", true
+            return MakeMedExMenuLookupResult(false, 0, startedAt, true, false,
+                lookupAttemptCount > 1, lookupAttemptCount, 0,
+                firstRootDurationMs, firstQueryDurationMs,
+                lastRootDurationMs, lastQueryDurationMs)
+
+        rootStartedAt := A_TickCount
+        currentWindowElement := RefreshMedExWindowElement(foregroundHwnd, windowElement)
+        rootDurationMs := A_TickCount - rootStartedAt
+        queryStartedAt := A_TickCount
+        blackItem := FindExactMedExColorItem(currentWindowElement, "000000")
+        queryDurationMs := A_TickCount - queryStartedAt
+        lookupAttemptCount += 1
+
+        if lookupAttemptCount = 1 {
+            firstRootDurationMs := rootDurationMs
+            firstQueryDurationMs := queryDurationMs
+            RecordOptionalPerformanceTimestamp(
+                performanceContext,
+                "ImmediateBlackLookupCompletedMs"
             )
-
-        ; Refresh the root so a newly-created Chromium popup is not missed.
-        try currentWindowElement := UIA.ElementFromHandle(foregroundHwnd)
-        catch
-            currentWindowElement := windowElement
-
-        try blackItem := currentWindowElement.ElementExist({Type: "Hyperlink", Name: "000000"})
-        catch
-            blackItem := 0
-        if blackItem
-            return Map(
-                "opened", true,
-                "blackItem", blackItem,
-                "elapsedMs", A_TickCount - startedAt,
-                "foregroundChanged", false
-            )
-
-        for colorName in knownColorNames {
-            if colorName = "000000"
-                continue
-            try colorItem := currentWindowElement.ElementExist({Type: "Hyperlink", Name: colorName})
-            catch
-                colorItem := 0
-            if colorItem
-                menuObserved := true
+        } else {
+            lastRootDurationMs := rootDurationMs
+            lastQueryDurationMs := queryDurationMs
+            RecordOptionalPerformanceTimestamp(performanceContext, "RetryLookupCompletedMs")
         }
 
-        if A_TickCount - startedAt >= timeoutMs
-            return Map(
-                "opened", menuObserved,
-                "blackItem", 0,
-                "elapsedMs", A_TickCount - startedAt,
-                "foregroundChanged", false
-            )
-        Sleep Max(10, pollIntervalMs)
+        if blackItem
+            return MakeMedExMenuLookupResult(true, blackItem, startedAt, false,
+                lookupAttemptCount = 1, lookupAttemptCount > 1, lookupAttemptCount, 0,
+                firstRootDurationMs, firstQueryDurationMs,
+                lastRootDurationMs, lastQueryDurationMs)
+
+        if A_TickCount - startedAt >= timeoutMs {
+            ; Auxiliary items are queried only after the exact-black polling
+            ; window expires, so they do not multiply normal-path tree scans.
+            menuObserved := FindExactMedExColorItem(currentWindowElement, "ff0000")
+                || FindExactMedExColorItem(currentWindowElement, "95b3d7")
+            return MakeMedExMenuLookupResult(menuObserved, 0, startedAt, false,
+                false, lookupAttemptCount > 1, lookupAttemptCount, 0,
+                firstRootDurationMs, firstQueryDurationMs,
+                lastRootDurationMs, lastQueryDurationMs)
+        }
+        Sleep pollIntervalMs
     }
 }
 
-FindMedExDocument(windowElement, foregroundHwnd) {
+WaitForMedExColorMenuFixedAttempts(foregroundHwnd, windowElement, preLookupSettleMs, retryDelayMs,
+    maxLookupAttempts, performanceContext := 0) {
     global UIA
 
+    startedAt := A_TickCount
+    if WinExist("A") != foregroundHwnd
+        return MakeMedExMenuLookupResult(false, 0, startedAt, true, false, false, 0,
+            preLookupSettleMs)
+
+    if preLookupSettleMs > 0
+        Sleep preLookupSettleMs
+
+    rootStartedAt := A_TickCount
+    currentWindowElement := RefreshMedExWindowElement(foregroundHwnd, windowElement)
+    firstRootDurationMs := A_TickCount - rootStartedAt
+    queryStartedAt := A_TickCount
+    blackItem := FindExactMedExColorItem(currentWindowElement, "000000")
+    firstQueryDurationMs := A_TickCount - queryStartedAt
+    RecordOptionalPerformanceTimestamp(
+        performanceContext,
+        "ImmediateBlackLookupCompletedMs"
+    )
+    if blackItem
+        return MakeMedExMenuLookupResult(true, blackItem, startedAt, false, true, false, 1,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs)
+
+    if maxLookupAttempts < 2
+        return MakeMedExMenuLookupResult(false, 0, startedAt, false, false, false, 1,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs)
+
+    if retryDelayMs > 0
+        Sleep retryDelayMs
+
+    if WinExist("A") != foregroundHwnd
+        return MakeMedExMenuLookupResult(false, 0, startedAt, true, false, true, 1,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs)
+
+    retryRootStartedAt := A_TickCount
+    currentWindowElement := RefreshMedExWindowElement(foregroundHwnd, windowElement)
+    retryRootDurationMs := A_TickCount - retryRootStartedAt
+    retryQueryStartedAt := A_TickCount
+    blackItem := FindExactMedExColorItem(currentWindowElement, "000000")
+    retryQueryDurationMs := A_TickCount - retryQueryStartedAt
+    RecordOptionalPerformanceTimestamp(performanceContext, "RetryLookupCompletedMs")
+    if blackItem
+        return MakeMedExMenuLookupResult(true, blackItem, startedAt, false, false, true, 2,
+            preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs,
+            retryRootDurationMs, retryQueryDurationMs)
+
+    ; Auxiliary colors are queried only on failure to distinguish an opened
+    ; menu with a missing black item from a menu that was not exposed at all.
+    menuObserved := FindExactMedExColorItem(currentWindowElement, "ff0000")
+        || FindExactMedExColorItem(currentWindowElement, "95b3d7")
+    return MakeMedExMenuLookupResult(menuObserved, 0, startedAt, false, false, true, 2,
+        preLookupSettleMs, firstRootDurationMs, firstQueryDurationMs,
+        retryRootDurationMs, retryQueryDurationMs)
+}
+
+RefreshMedExWindowElement(foregroundHwnd, fallbackElement) {
+    global UIA
+    try return UIA.ElementFromHandle(foregroundHwnd)
+    catch
+        return fallbackElement
+}
+
+FindExactMedExColorItem(windowElement, colorName) {
+    try return windowElement.ElementExist({Type: "Hyperlink", Name: colorName})
+    catch
+        return 0
+}
+
+MakeMedExMenuLookupResult(opened, blackItem, startedAt, foregroundChanged,
+    immediateLookupSucceeded, retryUsed, lookupAttemptCount, preLookupSettleMs,
+    firstRootDurationMs := "UNKNOWN", firstQueryDurationMs := "UNKNOWN",
+    retryRootDurationMs := "UNKNOWN", retryQueryDurationMs := "UNKNOWN") {
+    return Map(
+        "opened", opened = true,
+        "blackItem", blackItem,
+        "elapsedMs", A_TickCount - startedAt,
+        "foregroundChanged", foregroundChanged = true,
+        "immediateLookupSucceeded", immediateLookupSucceeded = true,
+        "retryUsed", retryUsed = true,
+        "lookupAttemptCount", lookupAttemptCount,
+        "scope", "foregroundWindowDescendants",
+        "preLookupSettleMs", preLookupSettleMs,
+        "firstRootDurationMs", firstRootDurationMs,
+        "firstQueryDurationMs", firstQueryDurationMs,
+        "retryRootDurationMs", retryRootDurationMs,
+        "retryQueryDurationMs", retryQueryDurationMs
+    )
+}
+
+FindMedExDocument(windowElement, foregroundHwnd, context := 0) {
+    global UIA
+    startedAt := A_TickCount
+
     try {
-        if windowElement.Type = UIA.ControlType.Document
+        if windowElement.Type = UIA.ControlType.Document {
+            RecordMedExDocumentLookup(context, "foregroundRoot", startedAt)
             return windowElement
+        }
     }
     try {
-        if documentElement := windowElement.ElementExist({Type: "Document"})
+        if documentElement := windowElement.ElementExist({Type: "Document"}) {
+            RecordMedExDocumentLookup(context, "foregroundRootDescendant", startedAt)
             return documentElement
+        }
     }
 
     ; Chromium fallback remains scoped to the same foreground window.
     try chromiumElement := UIA.ElementFromChromium("ahk_id " foregroundHwnd)
-    catch
+    catch {
+        RecordMedExDocumentLookup(context, "chromiumRootUnavailable", startedAt)
         return 0
+    }
 
     try {
-        if chromiumElement.Type = UIA.ControlType.Document
+        if chromiumElement.Type = UIA.ControlType.Document {
+            RecordMedExDocumentLookup(context, "chromiumRoot", startedAt)
             return chromiumElement
+        }
     }
-    try return chromiumElement.ElementExist({Type: "Document"})
-    catch
+    try {
+        documentElement := chromiumElement.ElementExist({Type: "Document"})
+        RecordMedExDocumentLookup(context,
+            documentElement ? "chromiumRootDescendant" : "notFound", startedAt)
+        return documentElement
+    } catch {
+        RecordMedExDocumentLookup(context, "chromiumDescendantQueryFailed", startedAt)
         return 0
+    }
+}
+
+RecordMedExDocumentLookup(context, path, startedAt) {
+    if Type(context) = "Map" {
+        context["documentLookupPath"] := path
+        context["documentLookupDurationMs"] := A_TickCount - startedAt
+    }
+}
+
+CaptureMedExFocusedElementContext(prefix) {
+    global UIA
+    context := Map()
+    startedAt := A_TickCount
+    context[prefix "FocusedElementCaptured"] := false
+    try {
+        element := UIA.GetFocusedElement()
+        context[prefix "FocusedElementCaptured"] := true
+        for propertyName in ["ControlType", "ClassName", "AutomationId", "NativeWindowHandle", "ProcessId"] {
+            try context[prefix "FocusedElement" propertyName] := element.%propertyName%
+            catch
+                context[prefix "FocusedElement" propertyName] := "UNKNOWN"
+        }
+        try context[prefix "FocusedElementRect"] := UiaRectangleToMap(element.BoundingRectangle)
+        catch
+            context[prefix "FocusedElementRect"] := "UNKNOWN"
+    } catch as err {
+        context[prefix "FocusedElementReason"] := "focusedElementQueryFailed"
+        context[prefix "FocusedElementExceptionType"] := Type(err)
+    }
+    context[prefix "FocusedElementQueryDurationMs"] := A_TickCount - startedAt
+    return context
 }
 
 MedExProcessNameIsApproved(processName, candidates) {
@@ -386,12 +685,58 @@ MedExForegroundTargetMatches(expectedHwnd, expectedProcess) {
     return StrLower(currentProcess) = StrLower(expectedProcess)
 }
 
-UiaTextElementsToAnchors(elements) {
-    anchors := []
-    for element in elements {
-        try anchors.Push(MakeTextAnchor(element.Name, UiaRectangleToMap(element.BoundingRectangle)))
+CollectMedExTextAnchorSnapshot(windowElement, useCachedProperties := false) {
+    global UIA
+
+    queryStartedAt := A_TickCount
+    if useCachedProperties {
+        cacheRequest := UIA.CreateCacheRequest(["Name", "BoundingRectangle"])
+        textElements := windowElement.FindElements({Type: "Text"}, 4, 0, 0, cacheRequest)
+    } else {
+        textElements := windowElement.FindElements({Type: "Text"})
     }
-    return anchors
+    queryCompletedAt := A_TickCount
+    conversion := UiaTextElementsToAnchors(textElements, useCachedProperties)
+    context := Map(
+        "anchorSnapshotScope", "foregroundWindowDescendants",
+        "anchorSnapshotShared", true,
+        "anchorSnapshotMode", useCachedProperties ? "cachedProperties" : "liveProperties",
+        "anchorSnapshotTextElementCount", textElements.Length,
+        "anchorSnapshotQueryDurationMs", queryCompletedAt - queryStartedAt,
+        "anchorSnapshotConversionDurationMs", A_TickCount - queryCompletedAt,
+        "anchorSnapshotPropertyReadFailureCount", conversion.propertyReadFailureCount,
+        "anchorSnapshotPropertyReadFailureReasons", conversion.propertyReadFailureReasons
+    )
+    return {anchors: conversion.anchors, context: context}
+}
+
+UiaTextElementsToAnchors(elements, useCachedProperties := false) {
+    anchors := []
+    propertyReadFailureCount := 0
+    propertyReadFailureReasons := []
+    for element in elements {
+        try name := useCachedProperties ? element.CachedName : element.Name
+        catch {
+            propertyReadFailureCount += 1
+            propertyReadFailureReasons.Push("nameReadFailed")
+            continue
+        }
+
+        try rect := UiaRectangleToMap(
+            useCachedProperties ? element.CachedBoundingRectangle : element.BoundingRectangle
+        )
+        catch {
+            propertyReadFailureCount += 1
+            propertyReadFailureReasons.Push("rectangleReadFailed")
+            rect := 0
+        }
+        anchors.Push(MakeTextAnchor(name, rect))
+    }
+    return {
+        anchors: anchors,
+        propertyReadFailureCount: propertyReadFailureCount,
+        propertyReadFailureReasons: propertyReadFailureReasons
+    }
 }
 
 UiaRectangleToMap(rectangle) {
@@ -448,6 +793,8 @@ CollectMedExEnvironmentContext(hwnd, context) {
 
 FinishMedExColorReset(ok, code, context, startedAt, options) {
     context["elapsedMs"] := A_TickCount - startedAt
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
+    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetCompletedMs")
     result := MakeColorResetResult(ok, code, context)
     diagnosticMode := MedExAdapterOption(options, "diagnosticMode", "production")
     if diagnosticMode = "field" {

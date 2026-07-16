@@ -2,6 +2,19 @@
 
 本清单在安装 AutoHotkey v2 的 Windows 目标工作站执行。不得使用真实患者报告作为测试样本。
 
+## Reconciled release smoke test（TEST CHECKPOINT 1）
+
+- [ ] 完全退出所有旧 release、legacy 和 field-debug AHK instances。
+- [ ] 确认测试期间只有一个目标 AHK script process；不要同时运行 generated release 与 field debug。
+- [ ] 记录实际启动的 generated release absolute path 和 SHA-256。
+- [ ] release-only：确认无 BOM/parser/startup error。
+- [ ] release-only：执行 `;red` 一次，记录 red insertion 后是否出现 color-reset menu action。
+- [ ] release-only：执行 `;fzg` 一次，记录 color reset 与 caret 视觉位置。
+- [ ] 完全退出 release，再启动 matching `debug/medex_color_reset_field_debug.ahk`。
+- [ ] debug-only：执行 F11 一次并保存 clipboard result；不要在同一进程测试 normal hotstrings。
+- [ ] 比较 release 与 F11 是否都进入 `uiaInvoke` shared strategy chain；此检查点不评价 Candidate G。
+- [ ] 检查 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log` 是否记录 release failure code。
+
 - [ ] Script 正常启动。
 - [ ] Ctrl+Alt+Esc 可以暂停和恢复 new-project hotkeys/hotstrings。
 - [ ] Ctrl+Alt+Q 可以退出新项目。
@@ -84,6 +97,49 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 
 严禁在 finalized patient report 中执行本测试。Diagnostic hotkey 不插入 test text，也不得记录 clinical content。
 
+### Production latency/cursor smoke test
+
+本测试同样只能在 approved non-clinical context 中执行。`Ctrl+Alt+F11` 会运行完整 `;fzg` production chain，实际插入测试短语，并把 timing result 写入 clipboard 和 `%TEMP%\MedExAHK\medex_production_timing_debug.txt`。运行 timing debug 时不要同时启动另一个注册相同 hotstrings 的 production instance。
+
+1. [ ] 启动 `debug/medex_color_reset_field_debug.ahk`，focus MedEx 测试编辑区。
+2. [ ] 按 `Ctrl+Alt+F11` 连续执行三次，每次使用新的空白测试位置。
+3. [ ] 记录 `TotalHotstringDurationMs`、`MenuLookupStrategy`、`BlackLookupAttemptCount` 和 `RetryUsed`。
+4. [ ] 确认每次 `ClipboardRestoreSucceeded=true`，并人工核对测试前 clipboard payload 已恢复。
+5. [ ] 确认最终颜色为 black，并把 `FinalInsertionColorVisuallyValidated` 人工记为 true。
+6. [ ] 确认最终光标位于 `|（见图）`，把 `CursorPositionVisuallyValidated` 人工记为 true。
+7. [ ] 使用 normal `;fzg` 后立即连续输入 harmless punctuation，确认它保持 black，并记录 `ImmediateContinuedTypingRemainedBlack=true`。
+8. [ ] 在错误 region 执行一次，确认 no trigger click、no second click 和 fail-closed result。
+9. [ ] 确认整个过程没有 `MsgBox`、`ToolTip`、`TrayTip` 或 focus-stealing feedback。
+10. [ ] 将完整 timing result 回传开发环境；重点保留 anchor snapshot、每次 black lookup 和 total timing。
+
+#### Reliability/latency remediation matrix
+
+所有测试均使用 approved non-clinical test context；不得在 finalized patient report 执行。
+
+1. [ ] normal `;red` 连续执行 10 次，逐次记录 red insertion、black reset、silent post-red failure 和是否需要 reload。
+2. [ ] normal `;fzg` 连续执行 10 次，逐次确认最终 caret 为 `|（见图）`，并立即输入 harmless punctuation 验证其保持 black。
+3. [ ] F11 记录 `RawFontSizePatternMatchCount`、`ValidFontSizeRectCount`、`AlignedFontSizeCandidateCount`、`IgnoredFontSizeReasons`、`AnchorSnapshotQueryDurationMs` 和 `FontAnchorRetryUsed`。
+4. [ ] 首轮 A/B 保持 `EnableFontAnchorRetry=false`；记录 zero raw match，但不自动重试。
+5. [ ] 记录 `BlackLookupFirstQueryDurationMs`、`BlackLookupRetryQueryDurationMs`、`BlackLookupAttemptCount` 和 `BlackLookupScope`。
+6. [ ] Control 使用 `UseCachedAnchorSnapshot=false`；Candidate 只改为 `true`。两者保持 `MenuLookupStrategy=adaptivePolling`、timeout 600 ms、poll 40 ms、font retry disabled。
+   在 `debug/medex_color_reset_field_debug.ahk` 顶部只修改 `DEBUG_USE_CACHED_ANCHOR_SNAPSHOT`；启动时该值会应用到本 debug process，因此其中的 normal `;red`/`;fzg` 也使用同一 A/B 条件。切换条件前退出并重启脚本。
+7. [ ] Control/Candidate 各完成一次 cold F12、五次 warm F12、十次 `;red`、十次 `;fzg` 和一次 wrong-region test。
+8. [ ] 记录 `FocusedElementBeforeCursorRestore`、`ForegroundHwndBeforeCursorRestore`、`CursorRestoreTargetHwnd`、`CursorRestoreRequestedCount=4` 和 `CursorRestoreCommandSent=true`。
+   性能 A/B 保持 `DEBUG_COLLECT_FOCUS_DIAGNOSTICS=false`；另做一次专用运行临时改为 `true`，避免 focus query 污染常规 timing。
+9. [ ] 若 effective cursor 仍为 3，先比较 Invoke 后和 cursor restore 前的 focused element；不得直接改为 `Left 5`。
+10. [ ] 分别连续输入、插入普通字符、使用方向键/鼠标打断 `;fzg` 前缀，记录哪些事件会重置 AHK hotstring recognition buffer；该结果单独处理，不与 Color Reset 修复耦合。
+11. [ ] 在错误 region 测试一次，确认 no menu click、no Invoke、明确 fail-closed result。
+
+#### Candidate G activation gate（当前不执行）
+
+- [ ] Control/Candidate A/B 已完成。
+- [ ] `检查所见` localization 重复稳定。
+- [ ] 剩余主要失败明确位于 popup UIA lookup/Invoke。
+- [ ] 用户明确批准 Candidate G calibration milestone。
+- [ ] calibration 前没有把 estimated arrow/black offsets 或 pixel thresholds 写入 production。
+- [ ] 如果启动 calibration，popup absent signature 必须失败且不得发送 black click。
+- [ ] 严禁在 finalized patient report 中校准或验证。
+
 - [ ] Foreground process 正确时进入 UIA lookup；错误时返回 `COLOR_RESET_WRONG_PROCESS` 且不点击。
 - [ ] Production process name 未确认时返回 `COLOR_RESET_PROCESS_NAME_UNCONFIRMED` 且不点击。
 - [ ] UIA-v2 缺失时返回 `COLOR_RESET_UIA_UNAVAILABLE` 且不点击。
@@ -116,7 +172,7 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] `RetryCount` 输出为整数 `0` 或 `1`，不得序列化为 Boolean。
 - [ ] `ProcessNameConfirmed=false` 必须与 provisional candidate accepted 的含义分开记录。
 - [ ] Field debug 默认只写 clipboard/log，不显示成功提示；任何可选提示必须先证明不改变 focus 和颜色状态。
-- [ ] 最多执行一次 initial trigger click 和一次 bounded retry，不出现 repeated blind clicks。
+- [ ] 只执行一次 validated trigger click；随后以 40 ms interval 在 600 ms bounded window 内查询 exact `000000`，找到即停止，不再次点击 trigger。
 - [ ] Mouse position 在 interaction 结束后恢复。
 - [ ] 在目标 DPI、display scaling、resolution、window width 和 MedEx version 上重复测试。
 - [ ] Logs 只包含 timestamp、action、result code、process、rectangles、point、timing、retry 和安全检测到的 version。
