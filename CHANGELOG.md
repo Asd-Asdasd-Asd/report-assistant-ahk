@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Restored the field-validated CF_HTML clipboard timing (`200 ms` paste settle, `100 ms` before restore, `100 ms` after restore) after Windows testing exposed a 50 ms race that could insert the user's restored clipboard content.
+- Added Candidate G1 calibration-only toolbar-row selection, relative geometry measurement, and privacy-safe pixel probes. The harness may click the validated arrow once but cannot click black, query popup UIA, or change the production default strategy.
 - Declared explicit `uiaInvoke` and `relativeMousePixelValidated` strategy names without automatic fallback; Candidate G runtime, uncalibrated geometry, and pixel thresholds remain absent.
 - Removed production hotstring registration from the field-debug process; F11 now calls the shared `RunFzgInsertion()` workflow directly, avoiding duplicate `;red`/`;fzg` handlers when comparing release and debug paths.
 - Recorded 2026-07-16 evidence that semantic localization is usable while popup UIA traversal is too slow and unreliable for the preferred production route; `uiaInvoke` remains a comparison/rollback strategy.

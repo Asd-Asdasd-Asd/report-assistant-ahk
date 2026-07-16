@@ -34,6 +34,8 @@ MedEx 现场验证已经确认 `CF_HTML` 可以插入红色文字。仍未解决
 
 `ResetMedExInsertionColor()` 是统一 strategy dispatcher。当前有 `uiaInvoke` 和已声明但未实现的 `relativeMousePixelValidated`；两者不得自动互相 fallback。Candidate G 将继续复用 report/clipboard orchestration，只把 MedEx interaction strategy 替换为 UIA toolbar-row localization、profile geometry、popup pixel validation 和 relative mouse clicks。G1 calibration 完成前不得加入未校准坐标、像素阈值或 black click。
 
+G1 的 `medex_candidate_g_logic.ahk` 只提供 pure toolbar-row selection、supported-profile validation 和 relative point calculations。它不接入 generated production release。独立 calibration harness 使用 exact region query；只有出现多个 geometry-valid region candidates 时才收集 full Text snapshot 进行 same-row corroboration。open probe 最多点击 arrow 一次，之后仅执行 `PixelGetColor`，black interaction 保持不可达。
+
 红字实现仍必须包裹在 clipboard save/restore transaction 中，最终行为必须插入红色 `（见图）`、恢复用户原始剪贴板，并让后续输入恢复黑色。颜色复位不得插入可见、零宽或隐藏字符，也不得改变 clipboard restoration contract。
 
 所有报告书写辅助都必须保留人工确认，不默认执行最终提交、审核或发送。

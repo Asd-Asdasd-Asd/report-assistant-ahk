@@ -1,7 +1,7 @@
 # Technical Investigation：Candidate G — UIA Localization + Guarded Relative Mouse Interaction
 
 日期：2026-07-16
-状态：G1 已批准，等待 reconciled release smoke test；尚未实现 runtime
+状态：G1 calibration harness 已实现；等待 TEST CHECKPOINT 2
 
 ## Objective
 
@@ -19,6 +19,9 @@ Candidate G 是复杂度缩减路线，不是单纯性能优化。2026-07-16 测
 - 当前 UIA 路线已证明 semantic localization、arrow click、exact `000000` Invoke 和最终黑色人工验证可以成功。
 - 新一轮 F11/F12 中 foreground Text snapshot 得到 3 个 font-size raw matches、1 个 aligned candidate、0 个 property-read failures，继续支持 semantic/static localization 可用的结论。
 - popup UIA exact-item query 每轮约 125–156 ms，常见 first lookup failure、second lookup success；normal-use success rate 仅略高于半数，已由用户判定不可接受。
+- reconciled release 与 F11 均进入 `uiaInvoke`。normal release 大量失败为 `alignedFontSizeAnchorNotFound`；一次 F11 枚举到 2 个 raw font-size names，但 0 个 aligned candidate，证明 mandatory font anchor 本身也是明显不稳定边界。
+- `Left 4` 在 source 和 release 中确实发送，但实际只产生三次有效 caret movement；当前证据更符合 popup/focus 消耗一个 Left，不支持改成任意 `Left 5`。
+- 50 ms clipboard restoration 路线曾偶发插入原剪贴板内容；G1 前已恢复 200/100/100 ms field-validated safety timing。
 
 ### Implementation inference
 
@@ -103,7 +106,7 @@ FINAL_COLOR_PENDING_VISUAL_VALIDATION
 4. 当前 UIA interaction 未达到可接受可靠性；
 5. 用户明确批准进入 Candidate G field-calibration milestone。
 
-进入 G1 前仍必须完成 reconciled release smoke test，排除 stale release/duplicate instance discrepancy。当前只允许声明 strategy boundary；不创建 pixel reader、relative-black-click runtime 或未校准 profile。
+reconciled release smoke test 已完成。G1 允许建立 calibration-only pure logic 和 pixel reader，但不接入 production strategy，不创建 relative-black-click runtime，也不把 estimated offsets 或现场采样前 RGB 写成 production profile。
 
 ## Field validation if activated
 
@@ -113,4 +116,15 @@ FINAL_COLOR_PENDING_VISUAL_VALIDATION
 
 Supported initial environment 限定为 MedEx 0.0.1.0、1920×1080、100% scaling、DPI 96。其他环境必须返回 unsupported profile，不能复用坐标。
 
-Status: G1 approved after TEST CHECKPOINT 1; runtime not started.
+## G1 calibration controls
+
+独立 `debug/medex_candidate_g_calibration.ahk` 不注册 production hotstrings：
+
+- `F8`：记录人工 arrow center；
+- `F9`：记录人工 black center，但不点击；
+- `F10`：读取 popup-closed pixel grid；
+- `F11`：validated region 后点击 arrow 一次，在 0/20/40/80 ms 读取相同 pixel grid；不点击 black。
+
+Pixel grid 仅保存 screen coordinate 与 RGB，不保存截图或文字。结果写入 clipboard 和 `%TEMP%\MedExAHK\candidate_g_calibration.txt`。
+
+Status: G1 implemented for calibration only; field validation pending.

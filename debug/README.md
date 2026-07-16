@@ -83,3 +83,22 @@ ColorArrowOffsetY = targetScreenY - Round((fontRect.t + fontRect.b) / 2)
 - 使用经过批准的 non-clinical test context。
 - F12 不插入 test text；F11 会运行真实 `;fzg` workflow。两者都只能在 approved non-clinical context 使用。
 - 如果鼠标移动、窗口失焦或菜单行为异常，立即停止重复测试并退出脚本。
+
+## Candidate G1 calibration
+
+`medex_candidate_g_calibration.ahk` 是独立 calibration harness。不要与 generated release、legacy 或 `medex_color_reset_field_debug.ahk` 同时运行。
+
+- `F8`：鼠标置于实际 color arrow center，记录 arrow offset。
+- `F9`：手工打开 popup、鼠标置于 black swatch center，记录 black offset；脚本不会点击。
+- `F10`：popup closed 状态读取 pixel probe grid。
+- `F11`：解析并验证 toolbar row，最多点击 arrow 一次，在 0/20/40/80 ms 读取 probe grid。
+
+F11 不执行 popup UIA lookup、`000000` search、Invoke 或 black click。estimated `(320,0)` 和 `(6,83)` 只用于 supported baseline 的 G1 measurement，不是 production constants。
+
+输出位置：
+
+```text
+%TEMP%\MedExAHK\candidate_g_calibration.txt
+```
+
+脚本不显示 `MsgBox`、`ToolTip` 或 `TrayTip`，不保存 screenshot、报告文字或 clipboard content。

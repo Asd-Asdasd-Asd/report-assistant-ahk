@@ -15,6 +15,29 @@
 - [ ] 比较 release 与 F11 是否都进入 `uiaInvoke` shared strategy chain；此检查点不评价 Candidate G。
 - [ ] 检查 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log` 是否记录 release failure code。
 
+## Candidate G1 calibration（TEST CHECKPOINT 2）
+
+### Clipboard safety gate
+
+- [ ] 只运行 regenerated release，并把 clipboard 设为无害 `CLIPBOARD_SENTINEL_20260716`。
+- [ ] 在 approved non-clinical context 连续执行 `;red` 20 次。
+- [ ] sentinel 被错误插入次数为 0/20。
+- [ ] 每次执行后 clipboard 仍为 sentinel，恢复成功为 20/20。
+- [ ] 本项不把现有 `uiaInvoke` 成败作为判定条件。
+
+### Candidate G1
+
+- [ ] 完全退出 release，只运行 `debug/medex_candidate_g_calibration.ahk`。
+- [ ] toolbar high/middle/low 三个 Y 位置各完成至少 10 次 row localization。
+- [ ] 每个 Y 位置使用 F8/F9 记录实际 arrow/black point 和四项 offsets。
+- [ ] 每个 Y 位置使用 F10 记录 popup closed probes，使用 F11 记录 open-attempt probes。
+- [ ] 四项 offsets 跨位置变化不超过 ±1 px。
+- [ ] localization 成功 30/30；任何 miss、ambiguity 或错误选择均记录并停止自动推进。
+- [ ] 在 report content 输入无害“检查所见”，确认 toolbar candidate 被选择或 ambiguity fail closed。
+- [ ] wrong region 和 unresolved duplicate case 不发送 arrow click。
+- [ ] open/closed probes 至少产生三个稳定区分点，且 popup 状态在 80 ms 内稳定。
+- [ ] 所有结果 `BlackClickSent=false`，不执行最终颜色验证。
+
 - [ ] Script 正常启动。
 - [ ] Ctrl+Alt+Esc 可以暂停和恢复 new-project hotkeys/hotstrings。
 - [ ] Ctrl+Alt+Q 可以退出新项目。
