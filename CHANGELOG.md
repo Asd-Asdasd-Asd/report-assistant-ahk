@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Documentation
+
+- Synchronized project state with `2369b68` / `v0.6.0-candidate-g`, including the promoted `relativeMousePixelValidated` default, field-confirmed `medexworkstations.exe`, phrase-specific no-reset `;fzg`, and recorded `75 tests passed` promotion baseline.
+- Added the ordered critical-path optimization checkpoints, timing schema, clipboard minimum-interval safety contract, MedEx-only hotstring scope plan, Windows result continuation rules, and deferred per-machine calibration design.
+
 ### Fixed
 
 - Restored the field-validated CF_HTML clipboard timing (`200 ms` paste settle, `100 ms` before restore, `100 ms` after restore) after Windows testing exposed a 50 ms race that could insert the user's restored clipboard content.
@@ -16,11 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Deferred the remaining small post-insertion delay until after final release validation; the validated clipboard transaction waits and legacy 50 ms caret settle remain unchanged for this promotion.
 - Removed production hotstring registration from the field-debug process; F11 now calls the shared `RunFzgInsertion()` workflow directly, avoiding duplicate `;red`/`;fzg` handlers when comparing release and debug paths.
 - Recorded 2026-07-16 evidence that semantic localization is usable while popup UIA traversal is too slow and unreliable for the preferred production route; `uiaInvoke` remains a comparison/rollback strategy.
-- Prepared an uncommitted Color Reset reconciliation candidate: restored one-click bounded adaptive black-item polling, isolated cached Text snapshots and zero-raw-match font retries behind independent disabled-by-default switches, and retained staged privacy-safe diagnostics. Windows A/B validation is still required.
+- Recorded the earlier reconciliation control and its disabled diagnostic experiments; it was superseded as production default by the validated Candidate G promotion.
 - Hoisted required AutoHotkey directives to the beginning of the generated self-contained release while preserving BOM-safe generation.
 - Stripped only the leading UTF-8 BOM from each release component before merging, preventing embedded U+FEFF parser errors in the self-contained AHK release.
 - Added a zero-U+FEFF build guard and BOM regression coverage while preserving the original source content beyond its first character.
-- Reduced the red-insertion clipboard success path from 400 ms of fixed waits to one named 50 ms paste-settle interval while preserving transactional restoration.
+- Recorded and then superseded an attempted 50 ms clipboard settle; Windows exposed a wrong-paste race, so the promoted baseline retains the field-validated `200/100/100 ms` timing.
 - Preserved the fixed-attempt lookup implementation only as an explicit diagnostic experiment; it is not the production default.
 - Restored the legacy `;fzg` 50 ms caret-settle interval while retaining phrase-specific `Left 4` behavior.
 - Added an explicit full-production timing diagnostic hotkey and stage timestamps without enabling heavy diagnostics on the normal success path.

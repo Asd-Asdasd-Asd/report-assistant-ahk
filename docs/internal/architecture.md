@@ -40,6 +40,10 @@ MedEx 现场验证已经确认 `CF_HTML` 可以插入红色文字。仍未解决
 
 `Color Reset` 是 phrase-specific orchestration，而不是所有红色 marker 的无条件尾处理。Standalone `;red` 的 caret 留在 marker 后方，因此需要 adapter reset；`;fzg` 的 caret 必须移动到 marker 前方，Windows A/B 已验证其正确顺序是 paste/clipboard restore → 50 ms → `Left 4`，不经过 toolbar reset。该路径返回 `COLOR_RESET_NOT_REQUIRED`，不能伪报 `AUTOMATION_CHAIN_OK`。
 
+当前 `;red` transaction 先完成 CF_HTML paste 和 clipboard restoration，再调用 Candidate G。下一轮性能工作的 critical path 定义为 `HotstringTriggeredMs → BlackClickSentMs`，不是整个函数返回时间。计划在独立检查点中把 black click 提前到 clipboard restoration 之前，同时继续用 `finally` 强制恢复剪贴板，并以 `pasteSentAt`/`SafeMinPasteToRestoreMs` 保护快速失败路径；安全最小值必须由 Windows 测试决定。
+
+Report hotstrings 当前仍为 global。计划用 shared `#HotIf`/foreground predicate 限制 MedEx-specific entries；全局 pause/exit 保持 suspend-exempt。entry guard 建立后可删除 Candidate G 中冗余的 process-name 重查，但 arrow/black 两次 coordinate click 前必须继续验证 original HWND 仍 active。
+
 所有报告书写辅助都必须保留人工确认，不默认执行最终提交、审核或发送。
 
 ## Measurement architecture
@@ -99,7 +103,7 @@ hotstring workflow
    └── editor adapter
        └── medex_report_editor.ahk
            ├── uiaInvoke (comparison/rollback)
-           └── relativeMousePixelValidated (G2 controlled; explicit override only)
+           └── relativeMousePixelValidated (production default)
 ```
 
 未来 Word、browser editor 或其他 HIS 必须通过新的 adapter 接入。不能通过向 generic clipboard module 添加 MedEx 条件分支实现 multi-editor support。
@@ -126,9 +130,18 @@ MedEx color reset 返回 stable result code 和诊断 context，而不是单个 
 - `COLOR_RESET_BLACK_ITEM_NOT_FOUND`；
 - `COLOR_RESET_INVOKE_UNAVAILABLE`；
 - `COLOR_RESET_INVOKE_FAILED`；
+- `COLOR_RESET_UNSUPPORTED_PROFILE`；
+- `COLOR_RESET_INVALID_ARROW_POINT`；
+- `COLOR_RESET_INVALID_BLACK_POINT`；
+- `COLOR_RESET_POPUP_SIGNATURE_MISMATCH`；
+- `COLOR_RESET_BLACK_CLICK_FAILED`；
+- `RELATIVE_MOUSE_CHAIN_OK`；
+- `COLOR_RESET_NOT_REQUIRED`；
 - `COLOR_RESET_UNEXPECTED_ERROR`。
 
-自动化链路可报告 `AUTOMATION_CHAIN_OK` 和 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。只有 Windows 操作者在 approved non-clinical context 输入无害字符后，才能将 `FinalInsertionColorVisuallyValidated` 记录为 true。调用层决定如何处理结果；adapter 在所有不确定状态下 fail-closed，绝不继续 blind clicks。Production 默认只在失败时写 lightweight privacy-safe diagnostic；field debug 必须显式选择 `diagnosticMode=field` 才输出完整 geometry schema。两种模式共享同一个 adapter 和 resolver，且不显示 `MsgBox`、`ToolTip` 或 `TrayTip`。
+自动化链路可报告 `AUTOMATION_CHAIN_OK` 和 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。只有 Windows 操作者在 approved non-clinical context 输入无害字符后，才能将 `FinalInsertionColorVisuallyValidated` 记录为 true。调用层决定如何处理结果；adapter 在所有不确定状态下 fail-closed，绝不继续 blind clicks。Production 默认只在失败时写 lightweight privacy-safe diagnostic；field debug 必须显式选择 `diagnosticMode=field` 才输出完整 geometry schema。下一轮 timing fields 进入现有 performance context，不创建第二个 release artifact。两种模式共享同一个 adapter 和 resolver，且不显示 `MsgBox`、`ToolTip` 或 `TrayTip`。
+
+MedEx version 当前仍是 narrow runtime profile 的 hard gate。计划把 version 独立改为 diagnostics-only metadata；resolution、DPI 和 scaling 的 hard gate 不能简单删除后宣称多环境支持，真正 rollout 需要本机 calibration/profile。
 
 ## Configuration boundary
 

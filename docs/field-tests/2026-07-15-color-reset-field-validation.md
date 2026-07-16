@@ -6,7 +6,7 @@
 
 - Application version under test：`0.5.0-development` semantic-anchor build
 - MedEx：`0.0.1.0`
-- Process observed：`medexworkstations.exe`（仍作为 provisional production candidate）
+- Process observed：`medexworkstations.exe`（该现场结果后来作为 primary field-confirmed process；`medexworkstation.exe` 仅保留为 compatibility candidate）
 - Resolution：1920×1080
 - Display scaling：100%
 - DPI：96

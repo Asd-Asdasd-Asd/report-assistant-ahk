@@ -14,13 +14,13 @@
 | Capability | Coexistence owner | Activation condition |
 | --- | --- | --- |
 | `;cmx` | 新项目 | 源码行为已对齐；Windows 回归通过 |
-| `;red`、`;fzg`、`;fwj`、`;fjd` | 暂由 legacy；目标切换到新项目 | 只有在 V1 color reset 完成且 4 个完整 workflow 通过 MedEx validation 后才切换 |
+| `;red`、`;fzg`、`;fwj`、`;fjd` | 新项目 current mainline；legacy duplicate 必须停用 | Candidate G generated release 已验证；继续完成 phrase regression 与 MedEx-only entry guard |
 | RAlt+H/J/K/L | compatibility | 用户确认仍需要，且新项目没有替代 |
 | Legacy viewer/annotation hotkeys | compatibility | 用户确认仍需要，且未被新项目逐项验证替代 |
 | Shift+Alt+R snapshot save | 原 legacy only，compatibility 不启用 | 只为旧 `red_not.clip` 流程服务；新项目验证后退役 |
 | Ctrl+Alt+Esc / Ctrl+Alt+Q | 新项目 | 注意它们不控制 compatibility 进程 |
 
-2026-07-15 Color Reset V1 已在 baseline workstation 完成验证，但 internal-alpha package、configuration 和完整 coexistence smoke test 尚未完成。因此当前 compatibility scaffold 与新项目仍不能直接视为完整日常替代组合；在下一里程碑明确 feature ownership 和回滚步骤前，保持用户现有可回退组合。
+2026-07-16 Candidate G generated release 已在 baseline workstation 完成验证并成为 production mainline；internal-alpha package、configuration、MedEx-only hotstring guard 和完整 coexistence smoke test 仍未完成。因此 compatibility scaffold 与新项目仍不能直接视为完整日常替代组合，且 legacy duplicate report hotstrings 必须保持停用。
 
 ## 进程与启动顺序
 
@@ -38,7 +38,7 @@
 
 ### Hotstrings
 
-同一个 trigger 只能由一个进程注册。Compatibility 中不注册 `;red`、`;fzg`、`;fwj`、`;fjd`、`;cmx`。在 color reset 切换前，如必须依赖 legacy 报告 hotstrings，应继续使用现有 legacy 组合，不启用 compatibility scaffold 作为正式替代。
+同一个 trigger 只能由一个进程注册。Compatibility 中不注册 `;red`、`;fzg`、`;fwj`、`;fjd`、`;cmx`。如需回滚到 legacy 报告 hotstrings，必须先退出新项目实例，不能让两套同名 triggers 并行注册。
 
 ### Hotkeys
 

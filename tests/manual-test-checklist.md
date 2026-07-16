@@ -2,18 +2,33 @@
 
 本清单在安装 AutoHotkey v2 的 Windows 目标工作站执行。不得使用真实患者报告作为测试样本。
 
-## Reconciled release smoke test（TEST CHECKPOINT 1）
+## Current baseline and next checkpoint
 
-- [ ] 完全退出所有旧 release、legacy 和 field-debug AHK instances。
-- [ ] 确认测试期间只有一个目标 AHK script process；不要同时运行 generated release 与 field debug。
-- [ ] 记录实际启动的 generated release absolute path 和 SHA-256。
-- [ ] release-only：确认无 BOM/parser/startup error。
-- [ ] release-only：执行 `;red` 一次，记录 red insertion 后是否出现 color-reset menu action。
-- [ ] release-only：执行 `;fzg` 一次，记录 color reset 与 caret 视觉位置。
-- [ ] 完全退出 release，再启动 matching `debug/medex_color_reset_field_debug.ahk`。
-- [ ] debug-only：执行 F11 一次并保存 clipboard result；不要在同一进程测试 normal hotstrings。
-- [ ] 比较 release 与 F11 是否都进入 `uiaInvoke` shared strategy chain；此检查点不评价 Candidate G。
-- [ ] 检查 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log` 是否记录 release failure code。
+- Frozen baseline：`2369b68` / `v0.6.0-candidate-g`。
+- Windows promotion 已记录 `75 tests passed`；当前环境无法重跑时只表示本次未独立复验。
+- `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅显式 comparison/rollback；无 fallback。
+- `;fzg` 当前不运行 Color Reset，顺序为 paste/restore → 50 ms → `Left 4`。
+- 下一次 Windows 操作从 Step 1 baseline timing 开始，详细 pass/failure contract 见 `docs/internal/performance-optimization-checkpoints.md`。
+
+Step 1 最小回报：
+
+```text
+Step 1 passed
+TriggerToBlackClickMs=...
+PasteToClipboardRestoreMs=...
+No functional failures
+```
+
+Step 3 必须同时回报 success 与 deliberately induced fast-failure，确认 no wrong paste、clipboard restored 和 immediate punctuation black。
+
+## Historical reconciled release smoke test（TEST CHECKPOINT 1，已被 promotion 取代）
+
+该检查点记录 Candidate G promotion 前的 `uiaInvoke` control，不再是下一次 Windows 操作入口。其成果已进入后续 G1/G2 与最终 generated-release validation；当前 release 应进入 `relativeMousePixelValidated`，不得再以“release 与 F11 都进入 `uiaInvoke`”作为验收条件。
+
+- [x] 已确认 generated release 可启动、无 BOM/parser error。
+- [x] 已确认 release/debug 不同时注册 production hotstrings。
+- [x] 已记录旧 `uiaInvoke` control evidence，并保留为显式 rollback reference。
+- [x] 已完成 Candidate G promotion 后的最终 release-only validation。
 
 ## Candidate G1 calibration（TEST CHECKPOINT 2）
 
@@ -61,8 +76,8 @@
 - [ ] `Ctrl+Alt+F9` 运行 legacy 顺序：CF_HTML → no reset → 50 ms → Left 4；重复 5 次。
 - [ ] 两组都记录最终 caret 是否为 `|（见图）`，并在 caret 处输入一个无害字符确认实际继承颜色。
 - [ ] F9 必须记录 `ColorResetStrategy=SKIPPED_FOR_LEGACY_ORDER_AB`、`CursorRestoreRequestedCount=4`；不得用于 finalized report。
-- [ ] 若只有 F9 正确，则将 `;fzg` 设计为 phrase-specific no-reset workflow；若两组都差一位，则继续调查 CF_HTML caret boundary，不实施 `Left 5`。
-- [x] 2026-07-16：F9 no-reset legacy order 连续 6 次正确；production `;fzg` 已切换为同一顺序，等待 regenerated production-path smoke test。
+- [x] F9 no-reset A/B 已证明正确，production 已采用 phrase-specific no-reset workflow；不实施 `Left 5`。
+- [x] 2026-07-16：F9 no-reset legacy order 连续 6 次正确，production `;fzg` 已切换并完成最终 generated-release smoke test。
 
 - [ ] Script 正常启动。
 - [ ] Ctrl+Alt+Esc 可以暂停和恢复 new-project hotkeys/hotstrings。
@@ -190,7 +205,7 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] 严禁在 finalized patient report 中校准或验证。
 
 - [ ] Foreground process 正确时进入 UIA lookup；错误时返回 `COLOR_RESET_WRONG_PROCESS` 且不点击。
-- [ ] Production process name 未确认时返回 `COLOR_RESET_PROCESS_NAME_UNCONFIRMED` 且不点击。
+- [x] 现场主进程名确认为 `medexworkstations.exe`；另测 compatibility candidate 与 wrong-process fail-closed，不再把主进程描述为未确认。
 - [ ] UIA-v2 缺失时返回 `COLOR_RESET_UIA_UNAVAILABLE` 且不点击。
 - [ ] Anchor enumeration 以 foreground MedEx window root 或经确认的报告区域父容器为 scope，不要求 toolbar 是 focused `Document` descendant。
 - [ ] 不使用 exact `16px` 或 shortcut `①` 作为 production lookup。

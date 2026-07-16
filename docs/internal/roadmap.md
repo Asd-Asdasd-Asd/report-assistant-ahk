@@ -151,9 +151,9 @@ Explicitly deferred，除非已经实现且稳定：
 - automatic updater；
 - multi-editor support。
 
-v0.5.0 的 MedEx color reset 采用已批准 V1：semantic region anchor + dynamic local font anchor + centralized local-offset positioning + UIA Invoke。该方案属于可替换 adapter，不进入 generic clipboard module。
+当前冻结 mainline 已完成 Candidate G promotion：`relativeMousePixelValidated` 是 production default，使用 semantic `检查所见` localization、profile geometry、四点 popup signature 和 at-most-once relative clicks。旧 V1 `uiaInvoke` 仅显式 comparison/rollback，不能 automatic fallback。该 adapter boundary 不进入 generic clipboard module。
 
-2026-07-16 field evidence 已满足 Candidate G 的启动条件：semantic localization 稳定，而 popup UIA traversal/Invoke 延迟高且可靠性不可接受。Candidate G 因此成为下一条首选开发路线，但仍按 G1 calibration → G2 controlled interaction → explicit promotion 分阶段执行。G1 前不得写入未校准 offsets/pixel thresholds；G2 前不得自动点击 black；任何阶段都不得自动 fallback 到 `uiaInvoke`。
+下一条路线是按检查点缩短 `TriggerToBlackClickMs`：先测 baseline，再加入 MedEx-only entry guard/精简冗余 process checks，再把 clipboard restoration 安全地移到 black click 后，之后独立验证 `;fzg` 50 ms cleanup 和 MedEx-version gate。详细 pass/failure rules 见 `performance-optimization-checkpoints.md`。
 
 ## 首次有限内测里程碑
 
