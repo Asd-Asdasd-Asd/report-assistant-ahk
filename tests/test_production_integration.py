@@ -63,23 +63,32 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         for forbidden in ("MsgBox", "ToolTip", "TrayTip", "Flash("):
             self.assertNotIn(forbidden, body)
 
-    def test_html_clipboard_success_path_has_one_named_short_settle(self) -> None:
+    def test_html_clipboard_restores_field_validated_safe_timing(self) -> None:
         clipboard = source("src/clipboard_html.ahk")
-        transaction = function_body(
-            clipboard,
-            "WithClipboardRestore",
-            "PasteHtmlFragmentWithoutRestore",
+        transaction = clipboard.split(
+            "WithClipboardRestore(callback, performanceContext := 0)", 1
+        )[1].split("\n\nPasteHtmlFragmentWithoutRestore(fragment,", 1)[0]
+        html_paste = clipboard.split(
+            "PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0)", 1
+        )[1].split("\n\nPastePlainTextWithoutRestore(text)", 1)[0]
+        self.assertIn("static HtmlPasteDispatchSettleMs := 200", clipboard)
+        self.assertIn("static ClipboardPreRestoreSettleMs := 100", clipboard)
+        self.assertIn("static ClipboardPostRestoreSettleMs := 100", clipboard)
+        pre_restore = transaction.index(
+            "Sleep ClipboardTransactionDefaults.ClipboardPreRestoreSettleMs"
         )
-        html_paste = function_body(
-            clipboard,
-            "PasteHtmlFragmentWithoutRestore",
-            "PastePlainTextWithoutRestore",
+        restore = transaction.index("A_Clipboard := savedClipboard")
+        post_restore = transaction.index(
+            "Sleep ClipboardTransactionDefaults.ClipboardPostRestoreSettleMs"
         )
-        self.assertIn("static HtmlPasteSettleMs := 50", clipboard)
-        self.assertNotIn("Sleep", transaction)
+        self.assertLess(pre_restore, restore)
+        self.assertLess(restore, post_restore)
         self.assertIn("Send(\"^v\")", html_paste)
-        self.assertIn("Sleep ClipboardTransactionDefaults.HtmlPasteSettleMs", html_paste)
-        self.assertNotIn("Sleep 200", html_paste)
+        self.assertIn(
+            "Sleep ClipboardTransactionDefaults.HtmlPasteDispatchSettleMs",
+            html_paste,
+        )
+        self.assertNotIn("HtmlPasteSettleMs := 50", clipboard)
 
     def test_provisional_process_allowlist_is_exact_and_enabled_for_baseline(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")

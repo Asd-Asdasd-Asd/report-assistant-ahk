@@ -260,6 +260,8 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "ImmediateContinuedTypingRemainedBlack=MANUAL_REQUIRED",
         "HotstringStartMs=" PerformanceTimestampValue(performanceContext, "HotstringStartMs"),
         "PasteSentMs=" PerformanceTimestampValue(performanceContext, "PasteSentMs"),
+        "PasteDispatchSettleCompletedMs=" PerformanceTimestampValue(performanceContext, "PasteDispatchSettleCompletedMs"),
+        "ClipboardRestoreStartedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreStartedMs"),
         "ClipboardRestoreCompletedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreCompletedMs"),
         "ColorResetStartMs=" PerformanceTimestampValue(performanceContext, "ColorResetStartMs"),
         "ColorResetReturnedMs=" PerformanceTimestampValue(performanceContext, "ColorResetReturnedMs"),

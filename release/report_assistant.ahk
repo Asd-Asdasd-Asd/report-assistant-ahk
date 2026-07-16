@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-16 12:07:58 UTC
+; Generated at: 2026-07-16 12:45:30 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -8070,9 +8070,12 @@ ClickPoint(name, clicks := 1) {
 
 ; --- BEGIN clipboard_html.ahk ---
 class ClipboardTransactionDefaults {
-    ; Provisional production value. This is the only fixed wait between the
-    ; Ctrl+V dispatch and transactional clipboard restoration.
-    static HtmlPasteSettleMs := 50
+    ; Restored field-validated safety timing. Some editors consume Ctrl+V
+    ; asynchronously, so restoring ClipboardAll after only 50 ms can paste the
+    ; user's original clipboard content instead of the CF_HTML fragment.
+    static HtmlPasteDispatchSettleMs := 200
+    static ClipboardPreRestoreSettleMs := 100
+    static ClipboardPostRestoreSettleMs := 100
 }
 
 PastePlainText(text) {
@@ -8206,7 +8209,13 @@ WithClipboardRestore(callback, performanceContext := 0) {
         if clipboardSaved {
             result.restoreAttempted := true
             try {
+                Sleep ClipboardTransactionDefaults.ClipboardPreRestoreSettleMs
+                RecordOptionalPerformanceTimestamp(
+                    performanceContext,
+                    "ClipboardRestoreStartedMs"
+                )
                 A_Clipboard := savedClipboard
+                Sleep ClipboardTransactionDefaults.ClipboardPostRestoreSettleMs
                 result.restoreSucceeded := true
                 RecordOptionalPerformanceTimestamp(
                     performanceContext,
@@ -8232,7 +8241,11 @@ PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
 
     Send("^v")
     RecordOptionalPerformanceTimestamp(performanceContext, "PasteSentMs")
-    Sleep ClipboardTransactionDefaults.HtmlPasteSettleMs
+    Sleep ClipboardTransactionDefaults.HtmlPasteDispatchSettleMs
+    RecordOptionalPerformanceTimestamp(
+        performanceContext,
+        "PasteDispatchSettleCompletedMs"
+    )
     return true
 }
 
@@ -8921,6 +8934,8 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "ImmediateContinuedTypingRemainedBlack=MANUAL_REQUIRED",
         "HotstringStartMs=" PerformanceTimestampValue(performanceContext, "HotstringStartMs"),
         "PasteSentMs=" PerformanceTimestampValue(performanceContext, "PasteSentMs"),
+        "PasteDispatchSettleCompletedMs=" PerformanceTimestampValue(performanceContext, "PasteDispatchSettleCompletedMs"),
+        "ClipboardRestoreStartedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreStartedMs"),
         "ClipboardRestoreCompletedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreCompletedMs"),
         "ColorResetStartMs=" PerformanceTimestampValue(performanceContext, "ColorResetStartMs"),
         "ColorResetReturnedMs=" PerformanceTimestampValue(performanceContext, "ColorResetReturnedMs"),

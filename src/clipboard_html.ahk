@@ -1,7 +1,10 @@
 class ClipboardTransactionDefaults {
-    ; Provisional production value. This is the only fixed wait between the
-    ; Ctrl+V dispatch and transactional clipboard restoration.
-    static HtmlPasteSettleMs := 50
+    ; Restored field-validated safety timing. Some editors consume Ctrl+V
+    ; asynchronously, so restoring ClipboardAll after only 50 ms can paste the
+    ; user's original clipboard content instead of the CF_HTML fragment.
+    static HtmlPasteDispatchSettleMs := 200
+    static ClipboardPreRestoreSettleMs := 100
+    static ClipboardPostRestoreSettleMs := 100
 }
 
 PastePlainText(text) {
@@ -135,7 +138,13 @@ WithClipboardRestore(callback, performanceContext := 0) {
         if clipboardSaved {
             result.restoreAttempted := true
             try {
+                Sleep ClipboardTransactionDefaults.ClipboardPreRestoreSettleMs
+                RecordOptionalPerformanceTimestamp(
+                    performanceContext,
+                    "ClipboardRestoreStartedMs"
+                )
                 A_Clipboard := savedClipboard
+                Sleep ClipboardTransactionDefaults.ClipboardPostRestoreSettleMs
                 result.restoreSucceeded := true
                 RecordOptionalPerformanceTimestamp(
                     performanceContext,
@@ -161,7 +170,11 @@ PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
 
     Send("^v")
     RecordOptionalPerformanceTimestamp(performanceContext, "PasteSentMs")
-    Sleep ClipboardTransactionDefaults.HtmlPasteSettleMs
+    Sleep ClipboardTransactionDefaults.HtmlPasteDispatchSettleMs
+    RecordOptionalPerformanceTimestamp(
+        performanceContext,
+        "PasteDispatchSettleCompletedMs"
+    )
     return true
 }
 
