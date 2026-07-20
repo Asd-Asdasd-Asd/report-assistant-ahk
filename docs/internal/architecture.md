@@ -40,9 +40,9 @@ MedEx 现场验证已经确认 `CF_HTML` 可以插入红色文字。仍未解决
 
 `Color Reset` 是 phrase-specific orchestration，而不是所有红色 marker 的无条件尾处理。Standalone `;red` 的 caret 留在 marker 后方，因此需要 adapter reset；`;fzg` 的 caret 必须移动到 marker 前方，Windows A/B 已验证其正确顺序是 paste/clipboard restore → 50 ms → `Left 4`，不经过 toolbar reset。该路径返回 `COLOR_RESET_NOT_REQUIRED`，不能伪报 `AUTOMATION_CHAIN_OK`。
 
-当前 `;red` transaction 先完成 CF_HTML paste 和 clipboard restoration，再调用 Candidate G。下一轮性能工作的 critical path 定义为 `HotstringTriggeredMs → BlackClickSentMs`，不是整个函数返回时间。计划在独立检查点中把 black click 提前到 clipboard restoration 之前，同时继续用 `finally` 强制恢复剪贴板，并以 `pasteSentAt`/`SafeMinPasteToRestoreMs` 保护快速失败路径；安全最小值必须由 Windows 测试决定。
+Step 3 通过通用 before-restore callback 将 Candidate G 移到 restore 前；clipboard module 仍由唯一 `finally` 强制恢复，并以内部 `pasteSentAt` 和 field-approved `SafeMinPasteToRestoreMs=300` 保护 fast failure。Windows success 与 controlled fast-failure paths 均已验证该顺序。
 
-Report hotstrings 的 Step 2 working tree 已用 shared `#HotIf`/foreground predicate 限制 MedEx-specific entries；全局 pause/exit 保持 suspend-exempt。Candidate G interaction path 已移除冗余的 process-name 重查，但 arrow、second signature sample 和 black click 前继续验证 original HWND 仍 active。该变更已通过 Windows scope/foreground 验收，等待提交。
+Report hotstrings 已由 Step 2 使用 shared `#HotIf`/foreground predicate 限制 MedEx-specific entries；全局 pause/exit 保持 suspend-exempt。Candidate G interaction path 已移除冗余的 process-name 重查，但 arrow、second signature sample 和 black click 前继续验证 original HWND 仍 active。该变更已通过 Windows scope/foreground 验收并提交。
 
 所有报告书写辅助都必须保留人工确认，不默认执行最终提交、审核或发送。
 

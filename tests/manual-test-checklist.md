@@ -4,11 +4,11 @@
 
 ## Current baseline and next checkpoint
 
-- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；当前已提交 Step 1：`87dce53`。
-- Step 2 已记录 `82 tests passed` 并通过 Windows scope/foreground test；验收 release SHA-256=`1ede185566caf4c9f25d744fe567df45cd9ed679bd8daa522ecfd71edc2bc010`。
+- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`。
+- Step 3 已记录 `86 tests passed`；验收 release SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
 - `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅显式 comparison/rollback；无 fallback。
 - `;fzg` 当前不运行 Color Reset，顺序为 paste/restore → 50 ms → `Left 4`。
-- 下一次 Windows 操作从 Step 2 scope/foreground test 开始，详细 pass/failure contract 见 `docs/internal/performance-optimization-checkpoints.md`。
+- Step 3 success/fast-failure test 已通过；下一检查点为独立 Step 4，详细 contract 见 `docs/internal/performance-optimization-checkpoints.md`。
 
 Step 1 已于 2026-07-20 通过：
 
@@ -32,7 +32,21 @@ Step 2 Windows 验收：
 
 Candidate G 同轮复验：G1 row localization 稳定；G2 success path 与 closed-signature fail-closed 正常。Caret-order A/B 继续表现为 F8 reset-path `Left 3`、F9 no-reset `Left 4`；production `;fzg` 使用后者，因此不构成 Step 2 回归。
 
-Step 3 必须同时回报 success 与 deliberately induced fast-failure，确认 no wrong paste、clipboard restored 和 immediate punctuation black。
+Step 3 已同时完成 success 与 deliberately induced fast-failure，确认 no wrong paste、clipboard restored 和 immediate punctuation black。
+
+### Step 3 clipboard reorder
+
+本轮只在 approved non-clinical context 执行。F11 会把 timing output 写入 clipboard；F10 故意制造 Candidate G fast failure，并只写 `%TEMP%\MedExAHK\medex_production_timing_debug.txt`，不会覆盖用于验证 restore 的 sentinel。
+
+1. [x] 只运行 regenerated release，在 MedEx 中把 clipboard 设为无害 sentinel 后执行 normal `;red`；marker 为红色、未粘贴 sentinel、执行后原 clipboard 恢复，立即输入标点为黑色。
+2. [x] 退出 release，只运行 field harness；F11 success path 连续执行三次。
+3. [x] 三次均为 `RED_TEXT_OK`、`RELATIVE_MOUSE_CHAIN_OK`、`ClipboardRestoreSucceeded=true`，且 `BlackClickSentMs = ClipboardRestoreStartedMs`。
+4. [x] `TriggerToBlackClickMs=625/500/515`、`BlackClickToClipboardRestoreMs=0/0/0`；black click 较 Step 1 平均约提前 276 ms。
+5. [x] 重新设置无害 sentinel，F10 fast-failure path 连续执行三次。
+6. [x] F10 每次 red marker 未被 sentinel 替换，运行后 clipboard 仍为 sentinel。
+7. [x] F10 每次为 `RED_TEXT_RESET_FAILED`、`COLOR_RESET_WRONG_PROCESS`，arrow/black timestamps 为 `UNKNOWN`，clipboard restore 成功。
+8. [x] F10 `PasteToClipboardRestoreMs=312/313/313`，safety wait=`109/94/110`；failure feedback 均在 restore completed 后。
+9. [x] Artifact SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`；Step 3 pass。
 
 ## Historical reconciled release smoke test（TEST CHECKPOINT 1，已被 promotion 取代）
 

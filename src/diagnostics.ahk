@@ -269,6 +269,8 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "PasteDispatchSettleCompletedMs=" PerformanceTimestampValue(performanceContext, "PasteDispatchSettleCompletedMs"),
         "ClipboardRestoreStartedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreStartedMs"),
         "ClipboardRestoreCompletedMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreCompletedMs"),
+        "SafeMinPasteToRestoreMs=" ClipboardTransactionDefaults.SafeMinPasteToRestoreMs,
+        "ClipboardRestoreSafetyWaitMs=" PerformanceTimestampValue(performanceContext, "ClipboardRestoreSafetyWaitMs"),
         "ColorResetStartMs=" PerformanceTimestampValue(performanceContext, "ColorResetStartMs"),
         "ColorResetReturnedMs=" PerformanceTimestampValue(performanceContext, "ColorResetReturnedMs"),
         "FailureFeedbackStartedMs=" PerformanceTimestampValue(performanceContext, "FailureFeedbackStartedMs"),
@@ -292,7 +294,8 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "TotalHotstringMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
         "TotalHotstringDurationMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
         "TriggerToBlackClickMs=" PerformanceDuration(performanceContext, "HotstringTriggeredMs", "BlackClickSentMs"),
-        "PasteToClipboardRestoreMs=" PerformanceDuration(performanceContext, "PasteCommandSentMs", "ClipboardRestoreStartedMs")
+        "PasteToClipboardRestoreMs=" PerformanceDuration(performanceContext, "PasteCommandSentMs", "ClipboardRestoreStartedMs"),
+        "BlackClickToClipboardRestoreMs=" PerformanceDuration(performanceContext, "BlackClickSentMs", "ClipboardRestoreStartedMs")
     ]
     return JoinDiagnosticFields(fields, "`r`n") "`r`n"
 }

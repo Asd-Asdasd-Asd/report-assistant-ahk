@@ -31,7 +31,9 @@ Ctrl+Alt+F12
 Ctrl+Alt+F11
 ```
 
-脚本不会显示 MsgBox、ToolTip 或 TrayTip。它自动把完整结果复制到 clipboard，并默认追加写入：
+Step 3 另提供 `Ctrl+Alt+F10` fast-failure test。它会先发送同一 red CF_HTML paste，再用故意不匹配的 process allowlist 让 Candidate G 在任何 coordinate click 前 fail closed。F10 不把 diagnostic 写回 clipboard，以便操作者验证原 sentinel 已恢复；完整结果只追加到 `%TEMP%\MedExAHK\medex_production_timing_debug.txt`。
+
+脚本不会显示 MsgBox、ToolTip 或 TrayTip。F12/F11 自动把完整结果复制到 clipboard；F10 保留 restored clipboard。结果默认追加写入：
 
 ```text
 %TEMP%\MedExAHK\medex_color_reset_field_debug.txt
@@ -47,7 +49,7 @@ Ctrl+Alt+F11
 
 `AUTOMATION_CHAIN_OK` 只表示 candidate selection、menu click、black-item lookup 和 Invoke 自动化链路完成。输出仍为 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`；只有操作者随后输入无害字符并确认黑色，才能单独记录最终视觉验证成功。
 
-F12 是 reset-only field diagnostic；F11 是完整 Candidate G `;red` production-chain timing diagnostic。测试时不得同时运行 generated release 与本 debug script。
+F12 是 reset-only field diagnostic；F11 是完整 Candidate G `;red` success timing；F10 是 Step 3 controlled fast failure。测试时不得同时运行 generated release 与本 debug script。
 
 ## 可调 field-test overrides
 

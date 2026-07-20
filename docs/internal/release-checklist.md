@@ -8,13 +8,13 @@
 - [x] `uiaInvoke` 仅为显式 comparison/rollback，不存在 automatic fallback。
 - [x] 现场确认主进程为 `medexworkstations.exe`；`medexworkstation.exe` 仅暂作 compatibility candidate。
 - [x] Final generated release 已覆盖 Candidate G reset、phrase-specific no-reset `;fzg` 和 immediate punctuation；promotion 记录为 `75 tests passed`。
-- [x] 当前环境重新运行 Python tests；Step 2 working tree 为 `82 tests passed`。
+- [x] 当前环境重新运行 Python tests；Step 3 为 `86 tests passed`。
 
 ## Next performance checkpoints
 
 - [x] Step 1：只增加 timing fields 和两个 derived metrics，不改 ordering/waits；Windows baseline 通过并由 `87dce53` 提交。
 - [x] Step 2：五个 report hotstrings 已加入 shared MedEx-only entry guard；active HWND checks 保留，Windows scope/foreground test 已通过。
-- [ ] Step 3：black click 前置、clipboard restoration 后置；`finally` 和基于 `pasteSentAt` 的 minimum interval 必须覆盖 success 与 fast-failure；两条 Windows path 都通过后才提交。
+- [x] Step 3：black click 前置、clipboard restoration 后置；`finally` 和基于 `pasteSentAt` 的 300 ms minimum interval 已通过 success 与 fast-failure Windows paths。
 - [ ] Step 4：独立删除 `;fzg` `Sleep 50`；caret 与 immediate typing 通过才提交；始终保持 `Left 4`。
 - [ ] Step 5：独立删除 exact MedEx-version hard gate，version 保留在 diagnostics；不得声称因此支持其他 DPI/layout。
 - [ ] Step 6：per-machine calibration 只在 latency work 稳定且另行授权后开始。

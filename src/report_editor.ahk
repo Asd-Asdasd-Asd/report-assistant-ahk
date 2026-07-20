@@ -98,7 +98,14 @@ InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext
 
 InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
-    pasteResult := PasteRedFigureTextDetailed(text, performanceContext)
+    pasteResult := PasteRedFigureTextDetailed(
+        text,
+        performanceContext,
+        () => ResetRedInsertionColorBeforeClipboardRestore(
+            resetOptions,
+            performanceContext
+        )
+    )
     if !pasteResult.pasteDispatched {
         return {
             ok: false,
@@ -109,14 +116,26 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
         }
     }
 
+    if pasteResult.beforeRestoreSucceeded {
+        resetResult := pasteResult.beforeRestoreResult
+    } else {
+        resetContext := Map(
+            "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+            "appVersion", AppMetadata.Version,
+            "colorResetStrategy", "beforeRestoreCallback",
+            "automationChainResult", "AUTOMATION_CHAIN_NOT_COMPLETED",
+            "exceptionMessage", pasteResult.beforeRestoreError
+        )
+        resetResult := MakeColorResetResult(
+            false,
+            ColorResetCode.UNEXPECTED_ERROR,
+            resetContext
+        )
+    }
+
     ; The text is already present at this point. A reset failure is reported but
-    ; never triggers automatic deletion or undo of report content.
-    RecordOptionalPerformanceTimestampAliases(
-        performanceContext,
-        ["ColorResetStartedMs", "ColorResetStartMs"]
-    )
-    resetResult := ResetMedExInsertionColor(resetOptions)
-    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetReturnedMs")
+    ; never triggers automatic deletion or undo of report content. The feedback
+    ; remains after the clipboard transaction has completed.
     if !resetResult.ok {
         RecordOptionalPerformanceTimestamp(performanceContext, "FailureFeedbackStartedMs")
         SoundBeep(650, 150)
@@ -147,6 +166,17 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
         clipboardRestoreSucceeded: true,
         reset: resetResult
     }
+}
+
+ResetRedInsertionColorBeforeClipboardRestore(resetOptions,
+    performanceContext := 0) {
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["ColorResetStartedMs", "ColorResetStartMs"]
+    )
+    resetResult := ResetMedExInsertionColor(resetOptions)
+    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetReturnedMs")
+    return resetResult
 }
 
 ResetReportFormattingPlaceholder() {

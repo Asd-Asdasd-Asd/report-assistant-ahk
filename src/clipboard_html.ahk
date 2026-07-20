@@ -5,6 +5,7 @@ class ClipboardTransactionDefaults {
     static HtmlPasteDispatchSettleMs := 200
     static ClipboardPreRestoreSettleMs := 100
     static ClipboardPostRestoreSettleMs := 100
+    static SafeMinPasteToRestoreMs := 300
 }
 
 PastePlainText(text) {
@@ -20,21 +21,34 @@ PasteRedFigureText(text := "（见图）") {
     return PasteRedFigureTextDetailed(text).pasteDispatched
 }
 
-PasteRedFigureTextDetailed(text := "（见图）", performanceContext := 0) {
+PasteRedFigureTextDetailed(text := "（见图）", performanceContext := 0,
+    beforeRestoreCallback := 0) {
     ; The black wrapper is intentionally empty of boundary/sentinel characters.
     escapedText := HtmlEscape(text)
     fragment := "<span style=`"color:#000000`"><span style=`"color:#ff0000`">" . escapedText . "</span></span>"
-    return PasteHtmlFragmentDetailed(fragment, performanceContext)
+    return PasteHtmlFragmentDetailed(
+        fragment,
+        performanceContext,
+        beforeRestoreCallback
+    )
 }
 
 PasteHtmlFragment(fragment) {
     return PasteHtmlFragmentDetailed(fragment).pasteDispatched
 }
 
-PasteHtmlFragmentDetailed(fragment, performanceContext := 0) {
+PasteHtmlFragmentDetailed(fragment, performanceContext := 0,
+    beforeRestoreCallback := 0) {
+    restoreTimingContext := Map()
     transaction := WithClipboardRestore(
-        () => PasteHtmlFragmentWithoutRestore(fragment, performanceContext),
-        performanceContext
+        () => PasteHtmlFragmentWithoutRestore(
+            fragment,
+            performanceContext,
+            restoreTimingContext
+        ),
+        performanceContext,
+        beforeRestoreCallback,
+        restoreTimingContext
     )
     pasteDispatched := transaction.actionSucceeded && transaction.restoreAttempted
 
@@ -49,6 +63,10 @@ PasteHtmlFragmentDetailed(fragment, performanceContext := 0) {
         ok: transaction.actionSucceeded && transaction.restoreSucceeded,
         pasteDispatched: pasteDispatched,
         clipboardRestoreSucceeded: transaction.restoreSucceeded,
+        beforeRestoreAttempted: transaction.beforeRestoreAttempted,
+        beforeRestoreSucceeded: transaction.beforeRestoreSucceeded,
+        beforeRestoreResult: transaction.beforeRestoreResult,
+        beforeRestoreError: transaction.beforeRestoreError,
         transaction: transaction
     }
 }
@@ -113,9 +131,14 @@ SetClipboardHtml(cfHtml) {
     }
 }
 
-WithClipboardRestore(callback, performanceContext := 0) {
+WithClipboardRestore(callback, performanceContext := 0,
+    beforeRestoreCallback := 0, restoreTimingContext := 0) {
     result := {
         actionSucceeded: false,
+        beforeRestoreAttempted: false,
+        beforeRestoreSucceeded: false,
+        beforeRestoreResult: 0,
+        beforeRestoreError: "",
         restoreAttempted: false,
         restoreSucceeded: false,
         actionError: "",
@@ -132,13 +155,26 @@ WithClipboardRestore(callback, performanceContext := 0) {
         savedClipboard := ClipboardAll()
         clipboardSaved := true
         result.actionSucceeded := callback.Call() = true
+        if result.actionSucceeded && IsObject(beforeRestoreCallback)
+            && HasMethod(beforeRestoreCallback, "Call") {
+            result.beforeRestoreAttempted := true
+            try {
+                result.beforeRestoreResult := beforeRestoreCallback.Call()
+                result.beforeRestoreSucceeded := true
+            } catch as beforeRestoreErr {
+                result.beforeRestoreError := beforeRestoreErr.Message
+            }
+        }
     } catch as err {
         result.actionError := err.Message
     } finally {
         if clipboardSaved {
             result.restoreAttempted := true
             try {
-                Sleep ClipboardTransactionDefaults.ClipboardPreRestoreSettleMs
+                WaitForSafeClipboardRestore(
+                    restoreTimingContext,
+                    performanceContext
+                )
                 RecordOptionalPerformanceTimestamp(
                     performanceContext,
                     "ClipboardRestoreStartedMs"
@@ -159,7 +195,30 @@ WithClipboardRestore(callback, performanceContext := 0) {
     return result
 }
 
-PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
+WaitForSafeClipboardRestore(restoreTimingContext := 0,
+    performanceContext := 0) {
+    waitStartedAt := A_TickCount
+    if Type(restoreTimingContext) = "Map"
+        && restoreTimingContext.Has("pasteSentAt") {
+        loop {
+            elapsedMs := A_TickCount - restoreTimingContext["pasteSentAt"]
+            waitMs := ClipboardTransactionDefaults.SafeMinPasteToRestoreMs
+                - elapsedMs
+            if waitMs <= 0
+                break
+            Sleep waitMs
+        }
+    } else {
+        Sleep ClipboardTransactionDefaults.ClipboardPreRestoreSettleMs
+    }
+    actualWaitMs := A_TickCount - waitStartedAt
+    if Type(performanceContext) = "Map"
+        performanceContext["ClipboardRestoreSafetyWaitMs"] := actualWaitMs
+    return actualWaitMs
+}
+
+PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0,
+    restoreTimingContext := 0) {
     cfHtml := BuildCfHtml(fragment)
     htmlFormat := SetClipboardHtml(cfHtml)
     if !htmlFormat
@@ -169,10 +228,13 @@ PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
         return false
 
     Send("^v")
-    RecordOptionalPerformanceTimestampAliases(
-        performanceContext,
-        ["PasteCommandSentMs", "PasteSentMs"]
-    )
+    pasteSentAt := A_TickCount
+    if Type(performanceContext) = "Map" {
+        performanceContext["PasteCommandSentMs"] := pasteSentAt
+        performanceContext["PasteSentMs"] := pasteSentAt
+    }
+    if Type(restoreTimingContext) = "Map"
+        restoreTimingContext["pasteSentAt"] := pasteSentAt
     Sleep ClipboardTransactionDefaults.HtmlPasteDispatchSettleMs
     RecordOptionalPerformanceTimestamp(
         performanceContext,

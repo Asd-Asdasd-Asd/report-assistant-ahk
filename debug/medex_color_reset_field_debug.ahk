@@ -55,6 +55,11 @@ A_IconTip := "MedEx Color Reset Field Debug"
     RunMedExProductionTimingFieldDebug()
 }
 
+^!F10::
+{
+    RunMedExProductionTimingFieldDebug(true)
+}
+
 RunMedExColorResetFieldDebug() {
     global DEBUG_COLOR_ARROW_OFFSET_X
     global DEBUG_COLOR_ARROW_OFFSET_Y
@@ -120,7 +125,7 @@ RunMedExColorResetFieldDebug() {
     ; Clipboard and files are the complete field-debug output contract.
 }
 
-RunMedExProductionTimingFieldDebug() {
+RunMedExProductionTimingFieldDebug(fastFailure := false) {
     global DEBUG_COLOR_RESET_STRATEGY
     global DEBUG_MENU_LOOKUP_STRATEGY
     global DEBUG_MENU_OPEN_TIMEOUT_MS
@@ -158,15 +163,20 @@ RunMedExProductionTimingFieldDebug() {
     )
 
     options["colorResetStrategy"] := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED
+    if fastFailure
+        options["processCandidates"] := ["__step3_fast_failure__.exe"]
     operation := RunRedInsertion(options)
     output := "SourceProjectVersion=" AppMetadata.Version "`r`n"
         . "SourceRevision=" AppMetadata.SourceRevision "`r`n"
         . "TestDate=" FormatTime(, "yyyy-MM-dd HH:mm:ss") "`r`n"
         . "Purpose=MedExProductionInsertionTiming`r`n"
+        . "TestMode=" (fastFailure ? "Step3FastFailure" : "Success") "`r`n"
         . FormatMedExPerformanceTimingResult(operation, performanceContext)
 
-    A_Clipboard := output
-    ClipWait(1)
+    if !fastFailure {
+        A_Clipboard := output
+        ClipWait(1)
+    }
     try {
         SplitPath DEBUG_PERFORMANCE_RESULT_FILE, , &resultDirectory
         if resultDirectory != "" && !DirExist(resultDirectory)

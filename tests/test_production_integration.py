@@ -81,6 +81,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
             "InsertRedFigureTextForCaretRelocation(text :=", 1
         )[1].split("\n\nInsertRedFigureTextAndRestoreState(text :=", 1)[0]
         self.assertIn("PasteRedFigureTextDetailed(text, performanceContext)", body)
+        self.assertNotIn("beforeRestore", body)
         self.assertIn("ColorResetCode.NOT_REQUIRED", body)
         self.assertIn('"colorResetReason", "caretMovesBeforeRedMarker"', body)
         self.assertNotIn("ResetMedExInsertionColor", body)
@@ -93,9 +94,11 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
             "InsertRedFigureTextAndRestoreState",
             "ResetReportFormattingPlaceholder",
         )
-        paste = body.index("PasteRedFigureTextDetailed(text, performanceContext)")
-        reset = body.index("ResetMedExInsertionColor(resetOptions)")
+        paste = body.index("PasteRedFigureTextDetailed(")
+        reset = body.index("ResetRedInsertionColorBeforeClipboardRestore(")
         self.assertLess(paste, reset)
+        self.assertIn("() => ResetRedInsertionColorBeforeClipboardRestore(", body)
+        self.assertIn("resetResult := pasteResult.beforeRestoreResult", body)
         self.assertIn("RedTextOperationCode.PASTE_FAILED", body)
         self.assertIn("RedTextOperationCode.RESET_FAILED", body)
         self.assertIn("pasteDispatched: true", body)
@@ -113,29 +116,93 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_html_clipboard_restores_field_validated_safe_timing(self) -> None:
         clipboard = source("src/clipboard_html.ahk")
         transaction = clipboard.split(
-            "WithClipboardRestore(callback, performanceContext := 0)", 1
-        )[1].split("\n\nPasteHtmlFragmentWithoutRestore(fragment,", 1)[0]
+            "WithClipboardRestore(callback, performanceContext := 0,", 1
+        )[1].split("\n\nWaitForSafeClipboardRestore(", 1)[0]
+        safe_wait = clipboard.split("\nWaitForSafeClipboardRestore(", 1)[1].split(
+            "\n\nPasteHtmlFragmentWithoutRestore(fragment,", 1
+        )[0]
         html_paste = clipboard.split(
-            "PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0)", 1
+            "PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0,", 1
         )[1].split("\n\nPastePlainTextWithoutRestore(text)", 1)[0]
         self.assertIn("static HtmlPasteDispatchSettleMs := 200", clipboard)
         self.assertIn("static ClipboardPreRestoreSettleMs := 100", clipboard)
         self.assertIn("static ClipboardPostRestoreSettleMs := 100", clipboard)
-        pre_restore = transaction.index(
-            "Sleep ClipboardTransactionDefaults.ClipboardPreRestoreSettleMs"
-        )
+        self.assertIn("static SafeMinPasteToRestoreMs := 300", clipboard)
+        before_restore = transaction.index("beforeRestoreCallback.Call()")
+        finally_block = transaction.index("} finally {")
         restore = transaction.index("A_Clipboard := savedClipboard")
         post_restore = transaction.index(
             "Sleep ClipboardTransactionDefaults.ClipboardPostRestoreSettleMs"
         )
-        self.assertLess(pre_restore, restore)
+        self.assertLess(before_restore, finally_block)
+        self.assertLess(finally_block, restore)
         self.assertLess(restore, post_restore)
+        self.assertIn("SafeMinPasteToRestoreMs", safe_wait)
+        self.assertIn("- elapsedMs", safe_wait)
+        self.assertIn("loop {", safe_wait)
+        self.assertIn("if waitMs <= 0", safe_wait)
+        self.assertIn("break", safe_wait)
+        self.assertIn("Sleep waitMs", safe_wait)
+        self.assertIn("ClipboardPreRestoreSettleMs", safe_wait)
         self.assertIn("Send(\"^v\")", html_paste)
+        self.assertIn('restoreTimingContext["pasteSentAt"] := pasteSentAt', html_paste)
         self.assertIn(
             "Sleep ClipboardTransactionDefaults.HtmlPasteDispatchSettleMs",
             html_paste,
         )
         self.assertNotIn("HtmlPasteSettleMs := 50", clipboard)
+
+    def test_step_three_callback_result_and_restore_timing_are_exposed(self) -> None:
+        clipboard = source("src/clipboard_html.ahk")
+        detailed = function_body(
+            clipboard,
+            "PasteHtmlFragmentDetailed",
+            "BuildCfHtml",
+        )
+        self.assertIn("restoreTimingContext := Map()", detailed)
+        self.assertIn("beforeRestoreCallback,", detailed)
+        self.assertIn("restoreTimingContext", detailed)
+        for field in (
+            "beforeRestoreAttempted",
+            "beforeRestoreSucceeded",
+            "beforeRestoreResult",
+            "beforeRestoreError",
+        ):
+            self.assertIn(field, detailed)
+
+    def test_step_three_restore_is_single_finally_owner(self) -> None:
+        clipboard = source("src/clipboard_html.ahk")
+        transaction = clipboard.split(
+            "WithClipboardRestore(callback, performanceContext := 0,", 1
+        )[1].split("\n\nWaitForSafeClipboardRestore(", 1)[0]
+        self.assertEqual(transaction.count("A_Clipboard := savedClipboard"), 1)
+        self.assertLess(
+            transaction.index("} finally {"),
+            transaction.index("A_Clipboard := savedClipboard"),
+        )
+
+    def test_step_three_failure_feedback_runs_after_transaction_result(self) -> None:
+        report_editor = source("src/report_editor.ahk")
+        orchestration = report_editor.split(
+            "InsertRedFigureTextAndRestoreState(text :=", 1
+        )[1].split("\n\nResetRedInsertionColorBeforeClipboardRestore(", 1)[0]
+        transaction_return = orchestration.index(
+            "resetResult := pasteResult.beforeRestoreResult"
+        )
+        feedback = orchestration.index('SoundBeep(650, 150)')
+        self.assertLess(transaction_return, feedback)
+
+    def test_step_three_fast_failure_harness_preserves_clipboard(self) -> None:
+        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        self.assertIn("^!F10::", field_debug)
+        self.assertIn("RunMedExProductionTimingFieldDebug(true)", field_debug)
+        self.assertIn('options["processCandidates"] := ["__step3_fast_failure__.exe"]', field_debug)
+        self.assertIn('"Step3FastFailure"', field_debug)
+        timing = field_debug.split(
+            "RunMedExProductionTimingFieldDebug(fastFailure := false)", 1
+        )[1]
+        self.assertIn("if !fastFailure {", timing)
+        self.assertIn("A_Clipboard := output", timing)
 
     def test_provisional_process_allowlist_is_exact_and_enabled_for_baseline(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")
@@ -349,6 +416,9 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
             "CursorRestoreSentMs",
             "HotstringReturnMs",
             "TotalHotstringMs",
+            "SafeMinPasteToRestoreMs",
+            "ClipboardRestoreSafetyWaitMs",
+            "BlackClickToClipboardRestoreMs",
         ):
             self.assertIn(field, diagnostics)
         self.assertIn('"diagnosticMode", "performance"', field_debug)
@@ -399,6 +469,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn("static HtmlPasteDispatchSettleMs := 200", clipboard)
         self.assertIn("static ClipboardPreRestoreSettleMs := 100", clipboard)
         self.assertIn("static ClipboardPostRestoreSettleMs := 100", clipboard)
+        self.assertIn("static SafeMinPasteToRestoreMs := 300", clipboard)
 
     def test_candidate_g_definitions_precede_adapter_references_in_release(self) -> None:
         candidate_g = source("src/medex_candidate_g_logic.ahk")

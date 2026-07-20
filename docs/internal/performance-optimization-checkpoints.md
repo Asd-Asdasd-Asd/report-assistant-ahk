@@ -42,7 +42,7 @@ if elapsed < SafeMinPasteToRestoreMs:
     wait SafeMinPasteToRestoreMs - elapsed
 ```
 
-Candidate G 成功执行的时间可自然贡献于安全间隔；fast failure 可能很快，因此也必须受剩余时间保护。`SafeMinPasteToRestoreMs` 尚未批准，必须通过 Windows field testing 决定。
+Candidate G 成功执行的时间可自然贡献于安全间隔；fast failure 可能很快，因此也必须受剩余时间保护。`SafeMinPasteToRestoreMs=300` 已由 Step 3 Windows success/fast-failure field testing 批准。
 
 ## 计划 timing fields
 
@@ -116,6 +116,12 @@ Windows pass criteria：五个 report hotstrings 在 MedEx 正常；在无关应
 ### Step 3 — Move clipboard restoration after Color Reset
 
 在 shared orchestration 中让 Candidate G localization 和 black click 发生在 clipboard restore 之前；restore 仍位于 `finally`。使用 `pasteSentAt` 和待现场确定的 `SafeMinPasteToRestoreMs`，只等待不足的剩余间隔。
+
+Implementation status：`SafeMinPasteToRestoreMs=300` 与 elapsed-time recheck loop 已通过 86 项自动测试和 Windows success/fast-failure field test；Step 3 可以独立提交，提交前不进入 Step 4。
+
+2026-07-20 preliminary field result：success path 三次 `TriggerToBlackClickMs=625/484/500`；三次 restore 成功，black click 与 restore start 记录在同一 tick。fast-failure 两次 restore 与 fail-closed behavior 正确，但 `PasteToClipboardRestoreMs=297`，证明单次 remaining Sleep 会受 Windows timer 提前返回影响。这批结果只作为 recheck-loop 修订依据，不构成 pass。
+
+2026-07-20 10:15 final field result（artifact SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`）：success path 三次 `TriggerToBlackClickMs=625/500/515`，平均约 547 ms，较 Step 1 平均约缩短 276 ms；`BlackClickToClipboardRestoreMs=0/0/0`，三次 restore 均成功。fast-failure 三次 `PasteToClipboardRestoreMs=312/313/313`、`ClipboardRestoreSafetyWaitMs=109/94/110`；均为 `COLOR_RESET_WRONG_PROCESS`、无 arrow/black click、clipboard restore 成功，failure feedback 在 restore completed 后开始。人工确认 red marker 未被 sentinel 替换、原 clipboard 恢复、success 后立即输入标点为黑色。Step 3 pass，批准 `SafeMinPasteToRestoreMs=300`。
 
 Windows 必测：成功 Candidate G path，以及故意制造的 fast-failure path。
 

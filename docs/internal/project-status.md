@@ -1,11 +1,11 @@
 # 项目状态与交接
 
-更新时间：2026-07-17（documentation synchronization；无 production-code 变化）
+更新时间：2026-07-20（Step 3 Windows 验收通过；准备独立提交）
 
 ## 冻结基线
 
 - Branch：`main`
-- Commit：`2369b68 Promote pixel-validated Color Reset to mainline`
+- Step 2 baseline commit：`7a0d9a2 perf: scope report hotstrings to MedEx`
 - Tag：`v0.6.0-candidate-g`
 - App source version：`0.5.0-alpha.0`
 - Production default：`relativeMousePixelValidated`
@@ -31,7 +31,7 @@
 - Candidate G G1 calibration、G2 controlled interaction、caret-order A/B 和最终 generated release mainline validation 均通过。
 - `;fzg` no-reset 顺序连续 6 次得到正确 caret，最终 generated release 也已验证。
 - 验证 artifact SHA-256：`761a6c4261246a4bc14f44597e30eef4564db0bd1e48e92a31c1ac1e41f8ef11`。
-- Step 1 已由 `87dce53` 提交；Step 2 记录为 `82 tests passed` 且已通过 Windows 验收，等待独立提交。
+- Step 1 已由 `87dce53` 提交，Step 2 已由 `7a0d9a2` 提交；Step 3 已记录 `86 tests passed`，Windows success/fast-failure 验收通过。验证 artifact SHA-256：`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
 
 ### 仅静态/Python 测试覆盖
 
@@ -40,10 +40,10 @@
 
 ### 当前性能检查点
 
-- MedEx-only shared `#HotIf`/foreground entry predicate 已通过 Windows scope/foreground 验收，等待提交。
+- MedEx-only shared `#HotIf`/foreground entry predicate 已通过 Windows scope/foreground 验收并由 Step 2 提交。
 - critical-path timing fields 和 derived metrics 已由 Step 1 提交并完成 Windows baseline。
-- black click 前置、clipboard restoration 后置的新 transaction ordering，以及 `SafeMinPasteToRestoreMs` 剩余时间保护。
-- Candidate G interaction path 的冗余 process-name queries 已移除，original active HWND checks 保留并通过 Windows 切窗验收；等待提交。
+- black click 前置、clipboard restoration 后置的新 transaction ordering 已通过 Step 3 Windows 验收；`SafeMinPasteToRestoreMs=300` 已批准。
+- Candidate G interaction path 的冗余 process-name queries 已移除，original active HWND checks 保留并通过 Windows 切窗验收。
 - 独立移除 `;fzg` 的 `Sleep 50`。
 - 将 MedEx version 从 hard gate 改为 diagnostics-only metadata。
 - 面向用户的 per-machine layout calibration/profile。
@@ -59,31 +59,34 @@
 ```text
 ;red / ;fwj / ;fjd
 → InsertRedFigureTextAndRestoreState()
-→ CF_HTML paste and ClipboardAll restoration
-→ ResetMedExInsertionColor()
+→ CF_HTML paste
+→ ResetMedExInsertionColor() before restore
 → relativeMousePixelValidated
 → exact UIA Name="检查所见"
 → geometry and client-bounds validation
 → arrow click at most once
 → four-point popup signature
 → black click at most once
-→ mouse restore and structured result
+→ mouse restore
+→ minimum paste-to-restore interval if still required
+→ ClipboardAll restoration in finally
+→ structured result
 ```
 
 `uiaInvoke` 的 popup traversal、exact `000000` lookup 和 Invoke 仅属于显式 comparison/rollback，不是上述 production default flow。
 
 ## 当前风险
 
-- 已提交基线中的 hotstrings 仍为 global；Step 2 working tree 的 MedEx-only entry guard 已通过 Windows 验收，等待提交。
+- report hotstrings 已由 Step 2 限制为 MedEx-only；全局 pause/exit 保持 suspend-exempt。
 - ClipboardAll 过早恢复曾导致 MedEx 粘贴用户原剪贴板；任何优化都必须保留 `finally` 并为 fast failure 强制最小 paste-to-restore interval。
-- 当前 fixed `200/100/100 ms` waits 保护 clipboard correctness，但 black click 被排在 restoration 后，形成用户可感知延迟。
+- Step 3 保留 200 ms paste settle 和 100 ms post-restore settle，以 300 ms minimum interval 替代固定 pre-restore wait，并把 black click 移到 restore 前。
 - 四点 signature 来源于受控 35-point open/closed calibration grid，不是当前明显瓶颈，立即优化不得删除。
 - `RELATIVE_MOUSE_CHAIN_OK` 只表示 signature 通过且 black click 已发送；最终 insertion color 仍需人工确认。
 - 当前 exact MedEx version gate 会拒绝未单独验证的新版本；计划独立移除，但这不等于获得多环境支持。
 
 ## 下一检查点
 
-Step 1 baseline diagnostics 已完成；下一步是完成 Step 2 Windows scope/foreground 验收。主要指标仍为：
+Step 1–3 已完成验证；下一步是独立规划 Step 4，评估删除 `;fzg` 的 `Sleep 50`，但不得与 Step 3 提交混合。主要指标仍为：
 
 ```text
 TriggerToBlackClickMs = BlackClickSentMs - HotstringTriggeredMs
