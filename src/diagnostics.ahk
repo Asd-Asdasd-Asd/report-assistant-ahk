@@ -258,6 +258,12 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "FinalInsertionColorVisuallyValidated=MANUAL_REQUIRED",
         "CursorPositionVisuallyValidated=MANUAL_REQUIRED",
         "ImmediateContinuedTypingRemainedBlack=MANUAL_REQUIRED",
+        "HotstringTriggeredMs=" PerformanceTimestampValue(performanceContext, "HotstringTriggeredMs"),
+        "PasteCommandSentMs=" PerformanceTimestampValue(performanceContext, "PasteCommandSentMs"),
+        "ColorResetStartedMs=" PerformanceTimestampValue(performanceContext, "ColorResetStartedMs"),
+        "ArrowClickSentMs=" PerformanceTimestampValue(performanceContext, "ArrowClickSentMs"),
+        "BlackClickSentMs=" PerformanceTimestampValue(performanceContext, "BlackClickSentMs"),
+        "FunctionReturnedMs=" PerformanceTimestampValue(performanceContext, "FunctionReturnedMs"),
         "HotstringStartMs=" PerformanceTimestampValue(performanceContext, "HotstringStartMs"),
         "PasteSentMs=" PerformanceTimestampValue(performanceContext, "PasteSentMs"),
         "PasteDispatchSettleCompletedMs=" PerformanceTimestampValue(performanceContext, "PasteDispatchSettleCompletedMs"),
@@ -284,7 +290,9 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "InvokeMs=" PerformanceDurationFromFirstAvailable(performanceContext, ["RetryLookupCompletedMs", "ImmediateBlackLookupCompletedMs"], "BlackInvokeCompletedMs"),
         "PostInvokeToCursorMs=" PerformanceDuration(performanceContext, "BlackInvokeCompletedMs", "CursorRestoreSentMs"),
         "TotalHotstringMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
-        "TotalHotstringDurationMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs")
+        "TotalHotstringDurationMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
+        "TriggerToBlackClickMs=" PerformanceDuration(performanceContext, "HotstringTriggeredMs", "BlackClickSentMs"),
+        "PasteToClipboardRestoreMs=" PerformanceDuration(performanceContext, "PasteCommandSentMs", "ClipboardRestoreStartedMs")
     ]
     return JoinDiagnosticFields(fields, "`r`n") "`r`n"
 }

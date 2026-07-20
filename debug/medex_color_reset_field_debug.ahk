@@ -15,6 +15,7 @@
 #Include ..\src\Lib\UIA.ahk
 #Include ..\src\clipboard_html.ahk
 #Include ..\src\medex_color_reset_logic.ahk
+#Include ..\src\medex_candidate_g_logic.ahk
 #Include ..\src\diagnostics.ahk
 #Include ..\src\adapters\medex_report_editor.ahk
 #Include ..\src\report_editor.ahk
@@ -156,7 +157,8 @@ RunMedExProductionTimingFieldDebug() {
         "uiaLibraryVersionPinned", DEBUG_UIA_LIBRARY_VERSION_PINNED
     )
 
-    operation := RunFzgInsertion(options)
+    options["colorResetStrategy"] := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED
+    operation := RunRedInsertion(options)
     output := "SourceProjectVersion=" AppMetadata.Version "`r`n"
         . "SourceRevision=" AppMetadata.SourceRevision "`r`n"
         . "TestDate=" FormatTime(, "yyyy-MM-dd HH:mm:ss") "`r`n"

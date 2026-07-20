@@ -50,6 +50,7 @@ ResetMedExInsertionColor(options := 0) {
 
 RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
     startedAt := A_TickCount
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "appVersion", AppMetadata.Version,
@@ -190,6 +191,10 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
         if !skipArrowClickForClosedSignatureTest {
             try {
                 Click arrowPoint["x"], arrowPoint["y"]
+                RecordOptionalPerformanceTimestamp(
+                    performanceContext,
+                    "ArrowClickSentMs"
+                )
                 context["arrowClickSent"] := true
                 context["arrowClickCount"] := 1
             } catch as err {
@@ -235,6 +240,10 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
         }
         try {
             Click blackPoint["x"], blackPoint["y"]
+            RecordOptionalPerformanceTimestamp(
+                performanceContext,
+                "BlackClickSentMs"
+            )
             context["blackClickSent"] := true
             context["blackClickCount"] := 1
         } catch as err {

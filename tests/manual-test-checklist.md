@@ -5,17 +5,17 @@
 ## Current baseline and next checkpoint
 
 - Frozen baseline：`2369b68` / `v0.6.0-candidate-g`。
-- Windows promotion 已记录 `75 tests passed`；当前环境无法重跑时只表示本次未独立复验。
+- Step 1 本地验证已记录 `78 tests passed`。
 - `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅显式 comparison/rollback；无 fallback。
 - `;fzg` 当前不运行 Color Reset，顺序为 paste/restore → 50 ms → `Left 4`。
 - 下一次 Windows 操作从 Step 1 baseline timing 开始，详细 pass/failure contract 见 `docs/internal/performance-optimization-checkpoints.md`。
 
-Step 1 最小回报：
+Step 1 已于 2026-07-20 通过：
 
 ```text
 Step 1 passed
-TriggerToBlackClickMs=...
-PasteToClipboardRestoreMs=...
+TriggerToBlackClickMs=906/797/766
+PasteToClipboardRestoreMs=312/312/313
 No functional failures
 ```
 
@@ -163,18 +163,17 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 
 ### Production latency/cursor smoke test
 
-本测试同样只能在 approved non-clinical context 中执行。`Ctrl+Alt+F11` 会运行完整 `;fzg` production chain，实际插入测试短语，并把 timing result 写入 clipboard 和 `%TEMP%\MedExAHK\medex_production_timing_debug.txt`。运行 timing debug 时不要同时启动另一个注册相同 hotstrings 的 production instance。
+本测试同样只能在 approved non-clinical context 中执行。`Ctrl+Alt+F11` 会运行与 production `;red` 相同的 shared insertion chain，显式选择 Candidate G，插入红色 `（见图）`，并把 timing result 写入 clipboard 和 `%TEMP%\MedExAHK\medex_production_timing_debug.txt`。运行 timing debug 时不要同时启动 generated release 或其他 AHK test instance。
 
-1. [ ] 启动 `debug/medex_color_reset_field_debug.ahk`，focus MedEx 测试编辑区。
-2. [ ] 按 `Ctrl+Alt+F11` 连续执行三次，每次使用新的空白测试位置。
-3. [ ] 记录 `TotalHotstringDurationMs`、`MenuLookupStrategy`、`BlackLookupAttemptCount` 和 `RetryUsed`。
-4. [ ] 确认每次 `ClipboardRestoreSucceeded=true`，并人工核对测试前 clipboard payload 已恢复。
-5. [ ] 确认最终颜色为 black，并把 `FinalInsertionColorVisuallyValidated` 人工记为 true。
-6. [ ] 确认最终光标位于 `|（见图）`，把 `CursorPositionVisuallyValidated` 人工记为 true。
-7. [ ] 使用 normal `;fzg` 后立即连续输入 harmless punctuation，确认它保持 black，并记录 `ImmediateContinuedTypingRemainedBlack=true`。
-8. [ ] 在错误 region 执行一次，确认 no trigger click、no second click 和 fail-closed result。
-9. [ ] 确认整个过程没有 `MsgBox`、`ToolTip`、`TrayTip` 或 focus-stealing feedback。
-10. [ ] 将完整 timing result 回传开发环境；重点保留 anchor snapshot、每次 black lookup 和 total timing。
+1. [x] 启动 `debug/medex_color_reset_field_debug.ahk`，focus MedEx 测试编辑区。
+2. [x] 按 `Ctrl+Alt+F11` 连续执行三次，每次使用新的空白测试位置，并立即输入 `。` 或 `；`。
+3. [x] 每次确认输出含 `HotstringTriggeredMs`、`PasteCommandSentMs`、`ColorResetStartedMs`、`ArrowClickSentMs`、`BlackClickSentMs`、`ClipboardRestoreStartedMs`、`ClipboardRestoreCompletedMs`、`FunctionReturnedMs`、`TriggerToBlackClickMs` 和 `PasteToClipboardRestoreMs`。
+4. [x] 确认两个 derived duration 非负，且 timestamps 顺序符合当前 baseline transaction。
+5. [x] 确认 red marker 未被 clipboard sentinel 替换、原 clipboard 已恢复、immediate punctuation 为黑色。
+6. [x] 记录三次 `TriggerToBlackClickMs` 和 `PasteToClipboardRestoreMs`，不以 total function runtime 代替关键路径指标。
+7. [x] 确认 `ArrowClickSentMs <= BlackClickSentMs <= FunctionReturnedMs`，且当前 baseline 中 `ClipboardRestoreStartedMs < ColorResetStartedMs`。
+8. [ ] 单独确认整个过程没有 `MsgBox`、`ToolTip`、`TrayTip` 或 focus-stealing feedback；本次回报未单列该观察项。
+9. [x] 将完整 timing result 回传开发环境；本步骤未修改 waits、transaction ordering 或 Candidate G checks。
 
 #### Reliability/latency remediation matrix
 

@@ -169,7 +169,10 @@ PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
         return false
 
     Send("^v")
-    RecordOptionalPerformanceTimestamp(performanceContext, "PasteSentMs")
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["PasteCommandSentMs", "PasteSentMs"]
+    )
     Sleep ClipboardTransactionDefaults.HtmlPasteDispatchSettleMs
     RecordOptionalPerformanceTimestamp(
         performanceContext,
@@ -217,6 +220,14 @@ WaitForClipboardFormat(format, timeoutMs := 500) {
 RecordOptionalPerformanceTimestamp(performanceContext, key) {
     if Type(performanceContext) = "Map"
         performanceContext[key] := A_TickCount
+}
+
+RecordOptionalPerformanceTimestampAliases(performanceContext, keys) {
+    if Type(performanceContext) != "Map" || Type(keys) != "Array"
+        return
+    timestamp := A_TickCount
+    for key in keys
+        performanceContext[key] := timestamp
 }
 
 SetClipboardBuffer(format, source) {

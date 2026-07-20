@@ -31,7 +31,7 @@
 - [ ] 在 Windows 上直接用目标 AutoHotkey v2 启动 generated `.ahk`，确认无 parser/startup error；静态扫描不能替代本步骤。
 - [ ] Windows smoke test 前完全退出所有 release、legacy 和 field-debug AHK instances；测试期间一次只运行一个脚本。
 - [ ] 记录实际启动的 `release/report_assistant.ahk` 路径和 SHA-256，避免把 stale NAS/local copy 当作当前生成物。
-- [ ] 分别在 release-only 与 debug-only 状态测试；确认 field-debug 不注册 `;red`/`;fzg`，F11 通过 shared `RunFzgInsertion()` 调用同一 strategy dispatcher。
+- [ ] 分别在 release-only 与 debug-only 状态测试；确认 field-debug 不注册 production hotstrings，Step 1 F11 通过 shared `RunRedInsertion()` 调用 Candidate G production dispatcher。
 - [ ] 从 source truth 生成 internal-test executable，不手改生成产物。
 - [ ] 检查 executable/source release 不包含真实 `config.ini`、日志或 patient data。
 - [ ] 确认更新流程不会覆盖 `%LocalAppData%\MedExAHK\config.ini`。

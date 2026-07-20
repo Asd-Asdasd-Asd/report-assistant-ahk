@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-16 13:53:55 UTC
+; Generated at: 2026-07-20 01:04:27 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -8240,7 +8240,10 @@ PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0) {
         return false
 
     Send("^v")
-    RecordOptionalPerformanceTimestamp(performanceContext, "PasteSentMs")
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["PasteCommandSentMs", "PasteSentMs"]
+    )
     Sleep ClipboardTransactionDefaults.HtmlPasteDispatchSettleMs
     RecordOptionalPerformanceTimestamp(
         performanceContext,
@@ -8288,6 +8291,14 @@ WaitForClipboardFormat(format, timeoutMs := 500) {
 RecordOptionalPerformanceTimestamp(performanceContext, key) {
     if Type(performanceContext) = "Map"
         performanceContext[key] := A_TickCount
+}
+
+RecordOptionalPerformanceTimestampAliases(performanceContext, keys) {
+    if Type(performanceContext) != "Map" || Type(keys) != "Array"
+        return
+    timestamp := A_TickCount
+    for key in keys
+        performanceContext[key] := timestamp
 }
 
 SetClipboardBuffer(format, source) {
@@ -9341,6 +9352,12 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "FinalInsertionColorVisuallyValidated=MANUAL_REQUIRED",
         "CursorPositionVisuallyValidated=MANUAL_REQUIRED",
         "ImmediateContinuedTypingRemainedBlack=MANUAL_REQUIRED",
+        "HotstringTriggeredMs=" PerformanceTimestampValue(performanceContext, "HotstringTriggeredMs"),
+        "PasteCommandSentMs=" PerformanceTimestampValue(performanceContext, "PasteCommandSentMs"),
+        "ColorResetStartedMs=" PerformanceTimestampValue(performanceContext, "ColorResetStartedMs"),
+        "ArrowClickSentMs=" PerformanceTimestampValue(performanceContext, "ArrowClickSentMs"),
+        "BlackClickSentMs=" PerformanceTimestampValue(performanceContext, "BlackClickSentMs"),
+        "FunctionReturnedMs=" PerformanceTimestampValue(performanceContext, "FunctionReturnedMs"),
         "HotstringStartMs=" PerformanceTimestampValue(performanceContext, "HotstringStartMs"),
         "PasteSentMs=" PerformanceTimestampValue(performanceContext, "PasteSentMs"),
         "PasteDispatchSettleCompletedMs=" PerformanceTimestampValue(performanceContext, "PasteDispatchSettleCompletedMs"),
@@ -9367,7 +9384,9 @@ FormatMedExPerformanceTimingResult(operation, performanceContext) {
         "InvokeMs=" PerformanceDurationFromFirstAvailable(performanceContext, ["RetryLookupCompletedMs", "ImmediateBlackLookupCompletedMs"], "BlackInvokeCompletedMs"),
         "PostInvokeToCursorMs=" PerformanceDuration(performanceContext, "BlackInvokeCompletedMs", "CursorRestoreSentMs"),
         "TotalHotstringMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
-        "TotalHotstringDurationMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs")
+        "TotalHotstringDurationMs=" PerformanceDuration(performanceContext, "HotstringStartMs", "HotstringReturnMs"),
+        "TriggerToBlackClickMs=" PerformanceDuration(performanceContext, "HotstringTriggeredMs", "BlackClickSentMs"),
+        "PasteToClipboardRestoreMs=" PerformanceDuration(performanceContext, "PasteCommandSentMs", "ClipboardRestoreStartedMs")
     ]
     return JoinDiagnosticFields(fields, "`r`n") "`r`n"
 }
@@ -9532,6 +9551,7 @@ ResetMedExInsertionColor(options := 0) {
 
 RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
     startedAt := A_TickCount
+    performanceContext := MedExAdapterOption(options, "performanceContext", 0)
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "appVersion", AppMetadata.Version,
@@ -9672,6 +9692,10 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
         if !skipArrowClickForClosedSignatureTest {
             try {
                 Click arrowPoint["x"], arrowPoint["y"]
+                RecordOptionalPerformanceTimestamp(
+                    performanceContext,
+                    "ArrowClickSentMs"
+                )
                 context["arrowClickSent"] := true
                 context["arrowClickCount"] := 1
             } catch as err {
@@ -9717,6 +9741,10 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
         }
         try {
             Click blackPoint["x"], blackPoint["y"]
+            RecordOptionalPerformanceTimestamp(
+                performanceContext,
+                "BlackClickSentMs"
+            )
             context["blackClickSent"] := true
             context["blackClickCount"] := 1
         } catch as err {
@@ -10556,6 +10584,20 @@ class ReportHotstringTimingDefaults {
     static FzgCursorRestoreDelayMs := 50
 }
 
+RunRedInsertion(resetOptions := 0) {
+    performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["HotstringTriggeredMs", "HotstringStartMs"]
+    )
+    operation := InsertRedFigureTextAndRestoreState("（见图）", resetOptions)
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["FunctionReturnedMs", "HotstringReturnMs"]
+    )
+    return operation
+}
+
 RunFzgInsertion(resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
@@ -10646,7 +10688,10 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
 
     ; The text is already present at this point. A reset failure is reported but
     ; never triggers automatic deletion or undo of report content.
-    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetStartMs")
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["ColorResetStartedMs", "ColorResetStartMs"]
+    )
     resetResult := ResetMedExInsertionColor(resetOptions)
     RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetReturnedMs")
     if !resetResult.ok {
@@ -10713,7 +10758,7 @@ ExampleCalibratedViewerClick() {
 ; --- BEGIN hotstrings.ahk ---
 :*?:;red::
 {
-    InsertRedFigureTextAndRestoreState()
+    RunRedInsertion()
 }
 
 :*?:;fzg::
@@ -10724,13 +10769,13 @@ ExampleCalibratedViewerClick() {
 :*?:;fwj::
 {
     SendText("放射性摄取未见明显增高")
-    InsertRedFigureTextAndRestoreState()
+    RunRedInsertion()
 }
 
 :*?:;fjd::
 {
     SendText("放射性摄取降低")
-    InsertRedFigureTextAndRestoreState()
+    RunRedInsertion()
 }
 
 :*?:;cmx::

@@ -7,6 +7,20 @@ class ReportHotstringTimingDefaults {
     static FzgCursorRestoreDelayMs := 50
 }
 
+RunRedInsertion(resetOptions := 0) {
+    performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["HotstringTriggeredMs", "HotstringStartMs"]
+    )
+    operation := InsertRedFigureTextAndRestoreState("（见图）", resetOptions)
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["FunctionReturnedMs", "HotstringReturnMs"]
+    )
+    return operation
+}
+
 RunFzgInsertion(resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
@@ -97,7 +111,10 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
 
     ; The text is already present at this point. A reset failure is reported but
     ; never triggers automatic deletion or undo of report content.
-    RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetStartMs")
+    RecordOptionalPerformanceTimestampAliases(
+        performanceContext,
+        ["ColorResetStartedMs", "ColorResetStartMs"]
+    )
     resetResult := ResetMedExInsertionColor(resetOptions)
     RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetReturnedMs")
     if !resetResult.ok {

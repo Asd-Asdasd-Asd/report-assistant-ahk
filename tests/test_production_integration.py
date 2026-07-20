@@ -23,7 +23,7 @@ def function_body(text: str, name: str, next_name: str) -> str:
 class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_hotstrings_use_report_editor_orchestration(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        self.assertIn("InsertRedFigureTextAndRestoreState()", hotstrings)
+        self.assertIn("RunRedInsertion()", hotstrings)
         self.assertNotIn("ResetMedExInsertionColor(", hotstrings)
 
     def test_fzg_preserves_phrase_specific_legacy_cursor_contract(self) -> None:
@@ -205,9 +205,23 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertNotIn("#Include ..\\src\\hotstrings.ahk", field_debug)
         self.assertNotIn(":*?:;red::", field_debug)
         self.assertNotIn(":*?:;fzg::", field_debug)
-        self.assertIn("RunFzgInsertion(options)", field_debug)
+        self.assertIn("RunRedInsertion(options)", field_debug)
+        self.assertIn(
+            'options["colorResetStrategy"] := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED',
+            field_debug,
+        )
         self.assertIn("DEBUG_USE_CACHED_ANCHOR_SNAPSHOT := MedExColorResetDefaults.UseCachedAnchorSnapshot", field_debug)
         self.assertIn("static UseCachedAnchorSnapshot := false", source("src/adapters/medex_report_editor.ahk"))
+
+    def test_field_debug_loads_candidate_g_before_adapter(self) -> None:
+        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        candidate_g_include = "#Include ..\\src\\medex_candidate_g_logic.ahk"
+        adapter_include = "#Include ..\\src\\adapters\\medex_report_editor.ahk"
+        self.assertEqual(field_debug.count(candidate_g_include), 1)
+        self.assertLess(
+            field_debug.index(candidate_g_include),
+            field_debug.index(adapter_include),
+        )
 
     def test_color_reset_strategy_boundary_has_no_automatic_fallback(self) -> None:
         logic = source("src/medex_color_reset_logic.ahk")
@@ -269,6 +283,14 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         diagnostics = source("src/diagnostics.ahk")
         field_debug = source("debug/medex_color_reset_field_debug.ahk")
         for field in (
+            "HotstringTriggeredMs",
+            "PasteCommandSentMs",
+            "ColorResetStartedMs",
+            "ArrowClickSentMs",
+            "BlackClickSentMs",
+            "FunctionReturnedMs",
+            "TriggerToBlackClickMs",
+            "PasteToClipboardRestoreMs",
             "HotstringStartMs",
             "PasteSentMs",
             "ClipboardRestoreCompletedMs",
@@ -284,9 +306,68 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         ):
             self.assertIn(field, diagnostics)
         self.assertIn('"diagnosticMode", "performance"', field_debug)
-        self.assertIn("RunFzgInsertion(options)", field_debug)
+        self.assertIn("RunRedInsertion(options)", field_debug)
         for forbidden in ("patient", "clipboard text", "report content"):
             self.assertNotIn(forbidden, diagnostics.lower())
+
+    def test_step_one_timing_keeps_ordering_and_records_candidate_g_clicks(self) -> None:
+        report_editor = source("src/report_editor.ahk")
+        clipboard = source("src/clipboard_html.ahk")
+        adapter = source("src/adapters/medex_report_editor.ahk")
+        wrapper = function_body(report_editor, "RunRedInsertion", "RunFzgInsertion")
+        orchestration = function_body(
+            report_editor,
+            "InsertRedFigureTextAndRestoreState",
+            "ResetReportFormattingPlaceholder",
+        )
+        self.assertLess(
+            wrapper.index('"HotstringTriggeredMs"'),
+            wrapper.index("InsertRedFigureTextAndRestoreState"),
+        )
+        self.assertGreater(
+            wrapper.index('"FunctionReturnedMs"'),
+            wrapper.index("InsertRedFigureTextAndRestoreState"),
+        )
+        self.assertIn('"PasteCommandSentMs"', clipboard)
+        self.assertIn('"ColorResetStartedMs"', orchestration)
+        self.assertIn('"ArrowClickSentMs"', adapter)
+        self.assertIn('"BlackClickSentMs"', adapter)
+        candidate_g = adapter.split(
+            "RunMedExRelativeMousePixelValidatedColorReset(options := 0)", 1
+        )[1].split("\n\nSampleAndEvaluateCandidateGPopupSignature(arrowPoint)", 1)[0]
+        self.assertEqual(
+            candidate_g.count(
+                'performanceContext := MedExAdapterOption(options, "performanceContext", 0)'
+            ),
+            1,
+        )
+        self.assertEqual(candidate_g.count("RecordOptionalPerformanceTimestamp("), 2)
+        self.assertEqual(candidate_g.count("performanceContext,"), 2)
+        self.assertEqual(
+            orchestration.index("PasteRedFigureTextDetailed"),
+            min(
+                orchestration.index("PasteRedFigureTextDetailed"),
+                orchestration.index("ResetMedExInsertionColor"),
+            ),
+        )
+        self.assertIn("static HtmlPasteDispatchSettleMs := 200", clipboard)
+        self.assertIn("static ClipboardPreRestoreSettleMs := 100", clipboard)
+        self.assertIn("static ClipboardPostRestoreSettleMs := 100", clipboard)
+
+    def test_candidate_g_definitions_precede_adapter_references_in_release(self) -> None:
+        candidate_g = source("src/medex_candidate_g_logic.ahk")
+        adapter = source("src/adapters/medex_report_editor.ahk")
+        release = source("release/report_assistant.ahk")
+        self.assertIn("class CandidateGRelativeMouseProfile", candidate_g)
+        self.assertIn("CandidateGRelativeMouseProfile.ProfileName", adapter)
+        self.assertEqual(
+            release.count("; --- BEGIN medex_candidate_g_logic.ahk ---"),
+            1,
+        )
+        self.assertLess(
+            release.index("class CandidateGRelativeMouseProfile"),
+            release.index("CandidateGRelativeMouseProfile.ProfileName"),
+        )
 
     def test_version_and_uia_dependency_are_production_owned(self) -> None:
         metadata = source("src/app_metadata.ahk")

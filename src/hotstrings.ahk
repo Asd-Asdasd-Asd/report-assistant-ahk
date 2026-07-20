@@ -1,6 +1,6 @@
 :*?:;red::
 {
-    InsertRedFigureTextAndRestoreState()
+    RunRedInsertion()
 }
 
 :*?:;fzg::
@@ -11,13 +11,13 @@
 :*?:;fwj::
 {
     SendText("放射性摄取未见明显增高")
-    InsertRedFigureTextAndRestoreState()
+    RunRedInsertion()
 }
 
 :*?:;fjd::
 {
     SendText("放射性摄取降低")
-    InsertRedFigureTextAndRestoreState()
+    RunRedInsertion()
 }
 
 :*?:;cmx::
