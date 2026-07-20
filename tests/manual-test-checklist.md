@@ -4,11 +4,12 @@
 
 ## Current baseline and next checkpoint
 
-- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`，Step 3=`6c2e2dc`。
+- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`，Step 3=`6c2e2dc`，Step 4=`5193403`。
 - Step 3 已记录 `86 tests passed`；验收 release SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
+- Step 5 已记录 `89 tests passed`；Windows version-metadata validation 与 generated-release smoke test 已通过。
 - `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅显式 comparison/rollback；无 fallback。
 - `;fzg` 当前不运行 Color Reset；Step 4 candidate 顺序为 paste/restore → `Left 4`，始终不使用 `Left 5`。
-- Step 4 F9/F10 A/B 和 generated-release validation 已通过；下一检查点为独立 Step 5。
+- Step 4 已由 `5193403` 提交；下一检查点为 Step 5 version-metadata validation。
 
 Step 1 已于 2026-07-20 通过：
 
@@ -60,6 +61,19 @@ Step 3 已同时完成 success 与 deliberately induced fast-failure，确认 no
 6. [x] 退出 harness，只运行 regenerated release；normal `;fzg` 连续 10 次通过 caret、clipboard 和 immediate-black 验证。
 7. [x] Generated release 的 normal `;red` smoke test 通过，Step 3 red insertion、black reset 和 clipboard restore 无回退。
 8. [x] Artifact SHA-256=`4de7f53a2498a2eda5ba4df8035339051b3d99653b5b004df0647a7517a936aa`；Step 4 pass，提交前不得进入 Step 5。
+
+### Step 5 version metadata gate removal
+
+模拟 `9.9.9.9` 只验证 version 字符串不再阻止 execution/calibration，不代表真实新版支持。所有测试均在 approved non-clinical context 执行，各 harness 与 release 必须单独运行。
+
+1. [x] 只运行 `debug/medex_candidate_g_calibration.ahk`，交替执行 F10 actual-version control 与 `Ctrl+Alt+F6` mismatch override，各 3 次。
+2. [x] 六次均为 `CANDIDATE_G_ROW_OK`，row/anchor/estimated points 一致且无 black click；override 记录 `ProfileValidationMedExVersion=9.9.9.9`、`MedExVersionMatchState=MISMATCH`、`MedExVersionMetadataOverrideApplied=true`。
+3. [x] 退出 G1，只运行 `debug/medex_candidate_g2_test.ahk`，交替执行 F12 actual-version control 与 `Ctrl+Alt+F11` mismatch override，各 3 次。
+4. [x] 六次均为 `RELATIVE_MOUSE_CHAIN_OK`，arrow/black points、signature 和 click counts 一致；人工确认后续无害字符为黑色。
+5. [x] G2 override 记录 `TestCase=step5VersionMetadataMismatch`、实际 `MedExVersion=0.0.1.0`、`ProfileValidationMedExVersion=9.9.9.9`、`CalibratedMedExVersion=0.0.1.0`、`MedExVersionMatchState=MISMATCH`。
+6. [x] 确认 resolution、DPI、scaling、geometry、signature 和 foreground guards 均未放宽。
+7. [x] 退出 harness，只运行 regenerated release；normal `;red` 确认 red insertion、black reset、clipboard restore 和 immediate black 无回退。
+8. [x] Release SHA-256=`02f04601e2a1bb1501374c95e9d70f9961d96d87079713ecce366893988b8bae`；Step 5 pass，提交前不得进入 Step 6。
 
 ## Historical reconciled release smoke test（TEST CHECKPOINT 1，已被 promotion 取代）
 

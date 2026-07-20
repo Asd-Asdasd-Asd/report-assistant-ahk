@@ -162,6 +162,27 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertIn("static ArrowOffsetY := 0", source)
         self.assertIn("static BlackOffsetX := 6", source)
         self.assertIn("static BlackOffsetY := 83", source)
+        self.assertEqual(source.count('static CalibratedMedExVersion := "0.0.1.0"'), 2)
+        self.assertNotIn("SupportedMedExVersion", source)
+
+    def test_step_five_version_is_metadata_while_layout_remains_gated(self) -> None:
+        source = LOGIC.read_text(encoding="utf-8")
+        calibration = source.split(
+            "ValidateCandidateGSupportedProfile(environment, options := 0)", 1
+        )[1].split("\n\nBuildCandidateGRuntimeLayoutOptions", 1)[0]
+        runtime = source.split(
+            "ValidateCandidateGRuntimeProfile(environment, options := 0)", 1
+        )[1].split("\n\nCandidateGPopupSignatureSample", 1)[0]
+        for body in (calibration, runtime):
+            expected = body.split("expected := Map(", 1)[1].split("\n    )", 1)[0]
+            self.assertNotIn('"medExVersion"', expected)
+            for key in ("screenWidth", "screenHeight", "dpi", "displayScaling"):
+                self.assertIn(f'"{key}"', expected)
+            self.assertIn("BuildCandidateGVersionMetadata", body)
+        self.assertIn('static MATCH := "MATCH"', source)
+        self.assertIn('static MISMATCH := "MISMATCH"', source)
+        self.assertIn('static UNKNOWN := "UNKNOWN"', source)
+        self.assertIn("candidateGMedExVersionMetadataOverride", source)
 
     def test_field_signature_matches_open_popup_evidence(self) -> None:
         self.assertTrue(signature_matches({
@@ -291,6 +312,24 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertNotIn("InvokePattern", source)
         for forbidden in ("MsgBox", "ToolTip", "TrayTip"):
             self.assertNotIn(forbidden, source)
+
+    def test_step_five_debug_paths_override_only_version_metadata(self) -> None:
+        calibration = DEBUG.read_text(encoding="utf-8")
+        controlled = G2_TEST.read_text(encoding="utf-8")
+        self.assertIn("^!F6::RunCandidateGVersionMetadataMismatchProbe()", calibration)
+        self.assertIn('"candidateGMedExVersionMetadataOverride", "9.9.9.9"', calibration)
+        self.assertIn("ValidateCandidateGSupportedProfile(environment, options)", calibration)
+        self.assertIn("^!F11::", controlled)
+        self.assertIn('CandidateG2TestOptions("9.9.9.9")', controlled)
+        self.assertIn('"step5VersionMetadataMismatch"', controlled)
+        for field in (
+            "ProfileValidationMedExVersion",
+            "CalibratedMedExVersion",
+            "MedExVersionMatchState",
+            "MedExVersionMetadataOverrideApplied",
+        ):
+            self.assertIn(field, calibration)
+            self.assertIn(field, controlled)
 
     def test_step_four_caret_ab_keeps_left_four_and_changes_only_delay(self) -> None:
         source = G2_TEST.read_text(encoding="utf-8")

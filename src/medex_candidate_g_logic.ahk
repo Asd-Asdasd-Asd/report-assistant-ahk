@@ -8,7 +8,7 @@ class CandidateGCalibrationCode {
 
 class CandidateGCalibrationProfile {
     static ProfileName := "medex-0.0.1-1920x1080-100-calibration"
-    static SupportedMedExVersion := "0.0.1.0"
+    static CalibratedMedExVersion := "0.0.1.0"
     static SupportedScreenWidth := 1920
     static SupportedScreenHeight := 1080
     static SupportedDpi := 96
@@ -37,7 +37,7 @@ class CandidateGCalibrationProfile {
 
 class CandidateGRelativeMouseProfile {
     static ProfileName := "medex-0.0.1-1920x1080-100-relative-mouse-v1"
-    static SupportedMedExVersion := "0.0.1.0"
+    static CalibratedMedExVersion := "0.0.1.0"
     static SupportedScreenWidth := 1920
     static SupportedScreenHeight := 1080
     static SupportedDpi := 96
@@ -69,6 +69,41 @@ class CandidateGRelativeMouseProfile {
     static BlueSwatchTolerance := 12
 }
 
+class CandidateGVersionMatchState {
+    static MATCH := "MATCH"
+    static MISMATCH := "MISMATCH"
+    static UNKNOWN := "UNKNOWN"
+}
+
+BuildCandidateGVersionMetadata(environment, calibratedVersion, options := 0) {
+    overrideApplied := Type(options) = "Map"
+        && options.Has("candidateGMedExVersionMetadataOverride")
+    if overrideApplied {
+        profileValidationVersion := options[
+            "candidateGMedExVersionMetadataOverride"
+        ]
+    } else if Type(environment) = "Map" && environment.Has("medExVersion") {
+        profileValidationVersion := environment["medExVersion"]
+    } else {
+        profileValidationVersion := "UNKNOWN"
+    }
+
+    versionText := String(profileValidationVersion)
+    if versionText = "" || versionText = "UNKNOWN" {
+        matchState := CandidateGVersionMatchState.UNKNOWN
+    } else if versionText = String(calibratedVersion) {
+        matchState := CandidateGVersionMatchState.MATCH
+    } else {
+        matchState := CandidateGVersionMatchState.MISMATCH
+    }
+    return Map(
+        "profileValidationMedExVersion", profileValidationVersion,
+        "calibratedMedExVersion", calibratedVersion,
+        "medExVersionMatchState", matchState,
+        "medExVersionMetadataOverrideApplied", overrideApplied
+    )
+}
+
 ValidateCandidateGSupportedProfile(environment, options := 0) {
     context := Map(
         "candidateGProfileName", CandidateGLogicOption(
@@ -79,13 +114,19 @@ ValidateCandidateGSupportedProfile(environment, options := 0) {
         "supportedProfile", false,
         "unsupportedProfileReason", ""
     )
+    versionMetadata := BuildCandidateGVersionMetadata(
+        environment,
+        CandidateGCalibrationProfile.CalibratedMedExVersion,
+        options
+    )
+    for key, value in versionMetadata
+        context[key] := value
     if Type(environment) != "Map" {
         context["unsupportedProfileReason"] := "environmentUnavailable"
         return MakeCandidateGResult(false, CandidateGCalibrationCode.UNSUPPORTED_PROFILE, context)
     }
 
     expected := Map(
-        "medExVersion", CandidateGCalibrationProfile.SupportedMedExVersion,
         "screenWidth", CandidateGCalibrationProfile.SupportedScreenWidth,
         "screenHeight", CandidateGCalibrationProfile.SupportedScreenHeight,
         "dpi", CandidateGCalibrationProfile.SupportedDpi,
@@ -126,12 +167,18 @@ ValidateCandidateGRuntimeProfile(environment, options := 0) {
         "supportedProfile", false,
         "unsupportedProfileReason", ""
     )
+    versionMetadata := BuildCandidateGVersionMetadata(
+        environment,
+        CandidateGRelativeMouseProfile.CalibratedMedExVersion,
+        options
+    )
+    for key, value in versionMetadata
+        context[key] := value
     if Type(environment) != "Map" {
         context["unsupportedProfileReason"] := "environmentUnavailable"
         return MakeColorResetResult(false, ColorResetCode.UNSUPPORTED_PROFILE, context)
     }
     expected := Map(
-        "medExVersion", CandidateGRelativeMouseProfile.SupportedMedExVersion,
         "screenWidth", CandidateGRelativeMouseProfile.SupportedScreenWidth,
         "screenHeight", CandidateGRelativeMouseProfile.SupportedScreenHeight,
         "dpi", CandidateGRelativeMouseProfile.SupportedDpi,

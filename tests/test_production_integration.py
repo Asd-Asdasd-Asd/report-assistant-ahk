@@ -390,6 +390,9 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         )
         self.assertIn('"appVersion="', lightweight)
         self.assertIn('"resultCode="', lightweight)
+        self.assertIn('"medExVersion="', lightweight)
+        self.assertIn('"calibratedMedExVersion="', lightweight)
+        self.assertIn('"medExVersionMatchState="', lightweight)
         for heavy_field in ("uiaRootRect", "regionAnchorRect", "fontSizeAnchorRect", "calculatedScreenPoint"):
             self.assertNotIn(heavy_field, lightweight)
         self.assertIn("FormatMedExFieldDebugResult", diagnostics)
@@ -501,6 +504,23 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertFalse((ROOT / "debug" / "Lib" / "UIA.ahk").exists())
         self.assertIn('"Lib/UIA.ahk"', build)
         self.assertIn("..\\src\\Lib\\UIA.ahk", field_debug)
+
+    def test_step_five_version_metadata_is_bundled_without_exact_gate(self) -> None:
+        release = source("release/report_assistant.ahk")
+        diagnostics = source("src/diagnostics.ahk")
+        self.assertNotIn("SupportedMedExVersion", release)
+        self.assertEqual(
+            release.count('static CalibratedMedExVersion := "0.0.1.0"'),
+            2,
+        )
+        for field in (
+            "ProfileValidationMedExVersion",
+            "CalibratedMedExVersion",
+            "MedExVersionMatchState",
+            "MedExVersionMetadataOverrideApplied",
+        ):
+            self.assertIn(field, diagnostics)
+            self.assertIn(field, release)
 
     def test_production_sources_are_relocatable(self) -> None:
         app_sources = [

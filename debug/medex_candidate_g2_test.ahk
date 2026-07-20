@@ -41,6 +41,14 @@ F12::
     WriteCandidateG2TestReset("resetOnly", result)
 }
 
+; Step 5: exercise the production interaction chain with mismatched version
+; metadata. Layout, signature, and foreground gates remain real.
+^!F11::
+{
+    result := ResetMedExInsertionColor(CandidateG2TestOptions("9.9.9.9"))
+    WriteCandidateG2TestReset("step5VersionMetadataMismatch", result)
+}
+
 ; Caret A/B control: current Candidate G2 reset chain, then Left 4.
 ^!F8::
 {
@@ -60,11 +68,14 @@ F12::
     Step4CaretSettleAbDefaults.CandidateSettleMs
 )
 
-CandidateG2TestOptions() {
-    return Map(
+CandidateG2TestOptions(versionMetadataOverride := "") {
+    options := Map(
         "colorResetStrategy", MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED,
         "diagnosticMode", "candidateG2"
     )
+    if versionMetadataOverride != ""
+        options["candidateGMedExVersionMetadataOverride"] := versionMetadataOverride
+    return options
 }
 
 RunCandidateG2FzgWithColorResetDiagnostic() {
@@ -122,6 +133,11 @@ WriteCandidateG2TestLine(testCase, operationCode, resetCode, context) {
         "OperationResult=" SafeDiagnosticValue(operationCode),
         "ColorResetResult=" SafeDiagnosticValue(resetCode),
         "ColorResetStrategy=" SafeDiagnosticValue(MedExContextValue(context, "colorResetStrategy", "UNKNOWN")),
+        "MedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "medExVersion", "UNKNOWN")),
+        "ProfileValidationMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "profileValidationMedExVersion", "UNKNOWN")),
+        "CalibratedMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "calibratedMedExVersion", "UNKNOWN")),
+        "MedExVersionMatchState=" SafeDiagnosticValue(MedExContextValue(context, "medExVersionMatchState", "UNKNOWN")),
+        "MedExVersionMetadataOverrideApplied=" FormatDiagnosticBoolean(MedExContextValue(context, "medExVersionMetadataOverrideApplied", false)),
         "RegionAnchorRect=" FormatDiagnosticRect(MedExContextValue(context, "regionAnchorRect", 0)),
         "ArrowPoint=" FormatDiagnosticPoint(MedExContextValue(context, "arrowPoint", 0)),
         "BlackPoint=" FormatDiagnosticPoint(MedExContextValue(context, "blackPoint", 0)),

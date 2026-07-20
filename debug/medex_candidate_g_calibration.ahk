@@ -32,6 +32,9 @@ F9::CaptureCandidateGObservedBlack()
 ; Read the closed-state pixel probe grid without clicking.
 F10::RunCandidateGClosedPixelProbe()
 
+; Step 5: keep the real environment but override version metadata only.
+^!F6::RunCandidateGVersionMetadataMismatchProbe()
+
 ; Click the validated estimated arrow once and sample at 0/20/40/80 ms.
 ; The script never clicks black.
 F11::RunCandidateGOpenPixelProbe()
@@ -104,8 +107,14 @@ CaptureCandidateGObservedBlack() {
     )
 }
 
-RunCandidateGClosedPixelProbe() {
-    prepared := PrepareCandidateGCalibration()
+RunCandidateGVersionMetadataMismatchProbe() {
+    RunCandidateGClosedPixelProbe(Map(
+        "candidateGMedExVersionMetadataOverride", "9.9.9.9"
+    ))
+}
+
+RunCandidateGClosedPixelProbe(options := 0) {
+    prepared := PrepareCandidateGCalibration(options)
     if !prepared.ok {
         WriteCandidateGCalibrationResult(prepared)
         return
@@ -180,7 +189,7 @@ RunCandidateGOpenPixelProbe() {
     WriteCandidateGCalibrationResult(outputResult)
 }
 
-PrepareCandidateGCalibration() {
+PrepareCandidateGCalibration(options := 0) {
     startedAt := A_TickCount
     context := NewCandidateGCalibrationContext("prepare")
     foregroundHwnd := WinExist("A")
@@ -223,7 +232,7 @@ PrepareCandidateGCalibration() {
         "dpi", context["dpi"],
         "displayScaling", context["displayScaling"]
     )
-    profileResult := ValidateCandidateGSupportedProfile(environment)
+    profileResult := ValidateCandidateGSupportedProfile(environment, options)
     MergeContext(context, profileResult.context)
     if !profileResult.ok
         return FinishCandidateGPreparation(false, profileResult.code, context, startedAt)
@@ -355,6 +364,10 @@ FormatCandidateGCalibrationResult(result) {
         "Dpi=" SafeDiagnosticValue(MedExContextValue(context, "dpi", "UNKNOWN")),
         "DisplayScaling=" SafeDiagnosticValue(MedExContextValue(context, "displayScaling", "UNKNOWN")),
         "MedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "medExVersion", "UNKNOWN")),
+        "ProfileValidationMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "profileValidationMedExVersion", "UNKNOWN")),
+        "CalibratedMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "calibratedMedExVersion", "UNKNOWN")),
+        "MedExVersionMatchState=" SafeDiagnosticValue(MedExContextValue(context, "medExVersionMatchState", "UNKNOWN")),
+        "MedExVersionMetadataOverrideApplied=" FormatDiagnosticBoolean(MedExContextValue(context, "medExVersionMetadataOverrideApplied", false)),
         "RawRegionAnchorCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "rawRegionAnchorCandidateCount", 0)),
         "GeometryValidRegionCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "geometryValidRegionCandidateCount", 0)),
         "ToolbarRowCorroborationCount=" SafeDiagnosticValue(MedExContextValue(context, "toolbarRowCorroborationCount", 0)),
@@ -415,6 +428,10 @@ FormatCandidateG2ControlledResult(result) {
         "Dpi=" SafeDiagnosticValue(MedExContextValue(context, "dpi", "UNKNOWN")),
         "DisplayScaling=" SafeDiagnosticValue(MedExContextValue(context, "displayScaling", "UNKNOWN")),
         "MedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "medExVersion", "UNKNOWN")),
+        "ProfileValidationMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "profileValidationMedExVersion", "UNKNOWN")),
+        "CalibratedMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "calibratedMedExVersion", "UNKNOWN")),
+        "MedExVersionMatchState=" SafeDiagnosticValue(MedExContextValue(context, "medExVersionMatchState", "UNKNOWN")),
+        "MedExVersionMetadataOverrideApplied=" FormatDiagnosticBoolean(MedExContextValue(context, "medExVersionMetadataOverrideApplied", false)),
         "RawRegionAnchorCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "rawRegionAnchorCandidateCount", 0)),
         "GeometryValidRegionCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "geometryValidRegionCandidateCount", 0)),
         "ToolbarRowCorroborationCount=" SafeDiagnosticValue(MedExContextValue(context, "toolbarRowCorroborationCount", 0)),

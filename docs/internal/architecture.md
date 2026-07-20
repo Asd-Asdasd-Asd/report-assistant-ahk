@@ -141,7 +141,7 @@ MedEx color reset 返回 stable result code 和诊断 context，而不是单个 
 
 自动化链路可报告 `AUTOMATION_CHAIN_OK` 和 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`。只有 Windows 操作者在 approved non-clinical context 输入无害字符后，才能将 `FinalInsertionColorVisuallyValidated` 记录为 true。调用层决定如何处理结果；adapter 在所有不确定状态下 fail-closed，绝不继续 blind clicks。Production 默认只在失败时写 lightweight privacy-safe diagnostic；field debug 必须显式选择 `diagnosticMode=field` 才输出完整 geometry schema。下一轮 timing fields 进入现有 performance context，不创建第二个 release artifact。两种模式共享同一个 adapter 和 resolver，且不显示 `MsgBox`、`ToolTip` 或 `TrayTip`。
 
-MedEx version 当前仍是 narrow runtime profile 的 hard gate。计划把 version 独立改为 diagnostics-only metadata；resolution、DPI 和 scaling 的 hard gate 不能简单删除后宣称多环境支持，真正 rollout 需要本机 calibration/profile。
+Step 5 已将 MedEx version 从 runtime/calibration hard gate 改为 diagnostics-only metadata，同时记录 actual/profile-validation/calibrated version、match state 和 override 状态；Windows G1/G2 metadata-override 与 generated-release 验收已通过。Resolution、DPI 和 scaling 仍是 hard gate；这不构成多环境支持，真正 rollout 仍需要本机 calibration/profile。
 
 ## Configuration boundary
 

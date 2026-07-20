@@ -1,11 +1,11 @@
 # 项目状态与交接
 
-更新时间：2026-07-20（Step 4 Windows 验收通过；准备独立提交）
+更新时间：2026-07-20（Step 5 Windows 验收通过；准备独立提交）
 
 ## 冻结基线
 
 - Branch：`main`
-- Step 3 baseline commit：`6c2e2dc perf: restore clipboard after color reset`
+- Step 4 baseline commit：`5193403 perf: remove fzg cursor settle delay`
 - Tag：`v0.6.0-candidate-g`
 - App source version：`0.5.0-alpha.0`
 - Production default：`relativeMousePixelValidated`
@@ -37,6 +37,7 @@
 ### 仅静态/Python 测试覆盖
 
 - CF_HTML UTF-8 offsets、Candidate G pure geometry/signature rules、dispatcher boundary、at-most-once clicks、no-fallback、report orchestration 和 generated-release integration。
+- Step 5 已通过 89 项自动测试和 Windows G1/G2 metadata-override 验收；版本 mismatch/unknown 仅改变 diagnostics，四项 layout gates 保留。
 - 当前 macOS 环境可能缺少 `pytest`；无法重跑表示本次 review 未独立复验，不表示 mainline 从未测试。
 
 ### 当前性能检查点
@@ -45,8 +46,8 @@
 - critical-path timing fields 和 derived metrics 已由 Step 1 提交并完成 Windows baseline。
 - black click 前置、clipboard restoration 后置的新 transaction ordering 已通过 Step 3 Windows 验收；`SafeMinPasteToRestoreMs=300` 已批准。
 - Candidate G interaction path 的冗余 process-name queries 已移除，original active HWND checks 保留并通过 Windows 切窗验收。
-- Step 4 已独立移除 `;fzg` 的 `Sleep 50` 并通过 Windows A/B；等待独立提交。
-- 将 MedEx version 从 hard gate 改为 diagnostics-only metadata。
+- Step 4 已独立移除 `;fzg` 的 `Sleep 50`，通过 Windows A/B 并由 `5193403` 提交。
+- Step 5 已将 runtime/calibration MedEx version 从 hard gate 改为 diagnostics-only metadata；Windows override validation 与 generated-release smoke test 已通过。
 - 面向用户的 per-machine layout calibration/profile。
 
 ### 有意延期
@@ -83,11 +84,11 @@
 - Step 3 保留 200 ms paste settle 和 100 ms post-restore settle，以 300 ms minimum interval 替代固定 pre-restore wait，并把 black click 移到 restore 前。
 - 四点 signature 来源于受控 35-point open/closed calibration grid，不是当前明显瓶颈，立即优化不得删除。
 - `RELATIVE_MOUSE_CHAIN_OK` 只表示 signature 通过且 black click 已发送；最终 insertion color 仍需人工确认。
-- 当前 exact MedEx version gate 会拒绝未单独验证的新版本；计划独立移除，但这不等于获得多环境支持。
+- Step 5 不再以 exact MedEx version 拒绝执行，但仅有校准环境完成真实验证；version mismatch override 不等于支持真实新版。
 
 ## 下一检查点
 
-Step 1–4 已完成验证；下一步是在 Step 4 独立提交后规划 Step 5，当前不得修改 MedEx version hard gate。主要指标仍为：
+Step 1–5 已完成验收；Step 5 独立提交后才可规划 Step 6 per-machine calibration。主要指标仍为：
 
 ```text
 TriggerToBlackClickMs = BlackClickSentMs - HotstringTriggeredMs

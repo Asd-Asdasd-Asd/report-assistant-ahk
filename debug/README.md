@@ -68,11 +68,15 @@ F12 是 reset-only field diagnostic；F11 是完整 Candidate G `;red` success t
 
 现有 `medex_color_reset_field_debug.ahk` 继续固定测试 `uiaInvoke`，作为 comparison/rollback。Candidate G 使用独立 `medex_candidate_g_calibration.ahk`：F8–F11 用于 G1 calibration，F12 经 production dispatcher 显式调用 `relativeMousePixelValidated`。Windows G2、caret-order A/B 与最终 generated-release 验证通过后，正常 release 的颜色复位默认 strategy 已提升为后续 production mainline；两种 strategy 之间没有 automatic fallback。
 
-Candidate G2 F12 只在 MedEx 0.0.1.0、1920×1080、100%、DPI 96 profile 匹配、toolbar row 唯一、arrow/black points 有效、foreground 未变化且 popup 四点 signature 匹配时发送一次 black click。结果复制到 clipboard 并写入 `%TEMP%\MedExAHK\candidate_g_calibration.txt`；不显示 modal 或 non-modal UI。
+Candidate G2 F12 只在 1920×1080、100%、DPI 96 profile 匹配、toolbar row 唯一、arrow/black points 有效、foreground 未变化且 popup 四点 signature 匹配时发送一次 black click。MedEx version 仅作为 calibration provenance 和 match-state metadata。结果复制到 clipboard 并写入 `%TEMP%\MedExAHK\candidate_g_calibration.txt`；不显示 modal 或 non-modal UI。
 
 同一脚本的 F7 是 closed-popup safety gate：它故意不点击 arrow，只验证关闭状态 signature 必须失败且 black click 不可达。F7 只用于现场安全验证，不是 production fallback 或 interaction strategy。
 
+Step 5 在 calibration harness 中增加 `Ctrl+Alt+F6`：它用 `9.9.9.9` 覆盖 profile-validation version metadata，执行与 F10 相同的 closed pixel/row probe，不点击 black。F10 保持 actual-version control。
+
 `medex_candidate_g2_test.ahk` 是独立 G2 production-path test build，注册 `;red`、`;fzg` 和 reset-only F12，并为每次操作追加 privacy-safe 行到 `%TEMP%\MedExAHK\candidate_g2_test.txt`。它必须单独运行；不得同时运行 generated release、calibration harness 或 legacy script。
+
+Step 5 在该 G2 harness 中增加 `Ctrl+Alt+F11`：使用 `candidateGMedExVersionMetadataOverride=9.9.9.9` 运行完整 production interaction chain；F12 是 actual-version control。覆盖值只改变 diagnostics，不改变真实 environment 或 safety gates。
 
 同一 test build 保留历史 `Ctrl+Alt+F8` G2 reset-path，并提供 Step 4 单变量 A/B：`Ctrl+Alt+F9` 为 no-reset、50 ms、`Left 4` control；`Ctrl+Alt+F10` 为 no-reset、0 ms、`Left 4` candidate。F9/F10 只改变 `SettleDelayMs`，结果写入 `%TEMP%\MedExAHK\candidate_g2_test.txt`；不得使用 `Left 5`。
 
