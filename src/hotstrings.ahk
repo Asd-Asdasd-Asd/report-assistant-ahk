@@ -1,3 +1,5 @@
+#HotIf MedExReportHotstringsEnabled()
+
 :*?:;red::
 {
     RunRedInsertion()
@@ -25,3 +27,5 @@
     SendText("cm×cm")
     Send("{Left 2}")
 }
+
+#HotIf

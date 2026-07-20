@@ -100,6 +100,10 @@ No functional failures
 
 用 shared `#HotIf`/foreground predicate 限制 `;red`、`;fwj`、`;fjd`、`;fzg`、`;cmx` 仅在 MedEx 前景窗口触发。全局 pause/exit 必须继续在 MedEx 外和 suspended 状态工作。
 
+Implementation status：2026-07-20 Windows scope/foreground field test 已通过，等待 Step 2 独立提交；Step 3 尚未开始。
+
+Windows 验收使用 generated release SHA-256 `1ede185566caf4c9f25d744fe567df45cd9ed679bd8daa522ecfd71edc2bc010`。五个 report hotstrings 在 MedEx 内保持正常，在无关应用中均不扩展且不改变 clipboard；pause/exit 保持全局。arrow 与 black click 前切换窗口均 fail closed，没有 coordinate click 落入新窗口。
+
 在 entry guard 建立后，移除 Candidate G interaction path 中冗余的重复 `WinGetProcessName`；仍在 arrow click 和 black click 前检查 original target HWND 仍为 active。
 
 Windows pass criteria：五个 report hotstrings 在 MedEx 正常；在无关应用不触发、不改 clipboard；切换窗口时两次 coordinate click 都 fail closed；pause/exit 保持全局。

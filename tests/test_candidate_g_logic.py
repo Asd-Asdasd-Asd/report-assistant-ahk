@@ -253,7 +253,8 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertLess(body.index("RectContainsPoint(clientRectScreen, arrowPoint)"), arrow_click)
         self.assertLess(body.index("RectContainsPoint(clientRectScreen, blackPoint)"), arrow_click)
         self.assertLess(body.index('if !signature["matched"]'), black_click)
-        self.assertGreaterEqual(body.count("MedExForegroundTargetMatches"), 3)
+        self.assertGreaterEqual(body.count("MedExForegroundWindowMatches"), 3)
+        self.assertNotIn("MedExForegroundTargetMatches", body)
         self.assertIn("MouseMove originalMouseX, originalMouseY, 0", body)
 
     def test_g2_debug_uses_real_dispatcher_and_no_production_hotstrings(self) -> None:

@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-20 01:04:27 UTC
+; Generated at: 2026-07-20 01:08:48 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -9678,7 +9678,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
         CoordMode "Mouse", "Screen"
         MouseGetPos &originalMouseX, &originalMouseY
         mouseCaptured := true
-        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+        if !MedExForegroundWindowMatches(foregroundHwnd) {
             context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGArrowClick"
             return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                 context, startedAt, options)
@@ -9718,7 +9718,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             context["signatureSecondSampleDelayMs"] := delayMs
             if delayMs > 0
                 Sleep delayMs
-            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+            if !MedExForegroundWindowMatches(foregroundHwnd) {
                 context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGSecondSignatureSample"
                 return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                     context, startedAt, options)
@@ -9734,7 +9734,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             return FinishMedExColorReset(false, ColorResetCode.POPUP_SIGNATURE_MISMATCH,
                 context, startedAt, options)
 
-        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+        if !MedExForegroundWindowMatches(foregroundHwnd) {
             context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGBlackClick"
             return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                 context, startedAt, options)
@@ -10412,6 +10412,18 @@ MedExProcessNameIsApproved(processName, candidates) {
     return false
 }
 
+MedExReportHotstringsEnabled() {
+    for processName in MedExColorResetDefaults.ProvisionalProcessNames {
+        if WinActive("ahk_exe " processName)
+            return true
+    }
+    return false
+}
+
+MedExForegroundWindowMatches(expectedHwnd) {
+    return expectedHwnd && WinExist("A") = expectedHwnd
+}
+
 MedExForegroundTargetMatches(expectedHwnd, expectedProcess) {
     if WinExist("A") != expectedHwnd
         return false
@@ -10756,6 +10768,8 @@ ExampleCalibratedViewerClick() {
 ; --- END viewer_actions.ahk ---
 
 ; --- BEGIN hotstrings.ahk ---
+#HotIf MedExReportHotstringsEnabled()
+
 :*?:;red::
 {
     RunRedInsertion()
@@ -10783,6 +10797,8 @@ ExampleCalibratedViewerClick() {
     SendText("cm×cm")
     Send("{Left 2}")
 }
+
+#HotIf
 
 ; --- END hotstrings.ahk ---
 

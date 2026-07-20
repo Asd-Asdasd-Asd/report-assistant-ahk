@@ -177,7 +177,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
         CoordMode "Mouse", "Screen"
         MouseGetPos &originalMouseX, &originalMouseY
         mouseCaptured := true
-        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+        if !MedExForegroundWindowMatches(foregroundHwnd) {
             context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGArrowClick"
             return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                 context, startedAt, options)
@@ -217,7 +217,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             context["signatureSecondSampleDelayMs"] := delayMs
             if delayMs > 0
                 Sleep delayMs
-            if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+            if !MedExForegroundWindowMatches(foregroundHwnd) {
                 context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGSecondSignatureSample"
                 return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                     context, startedAt, options)
@@ -233,7 +233,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             return FinishMedExColorReset(false, ColorResetCode.POPUP_SIGNATURE_MISMATCH,
                 context, startedAt, options)
 
-        if !MedExForegroundTargetMatches(foregroundHwnd, foregroundProcess) {
+        if !MedExForegroundWindowMatches(foregroundHwnd) {
             context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGBlackClick"
             return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                 context, startedAt, options)
@@ -909,6 +909,18 @@ MedExProcessNameIsApproved(processName, candidates) {
             return true
     }
     return false
+}
+
+MedExReportHotstringsEnabled() {
+    for processName in MedExColorResetDefaults.ProvisionalProcessNames {
+        if WinActive("ahk_exe " processName)
+            return true
+    }
+    return false
+}
+
+MedExForegroundWindowMatches(expectedHwnd) {
+    return expectedHwnd && WinExist("A") = expectedHwnd
 }
 
 MedExForegroundTargetMatches(expectedHwnd, expectedProcess) {

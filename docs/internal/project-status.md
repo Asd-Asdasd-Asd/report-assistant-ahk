@@ -31,19 +31,19 @@
 - Candidate G G1 calibration、G2 controlled interaction、caret-order A/B 和最终 generated release mainline validation 均通过。
 - `;fzg` no-reset 顺序连续 6 次得到正确 caret，最终 generated release 也已验证。
 - 验证 artifact SHA-256：`761a6c4261246a4bc14f44597e30eef4564db0bd1e48e92a31c1ac1e41f8ef11`。
-- Mainline promotion 记录为 `75 tests passed`。
+- Step 1 已由 `87dce53` 提交；Step 2 记录为 `82 tests passed` 且已通过 Windows 验收，等待独立提交。
 
 ### 仅静态/Python 测试覆盖
 
 - CF_HTML UTF-8 offsets、Candidate G pure geometry/signature rules、dispatcher boundary、at-most-once clicks、no-fallback、report orchestration 和 generated-release integration。
 - 当前 macOS 环境可能缺少 `pytest`；无法重跑表示本次 review 未独立复验，不表示 mainline 从未测试。
 
-### 计划但未实现
+### 当前性能检查点
 
-- MedEx-only shared `#HotIf`/foreground entry predicate。
-- 新 critical-path timing fields 和 derived metrics。
+- MedEx-only shared `#HotIf`/foreground entry predicate 已通过 Windows scope/foreground 验收，等待提交。
+- critical-path timing fields 和 derived metrics 已由 Step 1 提交并完成 Windows baseline。
 - black click 前置、clipboard restoration 后置的新 transaction ordering，以及 `SafeMinPasteToRestoreMs` 剩余时间保护。
-- 移除冗余 Candidate G process-name queries，但保留两次 click 前的 active HWND checks。
+- Candidate G interaction path 的冗余 process-name queries 已移除，original active HWND checks 保留并通过 Windows 切窗验收；等待提交。
 - 独立移除 `;fzg` 的 `Sleep 50`。
 - 将 MedEx version 从 hard gate 改为 diagnostics-only metadata。
 - 面向用户的 per-machine layout calibration/profile。
@@ -74,7 +74,7 @@
 
 ## 当前风险
 
-- Hotstrings 仍为 global，可能在非 MedEx 应用修改文字或剪贴板；Step 2 将加入 entry guard。
+- 已提交基线中的 hotstrings 仍为 global；Step 2 working tree 的 MedEx-only entry guard 已通过 Windows 验收，等待提交。
 - ClipboardAll 过早恢复曾导致 MedEx 粘贴用户原剪贴板；任何优化都必须保留 `finally` 并为 fast failure 强制最小 paste-to-restore interval。
 - 当前 fixed `200/100/100 ms` waits 保护 clipboard correctness，但 black click 被排在 restoration 后，形成用户可感知延迟。
 - 四点 signature 来源于受控 35-point open/closed calibration grid，不是当前明显瓶颈，立即优化不得删除。
@@ -83,7 +83,7 @@
 
 ## 下一检查点
 
-下一步不是直接改 waits，而是先增加 baseline critical-path diagnostics。主要指标：
+Step 1 baseline diagnostics 已完成；下一步是完成 Step 2 Windows scope/foreground 验收。主要指标仍为：
 
 ```text
 TriggerToBlackClickMs = BlackClickSentMs - HotstringTriggeredMs

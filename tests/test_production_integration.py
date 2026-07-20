@@ -26,6 +26,38 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn("RunRedInsertion()", hotstrings)
         self.assertNotIn("ResetMedExInsertionColor(", hotstrings)
 
+    def test_report_hotstrings_share_medex_only_scope(self) -> None:
+        hotstrings = source("src/hotstrings.ahk")
+        self.assertTrue(hotstrings.startswith("#HotIf MedExReportHotstringsEnabled()"))
+        self.assertTrue(hotstrings.rstrip().endswith("#HotIf"))
+        self.assertEqual(hotstrings.count(":*?:"), 5)
+        for trigger in (";red", ";fzg", ";fwj", ";fjd", ";cmx"):
+            self.assertEqual(hotstrings.count(f":*?:{trigger}::"), 1)
+
+    def test_medex_hotstring_scope_uses_production_process_candidates(self) -> None:
+        adapter = source("src/adapters/medex_report_editor.ahk")
+        predicate = function_body(
+            adapter,
+            "MedExReportHotstringsEnabled",
+            "MedExForegroundWindowMatches",
+        )
+        self.assertIn("MedExColorResetDefaults.ProvisionalProcessNames", predicate)
+        self.assertIn('WinActive("ahk_exe " processName)', predicate)
+        self.assertIn("return false", predicate)
+        self.assertNotIn("REPORT_EDITOR_EXE", predicate)
+
+    def test_release_resets_hotif_before_global_control_hotkeys(self) -> None:
+        release = source("release/report_assistant.ahk")
+        scoped = release.index("#HotIf MedExReportHotstringsEnabled()")
+        reset = release.index("\n#HotIf\n", scoped)
+        suspend_exempt = release.index("#SuspendExempt", reset)
+        pause = release.index("^!Esc::", suspend_exempt)
+        exit_hotkey = release.index("^!q::", pause)
+        self.assertLess(scoped, reset)
+        self.assertLess(reset, suspend_exempt)
+        self.assertLess(suspend_exempt, pause)
+        self.assertLess(pause, exit_hotkey)
+
     def test_fzg_preserves_phrase_specific_legacy_cursor_contract(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
         report_editor = source("src/report_editor.ahk")
@@ -118,6 +150,20 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn("COLOR_RESET_FOREGROUND_CHANGED", logic)
         self.assertGreaterEqual(adapter.count("ColorResetCode.FOREGROUND_CHANGED"), 3)
         self.assertIn("ColorResetCode.WRONG_PROCESS", adapter)
+
+    def test_candidate_g_interaction_rechecks_only_original_active_hwnd(self) -> None:
+        adapter = source("src/adapters/medex_report_editor.ahk")
+        candidate_g = adapter.split(
+            "RunMedExRelativeMousePixelValidatedColorReset(options := 0)", 1
+        )[1].split("\n\nSampleAndEvaluateCandidateGPopupSignature(arrowPoint)", 1)[0]
+        self.assertEqual(candidate_g.count("WinGetProcessName("), 1)
+        self.assertEqual(candidate_g.count("MedExForegroundWindowMatches("), 3)
+        self.assertNotIn("MedExForegroundTargetMatches(", candidate_g)
+        helper = adapter.split(
+            "\nMedExForegroundWindowMatches(expectedHwnd) {", 1
+        )[1].split("\nMedExForegroundTargetMatches(expectedHwnd, expectedProcess) {", 1)[0]
+        self.assertIn('WinExist("A") = expectedHwnd', helper)
+        self.assertNotIn("WinGetProcessName", helper)
 
     def test_production_and_field_share_core_with_different_diagnostic_modes(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")

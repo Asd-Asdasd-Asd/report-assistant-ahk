@@ -4,11 +4,11 @@
 
 ## Current baseline and next checkpoint
 
-- Frozen baseline：`2369b68` / `v0.6.0-candidate-g`。
-- Step 1 本地验证已记录 `78 tests passed`。
+- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；当前已提交 Step 1：`87dce53`。
+- Step 2 已记录 `82 tests passed` 并通过 Windows scope/foreground test；验收 release SHA-256=`1ede185566caf4c9f25d744fe567df45cd9ed679bd8daa522ecfd71edc2bc010`。
 - `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅显式 comparison/rollback；无 fallback。
 - `;fzg` 当前不运行 Color Reset，顺序为 paste/restore → 50 ms → `Left 4`。
-- 下一次 Windows 操作从 Step 1 baseline timing 开始，详细 pass/failure contract 见 `docs/internal/performance-optimization-checkpoints.md`。
+- 下一次 Windows 操作从 Step 2 scope/foreground test 开始，详细 pass/failure contract 见 `docs/internal/performance-optimization-checkpoints.md`。
 
 Step 1 已于 2026-07-20 通过：
 
@@ -18,6 +18,19 @@ TriggerToBlackClickMs=906/797/766
 PasteToClipboardRestoreMs=312/312/313
 No functional failures
 ```
+
+Step 2 Windows 验收：
+
+1. [x] 只运行 regenerated release；确认启动时无 parser error 或 `#Warn`。
+2. [x] 在 MedEx 前景窗口逐一验证 `;red`、`;fwj`、`;fjd`、`;fzg`、`;cmx`，确认文字、颜色、caret 和 clipboard 行为不变。
+3. [x] 将 clipboard 设为无害 sentinel，在 Notepad 等无关应用逐一输入五个 trigger；确认均保留为普通文本，未扩展、未发送额外按键且 clipboard 未改变。
+4. [x] 在 MedEx 外按 `Ctrl+Alt+Esc` 可暂停，再按一次可恢复；suspended 时仍可执行该快捷键。
+5. [x] 在 MedEx 外确认 `Ctrl+Alt+Q` 仍可退出脚本，随后重启 release 完成余下测试。
+6. [x] 在 Candidate G arrow click 前切换到无关窗口，确认新窗口未收到 coordinate click，结果 fail closed。
+7. [x] 在 arrow 已打开 popup、black click 前切换到无关窗口，确认新窗口未收到 black coordinate click，结果 fail closed。
+8. [x] 未观察到 hotstring 漏触发、错误应用触发、clipboard 变化或跨窗口 click。
+
+Candidate G 同轮复验：G1 row localization 稳定；G2 success path 与 closed-signature fail-closed 正常。Caret-order A/B 继续表现为 F8 reset-path `Left 3`、F9 no-reset `Left 4`；production `;fzg` 使用后者，因此不构成 Step 2 回归。
 
 Step 3 必须同时回报 success 与 deliberately induced fast-failure，确认 no wrong paste、clipboard restored 和 immediate punctuation black。
 

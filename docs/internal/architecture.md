@@ -42,7 +42,7 @@ MedEx 现场验证已经确认 `CF_HTML` 可以插入红色文字。仍未解决
 
 当前 `;red` transaction 先完成 CF_HTML paste 和 clipboard restoration，再调用 Candidate G。下一轮性能工作的 critical path 定义为 `HotstringTriggeredMs → BlackClickSentMs`，不是整个函数返回时间。计划在独立检查点中把 black click 提前到 clipboard restoration 之前，同时继续用 `finally` 强制恢复剪贴板，并以 `pasteSentAt`/`SafeMinPasteToRestoreMs` 保护快速失败路径；安全最小值必须由 Windows 测试决定。
 
-Report hotstrings 当前仍为 global。计划用 shared `#HotIf`/foreground predicate 限制 MedEx-specific entries；全局 pause/exit 保持 suspend-exempt。entry guard 建立后可删除 Candidate G 中冗余的 process-name 重查，但 arrow/black 两次 coordinate click 前必须继续验证 original HWND 仍 active。
+Report hotstrings 的 Step 2 working tree 已用 shared `#HotIf`/foreground predicate 限制 MedEx-specific entries；全局 pause/exit 保持 suspend-exempt。Candidate G interaction path 已移除冗余的 process-name 重查，但 arrow、second signature sample 和 black click 前继续验证 original HWND 仍 active。该变更已通过 Windows scope/foreground 验收，等待提交。
 
 所有报告书写辅助都必须保留人工确认，不默认执行最终提交、审核或发送。
 
