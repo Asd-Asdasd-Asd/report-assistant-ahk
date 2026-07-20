@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-20 02:07:19 UTC
+; Generated at: 2026-07-20 02:34:24 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -10656,11 +10656,6 @@ FocusReportEditor() {
     return RequireReportEditor()
 }
 
-class ReportHotstringTimingDefaults {
-    ; Preserve the legacy ;fzg caret-settle interval after editor automation.
-    static FzgCursorRestoreDelayMs := 50
-}
-
 RunRedInsertion(resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestampAliases(
@@ -10681,7 +10676,6 @@ RunFzgInsertion(resetOptions := 0) {
     SendText("放射性摄取增高，SUVmax约")
     operation := InsertRedFigureTextForCaretRelocation("（见图）", performanceContext)
     if operation.ok {
-        Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs
         if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
             && Type(operation.reset.context) = "Map" {
             operation.reset.context["cursorRestoreRequestedCount"] := 4

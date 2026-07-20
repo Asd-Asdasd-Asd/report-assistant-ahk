@@ -4,11 +4,11 @@
 
 ## Current baseline and next checkpoint
 
-- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`。
+- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`，Step 3=`6c2e2dc`。
 - Step 3 已记录 `86 tests passed`；验收 release SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
 - `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅显式 comparison/rollback；无 fallback。
-- `;fzg` 当前不运行 Color Reset，顺序为 paste/restore → 50 ms → `Left 4`。
-- Step 3 success/fast-failure test 已通过；下一检查点为独立 Step 4，详细 contract 见 `docs/internal/performance-optimization-checkpoints.md`。
+- `;fzg` 当前不运行 Color Reset；Step 4 candidate 顺序为 paste/restore → `Left 4`，始终不使用 `Left 5`。
+- Step 4 F9/F10 A/B 和 generated-release validation 已通过；下一检查点为独立 Step 5。
 
 Step 1 已于 2026-07-20 通过：
 
@@ -47,6 +47,19 @@ Step 3 已同时完成 success 与 deliberately induced fast-failure，确认 no
 7. [x] F10 每次为 `RED_TEXT_RESET_FAILED`、`COLOR_RESET_WRONG_PROCESS`，arrow/black timestamps 为 `UNKNOWN`，clipboard restore 成功。
 8. [x] F10 `PasteToClipboardRestoreMs=312/313/313`，safety wait=`109/94/110`；failure feedback 均在 restore completed 后。
 9. [x] Artifact SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`；Step 3 pass。
+
+### Step 4 `;fzg` settle A/B
+
+本轮只在 approved non-clinical context 执行。完全退出 release 和其他 debug scripts，只运行 `debug/medex_candidate_g2_test.ahk`；结果写入 `%TEMP%\MedExAHK\candidate_g2_test.txt`。
+
+1. [x] 将 clipboard 设为无害 sentinel，在相同 editor state 交替完成五组 F9/F10；每次使用新的空白测试位置。
+2. [x] F9 control 记录 `TestCase=step4Control50Ms SettleDelayMs=50`；F10 candidate 记录 `TestCase=step4Candidate0Ms SettleDelayMs=0`。
+3. [x] 十次均确认 caret 精确为 `|（见图）`、原 clipboard 恢复，并立即输入 harmless punctuation 验证其为黑色。
+4. [x] 十次均为 `ClipboardRestoreSucceeded=true`、`ColorResetResult=NOT_RUN`、`CursorRestoreRequestedCount=4`、`CursorRestoreCommandSent=true`，且没有 toolbar interaction。
+5. [x] F9 `ElapsedMs=485/516/469/469/515`；F10 `ElapsedMs=437/422/422/422/438`，0 ms candidate 平均约缩短 63 ms。
+6. [x] 退出 harness，只运行 regenerated release；normal `;fzg` 连续 10 次通过 caret、clipboard 和 immediate-black 验证。
+7. [x] Generated release 的 normal `;red` smoke test 通过，Step 3 red insertion、black reset 和 clipboard restore 无回退。
+8. [x] Artifact SHA-256=`4de7f53a2498a2eda5ba4df8035339051b3d99653b5b004df0647a7517a936aa`；Step 4 pass，提交前不得进入 Step 5。
 
 ## Historical reconciled release smoke test（TEST CHECKPOINT 1，已被 promotion 取代）
 

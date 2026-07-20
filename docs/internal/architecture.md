@@ -38,7 +38,7 @@ MedEx 现场验证已经确认 `CF_HTML` 可以插入红色文字。仍未解决
 
 红字实现仍必须包裹在 clipboard save/restore transaction 中，最终行为必须插入红色 `（见图）`、恢复用户原始剪贴板，并让后续输入恢复黑色。颜色复位不得插入可见、零宽或隐藏字符，也不得改变 clipboard restoration contract。
 
-`Color Reset` 是 phrase-specific orchestration，而不是所有红色 marker 的无条件尾处理。Standalone `;red` 的 caret 留在 marker 后方，因此需要 adapter reset；`;fzg` 的 caret 必须移动到 marker 前方，Windows A/B 已验证其正确顺序是 paste/clipboard restore → 50 ms → `Left 4`，不经过 toolbar reset。该路径返回 `COLOR_RESET_NOT_REQUIRED`，不能伪报 `AUTOMATION_CHAIN_OK`。
+`Color Reset` 是 phrase-specific orchestration，而不是所有红色 marker 的无条件尾处理。Standalone `;red` 的 caret 留在 marker 后方，因此需要 adapter reset；`;fzg` 的 caret 必须移动到 marker 前方且不经过 toolbar reset。Step 4 已通过 Windows A/B，production 顺序为 paste/clipboard restore → `Left 4`，不需要额外 50 ms settle。该路径返回 `COLOR_RESET_NOT_REQUIRED`，不能伪报 `AUTOMATION_CHAIN_OK`。
 
 Step 3 通过通用 before-restore callback 将 Candidate G 移到 restore 前；clipboard module 仍由唯一 `finally` 强制恢复，并以内部 `pasteSentAt` 和 field-approved `SafeMinPasteToRestoreMs=300` 保护 fast failure。Windows success 与 controlled fast-failure paths 均已验证该顺序。
 

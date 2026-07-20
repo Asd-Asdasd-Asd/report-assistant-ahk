@@ -117,7 +117,7 @@ Windows pass criteria：五个 report hotstrings 在 MedEx 正常；在无关应
 
 在 shared orchestration 中让 Candidate G localization 和 black click 发生在 clipboard restore 之前；restore 仍位于 `finally`。使用 `pasteSentAt` 和待现场确定的 `SafeMinPasteToRestoreMs`，只等待不足的剩余间隔。
 
-Implementation status：`SafeMinPasteToRestoreMs=300` 与 elapsed-time recheck loop 已通过 86 项自动测试和 Windows success/fast-failure field test；Step 3 可以独立提交，提交前不进入 Step 4。
+Implementation status：`SafeMinPasteToRestoreMs=300` 与 elapsed-time recheck loop 已通过 86 项自动测试和 Windows success/fast-failure field test；Step 3 已由 `6c2e2dc` 独立提交。
 
 2026-07-20 preliminary field result：success path 三次 `TriggerToBlackClickMs=625/484/500`；三次 restore 成功，black click 与 restore start 记录在同一 tick。fast-failure 两次 restore 与 fail-closed behavior 正确，但 `PasteToClipboardRestoreMs=297`，证明单次 remaining Sleep 会受 Windows timer 提前返回影响。这批结果只作为 recheck-loop 修订依据，不构成 pass。
 
@@ -167,6 +167,10 @@ CF_HTML paste and clipboard restoration
 ```
 
 不得改为 `Left 5`，不得与 Step 3 合并。
+
+Implementation status：production 已删除 50 ms settle；独立 harness 使用 F9=`SettleDelayMs=50` control、F10=`SettleDelayMs=0` candidate。2026-07-20 五组单变量 A/B 与 generated-release validation 均通过；Step 4 可以独立提交，提交前不进入 Step 5。
+
+2026-07-20 final field result（artifact SHA-256=`4de7f53a2498a2eda5ba4df8035339051b3d99653b5b004df0647a7517a936aa`）：F9 control `ElapsedMs=485/516/469/469/515`，平均约 491 ms；F10 candidate `ElapsedMs=437/422/422/422/438`，平均约 428 ms，平均缩短约 63 ms。十次均 paste/clipboard restore 成功、`ColorResetResult=NOT_RUN`、`CursorRestoreRequestedCount=4`、`CursorRestoreCommandSent=true`。人工确认 caret=`|（见图）`、clipboard 恢复、immediate punctuation 为黑色；generated release 的十次 normal `;fzg` 与一次 normal `;red` smoke test 全部通过。Step 4 pass。
 
 - Caret=`|（见图）` 且 immediate typing 为黑色：提交 Step 4。
 - Caret 错位或输入颜色异常：不提交，恢复 `Sleep 50`，记录它仍是必要 editor-settle interval。

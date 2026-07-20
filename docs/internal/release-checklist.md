@@ -14,8 +14,8 @@
 
 - [x] Step 1：只增加 timing fields 和两个 derived metrics，不改 ordering/waits；Windows baseline 通过并由 `87dce53` 提交。
 - [x] Step 2：五个 report hotstrings 已加入 shared MedEx-only entry guard；active HWND checks 保留，Windows scope/foreground test 已通过。
-- [x] Step 3：black click 前置、clipboard restoration 后置；`finally` 和基于 `pasteSentAt` 的 300 ms minimum interval 已通过 success 与 fast-failure Windows paths。
-- [ ] Step 4：独立删除 `;fzg` `Sleep 50`；caret 与 immediate typing 通过才提交；始终保持 `Left 4`。
+- [x] Step 3：black click 前置、clipboard restoration 后置；300 ms minimum interval 已通过 success/fast-failure Windows paths，并由 `6c2e2dc` 提交。
+- [x] Step 4：已独立删除 `;fzg` `Sleep 50`；F9 50 ms/F10 0 ms A/B 和 generated-release caret/immediate-typing 验收通过，保持 `Left 4`。
 - [ ] Step 5：独立删除 exact MedEx-version hard gate，version 保留在 diagnostics；不得声称因此支持其他 DPI/layout。
 - [ ] Step 6：per-machine calibration 只在 latency work 稳定且另行授权后开始。
 
@@ -50,7 +50,7 @@
 - [x] 确认 generated release 的 default strategy 为 `relativeMousePixelValidated`，`uiaInvoke` 仅能通过显式 override 使用，且不存在 cross-strategy automatic fallback。
 - [x] 2026-07-16 在目标 Windows supported profile 上完成最终 generated-release mainline validation。
 - [ ] 确认 source、F11 harness 与 generated release 的 cursor restore request 均为 `Left 4`；若视觉位置不符，先验证 focused element，不使用任意额外 Left 补偿。
-- [x] 当前 `;fzg` no-reset → `Sleep 50` → `Left 4` production flow 已完成最终 generated-release validation；Step 4 cleanup 尚未实现。
+- [x] `;fzg` no-reset → `Left 4` 已完成 Step 4 A/B 和 generated-release validation；50 ms control 仅保留在独立 harness。
 - [ ] 检查没有自动提交、自动审核或自动最终发送功能。
 - [ ] 检查 new/compat hotkeys 和 hotstrings 没有重复注册。
 - [ ] 检查 compatibility 保留项、移除项和 rollback method 与本 release 中文维护说明一致。

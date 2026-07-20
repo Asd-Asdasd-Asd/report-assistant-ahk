@@ -18,6 +18,11 @@
 
 CANDIDATE_G2_TEST_LOG := A_Temp "\MedExAHK\candidate_g2_test.txt"
 
+class Step4CaretSettleAbDefaults {
+    static ControlSettleMs := 50
+    static CandidateSettleMs := 0
+}
+
 :*?:;red::
 {
     operation := InsertRedFigureTextAndRestoreState("（见图）", CandidateG2TestOptions())
@@ -43,9 +48,17 @@ F12::
     WriteCandidateG2TestOperation("fzgWithG2Reset", operation)
 }
 
-; Caret A/B candidate: reproduce the legacy ;fzg order with the current CF_HTML
-; payload. No color reset or toolbar interaction occurs before Left 4.
-^!F9::RunCandidateG2FzgWithoutColorResetDiagnostic()
+; Step 4 control: keep the legacy 50 ms settle before Left 4.
+^!F9::RunCandidateG2FzgWithoutColorResetDiagnostic(
+    "step4Control50Ms",
+    Step4CaretSettleAbDefaults.ControlSettleMs
+)
+
+; Step 4 candidate: remove only the settle before Left 4.
+^!F10::RunCandidateG2FzgWithoutColorResetDiagnostic(
+    "step4Candidate0Ms",
+    Step4CaretSettleAbDefaults.CandidateSettleMs
+)
 
 CandidateG2TestOptions() {
     return Map(
@@ -58,7 +71,7 @@ RunCandidateG2FzgWithColorResetDiagnostic() {
     SendText("放射性摄取增高，SUVmax约")
     operation := InsertRedFigureTextAndRestoreState("（见图）", CandidateG2TestOptions())
     if operation.ok {
-        Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs
+        Sleep Step4CaretSettleAbDefaults.ControlSettleMs
         operation.reset.context["cursorRestoreRequestedCount"] := 4
         Send("{Left 4}")
         operation.reset.context["cursorRestoreCommandSent"] := true
@@ -66,21 +79,23 @@ RunCandidateG2FzgWithColorResetDiagnostic() {
     return operation
 }
 
-RunCandidateG2FzgWithoutColorResetDiagnostic() {
+RunCandidateG2FzgWithoutColorResetDiagnostic(testCase, settleDelayMs) {
     startedAt := A_TickCount
     SendText("放射性摄取增高，SUVmax约")
     pasteResult := PasteRedFigureTextDetailed("（见图）")
     cursorRestoreRequestedCount := 0
     cursorRestoreCommandSent := false
     if pasteResult.pasteDispatched && pasteResult.clipboardRestoreSucceeded {
-        Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs
+        if settleDelayMs > 0
+            Sleep settleDelayMs
         cursorRestoreRequestedCount := 4
         Send("{Left 4}")
         cursorRestoreCommandSent := true
     }
     WriteCandidateG2CaretAbResult(
-        "fzgWithoutColorReset",
+        testCase,
         pasteResult,
+        settleDelayMs,
         cursorRestoreRequestedCount,
         cursorRestoreCommandSent,
         A_TickCount - startedAt
@@ -127,8 +142,8 @@ WriteCandidateG2TestLine(testCase, operationCode, resetCode, context) {
     }
 }
 
-WriteCandidateG2CaretAbResult(testCase, pasteResult, requestedCount, commandSent,
-    elapsedMs) {
+WriteCandidateG2CaretAbResult(testCase, pasteResult, settleDelayMs,
+    requestedCount, commandSent, elapsedMs) {
     global CANDIDATE_G2_TEST_LOG
     line := JoinDiagnosticFields([
         "Timestamp=" FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
@@ -138,6 +153,7 @@ WriteCandidateG2CaretAbResult(testCase, pasteResult, requestedCount, commandSent
         "ClipboardRestoreSucceeded=" FormatDiagnosticBoolean(pasteResult.clipboardRestoreSucceeded),
         "ColorResetStrategy=SKIPPED_FOR_LEGACY_ORDER_AB",
         "ColorResetResult=NOT_RUN",
+        "SettleDelayMs=" SafeDiagnosticValue(settleDelayMs),
         "CursorRestoreRequestedCount=" SafeDiagnosticValue(requestedCount),
         "CursorRestoreCommandSent=" FormatDiagnosticBoolean(commandSent),
         "ElapsedMs=" SafeDiagnosticValue(elapsedMs)

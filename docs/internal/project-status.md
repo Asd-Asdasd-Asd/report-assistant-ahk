@@ -1,11 +1,11 @@
 # 项目状态与交接
 
-更新时间：2026-07-20（Step 3 Windows 验收通过；准备独立提交）
+更新时间：2026-07-20（Step 4 Windows 验收通过；准备独立提交）
 
 ## 冻结基线
 
 - Branch：`main`
-- Step 2 baseline commit：`7a0d9a2 perf: scope report hotstrings to MedEx`
+- Step 3 baseline commit：`6c2e2dc perf: restore clipboard after color reset`
 - Tag：`v0.6.0-candidate-g`
 - App source version：`0.5.0-alpha.0`
 - Production default：`relativeMousePixelValidated`
@@ -21,7 +21,7 @@
 - `;red`、`;fwj`、`;fjd` 经 shared report orchestration 执行 CF_HTML paste、clipboard restoration 和 Candidate G reset。
 - Candidate G 使用 exact UIA `Name="检查所见"`、geometry validation、必要时的 ambiguity corroboration、client-bounds checks、at-most-once arrow/black clicks、四点 popup signature、鼠标恢复和 structured result。
 - 第一次 signature 立即采样；只在失败时等待 20 ms 再采一次。
-- `;fzg` 使用 phrase-specific no-reset 路径：paste → clipboard restore → `Sleep 50` → `Left 4`，返回 `COLOR_RESET_NOT_REQUIRED`。
+- `;fzg` 使用 phrase-specific no-reset 路径：paste → clipboard restore → `Left 4`，返回 `COLOR_RESET_NOT_REQUIRED`；Step 4 Windows A/B 已确认不需要额外 50 ms settle。
 - Production success 无 heavy log；production failure 写 lightweight privacy-safe log；field mode 才写详细诊断。
 
 ### Windows 现场已验证
@@ -31,7 +31,8 @@
 - Candidate G G1 calibration、G2 controlled interaction、caret-order A/B 和最终 generated release mainline validation 均通过。
 - `;fzg` no-reset 顺序连续 6 次得到正确 caret，最终 generated release 也已验证。
 - 验证 artifact SHA-256：`761a6c4261246a4bc14f44597e30eef4564db0bd1e48e92a31c1ac1e41f8ef11`。
-- Step 1 已由 `87dce53` 提交，Step 2 已由 `7a0d9a2` 提交；Step 3 已记录 `86 tests passed`，Windows success/fast-failure 验收通过。验证 artifact SHA-256：`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
+- Step 1 已由 `87dce53` 提交，Step 2 已由 `7a0d9a2` 提交，Step 3 已由 `6c2e2dc` 提交；Step 3 记录为 `86 tests passed`，Windows success/fast-failure 验收通过。验证 artifact SHA-256：`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
+- Step 4 五组 F9/F10 A/B、十次 generated-release `;fzg` 和一次 `;red` smoke test 均通过。验证 artifact SHA-256：`4de7f53a2498a2eda5ba4df8035339051b3d99653b5b004df0647a7517a936aa`。
 
 ### 仅静态/Python 测试覆盖
 
@@ -44,7 +45,7 @@
 - critical-path timing fields 和 derived metrics 已由 Step 1 提交并完成 Windows baseline。
 - black click 前置、clipboard restoration 后置的新 transaction ordering 已通过 Step 3 Windows 验收；`SafeMinPasteToRestoreMs=300` 已批准。
 - Candidate G interaction path 的冗余 process-name queries 已移除，original active HWND checks 保留并通过 Windows 切窗验收。
-- 独立移除 `;fzg` 的 `Sleep 50`。
+- Step 4 已独立移除 `;fzg` 的 `Sleep 50` 并通过 Windows A/B；等待独立提交。
 - 将 MedEx version 从 hard gate 改为 diagnostics-only metadata。
 - 面向用户的 per-machine layout calibration/profile。
 
@@ -86,7 +87,7 @@
 
 ## 下一检查点
 
-Step 1–3 已完成验证；下一步是独立规划 Step 4，评估删除 `;fzg` 的 `Sleep 50`，但不得与 Step 3 提交混合。主要指标仍为：
+Step 1–4 已完成验证；下一步是在 Step 4 独立提交后规划 Step 5，当前不得修改 MedEx version hard gate。主要指标仍为：
 
 ```text
 TriggerToBlackClickMs = BlackClickSentMs - HotstringTriggeredMs

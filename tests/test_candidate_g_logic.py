@@ -292,16 +292,21 @@ class CandidateGLogicTests(unittest.TestCase):
         for forbidden in ("MsgBox", "ToolTip", "TrayTip"):
             self.assertNotIn(forbidden, source)
 
-    def test_caret_ab_keeps_left_four_and_changes_only_reset_order(self) -> None:
+    def test_step_four_caret_ab_keeps_left_four_and_changes_only_delay(self) -> None:
         source = G2_TEST.read_text(encoding="utf-8")
         self.assertIn("^!F8::", source)
         self.assertIn("RunCandidateG2FzgWithColorResetDiagnostic()", source)
-        self.assertIn("^!F9::RunCandidateG2FzgWithoutColorResetDiagnostic()", source)
+        self.assertIn("^!F9::RunCandidateG2FzgWithoutColorResetDiagnostic(", source)
+        self.assertIn("^!F10::RunCandidateG2FzgWithoutColorResetDiagnostic(", source)
+        self.assertIn("Step4CaretSettleAbDefaults.ControlSettleMs", source)
+        self.assertIn("Step4CaretSettleAbDefaults.CandidateSettleMs", source)
         candidate = source.split(
-            "\nRunCandidateG2FzgWithoutColorResetDiagnostic() {", 1
+            "\nRunCandidateG2FzgWithoutColorResetDiagnostic(testCase, settleDelayMs) {", 1
         )[1].split("\nWriteCandidateG2TestOperation", 1)[0]
         self.assertIn("PasteRedFigureTextDetailed", candidate)
-        self.assertIn("ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs", candidate)
+        self.assertIn("if settleDelayMs > 0", candidate)
+        self.assertIn("Sleep settleDelayMs", candidate)
+        self.assertIn("SettleDelayMs=", source)
         self.assertEqual(candidate.count('Send("{Left 4}")'), 1)
         self.assertNotIn("ResetMedExInsertionColor", candidate)
         self.assertNotIn("RunMedExRelativeMousePixelValidatedColorReset", candidate)

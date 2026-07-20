@@ -58,14 +58,17 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertLess(suspend_exempt, pause)
         self.assertLess(pause, exit_hotkey)
 
-    def test_fzg_preserves_phrase_specific_legacy_cursor_contract(self) -> None:
+    def test_fzg_removes_settle_and_preserves_phrase_specific_cursor_contract(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
         report_editor = source("src/report_editor.ahk")
+        release = source("release/report_assistant.ahk")
         fzg = report_editor.split("RunFzgInsertion(resetOptions := 0)", 1)[1].split(
             "\n\nInsertRedFigureTextForCaretRelocation(text :=", 1
         )[0]
-        self.assertIn("static FzgCursorRestoreDelayMs := 50", report_editor)
-        self.assertIn("Sleep ReportHotstringTimingDefaults.FzgCursorRestoreDelayMs", fzg)
+        self.assertNotIn("FzgCursorRestoreDelayMs", report_editor)
+        self.assertNotIn("ReportHotstringTimingDefaults", report_editor)
+        self.assertNotIn("Sleep", fzg)
+        self.assertNotIn("FzgCursorRestoreDelayMs", release)
         self.assertEqual(fzg.count('Send("{Left 4}")'), 1)
         self.assertNotIn('Send("{Left 3}")', hotstrings + report_editor)
         self.assertIn('Send("{Left 4}")', report_editor)
