@@ -12,14 +12,76 @@ Step 4 基线为 `5193403`；`2369b68`（tag `v0.6.0-candidate-g`）是 Candidat
 
 ## 当前行为边界
 
-- `;red`、`;fwj`、`;fjd`：先发送 CF_HTML 红字粘贴，再运行 Candidate G 将后续输入颜色恢复为黑色，最后由 `finally` 恢复 clipboard。
-- `;fzg`：依次执行 CF_HTML paste、clipboard restore、`Left 4`；不运行 Color Reset。Step 4 已现场确认不需要额外 50 ms settle。
+- `;red`：把配置的 `Text` 作为 CF_HTML 红字粘贴，再运行 Candidate G 将后续输入颜色恢复为黑色，最后由 `finally` 恢复 clipboard。
+- `;fwj`、`;fjd`：保留历史混合颜色行为；完整 `Text` 末尾的 `（见图）` 单独作为红色 CF_HTML，之前的文字按普通黑字输入，再运行 Candidate G。
+- `;fzg`：保留历史混合颜色行为；黑色前缀之后仅粘贴红色 `（见图）`，依次执行 clipboard restore、固定 `Left 4`；不运行 Color Reset，也不增加额外 settle。
 - `;cmx`：插入 `cm×cm` 并 `Left 2`。
 - Production success 不写 heavy log；failure 写 privacy-safe lightweight log；field mode 才写详细 timing、geometry、UIA 和 pixel diagnostics。
 - 全局 pause/exit 分别为 `Ctrl+Alt+Esc`、`Ctrl+Alt+Q`。
 - Step 2 的 MedEx-only shared `#HotIf` guard 已由 `7a0d9a2` 提交。
 - Step 3 已将 Candidate G 移到 clipboard restore 前，并以 field-approved 300 ms minimum paste-to-restore interval 保护 fast failure；Windows success/fast-failure 均已通过。
 - Step 5 candidate 不再用 exact MedEx version 阻止 runtime/calibration；实际版本、校准版本和 match state 继续写入 diagnostics。Resolution、DPI、scaling 和所有 interaction guards 保持 hard gate。
+
+## 自定义报告热字符串
+
+程序首次启动时会创建：
+
+```text
+%LOCALAPPDATA%\MedExReportAssistant\config.ini
+```
+
+已有文件永远不会被程序覆盖。配置只在启动时读取，不支持 hot reload；修改后必须退出并重新启动 Report Assistant。建议先退出脚本，再在 Windows 文件资源管理器地址栏粘贴上面的路径，用“记事本”打开。文件编码必须保持为带 BOM 的 **UTF-16 LE**（新版记事本“另存为”窗口的编码选项可选择 `UTF-16 LE`），这样中文才能被 Windows INI API 稳定读取。
+
+最终 schema 为：
+
+```ini
+[Config]
+SchemaVersion=1
+
+[Hotstring.builtin-red]
+Enabled=true
+Name=红字插入
+Trigger=;red
+Text=（见图）
+Mode=red-reset
+```
+
+每个热字符串 section 必须命名为 `Hotstring.builtin-<stable-id>` 或 `Hotstring.custom-<user-id>`。支持的字段只有 `Enabled`、`Name`、`Trigger`、`Text`、`Mode`；未知字段会被忽略，不要添加 `Order`。`Text` 中使用两个字符 `\n` 表示换行，使用 `\\` 表示一个普通反斜杠。配置文本只作为文字发送或经过 HTML escaping 后粘贴，不会作为 AHK 代码执行。
+
+支持三种 `Mode`：
+
+- `text`：在当前 caret 位置插入普通黑字。
+- `red-reset`：在当前 caret 位置粘贴红色 CF_HTML，然后运行现有 Candidate G black reset。
+- `red-left4`：在当前 caret 位置粘贴红色 CF_HTML，跳过 Candidate G，在 clipboard restore 后执行固定 `Left 4`。
+
+section 在文件中的先后顺序就是优先级；不使用单独的排序字段。`Trigger` 重复时，第一个 enabled、字段有效并且成功注册的 entry 生效。`Enabled=false` 不注册该项。空 `Trigger`、未知 `Mode` 或无效 `Enabled` 的 section 会跳过，其他有效 section 仍会工作；文件缺失、不可读、schema 不支持或没有任何有效 entry 时，运行时安全回退到内置默认值。
+
+内置默认项如下：
+
+| Section | Trigger | Text | Mode | Enabled |
+| --- | --- | --- | --- | --- |
+| `Hotstring.builtin-red` | `;red` | `（见图）` | `red-reset` | `true` |
+| `Hotstring.builtin-fzg` | `;fzg` | `放射性摄取增高，SUVmax约（见图）` | `red-left4` | `true` |
+| `Hotstring.builtin-fwj` | `;fwj` | `放射性摄取未见明显增高（见图）` | `red-reset` | `true` |
+| `Hotstring.builtin-fjd` | `;fjd` | `放射性摄取降低（见图）` | `red-reset` | `true` |
+| `Hotstring.builtin-cmx` | `;cmx` | `cm×cm` | `text` | `true` |
+
+`builtin-cmx` 在默认 `text` 模式下继续保留历史固定 `Left 2` 行为；它不是用户配置字段。所有其他 position、color、coordinate、timing、offset 和 Left-count 均不可配置。
+
+`builtin-fwj`、`builtin-fjd`、`builtin-fzg` 还保留一项不可配置的兼容规则：当它们使用 red mode 且完整 `Text` 以 `（见图）` 结尾时，只把该结尾标记粘贴为红色，前缀保持普通黑字。这样现有用户配置文件无需重写；custom entry 仍严格按照所选 `Mode` 处理其完整 `Text`。
+
+可在文件末尾添加自定义项，例如：
+
+```ini
+[Hotstring.custom-warning]
+Enabled=true
+Name=重点提示
+Trigger=;warning
+Text=请重点关注该病灶
+Mode=red-reset
+```
+
+内置项和自定义项进入同一个 `HotstringEntry` 模型、动态 `Hotstring()` 注册器和 mode dispatcher，并继续共用 MedEx-only foreground guard。
 
 ## 下一开发路线
 

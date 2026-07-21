@@ -23,16 +23,35 @@ def function_body(text: str, name: str, next_name: str) -> str:
 class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_hotstrings_use_report_editor_orchestration(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        self.assertIn("RunRedInsertion()", hotstrings)
+        self.assertIn("RunConfiguredRedResetInsertion(entry)", hotstrings)
+        self.assertIn("RunConfiguredRedLeft4Insertion(entry)", hotstrings)
+        self.assertIn("RunRedResetInsertion(parts.RedText)", hotstrings)
+        self.assertIn("RunRedLeft4Insertion(parts.RedText)", hotstrings)
         self.assertNotIn("ResetMedExInsertionColor(", hotstrings)
+
+    def test_legacy_mixed_color_prefix_precedes_red_marker_insertion(self) -> None:
+        hotstrings = source("src/hotstrings.ahk")
+        reset = hotstrings.split("RunConfiguredRedResetInsertion(entry)", 2)[2].split(
+            "\n}\n\nRunConfiguredRedLeft4Insertion", 1
+        )[0]
+        left4 = hotstrings.split("RunConfiguredRedLeft4Insertion(entry)", 2)[2].split(
+            "\n}\n\nSplitConfiguredRedText", 1
+        )[0]
+        self.assertLess(
+            reset.index("SendConfiguredReportText(parts.PlainPrefix)"),
+            reset.index("RunRedResetInsertion(parts.RedText)"),
+        )
+        self.assertLess(
+            left4.index("SendConfiguredReportText(parts.PlainPrefix)"),
+            left4.index("RunRedLeft4Insertion(parts.RedText)"),
+        )
 
     def test_report_hotstrings_share_medex_only_scope(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        self.assertTrue(hotstrings.startswith("#HotIf MedExReportHotstringsEnabled()"))
-        self.assertTrue(hotstrings.rstrip().endswith("#HotIf"))
-        self.assertEqual(hotstrings.count(":*?:"), 5)
-        for trigger in (";red", ";fzg", ";fwj", ";fjd", ";cmx"):
-            self.assertEqual(hotstrings.count(f":*?:{trigger}::"), 1)
+        self.assertIn("HotIf (*) => MedExReportHotstringsEnabled()", hotstrings)
+        self.assertIn('Hotstring(":*?:" entry.Trigger,', hotstrings)
+        self.assertIn("} finally {\n        HotIf\n", hotstrings)
+        self.assertNotIn(":*?:;", hotstrings)
 
     def test_medex_hotstring_scope_uses_production_process_candidates(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")
@@ -48,8 +67,8 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
 
     def test_release_resets_hotif_before_global_control_hotkeys(self) -> None:
         release = source("release/report_assistant.ahk")
-        scoped = release.index("#HotIf MedExReportHotstringsEnabled()")
-        reset = release.index("\n#HotIf\n", scoped)
+        scoped = release.index("HotIf (*) => MedExReportHotstringsEnabled()")
+        reset = release.index("\n        HotIf\n", scoped)
         suspend_exempt = release.index("#SuspendExempt", reset)
         pause = release.index("^!Esc::", suspend_exempt)
         exit_hotkey = release.index("^!q::", pause)
@@ -62,7 +81,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         hotstrings = source("src/hotstrings.ahk")
         report_editor = source("src/report_editor.ahk")
         release = source("release/report_assistant.ahk")
-        fzg = report_editor.split("RunFzgInsertion(resetOptions := 0)", 1)[1].split(
+        fzg = report_editor.split("RunRedLeft4Insertion(text, resetOptions := 0)", 1)[1].split(
             "\n\nInsertRedFigureTextForCaretRelocation(text :=", 1
         )[0]
         self.assertNotIn("FzgCursorRestoreDelayMs", report_editor)

@@ -3,12 +3,16 @@ FocusReportEditor() {
 }
 
 RunRedInsertion(resetOptions := 0) {
+    return RunRedResetInsertion("（见图）", resetOptions)
+}
+
+RunRedResetInsertion(text, resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestampAliases(
         performanceContext,
         ["HotstringTriggeredMs", "HotstringStartMs"]
     )
-    operation := InsertRedFigureTextAndRestoreState("（见图）", resetOptions)
+    operation := InsertRedFigureTextAndRestoreState(text, resetOptions)
     RecordOptionalPerformanceTimestampAliases(
         performanceContext,
         ["FunctionReturnedMs", "HotstringReturnMs"]
@@ -17,10 +21,16 @@ RunRedInsertion(resetOptions := 0) {
 }
 
 RunFzgInsertion(resetOptions := 0) {
+    return RunRedLeft4Insertion(
+        "放射性摄取增高，SUVmax约（见图）",
+        resetOptions
+    )
+}
+
+RunRedLeft4Insertion(text, resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
-    SendText("放射性摄取增高，SUVmax约")
-    operation := InsertRedFigureTextForCaretRelocation("（见图）", performanceContext)
+    operation := InsertRedFigureTextForCaretRelocation(text, performanceContext)
     if operation.ok {
         if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
             && Type(operation.reset.context) = "Map" {

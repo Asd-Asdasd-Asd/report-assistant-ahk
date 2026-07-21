@@ -24,7 +24,7 @@ PasteRedFigureText(text := "（见图）") {
 PasteRedFigureTextDetailed(text := "（见图）", performanceContext := 0,
     beforeRestoreCallback := 0) {
     ; The black wrapper is intentionally empty of boundary/sentinel characters.
-    escapedText := HtmlEscape(text)
+    escapedText := StrReplace(HtmlEscape(text), "`n", "<br>")
     fragment := "<span style=`"color:#000000`"><span style=`"color:#ff0000`">" . escapedText . "</span></span>"
     return PasteHtmlFragmentDetailed(
         fragment,
