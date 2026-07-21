@@ -22,7 +22,10 @@ ORDER = [
     "adapters/medex_report_editor.ahk",
     "report_editor.ahk",
     "viewer_actions.ahk",
+    "hotstring_model.ahk",
     "hotstring_config.ahk",
+    "hotstring_normalization.ahk",
+    "hotstring_registration.ahk",
     "hotstrings.ahk",
     "main.ahk",
 ]

@@ -15,7 +15,10 @@
 #Include adapters\medex_report_editor.ahk
 #Include report_editor.ahk
 #Include viewer_actions.ahk
+#Include hotstring_model.ahk
 #Include hotstring_config.ahk
+#Include hotstring_normalization.ahk
+#Include hotstring_registration.ahk
 #Include hotstrings.ahk
 
 #SuspendExempt

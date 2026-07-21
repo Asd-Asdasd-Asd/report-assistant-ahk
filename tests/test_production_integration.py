@@ -23,35 +23,30 @@ def function_body(text: str, name: str, next_name: str) -> str:
 class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_hotstrings_use_report_editor_orchestration(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        self.assertIn("RunConfiguredRedResetInsertion(entry)", hotstrings)
-        self.assertIn("RunConfiguredRedLeft4Insertion(entry)", hotstrings)
-        self.assertIn("RunRedResetInsertion(parts.RedText)", hotstrings)
-        self.assertIn("RunRedLeft4Insertion(parts.RedText)", hotstrings)
+        self.assertIn("RunRedResetInsertion(entry.RedText)", hotstrings)
+        self.assertIn("RunRedLeft4Insertion(entry.RedText)", hotstrings)
         self.assertNotIn("ResetMedExInsertionColor(", hotstrings)
 
-    def test_legacy_mixed_color_prefix_precedes_red_marker_insertion(self) -> None:
+    def test_plain_text_precedes_fixed_red_marker_insertion(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        reset = hotstrings.split("RunConfiguredRedResetInsertion(entry)", 2)[2].split(
-            "\n}\n\nRunConfiguredRedLeft4Insertion", 1
-        )[0]
-        left4 = hotstrings.split("RunConfiguredRedLeft4Insertion(entry)", 2)[2].split(
-            "\n}\n\nSplitConfiguredRedText", 1
+        dispatcher = hotstrings.split("RunConfiguredReportHotstring(entry, *)", 1)[1].split(
+            "\n}\n\nSendConfiguredReportText", 1
         )[0]
         self.assertLess(
-            reset.index("SendConfiguredReportText(parts.PlainPrefix)"),
-            reset.index("RunRedResetInsertion(parts.RedText)"),
+            dispatcher.index("SendConfiguredReportText(entry.PlainText)"),
+            dispatcher.index("RunRedResetInsertion(entry.RedText)"),
         )
         self.assertLess(
-            left4.index("SendConfiguredReportText(parts.PlainPrefix)"),
-            left4.index("RunRedLeft4Insertion(parts.RedText)"),
+            dispatcher.index("SendConfiguredReportText(entry.PlainText)"),
+            dispatcher.index("RunRedLeft4Insertion(entry.RedText)"),
         )
 
     def test_report_hotstrings_share_medex_only_scope(self) -> None:
-        hotstrings = source("src/hotstrings.ahk")
-        self.assertIn("HotIf (*) => MedExReportHotstringsEnabled()", hotstrings)
-        self.assertIn('Hotstring(":*?:" entry.Trigger,', hotstrings)
-        self.assertIn("} finally {\n        HotIf\n", hotstrings)
-        self.assertNotIn(":*?:;", hotstrings)
+        registration = source("src/hotstring_registration.ahk")
+        self.assertIn("HotIf (*) => MedExReportHotstringsEnabled()", registration)
+        self.assertIn('Hotstring(":*?:" entry.Trigger,', registration)
+        self.assertIn("} finally {\n        HotIf\n", registration)
+        self.assertNotIn(":*?:;", registration)
 
     def test_medex_hotstring_scope_uses_production_process_candidates(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")

@@ -51,8 +51,10 @@ Mode=red-reset
 支持三种 `Mode`：
 
 - `text`：在当前 caret 位置插入普通黑字。
-- `red-reset`：在当前 caret 位置粘贴红色 CF_HTML，然后运行现有 Candidate G black reset。
-- `red-left4`：在当前 caret 位置粘贴红色 CF_HTML，跳过 Candidate G，在 clipboard restore 后执行固定 `Left 4`。
+- `red-reset`：将 `Text` 作为普通黑字输入，在末尾插入红色 `（见图）`，然后运行现有 Candidate G black reset。
+- `red-left4`：将 `Text` 作为普通黑字输入，在末尾插入红色 `（见图）`，跳过 Candidate G，并在 clipboard restore 后执行固定 `Left 4`。
+
+如果 red mode 的 `Text` 已经以 `（见图）` 结尾，该标记会被拆出并作为唯一的红色内容，不会重复追加。`Text` 其他位置的所有内容都保持黑色；`text` mode 不追加红色标记。
 
 section 在文件中的先后顺序就是优先级；不使用单独的排序字段。`Trigger` 重复时，第一个 enabled、字段有效并且成功注册的 entry 生效。`Enabled=false` 不注册该项。空 `Trigger`、未知 `Mode` 或无效 `Enabled` 的 section 会跳过，其他有效 section 仍会工作；文件缺失、不可读、schema 不支持或没有任何有效 entry 时，运行时安全回退到内置默认值。
 
@@ -68,7 +70,7 @@ section 在文件中的先后顺序就是优先级；不使用单独的排序字
 
 `builtin-cmx` 在默认 `text` 模式下继续保留历史固定 `Left 2` 行为；它不是用户配置字段。所有其他 position、color、coordinate、timing、offset 和 Left-count 均不可配置。
 
-`builtin-fwj`、`builtin-fjd`、`builtin-fzg` 还保留一项不可配置的兼容规则：当它们使用 red mode 且完整 `Text` 以 `（见图）` 结尾时，只把该结尾标记粘贴为红色，前缀保持普通黑字。这样现有用户配置文件无需重写；custom entry 仍严格按照所选 `Mode` 处理其完整 `Text`。
+所有 builtin 和 custom entry 使用相同的 red mode 规则：正文保持普通黑字，只有末尾完整的 `（见图）` 使用红色 CF_HTML。现有 builtin 的 `Text` 已包含该标记，因此运行时会拆分而不是再次追加，已有用户配置文件无需重写。
 
 可在文件末尾添加自定义项，例如：
 
@@ -80,6 +82,8 @@ Trigger=;warning
 Text=请重点关注该病灶
 Mode=red-reset
 ```
+
+上述示例最终输出黑色 `请重点关注该病灶`，并在末尾追加红色 `（见图）`。
 
 内置项和自定义项进入同一个 `HotstringEntry` 模型、动态 `Hotstring()` 注册器和 mode dispatcher，并继续共用 MedEx-only foreground guard。
 
