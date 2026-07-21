@@ -1,16 +1,7 @@
-class ReportHotstringConfig {
-    static Path() {
-        localAppData := EnvGet("LOCALAPPDATA")
-        if localAppData = ""
-            throw Error("LOCALAPPDATA is unavailable")
-        return localAppData "\" ReportHotstringDefaults.DirectoryName "\" ReportHotstringDefaults.FileName
-    }
-}
-
 LoadRawReportHotstringConfig(configPath := "") {
     defaults := ReportHotstringDefaults.BuiltinDefinitions()
     if configPath = "" {
-        try configPath := ReportHotstringConfig.Path()
+        try configPath := ReportAssistantConfig.Path()
         catch
             return defaults
     }
@@ -26,7 +17,7 @@ LoadRawReportHotstringConfig(configPath := "") {
     } catch {
         return defaults
     }
-    if schemaValue != String(ReportHotstringDefaults.SchemaVersion)
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
         return defaults
 
     entries := []
@@ -56,10 +47,13 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
     if Type(defaults) != "Array"
         defaults := ReportHotstringDefaults.BuiltinDefinitions()
     lines := [
-        "; MedEx Report Assistant hotstrings",
+        "; MedEx Report Assistant configuration",
         "; Encoding: UTF-16 LE with BOM. Use \\n inside Text for a line break.",
         "[Config]",
-        "SchemaVersion=" ReportHotstringDefaults.SchemaVersion
+        "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
+        "",
+        "[" FeatureDefaults.Section "]",
+        FeatureDefaults.GlobalHjklArrowsKey "=" FeatureDefaults.GlobalHjklArrowsDefault
     ]
     for entry in defaults {
         lines.Push("")

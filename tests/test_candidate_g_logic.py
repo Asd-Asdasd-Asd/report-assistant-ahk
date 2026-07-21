@@ -35,13 +35,15 @@ def geometry_valid(bounds: dict[str, int], client: dict[str, int]) -> bool:
     width = bounds["r"] - bounds["l"]
     height = bounds["b"] - bounds["t"]
     arrow = {"x": bounds["r"] + 320, "y": round((bounds["t"] + bounds["b"]) / 2)}
+    black = {"x": arrow["x"] + 6, "y": arrow["y"] + 83}
     return (
         client["l"] <= bounds["l"] < bounds["r"] <= client["r"]
         and client["t"] <= bounds["t"] < bounds["b"] <= client["b"]
-        and 272 <= bounds["l"] <= 320
         and 40 <= width <= 80
         and 10 <= height <= 28
         and client["l"] <= arrow["x"] <= client["r"]
+        and client["l"] <= black["x"] <= client["r"]
+        and client["t"] <= black["y"] <= client["b"]
         and bounds["t"] - 6 <= arrow["y"] <= bounds["b"] + 6
     )
 
@@ -115,16 +117,16 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertEqual(result["arrow"], {"x": 672, "y": 297})
         self.assertEqual(result["black"], {"x": 678, "y": 380})
 
-    def test_global_first_match_is_not_blindly_selected(self) -> None:
+    def test_multiple_candidates_without_corroboration_fail_closed(self) -> None:
         content = anchor("检查所见", rect(700, 500, 756, 516))
         result = resolve([content, self.toolbar])
-        self.assertTrue(result["ok"])
-        self.assertIs(result["selected"], self.toolbar)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["code"], "ambiguous")
 
     def test_invalid_geometry_and_missing_region_fail_closed(self) -> None:
         self.assertFalse(resolve([])["ok"])
-        content = anchor("检查所见", rect(700, 500, 756, 516))
-        self.assertEqual(resolve([content])["code"], "invalid_geometry")
+        invalid_width = anchor("检查所见", rect(700, 500, 900, 516))
+        self.assertEqual(resolve([invalid_width])["code"], "invalid_geometry")
 
     def test_multiple_candidates_require_unique_corroboration(self) -> None:
         second = anchor("检查所见", rect(296, 600, 352, 616))
@@ -150,6 +152,30 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertEqual(result["arrow"]["y"], original["arrow"]["y"] + 200)
         self.assertEqual(result["black"]["y"], original["black"]["y"] + 200)
 
+    def test_toolbar_horizontal_move_moves_points_by_same_delta(self) -> None:
+        original = resolve([self.toolbar])
+        for delta in (-120, 180):
+            moved = anchor("检查所见", rect(296 + delta, 289, 352 + delta, 305))
+            result = resolve([moved])
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["arrow"]["x"], original["arrow"]["x"] + delta)
+            self.assertEqual(result["black"]["x"], original["black"]["x"] + delta)
+            self.assertEqual(result["arrow"]["y"], original["arrow"]["y"])
+
+    def test_absolute_region_x_gate_is_not_part_of_production_geometry(self) -> None:
+        source = LOGIC.read_text(encoding="utf-8")
+        for forbidden in (
+            "RegionLeftMin",
+            "RegionLeftMax",
+            '"regionLeftMin"',
+            '"regionLeftMax"',
+            '"leftOutsideProfile"',
+        ):
+            self.assertNotIn(forbidden, source)
+        self.assertIn('"horizontalGeometryPolicy", "translationInvariant"', source)
+        self.assertIn('"regionAnchorScreenX"', source)
+        self.assertIn('"regionAnchorClientX"', source)
+
     def test_profiles_and_runtime_calibration_are_centralized(self) -> None:
         source = LOGIC.read_text(encoding="utf-8")
         self.assertIn("class CandidateGCalibrationProfile", source)
@@ -162,6 +188,7 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertIn("static ArrowOffsetY := 0", source)
         self.assertIn("static BlackOffsetX := 6", source)
         self.assertIn("static BlackOffsetY := 83", source)
+        self.assertIn("horizontal-translation-v2", source)
         self.assertEqual(source.count('static CalibratedMedExVersion := "0.0.1.0"'), 2)
         self.assertNotIn("SupportedMedExVersion", source)
 

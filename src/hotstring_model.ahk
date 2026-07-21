@@ -5,9 +5,6 @@ class ReportHotstringMode {
 }
 
 class ReportHotstringDefaults {
-    static SchemaVersion := 1
-    static DirectoryName := "MedExReportAssistant"
-    static FileName := "config.ini"
     static RedFigureMarker := "（见图）"
 
     static BuiltinDefinitions() {

@@ -27,7 +27,7 @@ Candidate G 是复杂度缩减路线，不是单纯性能优化。2026-07-16 测
 
 - 以 region right/center 为基准，初始 arrow offset 约为 `(320,0)`。
 - legacy black click 相对 legacy arrow 约为 `(7,84)`；映射到当前 arrow 时可作为 `(6–7,83–84)` 的现场校准起点。
-- toolbar 可能作为 rigid body 沿 Y 移动，因此 region-to-arrow offset 可能保持不变。
+- toolbar 可作为 rigid body 沿 Y 移动；后续 Windows 观察又确认 sidebar 关闭时整组 toolbar 沿 X 左移，而内部相对位置不变，因此 region-to-arrow offset 在两个轴上都应保持不变。
 
 这些数值和 rigid-body assumption 尚未经过多位置测量，不是 production constants。
 
@@ -150,6 +150,12 @@ G2 popup signature 要求四点全部匹配：
 closed probes 在 black/beige/blue 位置为 white，且 toolbar background 与 popup light point 不同；因此 signature mismatch 会阻止 black click。`(64,83)` 因 closed state 可能与下方内容颜色重合，不进入 required signature。
 
 Status: G2 controlled interaction, caret-order A/B, and the final generated-release validation passed on the supported Windows profile. `relativeMousePixelValidated` is the production mainline; `uiaInvoke` remains an explicit comparison/rollback strategy with no automatic fallback.
+
+## Sidebar horizontal-translation correction
+
+后续现场测试发现，MedEx 左侧 sidebar 关闭时工具栏整体向左平移。旧 production resolver 仍要求 `RegionAnchorRect.l` 位于绝对 screen X `272–320`，因此在点击 arrow 前以 `leftOutsideProfile` fail closed。该绝对范围不是 region-to-arrow 相对校准的一部分。
+
+horizontal-translation v2 删除该绝对 X gate，继续保留 exact `检查所见`、锚点宽高、foreground client bounds、toolbar row band、arrow/black bounds、foreground recheck 和四点 popup signature。多个同名候选仍要求唯一 corroboration。`ArrowOffsetX=320`、black offsets、signature 数值和全部时序不变。
 
 ## Final mainline validation
 

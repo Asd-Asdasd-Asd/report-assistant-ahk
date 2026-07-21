@@ -419,6 +419,10 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn('"medExVersion="', lightweight)
         self.assertIn('"calibratedMedExVersion="', lightweight)
         self.assertIn('"medExVersionMatchState="', lightweight)
+        self.assertIn('"candidateGProfileName="', lightweight)
+        self.assertIn('"horizontalGeometryPolicy="', lightweight)
+        self.assertIn('"regionAnchorScreenX="', lightweight)
+        self.assertIn('"regionAnchorClientX="', lightweight)
         for heavy_field in ("uiaRootRect", "regionAnchorRect", "fontSizeAnchorRect", "calculatedScreenPoint"):
             self.assertNotIn(heavy_field, lightweight)
         self.assertIn("FormatMedExFieldDebugResult", diagnostics)

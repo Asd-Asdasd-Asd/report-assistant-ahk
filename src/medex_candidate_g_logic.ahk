@@ -7,7 +7,7 @@ class CandidateGCalibrationCode {
 }
 
 class CandidateGCalibrationProfile {
-    static ProfileName := "medex-0.0.1-1920x1080-100-calibration"
+    static ProfileName := "medex-0.0.1-1920x1080-100-horizontal-translation-v2-calibration"
     static CalibratedMedExVersion := "0.0.1.0"
     static SupportedScreenWidth := 1920
     static SupportedScreenHeight := 1080
@@ -15,8 +15,6 @@ class CandidateGCalibrationProfile {
     static SupportedDisplayScaling := "100%"
 
     static RegionAnchorName := "检查所见"
-    static RegionLeftMin := 272
-    static RegionLeftMax := 320
     static RegionWidthMin := 40
     static RegionWidthMax := 80
     static RegionHeightMin := 10
@@ -36,7 +34,7 @@ class CandidateGCalibrationProfile {
 }
 
 class CandidateGRelativeMouseProfile {
-    static ProfileName := "medex-0.0.1-1920x1080-100-relative-mouse-v1"
+    static ProfileName := "medex-0.0.1-1920x1080-100-relative-mouse-horizontal-translation-v2"
     static CalibratedMedExVersion := "0.0.1.0"
     static SupportedScreenWidth := 1920
     static SupportedScreenHeight := 1080
@@ -257,6 +255,7 @@ ResolveCandidateGToolbarRow(textAnchors, clientRectScreen, options := 0) {
         "geometryValidRegionCandidateCount", 0,
         "toolbarRowCorroborationCount", 0,
         "toolbarRowSelectionReason", "",
+        "horizontalGeometryPolicy", "translationInvariant",
         "regionCandidateIgnoredReasons", [],
         "regionAnchorFound", false
     )
@@ -336,6 +335,8 @@ ResolveCandidateGToolbarRow(textAnchors, clientRectScreen, options := 0) {
     context["toolbarRowCorroborationCount"] := selected["corroborationCount"]
     context["regionAnchorFound"] := true
     context["regionAnchorRect"] := regionRect
+    context["regionAnchorScreenX"] := regionRect["l"]
+    context["regionAnchorClientX"] := regionRect["l"] - clientRectScreen["l"]
     context["estimatedArrowPoint"] := arrowPoint
     context["estimatedBlackPoint"] := blackPoint
     context["estimatedArrowOffsetX"] := arrowPoint["offsetX"]
@@ -357,14 +358,10 @@ CandidateGRegionGeometryReason(anchor, clientRectScreen, options := 0) {
     if !RectContainsRect(clientRectScreen, rect)
         return "outsideClient"
 
-    leftMin := CandidateGLogicOption(options, "regionLeftMin", CandidateGCalibrationProfile.RegionLeftMin)
-    leftMax := CandidateGLogicOption(options, "regionLeftMax", CandidateGCalibrationProfile.RegionLeftMax)
     widthMin := CandidateGLogicOption(options, "regionWidthMin", CandidateGCalibrationProfile.RegionWidthMin)
     widthMax := CandidateGLogicOption(options, "regionWidthMax", CandidateGCalibrationProfile.RegionWidthMax)
     heightMin := CandidateGLogicOption(options, "regionHeightMin", CandidateGCalibrationProfile.RegionHeightMin)
     heightMax := CandidateGLogicOption(options, "regionHeightMax", CandidateGCalibrationProfile.RegionHeightMax)
-    if rect["l"] < leftMin || rect["l"] > leftMax
-        return "leftOutsideProfile"
     if RectWidth(rect) < widthMin || RectWidth(rect) > widthMax
         return "widthOutsideProfile"
     if RectHeight(rect) < heightMin || RectHeight(rect) > heightMax
@@ -373,6 +370,9 @@ CandidateGRegionGeometryReason(anchor, clientRectScreen, options := 0) {
     arrowPoint := CalculateCandidateGArrowPoint(rect, options)
     if !RectContainsPoint(clientRectScreen, arrowPoint)
         return "arrowPointOutsideClient"
+    blackPoint := CalculateCandidateGBlackPoint(arrowPoint, options)
+    if !RectContainsPoint(clientRectScreen, blackPoint)
+        return "blackPointOutsideClient"
     padding := CandidateGLogicOption(options, "regionRowPadding", CandidateGCalibrationProfile.RegionRowPadding)
     rowBand := MakeRect(rect["l"], rect["t"] - padding, clientRectScreen["r"], rect["b"] + padding)
     if !RectContainsPoint(rowBand, arrowPoint)

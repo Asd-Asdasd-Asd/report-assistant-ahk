@@ -34,7 +34,7 @@
 - [ ] 分别在 release-only 与 debug-only 状态测试；确认 field-debug 不注册 production hotstrings，Step 1 F11 通过 shared `RunRedInsertion()` 调用 Candidate G production dispatcher。
 - [ ] 从 source truth 生成 internal-test executable，不手改生成产物。
 - [ ] 检查 executable/source release 不包含真实 `config.ini`、日志或 patient data。
-- [ ] 确认更新流程不会覆盖 `%LocalAppData%\MedExAHK\config.ini`。
+- [ ] 确认更新流程不会覆盖 `%LocalAppData%\MedExReportAssistant\config.ini` 的已有值；缺少 managed defaults 时先生成唯一备份，再只补缺失项。
 - [ ] 将 release artifacts 复制到 Windows 测试工作站。
 - [ ] Windows 上启动新项目和经过批准的 compatibility script；确认原始 legacy instances 已退出。
 - [ ] 测试 Ctrl+Alt+Q 紧急退出。

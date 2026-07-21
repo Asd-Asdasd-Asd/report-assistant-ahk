@@ -7,6 +7,16 @@
 | Ctrl+Alt+Esc | Suspend AutoHotkey hotkeys and hotstrings |
 | Ctrl+Alt+Q | Exit the script |
 
+Optional global navigation, enabled with `GlobalHjklArrows=true` in the
+`[Features]` section of `config.ini`:
+
+| Shortcut | Action |
+| --- | --- |
+| RAlt+H | Left |
+| RAlt+J | Down |
+| RAlt+K | Up |
+| RAlt+L | Right |
+
 ## Hotstrings
 
 | Hotstring | Action |

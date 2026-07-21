@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | `;cmx` | 新项目 | 源码行为已对齐；Windows 回归通过 |
 | `;red`、`;fzg`、`;fwj`、`;fjd` | 新项目 current mainline；legacy duplicate 必须停用 | Candidate G generated release 已验证；继续完成 phrase regression 与 MedEx-only entry guard |
-| RAlt+H/J/K/L | compatibility | 用户确认仍需要，且新项目没有替代 |
+| RAlt+H/J/K/L | compatibility，Windows 验证后切换到新项目 | 新项目已提供默认关闭的 `GlobalHjklArrows`；完成 generated-release 实测前不得双开 |
 | Legacy viewer/annotation hotkeys | compatibility | 用户确认仍需要，且未被新项目逐项验证替代 |
 | Shift+Alt+R snapshot save | 原 legacy only，compatibility 不启用 | 只为旧 `red_not.clip` 流程服务；新项目验证后退役 |
 | Ctrl+Alt+Esc / Ctrl+Alt+Q | 新项目 | 注意它们不控制 compatibility 进程 |
@@ -42,7 +42,7 @@
 
 ### Hotkeys
 
-当前没有字面相同的 hotkey，但兼容动作是 global。后续应为 MedEx/MxNMSoft 动作增加 `#HotIf` 或等价窗口范围，并由外部 config 控制是否注册。
+`GlobalHjklArrows=true` 会与 compatibility 的 RAlt+H/J/K/L 产生字面冲突，启用前必须退出 compatibility 或禁用其中相同按键。该 navigation 保持 global；后续 MedEx/MxNMSoft 动作仍应增加 `#HotIf` 或等价窗口范围，并由外部 config 控制是否注册。
 
 ### Clipboard
 

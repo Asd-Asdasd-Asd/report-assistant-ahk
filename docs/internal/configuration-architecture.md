@@ -2,16 +2,17 @@
 
 ## 决策摘要
 
-v0.5.0 采用外部 INI 文件作为普通用户支持的配置格式。运行时配置目录建议为：
+v0.5.0 采用外部 INI 文件作为普通用户支持的配置格式。运行时配置目录为：
 
 ```text
-%LocalAppData%\MedExAHK\
+%LocalAppData%\MedExReportAssistant\
 ├── config.ini
-├── config.backup.ini
+├── backups\
+│   └── config-YYYYMMDD-HHMMSS.ini
 └── logs\
 ```
 
-配置不得放在 executable 同目录作为唯一来源，也不得编译进 executable。替换或升级应用文件时不能覆盖 `%LocalAppData%\MedExAHK\config.ini`。
+配置不得放在 executable 同目录作为唯一来源，也不得编译进 executable。替换或升级应用文件时不能覆盖已有配置值；新增的 managed defaults 可以在唯一备份、临时副本写入和重新验证后补入。
 
 选择 INI 的原因：
 
@@ -163,12 +164,12 @@ MigrateV2ToV3(config)
 迁移建议：
 
 1. 读取原始文件并保留未知 sections/keys。
-2. 创建 `config.backup.ini`，不得覆盖唯一备份而不提示。
+2. 在 `backups` 目录创建带时间戳且不覆盖已有文件的备份。
 3. 在内存中迁移并重新验证。
 4. 只有验证成功才写入临时文件并替换目标文件。
 5. 迁移失败时继续使用能够安全解释的 defaults，并保留原文件供诊断。
 
-v0.5.0 可以只实现 `ConfigVersion=1` 的 identity migration 和 future-version rejection，但接口必须从一开始存在。
+当前 `SchemaVersion=1` 对新增可选项采用 additive reconciliation：只补缺失的 managed defaults。只有不兼容格式变化才提升版本并增加顺序 migration；future-version 继续 fail closed。
 
 ## Runtime registration
 
@@ -241,10 +242,10 @@ medExVersion
 ## Update preservation
 
 - Executable 和 source release 可以放在由维护者管理的版本目录。
-- 用户配置固定放在 `%LocalAppData%\MedExAHK\config.ini`。
+- 用户配置固定放在 `%LocalAppData%\MedExReportAssistant\config.ini`。
 - 打包脚本不得把真实 user config 包入 executable。
-- 更新过程只替换 app artifact，不删除或覆盖配置目录。
-- release package 可以带 `config.example.ini`，但不能自动覆盖已有 `config.ini`。
+- 更新过程只替换 app artifact，不删除配置目录或覆盖已有配置值。
+- release 可以通过 managed defaults 安全补充缺失项，但不能重建或整体覆盖已有 `config.ini`。
 
 ## Advanced-user extension boundary
 

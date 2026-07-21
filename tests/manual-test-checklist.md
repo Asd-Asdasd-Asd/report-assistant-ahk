@@ -2,6 +2,26 @@
 
 本清单在安装 AutoHotkey v2 的 Windows 目标工作站执行。不得使用真实患者报告作为测试样本。
 
+## Optional GlobalHjklArrows（待 Windows 验证）
+
+1. [ ] 准备一份不含 `[Features]` 的现有 UTF-16 LE 配置，只运行 regenerated release；确认自动补入 `GlobalHjklArrows=false`，原 hotstrings/custom sections 完整保留，并在 `backups` 目录生成备份。
+2. [ ] 再次启动 release；确认没有缺失项时不重复生成备份。退出 release，将 `GlobalHjklArrows=true` 写入配置，确认后续启动不会改回 `false`。
+3. [ ] 完全退出 `legacy/karabiner.ahk` 和 compatibility script，再启动 release。
+4. [ ] 分别在记事本、MedEx 和 viewer 验证 `RAlt+H/J/K/L` 为 Left/Down/Up/Right，并验证普通 H/J/K/L、左 Alt 和 RAlt 单独按下行为与 legacy 一致。
+5. [ ] 验证按住四个组合键的重复行为；确认不受 MedEx-only hotstring guard 限制。
+6. [ ] 按 `Ctrl+Alt+Esc` 后确认 HJKL 和 hotstrings 均暂停，再按一次确认恢复；暂停期间 `Ctrl+Alt+Q` 仍可退出。
+7. [ ] 重新启动 release，确认现有 `config.ini` 未被重写且开关继续生效；最后复测五个 production hotstrings。
+8. [ ] 使用不支持的 `SchemaVersion` 和只读配置分别启动，确认原文件不被修改、release 不崩溃且 HJKL 保持关闭。
+
+## Candidate G sidebar horizontal translation（待 Windows 验证）
+
+1. [ ] sidebar 展开时连续执行 `;red`、`;fwj`、`;fjd`，确认 marker 红色、后续输入立即为黑色、clipboard 和鼠标均恢复。
+2. [ ] 不重启 release，关闭左侧 sidebar；确认工具栏整体左移后重复同一组测试，颜色恢复仍成功。
+3. [ ] 在 sidebar 展开/关闭之间反复切换，每种状态至少执行 10 次 `;red`，确认没有错误 toolbar click、popup signature mismatch 或 black click failure。
+4. [ ] 检查 field diagnostics：两种状态的 `RegionAnchorScreenX/ClientX` 不同，但 `HorizontalGeometryPolicy=translationInvariant`，arrow/black offsets 保持 `320/0/6/83`。
+5. [ ] 强制 popup 未打开、切换 foreground 和构造多个同名候选，确认 black click 被阻止且没有 automatic fallback。
+6. [ ] 最后复测 `;fzg`、`;cmx` 和 `GlobalHjklArrows`，确认 sidebar 修复未改变 no-reset、caret 或全局 hotkey 行为。
+
 ## Current baseline and next checkpoint
 
 - Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`，Step 3=`6c2e2dc`，Step 4=`5193403`。

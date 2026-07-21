@@ -5,6 +5,7 @@
 #Include app_metadata.ahk
 #Include config.example.ahk
 #Include *i config.local.ahk
+#Include app_config.ahk
 #Include window_guard.ahk
 #Include utils.ahk
 #Include clipboard_html.ahk
@@ -15,11 +16,19 @@
 #Include adapters\medex_report_editor.ahk
 #Include report_editor.ahk
 #Include viewer_actions.ahk
+#Include feature_model.ahk
 #Include hotstring_model.ahk
 #Include hotstring_config.ahk
+#Include config_reconciliation.ahk
+#Include config_bootstrap.ahk
 #Include hotstring_normalization.ahk
 #Include hotstring_registration.ahk
 #Include hotstrings.ahk
+#Include feature_config.ahk
+#Include feature_normalization.ahk
+#Include hotkey_registration.ahk
+#Include global_hjkl_arrows.ahk
+#Include features.ahk
 
 #SuspendExempt
 

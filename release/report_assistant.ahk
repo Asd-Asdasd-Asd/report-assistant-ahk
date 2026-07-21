@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-21 12:19:29 UTC
+; Generated at: 2026-07-21 13:10:37 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -7982,6 +7982,32 @@ COORDINATES := Map(
 
 ; --- END config.example.ahk ---
 
+; --- BEGIN app_config.ahk ---
+class ReportAssistantConfigDefaults {
+    static SchemaVersion := 1
+    static DirectoryName := "MedExReportAssistant"
+    static FileName := "config.ini"
+}
+
+class ReportAssistantConfig {
+    static Path() {
+        localAppData := EnvGet("LOCALAPPDATA")
+        if localAppData = ""
+            throw Error("LOCALAPPDATA is unavailable")
+        return localAppData "\" ReportAssistantConfigDefaults.DirectoryName "\" ReportAssistantConfigDefaults.FileName
+    }
+}
+
+class ManagedConfigEntry {
+    __New(section, key, defaultValue) {
+        this.Section := String(section)
+        this.Key := String(key)
+        this.DefaultValue := String(defaultValue)
+    }
+}
+
+; --- END app_config.ahk ---
+
 ; --- BEGIN window_guard.ahk ---
 RequireReportEditor() {
     global REPORT_EDITOR_EXE
@@ -8761,7 +8787,7 @@ class CandidateGCalibrationCode {
 }
 
 class CandidateGCalibrationProfile {
-    static ProfileName := "medex-0.0.1-1920x1080-100-calibration"
+    static ProfileName := "medex-0.0.1-1920x1080-100-horizontal-translation-v2-calibration"
     static CalibratedMedExVersion := "0.0.1.0"
     static SupportedScreenWidth := 1920
     static SupportedScreenHeight := 1080
@@ -8769,8 +8795,6 @@ class CandidateGCalibrationProfile {
     static SupportedDisplayScaling := "100%"
 
     static RegionAnchorName := "检查所见"
-    static RegionLeftMin := 272
-    static RegionLeftMax := 320
     static RegionWidthMin := 40
     static RegionWidthMax := 80
     static RegionHeightMin := 10
@@ -8790,7 +8814,7 @@ class CandidateGCalibrationProfile {
 }
 
 class CandidateGRelativeMouseProfile {
-    static ProfileName := "medex-0.0.1-1920x1080-100-relative-mouse-v1"
+    static ProfileName := "medex-0.0.1-1920x1080-100-relative-mouse-horizontal-translation-v2"
     static CalibratedMedExVersion := "0.0.1.0"
     static SupportedScreenWidth := 1920
     static SupportedScreenHeight := 1080
@@ -9011,6 +9035,7 @@ ResolveCandidateGToolbarRow(textAnchors, clientRectScreen, options := 0) {
         "geometryValidRegionCandidateCount", 0,
         "toolbarRowCorroborationCount", 0,
         "toolbarRowSelectionReason", "",
+        "horizontalGeometryPolicy", "translationInvariant",
         "regionCandidateIgnoredReasons", [],
         "regionAnchorFound", false
     )
@@ -9090,6 +9115,8 @@ ResolveCandidateGToolbarRow(textAnchors, clientRectScreen, options := 0) {
     context["toolbarRowCorroborationCount"] := selected["corroborationCount"]
     context["regionAnchorFound"] := true
     context["regionAnchorRect"] := regionRect
+    context["regionAnchorScreenX"] := regionRect["l"]
+    context["regionAnchorClientX"] := regionRect["l"] - clientRectScreen["l"]
     context["estimatedArrowPoint"] := arrowPoint
     context["estimatedBlackPoint"] := blackPoint
     context["estimatedArrowOffsetX"] := arrowPoint["offsetX"]
@@ -9111,14 +9138,10 @@ CandidateGRegionGeometryReason(anchor, clientRectScreen, options := 0) {
     if !RectContainsRect(clientRectScreen, rect)
         return "outsideClient"
 
-    leftMin := CandidateGLogicOption(options, "regionLeftMin", CandidateGCalibrationProfile.RegionLeftMin)
-    leftMax := CandidateGLogicOption(options, "regionLeftMax", CandidateGCalibrationProfile.RegionLeftMax)
     widthMin := CandidateGLogicOption(options, "regionWidthMin", CandidateGCalibrationProfile.RegionWidthMin)
     widthMax := CandidateGLogicOption(options, "regionWidthMax", CandidateGCalibrationProfile.RegionWidthMax)
     heightMin := CandidateGLogicOption(options, "regionHeightMin", CandidateGCalibrationProfile.RegionHeightMin)
     heightMax := CandidateGLogicOption(options, "regionHeightMax", CandidateGCalibrationProfile.RegionHeightMax)
-    if rect["l"] < leftMin || rect["l"] > leftMax
-        return "leftOutsideProfile"
     if RectWidth(rect) < widthMin || RectWidth(rect) > widthMax
         return "widthOutsideProfile"
     if RectHeight(rect) < heightMin || RectHeight(rect) > heightMax
@@ -9127,6 +9150,9 @@ CandidateGRegionGeometryReason(anchor, clientRectScreen, options := 0) {
     arrowPoint := CalculateCandidateGArrowPoint(rect, options)
     if !RectContainsPoint(clientRectScreen, arrowPoint)
         return "arrowPointOutsideClient"
+    blackPoint := CalculateCandidateGBlackPoint(arrowPoint, options)
+    if !RectContainsPoint(clientRectScreen, blackPoint)
+        return "blackPointOutsideClient"
     padding := CandidateGLogicOption(options, "regionRowPadding", CandidateGCalibrationProfile.RegionRowPadding)
     rowBand := MakeRect(rect["l"], rect["t"] - padding, clientRectScreen["r"], rect["b"] + padding)
     if !RectContainsPoint(rowBand, arrowPoint)
@@ -9246,6 +9272,10 @@ FormatMedExColorResetFailureLogLine(result) {
         "profileValidationMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "profileValidationMedExVersion", "UNKNOWN")),
         "calibratedMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "calibratedMedExVersion", "UNKNOWN")),
         "medExVersionMatchState=" SafeDiagnosticValue(MedExContextValue(context, "medExVersionMatchState", "UNKNOWN")),
+        "candidateGProfileName=" SafeDiagnosticValue(MedExContextValue(context, "candidateGProfileName", "UNKNOWN")),
+        "horizontalGeometryPolicy=" SafeDiagnosticValue(MedExContextValue(context, "horizontalGeometryPolicy", "UNKNOWN")),
+        "regionAnchorScreenX=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorScreenX", "UNKNOWN")),
+        "regionAnchorClientX=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorClientX", "UNKNOWN")),
         "processReason=" SafeDiagnosticValue(MedExContextValue(context, "processReason", "")),
         "anchorSelectionReason=" SafeDiagnosticValue(MedExContextValue(context, "anchorSelectionReason", "")),
         "geometryReason=" SafeDiagnosticValue(MedExContextValue(context, "geometryReason", "")),
@@ -9278,6 +9308,10 @@ FormatMedExColorResetLogLine(result) {
         "documentRect=" FormatDiagnosticRect(MedExContextValue(context, "documentRect", 0)),
         "windowRect=" FormatDiagnosticRect(MedExContextValue(context, "windowRect", 0)),
         "clientRectScreen=" FormatDiagnosticRect(MedExContextValue(context, "clientRectScreen", 0)),
+        "candidateGProfileName=" SafeDiagnosticValue(MedExContextValue(context, "candidateGProfileName", "UNKNOWN")),
+        "horizontalGeometryPolicy=" SafeDiagnosticValue(MedExContextValue(context, "horizontalGeometryPolicy", "UNKNOWN")),
+        "regionAnchorScreenX=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorScreenX", "UNKNOWN")),
+        "regionAnchorClientX=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorClientX", "UNKNOWN")),
         "layoutProfileName=" SafeDiagnosticValue(MedExContextValue(context, "layoutProfileName", "UNKNOWN")),
         "regionAnchorName=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorName", "UNKNOWN")),
         "regionAnchorFound=" FormatDiagnosticBoolean(MedExContextValue(context, "regionAnchorFound", false)),
@@ -10959,6 +10993,45 @@ ExampleCalibratedViewerClick() {
 
 ; --- END viewer_actions.ahk ---
 
+; --- BEGIN feature_model.ahk ---
+class FeatureDefaults {
+    static Section := "Features"
+    static GlobalHjklArrowsKey := "GlobalHjklArrows"
+    static GlobalHjklArrowsDefault := "false"
+
+    static ManagedConfigDefaults() {
+        return [
+            ManagedConfigEntry(
+                this.Section,
+                this.GlobalHjklArrowsKey,
+                this.GlobalHjklArrowsDefault
+            )
+        ]
+    }
+}
+
+class RawFeatureSettings {
+    __New(globalHjklArrows) {
+        this.GlobalHjklArrows := String(globalHjklArrows)
+    }
+}
+
+class FeatureSettings {
+    __New(globalHjklArrows := false) {
+        this.GlobalHjklArrows := globalHjklArrows = true
+    }
+}
+
+class HotkeyDefinition {
+    __New(id, chord, handler) {
+        this.Id := String(id)
+        this.Chord := String(chord)
+        this.Handler := handler
+    }
+}
+
+; --- END feature_model.ahk ---
+
 ; --- BEGIN hotstring_model.ahk ---
 class ReportHotstringMode {
     static TEXT := "text"
@@ -10967,9 +11040,6 @@ class ReportHotstringMode {
 }
 
 class ReportHotstringDefaults {
-    static SchemaVersion := 1
-    static DirectoryName := "MedExReportAssistant"
-    static FileName := "config.ini"
     static RedFigureMarker := "（见图）"
 
     static BuiltinDefinitions() {
@@ -11030,19 +11100,10 @@ class HotstringEntry {
 ; --- END hotstring_model.ahk ---
 
 ; --- BEGIN hotstring_config.ahk ---
-class ReportHotstringConfig {
-    static Path() {
-        localAppData := EnvGet("LOCALAPPDATA")
-        if localAppData = ""
-            throw Error("LOCALAPPDATA is unavailable")
-        return localAppData "\" ReportHotstringDefaults.DirectoryName "\" ReportHotstringDefaults.FileName
-    }
-}
-
 LoadRawReportHotstringConfig(configPath := "") {
     defaults := ReportHotstringDefaults.BuiltinDefinitions()
     if configPath = "" {
-        try configPath := ReportHotstringConfig.Path()
+        try configPath := ReportAssistantConfig.Path()
         catch
             return defaults
     }
@@ -11058,7 +11119,7 @@ LoadRawReportHotstringConfig(configPath := "") {
     } catch {
         return defaults
     }
-    if schemaValue != String(ReportHotstringDefaults.SchemaVersion)
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
         return defaults
 
     entries := []
@@ -11088,10 +11149,13 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
     if Type(defaults) != "Array"
         defaults := ReportHotstringDefaults.BuiltinDefinitions()
     lines := [
-        "; MedEx Report Assistant hotstrings",
+        "; MedEx Report Assistant configuration",
         "; Encoding: UTF-16 LE with BOM. Use \\n inside Text for a line break.",
         "[Config]",
-        "SchemaVersion=" ReportHotstringDefaults.SchemaVersion
+        "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
+        "",
+        "[" FeatureDefaults.Section "]",
+        FeatureDefaults.GlobalHjklArrowsKey "=" FeatureDefaults.GlobalHjklArrowsDefault
     ]
     for entry in defaults {
         lines.Push("")
@@ -11152,6 +11216,159 @@ DecodeReportHotstringText(value) {
 }
 
 ; --- END hotstring_config.ahk ---
+
+; --- BEGIN config_reconciliation.ahk ---
+PrepareReportAssistantConfig(managedDefaults, configPath := "") {
+    if configPath = "" {
+        try configPath := ReportAssistantConfig.Path()
+        catch
+            return false
+    }
+    if !FileExist(configPath) {
+        try return CreateDefaultReportHotstringConfig(configPath)
+        catch
+            return false
+    }
+    try return ReconcileManagedConfigDefaults(configPath, managedDefaults)
+    catch
+        return false
+}
+
+ReconcileManagedConfigDefaults(configPath, managedDefaults) {
+    if !HasUniqueManagedConfigDefaults(managedDefaults)
+        return false
+
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+
+    missingDefaults := FindMissingManagedConfigDefaults(
+        configPath,
+        managedDefaults
+    )
+    if Type(missingDefaults) != "Array"
+        return false
+    if missingDefaults.Length = 0
+        return true
+    return ApplyMissingManagedConfigDefaults(configPath, missingDefaults)
+}
+
+HasUniqueManagedConfigDefaults(managedDefaults) {
+    if Type(managedDefaults) != "Array"
+        return false
+    seenKeys := Map()
+    for definition in managedDefaults {
+        keyId := ManagedConfigEntryId(definition)
+        if keyId = "" || seenKeys.Has(keyId)
+            return false
+        seenKeys[keyId] := true
+    }
+    return true
+}
+
+ManagedConfigEntryId(definition) {
+    section := StrLower(Trim(definition.Section, " `t`r`n"))
+    key := StrLower(Trim(definition.Key, " `t`r`n"))
+    if section = "" || key = ""
+        return ""
+    return section "`n" key
+}
+
+FindMissingManagedConfigDefaults(configPath, managedDefaults) {
+    static MissingValue := "{A8EF2E83-27E4-4D3A-9B24-915C70B990B7}"
+    missingDefaults := []
+    for definition in managedDefaults {
+        try value := IniRead(
+            configPath,
+            definition.Section,
+            definition.Key,
+            MissingValue
+        )
+        catch
+            return false
+        if value = MissingValue
+            missingDefaults.Push(definition)
+    }
+    return missingDefaults
+}
+
+ApplyMissingManagedConfigDefaults(configPath, missingDefaults) {
+    tempPath := configPath ".update.tmp.ini"
+    try {
+        CreateReportAssistantConfigBackup(configPath)
+        FileCopy configPath, tempPath, true
+        for definition in missingDefaults {
+            IniWrite(
+                definition.DefaultValue,
+                tempPath,
+                definition.Section,
+                definition.Key
+            )
+        }
+        if !ValidateManagedConfigUpdate(tempPath, missingDefaults)
+            throw Error("Updated configuration validation failed")
+        FileMove tempPath, configPath, true
+        return true
+    } catch {
+        try FileDelete tempPath
+        return false
+    }
+}
+
+CreateReportAssistantConfigBackup(configPath) {
+    SplitPath configPath, , &configDirectory
+    backupDirectory := configDirectory "\backups"
+    DirCreate backupDirectory
+    timestamp := FormatTime(A_Now, "yyyyMMdd-HHmmss")
+    Loop 100 {
+        suffix := A_Index = 1 ? "" : "-" A_Index
+        backupPath := backupDirectory "\config-" timestamp suffix ".ini"
+        if FileExist(backupPath)
+            continue
+        FileCopy configPath, backupPath, false
+        return backupPath
+    }
+    throw Error("A unique configuration backup path was unavailable")
+}
+
+ValidateManagedConfigUpdate(configPath, updatedDefaults) {
+    static MissingValue := "{5C0D5578-DC2A-448B-BD8C-E9302C9898C9}"
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+
+    for definition in updatedDefaults {
+        try value := IniRead(
+            configPath,
+            definition.Section,
+            definition.Key,
+            MissingValue
+        )
+        catch
+            return false
+        if value != definition.DefaultValue
+            return false
+    }
+    return true
+}
+
+; --- END config_reconciliation.ahk ---
+
+; --- BEGIN config_bootstrap.ahk ---
+PrepareReportAssistantConfig(ReportAssistantManagedConfigDefaults())
+
+ReportAssistantManagedConfigDefaults() {
+    defaults := []
+    for definition in FeatureDefaults.ManagedConfigDefaults()
+        defaults.Push(definition)
+    return defaults
+}
+
+; --- END config_bootstrap.ahk ---
 
 ; --- BEGIN hotstring_normalization.ahk ---
 LoadReportHotstringConfig(configPath := "") {
@@ -11291,6 +11508,135 @@ SendConfiguredReportText(text) {
 }
 
 ; --- END hotstrings.ahk ---
+
+; --- BEGIN feature_config.ahk ---
+LoadRawFeatureSettings(configPath := "") {
+    defaults := RawFeatureSettings(FeatureDefaults.GlobalHjklArrowsDefault)
+    if configPath = "" {
+        try configPath := ReportAssistantConfig.Path()
+        catch
+            return defaults
+    }
+    if !FileExist(configPath)
+        return defaults
+
+    try {
+        schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+        if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+            return defaults
+        return RawFeatureSettings(
+            IniRead(
+                configPath,
+                FeatureDefaults.Section,
+                FeatureDefaults.GlobalHjklArrowsKey,
+                FeatureDefaults.GlobalHjklArrowsDefault
+            )
+        )
+    } catch {
+        return defaults
+    }
+}
+
+; --- END feature_config.ahk ---
+
+; --- BEGIN feature_normalization.ahk ---
+LoadFeatureSettings(configPath := "") {
+    return NormalizeFeatureSettings(LoadRawFeatureSettings(configPath))
+}
+
+NormalizeFeatureSettings(raw) {
+    return FeatureSettings(
+        ParseOptionalFeatureEnabled(raw.GlobalHjklArrows)
+    )
+}
+
+ParseOptionalFeatureEnabled(value) {
+    normalized := StrLower(Trim(value, " `t`r`n"))
+    return normalized = "true"
+}
+
+; --- END feature_normalization.ahk ---
+
+; --- BEGIN hotkey_registration.ahk ---
+RegisterHotkeyDefinitions(definitions, reservedChords := 0) {
+    seenChords := BuildHotkeyChordSet(reservedChords)
+    registeredIds := []
+    for definition in definitions {
+        chordKey := NormalizeHotkeyChord(definition.Chord)
+        if chordKey = "" || seenChords.Has(chordKey)
+            continue
+        try {
+            Hotkey(definition.Chord, definition.Handler)
+            seenChords[chordKey] := true
+            registeredIds.Push(definition.Id)
+        }
+    }
+    return registeredIds
+}
+
+BuildHotkeyChordSet(chords := 0) {
+    chordSet := Map()
+    if Type(chords) != "Array"
+        return chordSet
+    for chord in chords {
+        chordKey := NormalizeHotkeyChord(chord)
+        if chordKey != ""
+            chordSet[chordKey] := true
+    }
+    return chordSet
+}
+
+NormalizeHotkeyChord(chord) {
+    return StrLower(Trim(chord, " `t`r`n"))
+}
+
+ReservedApplicationHotkeyChords() {
+    return ["^!Esc", "^!q"]
+}
+
+; --- END hotkey_registration.ahk ---
+
+; --- BEGIN global_hjkl_arrows.ahk ---
+GlobalHjklArrowHotkeyDefinitions() {
+    return [
+        HotkeyDefinition(
+            "global-hjkl-left", "RAlt & h",
+            SendGlobalHjklArrow.Bind("Left")
+        ),
+        HotkeyDefinition(
+            "global-hjkl-down", "RAlt & j",
+            SendGlobalHjklArrow.Bind("Down")
+        ),
+        HotkeyDefinition(
+            "global-hjkl-up", "RAlt & k",
+            SendGlobalHjklArrow.Bind("Up")
+        ),
+        HotkeyDefinition(
+            "global-hjkl-right", "RAlt & l",
+            SendGlobalHjklArrow.Bind("Right")
+        )
+    ]
+}
+
+SendGlobalHjklArrow(direction, *) {
+    SendInput("{" direction "}")
+}
+
+; --- END global_hjkl_arrows.ahk ---
+
+; --- BEGIN features.ahk ---
+RegisterConfiguredFeatures(LoadFeatureSettings())
+
+RegisterConfiguredFeatures(settings) {
+    if settings.GlobalHjklArrows {
+        RegisterHotkeyDefinitions(
+            GlobalHjklArrowHotkeyDefinitions(),
+            ReservedApplicationHotkeyChords()
+        )
+    }
+}
+
+; --- END features.ahk ---
 
 ; --- BEGIN main.ahk ---
 

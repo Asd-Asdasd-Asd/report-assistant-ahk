@@ -23,7 +23,7 @@ v0.5.0 起还必须：
 
 - 从 source truth 生成 internal-test executable，不手改 generated artifact；
 - 为每个 internal release 编写中文 maintainer/update notes；
-- 核对 `%LocalAppData%\MedExAHK\config.ini` 在更新前后保持不变；
+- 核对 `%LocalAppData%\MedExReportAssistant\config.ini` 的已有值保持不变；若新版本补充 managed defaults，核对备份、补项和验证流程；
 - 核对 compatibility script 与新 build 没有重复 hotkeys/hotstrings；
 - 记录本 release 从 compatibility 移除了哪些 capability 以及 rollback method。
 
@@ -65,4 +65,4 @@ v0.5.0 起还必须：
 - 编译出的 `.exe`
 - 未经确认的坐标校准文件
 
-`%LocalAppData%\MedExAHK\config.ini` 是用户持久数据，不属于 release source，也不能在应用更新时删除或覆盖。诊断日志可以在用户授权的本机内测流程中生成，但不得提交到仓库，也不得包含患者信息或 report text。
+`%LocalAppData%\MedExReportAssistant\config.ini` 是用户持久数据，不属于 release source。应用只能在创建备份后补充缺失的 managed defaults，不得覆盖已有值或删除用户 section。诊断日志可以在用户授权的本机内测流程中生成，但不得提交到仓库，也不得包含患者信息或 report text。
