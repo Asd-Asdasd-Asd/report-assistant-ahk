@@ -83,7 +83,13 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertNotIn("ReportHotstringTimingDefaults", report_editor)
         self.assertNotIn("Sleep", fzg)
         self.assertNotIn("FzgCursorRestoreDelayMs", release)
-        self.assertEqual(fzg.count('Send("{Left 4}")'), 1)
+        self.assertIn("static RedLeft4AfterPasteSettleMs := 60", report_editor)
+        self.assertIn(
+            "Sleep ReportEditorTimingDefaults.RedLeft4AfterPasteSettleMs",
+            report_editor,
+        )
+        self.assertNotIn('Send("{Left 4}")', fzg)
+        self.assertEqual(report_editor.count('Send("{Left 4}")'), 1)
         self.assertNotIn('Send("{Left 3}")', hotstrings + report_editor)
         self.assertIn('Send("{Left 4}")', report_editor)
         self.assertNotIn('Send("{Left 4}")', source("src/adapters/medex_report_editor.ahk"))
@@ -97,8 +103,14 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         body = report_editor.split(
             "InsertRedFigureTextForCaretRelocation(text :=", 1
         )[1].split("\n\nInsertRedFigureTextAndRestoreState(text :=", 1)[0]
-        self.assertIn("PasteRedFigureTextDetailed(text, performanceContext)", body)
-        self.assertNotIn("beforeRestore", body)
+        self.assertIn("PasteRedFigureTextDetailed(", body)
+        self.assertIn("() => SendRedFigureCaretRelocation(", body)
+        self.assertIn("if !pasteResult.beforeRestoreSucceeded", body)
+        self.assertIn('Send("{Left 4}")', body)
+        self.assertLess(
+            body.index("PasteRedFigureTextDetailed("),
+            body.index('Send("{Left 4}")'),
+        )
         self.assertIn("ColorResetCode.NOT_REQUIRED", body)
         self.assertIn('"colorResetReason", "caretMovesBeforeRedMarker"', body)
         self.assertNotIn("ResetMedExInsertionColor", body)
@@ -130,7 +142,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         for forbidden in ("MsgBox", "ToolTip", "TrayTip", "Flash("):
             self.assertNotIn(forbidden, body)
 
-    def test_html_clipboard_restores_field_validated_safe_timing(self) -> None:
+    def test_html_clipboard_keeps_restore_safety_with_zero_dispatch_settle(self) -> None:
         clipboard = source("src/clipboard_html.ahk")
         transaction = clipboard.split(
             "WithClipboardRestore(callback, performanceContext := 0,", 1
@@ -141,7 +153,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         html_paste = clipboard.split(
             "PasteHtmlFragmentWithoutRestore(fragment, performanceContext := 0,", 1
         )[1].split("\n\nPastePlainTextWithoutRestore(text)", 1)[0]
-        self.assertIn("static HtmlPasteDispatchSettleMs := 200", clipboard)
+        self.assertIn("static HtmlPasteDispatchSettleMs := 0", clipboard)
         self.assertIn("static ClipboardPreRestoreSettleMs := 100", clipboard)
         self.assertIn("static ClipboardPostRestoreSettleMs := 100", clipboard)
         self.assertIn("static SafeMinPasteToRestoreMs := 300", clipboard)
@@ -486,7 +498,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
                 orchestration.index("ResetMedExInsertionColor"),
             ),
         )
-        self.assertIn("static HtmlPasteDispatchSettleMs := 200", clipboard)
+        self.assertIn("static HtmlPasteDispatchSettleMs := 0", clipboard)
         self.assertIn("static ClipboardPreRestoreSettleMs := 100", clipboard)
         self.assertIn("static ClipboardPostRestoreSettleMs := 100", clipboard)
         self.assertIn("static SafeMinPasteToRestoreMs := 300", clipboard)

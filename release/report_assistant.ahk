@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-21 01:36:25 UTC
+; Generated at: 2026-07-21 12:19:29 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -8070,10 +8070,9 @@ ClickPoint(name, clicks := 1) {
 
 ; --- BEGIN clipboard_html.ahk ---
 class ClipboardTransactionDefaults {
-    ; Restored field-validated safety timing. Some editors consume Ctrl+V
-    ; asynchronously, so restoring ClipboardAll after only 50 ms can paste the
-    ; user's original clipboard content instead of the CF_HTML fragment.
-    static HtmlPasteDispatchSettleMs := 200
+    ; Continue after Ctrl+V without a fixed paste-dispatch delay. Clipboard restore
+    ; remains protected by the independently validated minimum interval below.
+    static HtmlPasteDispatchSettleMs := 0
     static ClipboardPreRestoreSettleMs := 100
     static ClipboardPostRestoreSettleMs := 100
     static SafeMinPasteToRestoreMs := 300
@@ -8456,6 +8455,7 @@ class MedExColorResetStrategy {
 class RedTextOperationCode {
     static OK := "RED_TEXT_OK"
     static PASTE_FAILED := "RED_TEXT_PASTE_FAILED"
+    static CURSOR_RESTORE_FAILED := "RED_TEXT_CURSOR_RESTORE_FAILED"
     static CLIPBOARD_RESTORE_FAILED := "RED_TEXT_CLIPBOARD_RESTORE_FAILED"
     static RESET_FAILED := "RED_TEXT_RESET_FAILED"
 }
@@ -10712,6 +10712,13 @@ MedExAdapterOption(options, key, defaultValue) {
 ; --- END adapters/medex_report_editor.ahk ---
 
 ; --- BEGIN report_editor.ahk ---
+class ReportEditorTimingDefaults {
+    ; MedEx commits CF_HTML asynchronously. Give the red marker time to set the
+    ; final caret before moving left; this wait remains inside the 300 ms
+    ; paste-to-clipboard-restore safety interval.
+    static RedLeft4AfterPasteSettleMs := 60
+}
+
 FocusReportEditor() {
     return RequireReportEditor()
 }
@@ -10744,35 +10751,32 @@ RunFzgInsertion(resetOptions := 0) {
 RunRedLeft4Insertion(text, resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
-    operation := InsertRedFigureTextForCaretRelocation(text, performanceContext)
-    if operation.ok {
-        if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
-            && Type(operation.reset.context) = "Map" {
-            operation.reset.context["cursorRestoreRequestedCount"] := 4
-            operation.reset.context["foregroundHwndBeforeCursorRestore"] := Format(
-                "0x{:X}", WinExist("A")
-            )
-            operation.reset.context["cursorRestoreTargetHwnd"] := MedExContextValue(
-                operation.reset.context,
-                "foregroundWindowHandle",
-                "UNKNOWN"
-            )
-            if MedExAdapterOption(resetOptions, "collectFocusDiagnostics", false)
-                MergeContext(operation.reset.context,
-                    CaptureMedExFocusedElementContext("beforeCursorRestore"))
-        }
-        Send("{Left 4}")
-        if IsObject(operation.reset) && operation.reset.HasOwnProp("context")
-            && Type(operation.reset.context) = "Map"
-            operation.reset.context["cursorRestoreCommandSent"] := true
-        RecordOptionalPerformanceTimestamp(performanceContext, "CursorRestoreSentMs")
-    }
+    operation := InsertRedFigureTextForCaretRelocation(
+        text,
+        performanceContext,
+        resetOptions
+    )
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringReturnMs")
     return operation
 }
 
-InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext := 0) {
-    pasteResult := PasteRedFigureTextDetailed(text, performanceContext)
+InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext := 0,
+    resetOptions := 0) {
+    cursorContext := Map(
+        "cursorRestoreRequestedCount", 4,
+        "cursorRestoreCommandSent", false,
+        "foregroundHwndBeforeCursorRestore", "UNKNOWN",
+        "cursorRestoreTargetHwnd", "UNKNOWN"
+    )
+    pasteResult := PasteRedFigureTextDetailed(
+        text,
+        performanceContext,
+        () => SendRedFigureCaretRelocation(
+            cursorContext,
+            performanceContext,
+            resetOptions
+        )
+    )
     if !pasteResult.pasteDispatched {
         return {
             ok: false,
@@ -10780,6 +10784,33 @@ InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext
             pasteDispatched: false,
             clipboardRestoreSucceeded: pasteResult.clipboardRestoreSucceeded,
             reset: 0
+        }
+    }
+
+    resetContext := Map(
+        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "appVersion", AppMetadata.Version,
+        "colorResetStrategy", "notRequiredForCaretRelocation",
+        "colorResetReason", "caretMovesBeforeRedMarker",
+        "foregroundWindowHandle", cursorContext["cursorRestoreTargetHwnd"],
+        "automationChainResult", ColorResetCode.NOT_REQUIRED,
+        "finalValidationState", "NOT_APPLICABLE",
+        "finalInsertionColorVisuallyValidated", false
+    )
+    MergeContext(resetContext, cursorContext)
+    if !pasteResult.beforeRestoreSucceeded {
+        resetContext["automationChainResult"] := ColorResetCode.UNEXPECTED_ERROR
+        resetContext["cursorRestoreError"] := pasteResult.beforeRestoreError
+        return {
+            ok: false,
+            code: RedTextOperationCode.CURSOR_RESTORE_FAILED,
+            pasteDispatched: true,
+            clipboardRestoreSucceeded: pasteResult.clipboardRestoreSucceeded,
+            reset: MakeColorResetResult(
+                false,
+                ColorResetCode.UNEXPECTED_ERROR,
+                resetContext
+            )
         }
     }
     if !pasteResult.clipboardRestoreSucceeded {
@@ -10791,20 +10822,6 @@ InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext
             reset: 0
         }
     }
-
-    foregroundHwnd := WinExist("A")
-    resetContext := Map(
-        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
-        "appVersion", AppMetadata.Version,
-        "colorResetStrategy", "notRequiredForCaretRelocation",
-        "colorResetReason", "caretMovesBeforeRedMarker",
-        "foregroundWindowHandle", foregroundHwnd
-            ? Format("0x{:X}", foregroundHwnd)
-            : "UNKNOWN",
-        "automationChainResult", ColorResetCode.NOT_REQUIRED,
-        "finalValidationState", "NOT_APPLICABLE",
-        "finalInsertionColorVisuallyValidated", false
-    )
     return {
         ok: true,
         code: RedTextOperationCode.OK,
@@ -10812,6 +10829,22 @@ InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext
         clipboardRestoreSucceeded: true,
         reset: MakeColorResetResult(true, ColorResetCode.NOT_REQUIRED, resetContext)
     }
+}
+
+SendRedFigureCaretRelocation(cursorContext, performanceContext := 0,
+    resetOptions := 0) {
+    foregroundHwnd := WinExist("A")
+    formattedHwnd := foregroundHwnd ? Format("0x{:X}", foregroundHwnd) : "UNKNOWN"
+    cursorContext["foregroundHwndBeforeCursorRestore"] := formattedHwnd
+    cursorContext["cursorRestoreTargetHwnd"] := formattedHwnd
+    if MedExAdapterOption(resetOptions, "collectFocusDiagnostics", false)
+        MergeContext(cursorContext,
+            CaptureMedExFocusedElementContext("beforeCursorRestore"))
+    Sleep ReportEditorTimingDefaults.RedLeft4AfterPasteSettleMs
+    Send("{Left 4}")
+    cursorContext["cursorRestoreCommandSent"] := true
+    RecordOptionalPerformanceTimestamp(performanceContext, "CursorRestoreSentMs")
+    return true
 }
 
 InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {

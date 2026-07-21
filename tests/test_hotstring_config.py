@@ -126,6 +126,20 @@ class HotstringConfigTests(unittest.TestCase):
         self.assertIn(": text", red_plan)
         self.assertIn("redText := marker", red_plan)
 
+    def test_custom_red_left4_uses_shared_settle_and_caret_path(self) -> None:
+        hotstrings = source("src/hotstrings.ahk")
+        report_editor = source("src/report_editor.ahk")
+        dispatcher = hotstrings.split("RunConfiguredReportHotstring(entry, *)", 1)[1].split(
+            "\n}\n\nSendConfiguredReportText", 1
+        )[0]
+        self.assertIn("RunRedLeft4Insertion(entry.RedText)", dispatcher)
+        self.assertNotIn("entry.Section", dispatcher)
+        self.assertIn("static RedLeft4AfterPasteSettleMs := 60", report_editor)
+        self.assertIn(
+            "Sleep ReportEditorTimingDefaults.RedLeft4AfterPasteSettleMs",
+            report_editor,
+        )
+
     def test_debug_compatibility_wrappers_remain_available(self) -> None:
         report_editor = source("src/report_editor.ahk")
         field_debug = source("debug/medex_color_reset_field_debug.ahk")

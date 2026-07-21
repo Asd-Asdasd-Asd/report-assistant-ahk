@@ -44,6 +44,7 @@ class MedExColorResetStrategy {
 class RedTextOperationCode {
     static OK := "RED_TEXT_OK"
     static PASTE_FAILED := "RED_TEXT_PASTE_FAILED"
+    static CURSOR_RESTORE_FAILED := "RED_TEXT_CURSOR_RESTORE_FAILED"
     static CLIPBOARD_RESTORE_FAILED := "RED_TEXT_CLIPBOARD_RESTORE_FAILED"
     static RESET_FAILED := "RED_TEXT_RESET_FAILED"
 }

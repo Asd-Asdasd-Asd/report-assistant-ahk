@@ -1,8 +1,7 @@
 class ClipboardTransactionDefaults {
-    ; Restored field-validated safety timing. Some editors consume Ctrl+V
-    ; asynchronously, so restoring ClipboardAll after only 50 ms can paste the
-    ; user's original clipboard content instead of the CF_HTML fragment.
-    static HtmlPasteDispatchSettleMs := 200
+    ; Continue after Ctrl+V without a fixed paste-dispatch delay. Clipboard restore
+    ; remains protected by the independently validated minimum interval below.
+    static HtmlPasteDispatchSettleMs := 0
     static ClipboardPreRestoreSettleMs := 100
     static ClipboardPostRestoreSettleMs := 100
     static SafeMinPasteToRestoreMs := 300
