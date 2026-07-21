@@ -1,6 +1,6 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-21 13:10:37 UTC
+; Generated at: 2026-07-21 14:02:43 UTC
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -8956,12 +8956,22 @@ ValidateCandidateGRuntimeProfile(environment, options := 0) {
         context["unsupportedProfileReason"] := "environmentUnavailable"
         return MakeColorResetResult(false, ColorResetCode.UNSUPPORTED_PROFILE, context)
     }
+    machineProfileValidated := CandidateGLogicOption(
+        options,
+        "candidateGMachineProfileValidated",
+        false
+    ) = true
+    context["machineProfileValidated"] := machineProfileValidated
     expected := Map(
         "screenWidth", CandidateGRelativeMouseProfile.SupportedScreenWidth,
         "screenHeight", CandidateGRelativeMouseProfile.SupportedScreenHeight,
         "dpi", CandidateGRelativeMouseProfile.SupportedDpi,
         "displayScaling", CandidateGRelativeMouseProfile.SupportedDisplayScaling
     )
+    if machineProfileValidated {
+        expected.Delete("screenWidth")
+        expected.Delete("screenHeight")
+    }
     for key, value in expected {
         if !environment.Has(key) || String(environment[key]) != String(value) {
             context["unsupportedProfileReason"] := key "Mismatch"
@@ -8972,13 +8982,13 @@ ValidateCandidateGRuntimeProfile(environment, options := 0) {
     return MakeColorResetResult(true, ColorResetCode.OK, context)
 }
 
-CandidateGPopupSignatureSample(arrowPoint) {
+CandidateGPopupSignatureSample(arrowPoint, options := 0) {
     CoordMode "Pixel", "Screen"
     points := Map(
-        "popupLight", Map("x", CandidateGRelativeMouseProfile.PopupLightOffsetX, "y", CandidateGRelativeMouseProfile.PopupLightOffsetY),
-        "blackSwatch", Map("x", CandidateGRelativeMouseProfile.BlackSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlackSwatchOffsetY),
-        "beigeSwatch", Map("x", CandidateGRelativeMouseProfile.BeigeSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BeigeSwatchOffsetY),
-        "blueSwatch", Map("x", CandidateGRelativeMouseProfile.BlueSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlueSwatchOffsetY)
+        "popupLight", Map("x", CandidateGLogicOption(options, "popupLightOffsetX", CandidateGRelativeMouseProfile.PopupLightOffsetX), "y", CandidateGLogicOption(options, "popupLightOffsetY", CandidateGRelativeMouseProfile.PopupLightOffsetY)),
+        "blackSwatch", Map("x", CandidateGLogicOption(options, "blackSwatchOffsetX", CandidateGRelativeMouseProfile.BlackSwatchOffsetX), "y", CandidateGLogicOption(options, "blackSwatchOffsetY", CandidateGRelativeMouseProfile.BlackSwatchOffsetY)),
+        "beigeSwatch", Map("x", CandidateGLogicOption(options, "beigeSwatchOffsetX", CandidateGRelativeMouseProfile.BeigeSwatchOffsetX), "y", CandidateGLogicOption(options, "beigeSwatchOffsetY", CandidateGRelativeMouseProfile.BeigeSwatchOffsetY)),
+        "blueSwatch", Map("x", CandidateGLogicOption(options, "blueSwatchOffsetX", CandidateGRelativeMouseProfile.BlueSwatchOffsetX), "y", CandidateGLogicOption(options, "blueSwatchOffsetY", CandidateGRelativeMouseProfile.BlueSwatchOffsetY))
     )
     samples := Map()
     for name, offset in points {
@@ -8993,12 +9003,12 @@ CandidateGPopupSignatureSample(arrowPoint) {
     return samples
 }
 
-EvaluateCandidateGPopupSignature(samples) {
+EvaluateCandidateGPopupSignature(samples, options := 0) {
     expected := [
-        ["popupLight", CandidateGRelativeMouseProfile.PopupLightColor, CandidateGRelativeMouseProfile.PopupLightTolerance],
-        ["blackSwatch", CandidateGRelativeMouseProfile.BlackSwatchColor, CandidateGRelativeMouseProfile.BlackSwatchTolerance],
-        ["beigeSwatch", CandidateGRelativeMouseProfile.BeigeSwatchColor, CandidateGRelativeMouseProfile.BeigeSwatchTolerance],
-        ["blueSwatch", CandidateGRelativeMouseProfile.BlueSwatchColor, CandidateGRelativeMouseProfile.BlueSwatchTolerance]
+        ["popupLight", CandidateGLogicOption(options, "popupLightColor", CandidateGRelativeMouseProfile.PopupLightColor), CandidateGLogicOption(options, "popupLightTolerance", CandidateGRelativeMouseProfile.PopupLightTolerance)],
+        ["blackSwatch", CandidateGLogicOption(options, "blackSwatchColor", CandidateGRelativeMouseProfile.BlackSwatchColor), CandidateGLogicOption(options, "blackSwatchTolerance", CandidateGRelativeMouseProfile.BlackSwatchTolerance)],
+        ["beigeSwatch", CandidateGLogicOption(options, "beigeSwatchColor", CandidateGRelativeMouseProfile.BeigeSwatchColor), CandidateGLogicOption(options, "beigeSwatchTolerance", CandidateGRelativeMouseProfile.BeigeSwatchTolerance)],
+        ["blueSwatch", CandidateGLogicOption(options, "blueSwatchColor", CandidateGRelativeMouseProfile.BlueSwatchColor), CandidateGLogicOption(options, "blueSwatchTolerance", CandidateGRelativeMouseProfile.BlueSwatchTolerance)]
     ]
     if Type(samples) != "Map"
         return Map("matched", false, "reason", "samplesUnavailable")
@@ -9147,6 +9157,9 @@ CandidateGRegionGeometryReason(anchor, clientRectScreen, options := 0) {
     if RectHeight(rect) < heightMin || RectHeight(rect) > heightMax
         return "heightOutsideProfile"
 
+    if CandidateGLogicOption(options, "validateInteractionPoints", true) != true
+        return ""
+
     arrowPoint := CalculateCandidateGArrowPoint(rect, options)
     if !RectContainsPoint(clientRectScreen, arrowPoint)
         return "arrowPointOutsideClient"
@@ -9225,6 +9238,169 @@ CandidateGLogicOption(options, key, defaultValue) {
 }
 
 ; --- END medex_candidate_g_logic.ahk ---
+
+; --- BEGIN machine_profile.ahk ---
+class MedExMachineProfileDefaults {
+    static SchemaVersion := 1
+    static FileName := "machine-profile.ini"
+    static Status := "validated"
+    static SupportedDpi := 96
+    static SupportedDisplayScaling := "100%"
+    static ArrowOffsetXMin := 40
+    static ArrowOffsetXMax := 800
+    static ArrowOffsetYAbsMax := 40
+    static BlackOffsetAbsMax := 300
+}
+
+MedExMachineProfilePath() {
+    configPath := ReportAssistantConfig.Path()
+    SplitPath configPath, , &configDirectory
+    return configDirectory "\" MedExMachineProfileDefaults.FileName
+}
+
+LoadValidatedMedExMachineProfile(profilePath := "") {
+    if profilePath = "" {
+        try profilePath := MedExMachineProfilePath()
+        catch
+            return 0
+    }
+    if !FileExist(profilePath)
+        return 0
+
+    try {
+        profile := Map(
+            "schemaVersion", IniRead(profilePath, "Profile", "SchemaVersion", ""),
+            "status", IniRead(profilePath, "Profile", "Status", ""),
+            "dpi", IniRead(profilePath, "Environment", "Dpi", ""),
+            "displayScaling", IniRead(profilePath, "Environment", "DisplayScaling", ""),
+            "arrowOffsetX", IniRead(profilePath, "Offsets", "ArrowOffsetX", ""),
+            "arrowOffsetY", IniRead(profilePath, "Offsets", "ArrowOffsetY", ""),
+            "blackOffsetX", IniRead(profilePath, "Offsets", "BlackOffsetX", ""),
+            "blackOffsetY", IniRead(profilePath, "Offsets", "BlackOffsetY", ""),
+            "validatedAt", IniRead(profilePath, "Diagnostics", "ValidatedAt", "UNKNOWN")
+        )
+    } catch {
+        return 0
+    }
+    if !ValidateMedExMachineProfile(profile)
+        return 0
+    for key in ["dpi", "arrowOffsetX", "arrowOffsetY", "blackOffsetX", "blackOffsetY"]
+        profile[key] := Integer(profile[key])
+    profile["path"] := profilePath
+    return profile
+}
+
+ValidateMedExMachineProfile(profile) {
+    if Type(profile) != "Map"
+        return false
+    required := [
+        "schemaVersion", "status", "dpi", "displayScaling",
+        "arrowOffsetX", "arrowOffsetY", "blackOffsetX", "blackOffsetY"
+    ]
+    for key in required {
+        if !profile.Has(key)
+            return false
+    }
+    if String(profile["schemaVersion"]) != String(MedExMachineProfileDefaults.SchemaVersion)
+        return false
+    if StrLower(String(profile["status"])) != MedExMachineProfileDefaults.Status
+        return false
+    for key in ["dpi", "arrowOffsetX", "arrowOffsetY", "blackOffsetX", "blackOffsetY"] {
+        if !IsInteger(profile[key])
+            return false
+    }
+    if Integer(profile["dpi"]) != MedExMachineProfileDefaults.SupportedDpi
+        return false
+    if String(profile["displayScaling"]) != MedExMachineProfileDefaults.SupportedDisplayScaling
+        return false
+    if Integer(profile["arrowOffsetX"]) < MedExMachineProfileDefaults.ArrowOffsetXMin
+        return false
+    if Integer(profile["arrowOffsetX"]) > MedExMachineProfileDefaults.ArrowOffsetXMax
+        return false
+    if Abs(Integer(profile["arrowOffsetY"])) > MedExMachineProfileDefaults.ArrowOffsetYAbsMax
+        return false
+    if Abs(Integer(profile["blackOffsetX"])) > MedExMachineProfileDefaults.BlackOffsetAbsMax
+        return false
+    if Abs(Integer(profile["blackOffsetY"])) > MedExMachineProfileDefaults.BlackOffsetAbsMax
+        return false
+    return true
+}
+
+BuildMedExMachineProfileOptions(profile) {
+    if !ValidateMedExMachineProfile(profile)
+        return 0
+    blackOffsetX := Integer(profile["blackOffsetX"])
+    blackOffsetY := Integer(profile["blackOffsetY"])
+    return Map(
+        "profileName", "machine-calibrated-relative-mouse-v1",
+        "candidateGMachineProfileValidated", true,
+        "arrowOffsetX", Integer(profile["arrowOffsetX"]),
+        "arrowOffsetY", Integer(profile["arrowOffsetY"]),
+        "blackOffsetX", blackOffsetX,
+        "blackOffsetY", blackOffsetY,
+        "popupLightOffsetX", blackOffsetX,
+        "popupLightOffsetY", blackOffsetY - 67,
+        "blackSwatchOffsetX", blackOffsetX,
+        "blackSwatchOffsetY", blackOffsetY,
+        "beigeSwatchOffsetX", blackOffsetX + 14,
+        "beigeSwatchOffsetY", blackOffsetY,
+        "blueSwatchOffsetX", blackOffsetX + 34,
+        "blueSwatchOffsetY", blackOffsetY
+    )
+}
+
+SaveValidatedMedExMachineProfile(profile, profilePath := "") {
+    if !ValidateMedExMachineProfile(profile)
+        return false
+    if profilePath = ""
+        profilePath := MedExMachineProfilePath()
+    SplitPath profilePath, , &profileDirectory
+    DirCreate profileDirectory
+    tempPath := profilePath ".write.tmp.ini"
+    try {
+        try FileDelete tempPath
+        IniWrite MedExMachineProfileDefaults.SchemaVersion, tempPath, "Profile", "SchemaVersion"
+        IniWrite MedExMachineProfileDefaults.Status, tempPath, "Profile", "Status"
+        IniWrite profile["dpi"], tempPath, "Environment", "Dpi"
+        IniWrite profile["displayScaling"], tempPath, "Environment", "DisplayScaling"
+        IniWrite profile["arrowOffsetX"], tempPath, "Offsets", "ArrowOffsetX"
+        IniWrite profile["arrowOffsetY"], tempPath, "Offsets", "ArrowOffsetY"
+        IniWrite profile["blackOffsetX"], tempPath, "Offsets", "BlackOffsetX"
+        IniWrite profile["blackOffsetY"], tempPath, "Offsets", "BlackOffsetY"
+        IniWrite MedExMachineProfileValue(profile, "validatedAt", FormatTime(, "yyyy-MM-ddTHH:mm:ss")), tempPath, "Diagnostics", "ValidatedAt"
+        if !LoadValidatedMedExMachineProfile(tempPath)
+            throw Error("Machine profile validation failed")
+        if FileExist(profilePath)
+            BackupMedExMachineProfile(profilePath)
+        FileMove tempPath, profilePath, true
+        return !!LoadValidatedMedExMachineProfile(profilePath)
+    } catch {
+        try FileDelete tempPath
+        return false
+    }
+}
+
+BackupMedExMachineProfile(profilePath) {
+    SplitPath profilePath, , &profileDirectory
+    backupDirectory := profileDirectory "\backups"
+    DirCreate backupDirectory
+    timestamp := FormatTime(A_Now, "yyyyMMdd-HHmmss")
+    Loop 100 {
+        suffix := A_Index = 1 ? "" : "-" A_Index
+        backupPath := backupDirectory "\machine-profile-" timestamp suffix ".ini"
+        if FileExist(backupPath)
+            continue
+        FileCopy profilePath, backupPath, false
+        return backupPath
+    }
+    throw Error("A unique machine profile backup path was unavailable")
+}
+
+MedExMachineProfileValue(profile, key, defaultValue) {
+    return Type(profile) = "Map" && profile.Has(key) ? profile[key] : defaultValue
+}
+
+; --- END machine_profile.ahk ---
 
 ; --- BEGIN diagnostics.ahk ---
 DefaultMedExColorResetLogPath() {
@@ -9864,7 +10040,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             }
         }
 
-        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint)
+        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
         context["popupSignatureSampleCount"] := 1
         context["popupSignatureFirstReason"] := signature["reason"]
         context["popupSignatureFirstSamples"] := signature["samples"]
@@ -9882,7 +10058,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
                 return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                     context, startedAt, options)
             }
-            signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint)
+            signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
             context["popupSignatureSampleCount"] := 2
             context["popupSignatureSecondReason"] := signature["reason"]
             context["popupSignatureSecondSamples"] := signature["samples"]
@@ -9930,9 +10106,9 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
     }
 }
 
-SampleAndEvaluateCandidateGPopupSignature(arrowPoint) {
-    samples := CandidateGPopupSignatureSample(arrowPoint)
-    evaluation := EvaluateCandidateGPopupSignature(samples)
+SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options := 0) {
+    samples := CandidateGPopupSignatureSample(arrowPoint, options)
+    evaluation := EvaluateCandidateGPopupSignature(samples, options)
     evaluation["samples"] := samples
     return evaluation
 }
@@ -10745,6 +10921,482 @@ MedExAdapterOption(options, key, defaultValue) {
 
 ; --- END adapters/medex_report_editor.ahk ---
 
+; --- BEGIN medex_calibration.ahk ---
+class MedExCalibrationStage {
+    static IDLE := "Idle"
+    static WAIT_ARROW := "WaitArrow"
+    static WAIT_BLACK := "WaitBlack"
+}
+
+class MedExCalibrationDefaults {
+    static HotkeyName := "Ctrl+Alt+F8"
+    static ToolTipId := 19
+    static BlackLookupTimeoutMs := 1200
+    static BlackLookupPollIntervalMs := 60
+    static MenuCloseValidationDelayMs := 60
+}
+
+global MEDEX_CALIBRATION_SESSION := 0
+
+MedExCalibrationActive(*) {
+    global MEDEX_CALIBRATION_SESSION
+    return Type(MEDEX_CALIBRATION_SESSION) = "Map"
+        && MEDEX_CALIBRATION_SESSION.Has("stage")
+        && MEDEX_CALIBRATION_SESSION["stage"] != MedExCalibrationStage.IDLE
+}
+
+AdvanceMedExCalibration(*) {
+    global MEDEX_CALIBRATION_SESSION
+    if !MedExCalibrationActive()
+        return BeginMedExCalibration()
+    stage := MEDEX_CALIBRATION_SESSION["stage"]
+    if stage = MedExCalibrationStage.WAIT_ARROW
+        return CaptureMedExCalibrationArrow()
+    if stage = MedExCalibrationStage.WAIT_BLACK
+        return CaptureMedExCalibrationBlack()
+    return CancelMedExCalibration("invalidState")
+}
+
+BeginMedExCalibration() {
+    global MEDEX_CALIBRATION_SESSION
+    SetTimer ClearMedExCalibrationToolTip, 0
+    ClearMedExCalibrationToolTip()
+    ShowMedExCalibrationToolTip("MedEx 校准`n正在检查环境…")
+    contextResult := CollectMedExCalibrationContext(
+        Map("validateInteractionPoints", false)
+    )
+    if !contextResult.ok {
+        ShowMedExCalibrationToolTip(
+            "MedEx 校准`n环境检查失败：" contextResult.reason .
+            "`n请保持 MedEx 前台、DPI 100%，然后重试。",
+            contextResult.context
+        )
+        return false
+    }
+    context := contextResult.context
+    logPath := StartMedExCalibrationLog(context)
+    MEDEX_CALIBRATION_SESSION := Map(
+        "stage", MedExCalibrationStage.WAIT_ARROW,
+        "hwnd", context["hwnd"],
+        "process", context["process"],
+        "clientRect", context["clientRect"],
+        "regionRect", context["regionRect"],
+        "windowElement", context["windowElement"],
+        "dpi", context["dpi"],
+        "displayScaling", context["displayScaling"],
+        "logPath", logPath
+    )
+    AppendMedExCalibrationLog("waitArrow")
+    ShowMedExCalibrationToolTip(
+        "MedEx 校准 1/2`n请把鼠标移动到字体颜色箭头中心，" .
+        "`n再次按 " MedExCalibrationDefaults.HotkeyName "。`nEsc 取消",
+        context
+    )
+    return true
+}
+
+CaptureMedExCalibrationArrow() {
+    global MEDEX_CALIBRATION_SESSION
+    session := MEDEX_CALIBRATION_SESSION
+    if !MedExCalibrationTargetStillValid(session)
+        return FailMedExCalibration("MedEx 前台窗口已改变，请重新开始。", "foregroundChanged")
+
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &mouseX, &mouseY
+    regionRect := session["regionRect"]
+    arrowOffsetX := Round(mouseX - regionRect["r"])
+    arrowOffsetY := Round(mouseY - RectCenterY(regionRect))
+    arrowPoint := Map("x", mouseX, "y", mouseY)
+    if !ValidMedExCalibrationArrow(
+        arrowOffsetX,
+        arrowOffsetY,
+        arrowPoint,
+        session["clientRect"],
+        regionRect
+    ) {
+        AppendMedExCalibrationLog("invalidArrow")
+        ShowMedExCalibrationToolTip(
+            "MedEx 校准 1/2`n箭头位置不合理，请重新指向箭头中心。" .
+            "`n再次按 " MedExCalibrationDefaults.HotkeyName "。`nEsc 取消",
+            session
+        )
+        return false
+    }
+    session["arrowOffsetX"] := arrowOffsetX
+    session["arrowOffsetY"] := arrowOffsetY
+    session["arrowPoint"] := arrowPoint
+    AppendMedExCalibrationLog(
+        "arrowCaptured ArrowOffsetX=" arrowOffsetX .
+        " ArrowOffsetY=" arrowOffsetY
+    )
+    ShowMedExCalibrationToolTip("MedEx 校准`n正在自动验证颜色菜单…", session)
+
+    try Click arrowPoint["x"], arrowPoint["y"]
+    catch
+        return FailMedExCalibration("无法点击颜色箭头，请重新开始。", "arrowClickFailed")
+    menuLookup := WaitForMedExColorMenu(
+        session["hwnd"],
+        session["windowElement"],
+        MedExCalibrationDefaults.BlackLookupTimeoutMs,
+        MedExCalibrationDefaults.BlackLookupPollIntervalMs
+    )
+    if menuLookup["foregroundChanged"]
+        return FailMedExCalibration("MedEx 前台窗口已改变，请重新开始。", "foregroundChangedDuringLookup")
+    blackItem := menuLookup["blackItem"]
+    if blackItem {
+        try blackRect := UiaRectangleToMap(blackItem.BoundingRectangle)
+        catch {
+            blackRect := 0
+        }
+        if IsValidRect(blackRect) {
+            blackPoint := Map(
+                "x", Round((blackRect["l"] + blackRect["r"]) / 2),
+                "y", Round((blackRect["t"] + blackRect["b"]) / 2)
+            )
+            if TryCompleteMedExCalibration(blackPoint, "uia")
+                return true
+        }
+    }
+
+    session["stage"] := MedExCalibrationStage.WAIT_BLACK
+    AppendMedExCalibrationLog("uiaBlackFallback")
+    ShowMedExCalibrationToolTip(
+        "MedEx 校准 2/2`n未能自动确认黑色方块。" .
+        "`n请确认颜色菜单已展开，把鼠标移到黑色方块中心，" .
+        "`n再次按 " MedExCalibrationDefaults.HotkeyName "。`nEsc 取消",
+        session
+    )
+    return false
+}
+
+CaptureMedExCalibrationBlack() {
+    global MEDEX_CALIBRATION_SESSION
+    if !MedExCalibrationTargetStillValid(MEDEX_CALIBRATION_SESSION)
+        return FailMedExCalibration("MedEx 前台窗口已改变，请重新开始。", "foregroundChanged")
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &mouseX, &mouseY
+    ShowMedExCalibrationToolTip("MedEx 校准`n正在验证黑色方块…", MEDEX_CALIBRATION_SESSION)
+    return TryCompleteMedExCalibration(Map("x", mouseX, "y", mouseY), "manual")
+}
+
+TryCompleteMedExCalibration(blackPoint, source) {
+    global MEDEX_CALIBRATION_SESSION
+    session := MEDEX_CALIBRATION_SESSION
+    arrowPoint := session["arrowPoint"]
+    blackOffsetX := Round(blackPoint["x"] - arrowPoint["x"])
+    blackOffsetY := Round(blackPoint["y"] - arrowPoint["y"])
+    if !ValidMedExCalibrationBlack(
+        blackOffsetX,
+        blackOffsetY,
+        blackPoint,
+        session["clientRect"]
+    ) {
+        AppendMedExCalibrationLog("invalidBlack source=" source)
+        if source = "uia"
+            return false
+        ShowMedExCalibrationToolTip(
+            "MedEx 校准 2/2`n黑色方块位置不合理，请重新定位。" .
+            "`n再次按 " MedExCalibrationDefaults.HotkeyName "。`nEsc 取消",
+            session
+        )
+        return false
+    }
+
+    profile := Map(
+        "schemaVersion", MedExMachineProfileDefaults.SchemaVersion,
+        "status", MedExMachineProfileDefaults.Status,
+        "dpi", session["dpi"],
+        "displayScaling", session["displayScaling"],
+        "arrowOffsetX", session["arrowOffsetX"],
+        "arrowOffsetY", session["arrowOffsetY"],
+        "blackOffsetX", blackOffsetX,
+        "blackOffsetY", blackOffsetY,
+        "validatedAt", FormatTime(, "yyyy-MM-ddTHH:mm:ss")
+    )
+    options := BuildMedExMachineProfileOptions(profile)
+    signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
+    if !signature["matched"] {
+        AppendMedExCalibrationLog("popupSignatureFailed source=" source " reason=" signature["reason"])
+        if source = "uia"
+            return false
+        ShowMedExCalibrationToolTip(
+            "MedEx 校准 2/2`n未检测到正确的颜色菜单或黑色方块。" .
+            "`n请保持菜单展开后重新定位。`nEsc 取消",
+            session
+        )
+        return false
+    }
+    if !MedExCalibrationTargetStillValid(session)
+        return FailMedExCalibration("MedEx 前台窗口已改变，请重新开始。", "foregroundChangedBeforeBlackClick")
+    try Click blackPoint["x"], blackPoint["y"]
+    catch
+        return FailMedExCalibration("无法点击黑色方块，请重新开始。", "blackClickFailed")
+    Sleep MedExCalibrationDefaults.MenuCloseValidationDelayMs
+    if !MedExCalibrationTargetStillValid(session)
+        return FailMedExCalibration("MedEx 前台窗口已改变，请重新开始。", "foregroundChangedAfterBlackClick")
+    closedSignature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
+    if closedSignature["matched"] {
+        AppendMedExCalibrationLog("menuCloseValidationFailed")
+        ShowMedExCalibrationToolTip(
+            "MedEx 校准失败`n颜色菜单没有正确关闭，请按 Esc 后重试。",
+            session
+        )
+        return false
+    }
+    if !SaveValidatedMedExMachineProfile(profile)
+        return FailMedExCalibration("无法保存 machine-profile.ini。", "profileWriteFailed")
+
+    AppendMedExCalibrationLog(
+        "completed source=" source " BlackOffsetX=" blackOffsetX .
+        " BlackOffsetY=" blackOffsetY
+    )
+    profilePath := MedExMachineProfilePath()
+    logPath := session["logPath"]
+    MEDEX_CALIBRATION_SESSION := 0
+    completionMessage := "校准完成`n此电脑已启用红字恢复。`n请正常输入一次 " Chr(59) "red 进行测试。`n配置：" profilePath "`n日志：" logPath
+    ShowMedExCalibrationToolTip(completionMessage, session)
+    SetTimer ClearMedExCalibrationToolTip, -8000
+    return true
+}
+
+CancelMedExCalibration(reason := "cancelled") {
+    global MEDEX_CALIBRATION_SESSION
+    if MedExCalibrationActive()
+        AppendMedExCalibrationLog(reason)
+    session := MEDEX_CALIBRATION_SESSION
+    MEDEX_CALIBRATION_SESSION := 0
+    ShowMedExCalibrationToolTip("MedEx 校准已取消。", session)
+    SetTimer ClearMedExCalibrationToolTip, -2000
+    return true
+}
+
+FailMedExCalibration(message, reason) {
+    global MEDEX_CALIBRATION_SESSION
+    AppendMedExCalibrationLog("failed reason=" reason)
+    session := MEDEX_CALIBRATION_SESSION
+    MEDEX_CALIBRATION_SESSION := 0
+    ShowMedExCalibrationToolTip("MedEx 校准失败`n" message, session)
+    SetTimer ClearMedExCalibrationToolTip, -5000
+    return false
+}
+
+PrepareMedExRedReset() {
+    options := 0
+    environment := CollectCurrentMedExProfileEnvironment()
+    if environment {
+        builtinResult := ValidateCandidateGRuntimeProfile(environment)
+        if builtinResult.ok
+            options := Map()
+    }
+    if !options {
+        profile := LoadValidatedMedExMachineProfile()
+        if profile
+            options := BuildMedExMachineProfileOptions(profile)
+    }
+    if !options {
+        ShowMedExCalibrationRequired()
+        return {ok: false, options: 0}
+    }
+    contextResult := CollectMedExCalibrationContext(options)
+    if !contextResult.ok {
+        ShowMedExCalibrationRequired(contextResult.reason)
+        return {ok: false, options: 0}
+    }
+    return {ok: true, options: options}
+}
+
+CollectCurrentMedExProfileEnvironment() {
+    hwnd := WinExist("A")
+    if !hwnd
+        return 0
+    try process := WinGetProcessName("ahk_id " hwnd)
+    catch
+        return 0
+    if !MedExProcessNameIsApproved(process, MedExColorResetDefaults.ProvisionalProcessNames)
+        return 0
+    context := Map()
+    CollectMedExEnvironmentContext(hwnd, context)
+    return Map(
+        "medExVersion", MedExContextValue(context, "medExVersion", "UNKNOWN"),
+        "screenWidth", A_ScreenWidth,
+        "screenHeight", A_ScreenHeight,
+        "dpi", MedExContextValue(context, "dpi", "UNKNOWN"),
+        "displayScaling", MedExContextValue(context, "displayScaling", "UNKNOWN")
+    )
+}
+
+CollectMedExCalibrationContext(options := 0) {
+    hwnd := WinExist("A")
+    if !hwnd
+        return {ok: false, reason: "未检测到前台窗口", context: Map()}
+    try process := WinGetProcessName("ahk_id " hwnd)
+    catch
+        return {ok: false, reason: "无法读取前台进程", context: Map()}
+    if !MedExProcessNameIsApproved(process, MedExColorResetDefaults.ProvisionalProcessNames)
+        return {ok: false, reason: "前台不是已批准的 MedEx 进程", context: Map()}
+
+    environmentContext := Map()
+    CollectMedExEnvironmentContext(hwnd, environmentContext)
+    if MedExContextValue(environmentContext, "dpi", "UNKNOWN") != 96
+        return {ok: false, reason: "仅支持 Windows 缩放 100% (DPI 96)", context: Map()}
+    global UIA
+    if !IsSet(UIA)
+        return {ok: false, reason: "UIA 不可用", context: Map()}
+    try windowElement := UIA.ElementFromHandle(hwnd)
+    catch
+        return {ok: false, reason: "无法连接 MedEx UIA", context: Map()}
+    try regionElements := windowElement.FindElements({
+        Type: "Text",
+        Name: CandidateGRelativeMouseProfile.RegionAnchorName
+    })
+    catch
+        return {ok: false, reason: "无法查找 检查所见 anchor", context: Map()}
+    conversion := UiaTextElementsToAnchors(regionElements, false)
+    textAnchors := conversion.anchors
+    if textAnchors.Length > 1 {
+        try textAnchors := CollectMedExTextAnchorSnapshot(windowElement, false).anchors
+        catch
+            return {ok: false, reason: "anchor 重复且无法完成校验", context: Map()}
+    }
+    clientRect := GetClientRectScreenMap(hwnd)
+    layoutOptions := BuildCandidateGRuntimeLayoutOptions(options)
+    if Type(options) = "Map" && options.Has("validateInteractionPoints")
+        layoutOptions["validateInteractionPoints"] := options["validateInteractionPoints"]
+    rowResult := ResolveCandidateGToolbarRow(textAnchors, clientRect, layoutOptions)
+    if !rowResult.ok
+        return {ok: false, reason: "检查所见 anchor 不唯一或位置不合理", context: Map()}
+    context := Map(
+        "hwnd", hwnd,
+        "process", process,
+        "clientRect", clientRect,
+        "windowRect", GetWindowRectMap(hwnd),
+        "regionRect", rowResult.context["regionAnchorRect"],
+        "windowElement", windowElement,
+        "dpi", environmentContext["dpi"],
+        "displayScaling", environmentContext["displayScaling"],
+        "medExVersion", MedExContextValue(environmentContext, "medExVersion", "UNKNOWN"),
+        "resolution", A_ScreenWidth "x" A_ScreenHeight
+    )
+    return {ok: true, reason: "ok", context: context}
+}
+
+ValidMedExCalibrationArrow(offsetX, offsetY, point, clientRect, regionRect) {
+    return offsetX >= MedExMachineProfileDefaults.ArrowOffsetXMin
+        && offsetX <= MedExMachineProfileDefaults.ArrowOffsetXMax
+        && Abs(offsetY) <= MedExMachineProfileDefaults.ArrowOffsetYAbsMax
+        && RectContainsPoint(clientRect, point)
+        && point["y"] >= regionRect["t"] - MedExMachineProfileDefaults.ArrowOffsetYAbsMax
+        && point["y"] <= regionRect["b"] + MedExMachineProfileDefaults.ArrowOffsetYAbsMax
+}
+
+ValidMedExCalibrationBlack(offsetX, offsetY, point, clientRect) {
+    return Abs(offsetX) <= MedExMachineProfileDefaults.BlackOffsetAbsMax
+        && Abs(offsetY) <= MedExMachineProfileDefaults.BlackOffsetAbsMax
+        && RectContainsPoint(clientRect, point)
+}
+
+MedExCalibrationTargetStillValid(session) {
+    if Type(session) != "Map" || !session.Has("hwnd") || !session.Has("process")
+        return false
+    return MedExForegroundTargetMatches(session["hwnd"], session["process"])
+}
+
+ShowMedExCalibrationRequired(reason := "此电脑尚未通过布局校准") {
+    context := Map("clientRect", GetSafeMedExForegroundClientRect())
+    ShowMedExCalibrationToolTip(
+        "红字恢复已停止`n" reason .
+        "`n未插入任何正文或红字。" .
+        "`n请按 " MedExCalibrationDefaults.HotkeyName " 开始校准。",
+        context
+    )
+    SetTimer ClearMedExCalibrationToolTip, -6000
+}
+
+ShowMedExCalibrationToolTip(message, context := 0) {
+    rect := 0
+    if Type(context) = "Map" {
+        if context.Has("clientRect")
+            rect := context["clientRect"]
+        else if context.Has("hwnd")
+            try rect := GetClientRectScreenMap(context["hwnd"])
+    }
+    if !IsValidRect(rect)
+        rect := MakeRect(0, 0, A_ScreenWidth, A_ScreenHeight)
+    x := Max(rect["l"] + 10, rect["r"] - 430)
+    y := Max(rect["t"] + 20, rect["b"] - 170)
+    CoordMode "ToolTip", "Screen"
+    ToolTip message, x, y, MedExCalibrationDefaults.ToolTipId
+}
+
+ClearMedExCalibrationToolTip(*) {
+    ToolTip , , , MedExCalibrationDefaults.ToolTipId
+}
+
+GetSafeMedExForegroundClientRect() {
+    hwnd := WinExist("A")
+    if hwnd {
+        try return GetClientRectScreenMap(hwnd)
+    }
+    return MakeRect(0, 0, A_ScreenWidth, A_ScreenHeight)
+}
+
+StartMedExCalibrationLog(context) {
+    try {
+        configPath := ReportAssistantConfig.Path()
+        SplitPath configPath, , &configDirectory
+        logDirectory := configDirectory "\logs"
+        DirCreate logDirectory
+        timestamp := FormatTime(A_Now, "yyyyMMdd-HHmmss")
+        logPath := ""
+        Loop 100 {
+            suffix := A_Index = 1 ? "" : "-" A_Index
+            candidatePath := logDirectory "\calibration-" timestamp suffix ".txt"
+            if !FileExist(candidatePath) {
+                logPath := candidatePath
+                break
+            }
+        }
+        if logPath = ""
+            throw Error("A unique calibration log path was unavailable")
+        clientRect := context["clientRect"]
+        windowRect := context["windowRect"]
+        regionRect := context["regionRect"]
+        FileAppend(
+            "Timestamp=" FormatTime(, "yyyy-MM-ddTHH:mm:ss") "`r`n" .
+            "Event=started`r`n" .
+            "Resolution=" context["resolution"] "`r`n" .
+            "Dpi=" context["dpi"] "`r`n" .
+            "DisplayScaling=" context["displayScaling"] "`r`n" .
+            "MedExVersion=" context["medExVersion"] "`r`n" .
+            "WindowRect=" windowRect["l"] "," windowRect["t"] "," windowRect["r"] "," windowRect["b"] "`r`n" .
+            "ClientRect=" clientRect["l"] "," clientRect["t"] "," clientRect["r"] "," clientRect["b"] "`r`n" .
+            "RegionAnchorRect=" regionRect["l"] "," regionRect["t"] "," regionRect["r"] "," regionRect["b"] "`r`n",
+            logPath,
+            "UTF-8"
+        )
+        return logPath
+    } catch {
+        return ""
+    }
+}
+
+AppendMedExCalibrationLog(message) {
+    global MEDEX_CALIBRATION_SESSION
+    if Type(MEDEX_CALIBRATION_SESSION) != "Map"
+        return
+    logPath := MedExMachineProfileValue(MEDEX_CALIBRATION_SESSION, "logPath", "")
+    if logPath = ""
+        return
+    try FileAppend(
+        "Timestamp=" FormatTime(, "yyyy-MM-ddTHH:mm:ss") .
+        " Event=" message "`r`n",
+        logPath,
+        "UTF-8"
+    )
+}
+
+; --- END medex_calibration.ahk ---
+
 ; --- BEGIN report_editor.ahk ---
 class ReportEditorTimingDefaults {
     ; MedEx commits CF_HTML asynchronously. Give the red marker time to set the
@@ -11484,6 +12136,12 @@ RegisterReportHotstrings(
 )
 
 RunConfiguredReportHotstring(entry, *) {
+    resetReadiness := 0
+    if entry.Mode = ReportHotstringMode.RED_RESET {
+        resetReadiness := PrepareMedExRedReset()
+        if !resetReadiness.ok
+            return false
+    }
     SendConfiguredReportText(entry.PlainText)
     if entry.Mode = ReportHotstringMode.TEXT {
         if entry.PostTextCaretLeftCount = 2
@@ -11491,7 +12149,7 @@ RunConfiguredReportHotstring(entry, *) {
         return true
     }
     if entry.Mode = ReportHotstringMode.RED_RESET
-        return RunRedResetInsertion(entry.RedText)
+        return RunRedResetInsertion(entry.RedText, resetReadiness.options)
     if entry.Mode = ReportHotstringMode.RED_LEFT4
         return RunRedLeft4Insertion(entry.RedText)
     return false
@@ -11658,6 +12316,12 @@ RegisterConfiguredFeatures(settings) {
 }
 
 #SuspendExempt False
+
+^!F8::AdvanceMedExCalibration()
+
+#HotIf MedExCalibrationActive()
+Esc::CancelMedExCalibration()
+#HotIf
 
 Flash("Report Assistant AHK loaded")
 

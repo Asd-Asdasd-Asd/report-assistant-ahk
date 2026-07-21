@@ -23,7 +23,7 @@ def function_body(text: str, name: str, next_name: str) -> str:
 class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_hotstrings_use_report_editor_orchestration(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        self.assertIn("RunRedResetInsertion(entry.RedText)", hotstrings)
+        self.assertIn("RunRedResetInsertion(entry.RedText, resetReadiness.options)", hotstrings)
         self.assertIn("RunRedLeft4Insertion(entry.RedText)", hotstrings)
         self.assertNotIn("ResetMedExInsertionColor(", hotstrings)
 
@@ -34,7 +34,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         )[0]
         self.assertLess(
             dispatcher.index("SendConfiguredReportText(entry.PlainText)"),
-            dispatcher.index("RunRedResetInsertion(entry.RedText)"),
+            dispatcher.index("RunRedResetInsertion(entry.RedText, resetReadiness.options)"),
         )
         self.assertLess(
             dispatcher.index("SendConfiguredReportText(entry.PlainText)"),
@@ -251,7 +251,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         adapter = source("src/adapters/medex_report_editor.ahk")
         candidate_g = adapter.split(
             "RunMedExRelativeMousePixelValidatedColorReset(options := 0)", 1
-        )[1].split("\n\nSampleAndEvaluateCandidateGPopupSignature(arrowPoint)", 1)[0]
+        )[1].split("\n\nSampleAndEvaluateCandidateGPopupSignature(arrowPoint, options := 0)", 1)[0]
         self.assertEqual(candidate_g.count("WinGetProcessName("), 1)
         self.assertEqual(candidate_g.count("MedExForegroundWindowMatches("), 3)
         self.assertNotIn("MedExForegroundTargetMatches(", candidate_g)
@@ -486,7 +486,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn('"BlackClickSentMs"', adapter)
         candidate_g = adapter.split(
             "RunMedExRelativeMousePixelValidatedColorReset(options := 0)", 1
-        )[1].split("\n\nSampleAndEvaluateCandidateGPopupSignature(arrowPoint)", 1)[0]
+        )[1].split("\n\nSampleAndEvaluateCandidateGPopupSignature(arrowPoint, options := 0)", 1)[0]
         self.assertEqual(
             candidate_g.count(
                 'performanceContext := MedExAdapterOption(options, "performanceContext", 0)'

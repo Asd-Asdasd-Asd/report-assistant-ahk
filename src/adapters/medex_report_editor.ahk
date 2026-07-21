@@ -204,7 +204,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             }
         }
 
-        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint)
+        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
         context["popupSignatureSampleCount"] := 1
         context["popupSignatureFirstReason"] := signature["reason"]
         context["popupSignatureFirstSamples"] := signature["samples"]
@@ -222,7 +222,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
                 return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                     context, startedAt, options)
             }
-            signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint)
+            signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
             context["popupSignatureSampleCount"] := 2
             context["popupSignatureSecondReason"] := signature["reason"]
             context["popupSignatureSecondSamples"] := signature["samples"]
@@ -270,9 +270,9 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
     }
 }
 
-SampleAndEvaluateCandidateGPopupSignature(arrowPoint) {
-    samples := CandidateGPopupSignatureSample(arrowPoint)
-    evaluation := EvaluateCandidateGPopupSignature(samples)
+SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options := 0) {
+    samples := CandidateGPopupSignatureSample(arrowPoint, options)
+    evaluation := EvaluateCandidateGPopupSignature(samples, options)
     evaluation["samples"] := samples
     return evaluation
 }

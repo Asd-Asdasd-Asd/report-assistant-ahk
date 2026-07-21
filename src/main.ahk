@@ -12,8 +12,10 @@
 #Include <UIA>
 #Include medex_color_reset_logic.ahk
 #Include medex_candidate_g_logic.ahk
+#Include machine_profile.ahk
 #Include diagnostics.ahk
 #Include adapters\medex_report_editor.ahk
+#Include medex_calibration.ahk
 #Include report_editor.ahk
 #Include viewer_actions.ahk
 #Include feature_model.ahk
@@ -47,5 +49,11 @@
 }
 
 #SuspendExempt False
+
+^!F8::AdvanceMedExCalibration()
+
+#HotIf MedExCalibrationActive()
+Esc::CancelMedExCalibration()
+#HotIf
 
 Flash("Report Assistant AHK loaded")

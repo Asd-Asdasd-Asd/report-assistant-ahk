@@ -97,7 +97,7 @@ class HotstringConfigTests(unittest.TestCase):
         hotstrings = source("src/hotstrings.ahk")
         dispatcher = hotstrings.split("RunConfiguredReportHotstring(entry, *)", 1)[1]
         self.assertIn("SendConfiguredReportText(entry.PlainText)", dispatcher)
-        self.assertIn("RunRedResetInsertion(entry.RedText)", dispatcher)
+        self.assertIn("RunRedResetInsertion(entry.RedText, resetReadiness.options)", dispatcher)
         self.assertIn("RunRedLeft4Insertion(entry.RedText)", dispatcher)
         self.assertNotIn("RunConfiguredRedResetInsertion", hotstrings)
         self.assertNotIn("RunConfiguredRedLeft4Insertion", hotstrings)

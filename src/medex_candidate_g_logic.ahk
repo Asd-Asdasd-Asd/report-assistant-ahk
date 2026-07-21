@@ -176,12 +176,22 @@ ValidateCandidateGRuntimeProfile(environment, options := 0) {
         context["unsupportedProfileReason"] := "environmentUnavailable"
         return MakeColorResetResult(false, ColorResetCode.UNSUPPORTED_PROFILE, context)
     }
+    machineProfileValidated := CandidateGLogicOption(
+        options,
+        "candidateGMachineProfileValidated",
+        false
+    ) = true
+    context["machineProfileValidated"] := machineProfileValidated
     expected := Map(
         "screenWidth", CandidateGRelativeMouseProfile.SupportedScreenWidth,
         "screenHeight", CandidateGRelativeMouseProfile.SupportedScreenHeight,
         "dpi", CandidateGRelativeMouseProfile.SupportedDpi,
         "displayScaling", CandidateGRelativeMouseProfile.SupportedDisplayScaling
     )
+    if machineProfileValidated {
+        expected.Delete("screenWidth")
+        expected.Delete("screenHeight")
+    }
     for key, value in expected {
         if !environment.Has(key) || String(environment[key]) != String(value) {
             context["unsupportedProfileReason"] := key "Mismatch"
@@ -192,13 +202,13 @@ ValidateCandidateGRuntimeProfile(environment, options := 0) {
     return MakeColorResetResult(true, ColorResetCode.OK, context)
 }
 
-CandidateGPopupSignatureSample(arrowPoint) {
+CandidateGPopupSignatureSample(arrowPoint, options := 0) {
     CoordMode "Pixel", "Screen"
     points := Map(
-        "popupLight", Map("x", CandidateGRelativeMouseProfile.PopupLightOffsetX, "y", CandidateGRelativeMouseProfile.PopupLightOffsetY),
-        "blackSwatch", Map("x", CandidateGRelativeMouseProfile.BlackSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlackSwatchOffsetY),
-        "beigeSwatch", Map("x", CandidateGRelativeMouseProfile.BeigeSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BeigeSwatchOffsetY),
-        "blueSwatch", Map("x", CandidateGRelativeMouseProfile.BlueSwatchOffsetX, "y", CandidateGRelativeMouseProfile.BlueSwatchOffsetY)
+        "popupLight", Map("x", CandidateGLogicOption(options, "popupLightOffsetX", CandidateGRelativeMouseProfile.PopupLightOffsetX), "y", CandidateGLogicOption(options, "popupLightOffsetY", CandidateGRelativeMouseProfile.PopupLightOffsetY)),
+        "blackSwatch", Map("x", CandidateGLogicOption(options, "blackSwatchOffsetX", CandidateGRelativeMouseProfile.BlackSwatchOffsetX), "y", CandidateGLogicOption(options, "blackSwatchOffsetY", CandidateGRelativeMouseProfile.BlackSwatchOffsetY)),
+        "beigeSwatch", Map("x", CandidateGLogicOption(options, "beigeSwatchOffsetX", CandidateGRelativeMouseProfile.BeigeSwatchOffsetX), "y", CandidateGLogicOption(options, "beigeSwatchOffsetY", CandidateGRelativeMouseProfile.BeigeSwatchOffsetY)),
+        "blueSwatch", Map("x", CandidateGLogicOption(options, "blueSwatchOffsetX", CandidateGRelativeMouseProfile.BlueSwatchOffsetX), "y", CandidateGLogicOption(options, "blueSwatchOffsetY", CandidateGRelativeMouseProfile.BlueSwatchOffsetY))
     )
     samples := Map()
     for name, offset in points {
@@ -213,12 +223,12 @@ CandidateGPopupSignatureSample(arrowPoint) {
     return samples
 }
 
-EvaluateCandidateGPopupSignature(samples) {
+EvaluateCandidateGPopupSignature(samples, options := 0) {
     expected := [
-        ["popupLight", CandidateGRelativeMouseProfile.PopupLightColor, CandidateGRelativeMouseProfile.PopupLightTolerance],
-        ["blackSwatch", CandidateGRelativeMouseProfile.BlackSwatchColor, CandidateGRelativeMouseProfile.BlackSwatchTolerance],
-        ["beigeSwatch", CandidateGRelativeMouseProfile.BeigeSwatchColor, CandidateGRelativeMouseProfile.BeigeSwatchTolerance],
-        ["blueSwatch", CandidateGRelativeMouseProfile.BlueSwatchColor, CandidateGRelativeMouseProfile.BlueSwatchTolerance]
+        ["popupLight", CandidateGLogicOption(options, "popupLightColor", CandidateGRelativeMouseProfile.PopupLightColor), CandidateGLogicOption(options, "popupLightTolerance", CandidateGRelativeMouseProfile.PopupLightTolerance)],
+        ["blackSwatch", CandidateGLogicOption(options, "blackSwatchColor", CandidateGRelativeMouseProfile.BlackSwatchColor), CandidateGLogicOption(options, "blackSwatchTolerance", CandidateGRelativeMouseProfile.BlackSwatchTolerance)],
+        ["beigeSwatch", CandidateGLogicOption(options, "beigeSwatchColor", CandidateGRelativeMouseProfile.BeigeSwatchColor), CandidateGLogicOption(options, "beigeSwatchTolerance", CandidateGRelativeMouseProfile.BeigeSwatchTolerance)],
+        ["blueSwatch", CandidateGLogicOption(options, "blueSwatchColor", CandidateGRelativeMouseProfile.BlueSwatchColor), CandidateGLogicOption(options, "blueSwatchTolerance", CandidateGRelativeMouseProfile.BlueSwatchTolerance)]
     ]
     if Type(samples) != "Map"
         return Map("matched", false, "reason", "samplesUnavailable")
@@ -366,6 +376,9 @@ CandidateGRegionGeometryReason(anchor, clientRectScreen, options := 0) {
         return "widthOutsideProfile"
     if RectHeight(rect) < heightMin || RectHeight(rect) > heightMax
         return "heightOutsideProfile"
+
+    if CandidateGLogicOption(options, "validateInteractionPoints", true) != true
+        return ""
 
     arrowPoint := CalculateCandidateGArrowPoint(rect, options)
     if !RectContainsPoint(clientRectScreen, arrowPoint)
