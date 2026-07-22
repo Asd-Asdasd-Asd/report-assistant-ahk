@@ -105,13 +105,15 @@ ContextMeasurementProvider
 
 本节是 v0.6.0 首版实现的固定运行契约。后续 remote development 以本节为准；现场证据推翻某项假设时，先更新本节，再修改 production workflow。
 
+配置包静态调查已经发现 `MxNMSoft*.ini` 和 `MxPetCtTemp.ini` 中存在可用于计算 viewer、图像区和候选子窗格的几何字段。当前配置路径与坐标语义通过 Windows 验证后，image-point resolver 应优先使用配置驱动几何；在此之前仍使用本节定义的集中 screen-coordinate profile。通用架构和证据边界见 `docs/internal/mxnmsoft-config-driven-automation.md`。
+
 ### Product boundary and assumptions
 
 - 用户在报告编辑时负责保证当前报告与阅片窗口中的检查对应。工具不读取患者姓名、检查号、窗口正文或其他临床内容，也不尝试纠正检查错配。
 - 首版只要求存在可用的 `MedExNMFusion.exe` 阅片窗口，不实现 study identity matching。
 - 阅片窗口由软件设置固定位置，不能由用户任意拖动。首版允许使用集中维护的 screen-coordinate profile 定位可靠图像区域。
 - 图像位置只能由单一 profile/resolver 提供，不得把坐标散落在 hotstring、clipboard 或 report-editor modules 中。
-- profile 至少校验 screen bounds 和目标 viewer window/client bounds。Windows 现场验收后，可在不改变调用方接口的前提下增加 UIA-relative resolver 或用户校验步骤。
+- profile 至少校验 screen bounds 和目标 viewer window/client bounds。Windows 现场验收后，可在不改变调用方接口的前提下增加 config-derived resolver、UIA-relative resolver 或用户校验步骤。
 
 ### Preferred no-focus-switch transport
 
