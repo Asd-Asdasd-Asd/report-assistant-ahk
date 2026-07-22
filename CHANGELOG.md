@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Wait for the GUI-based Ahk2Exe process to exit before checking its output, capture compiler diagnostics, retry temporary-file cleanup, and verify every overlaid static publish asset.
 - Restored the field-validated CF_HTML clipboard timing (`200 ms` paste settle, `100 ms` before restore, `100 ms` after restore) after Windows testing exposed a 50 ms race that could insert the user's restored clipboard content.
 - Added Candidate G1 calibration-only toolbar-row selection, relative geometry measurement, and privacy-safe pixel probes. The harness may click the validated arrow once but cannot click black or query popup UIA.
 - Added `relativeMousePixelValidated` using the field-calibrated `(320,0)` arrow offset, `(6,83)` black offset, four-point popup signature, one passive retry, and at-most-once arrow/black clicks. After controlled Windows G2 validation, it is now the production default; `uiaInvoke` remains an explicit comparison/rollback strategy and there is no automatic fallback.

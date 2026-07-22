@@ -57,10 +57,22 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         script = text(POWERSHELL, "utf-8-sig")
         for argument in ("'/in'", "'/out'", "'/base'", "'/silent'", "'verbose'"):
             self.assertIn(argument, script)
-        self.assertIn("$compilerExitCode = $LASTEXITCODE", script)
+        self.assertIn("Start-Process", script)
+        self.assertIn("-Wait", script)
+        self.assertIn("-PassThru", script)
+        self.assertIn("-RedirectStandardOutput", script)
+        self.assertIn("-RedirectStandardError", script)
+        self.assertIn("$compilerExitCode = $compilerProcess.ExitCode", script)
+        self.assertNotIn("& $CompilerPath @compilerArguments", script)
         self.assertIn("$item.Length -le 0", script)
         self.assertIn("$item.LastWriteTimeUtc", script)
         self.assertIn("麦旋风.building.exe", script)
+
+    def test_temporary_cleanup_retries_and_reports_file_ownership(self) -> None:
+        script = text(POWERSHELL, "utf-8-sig")
+        self.assertIn("[int]$Attempts = 5", script)
+        self.assertIn("Start-Sleep -Milliseconds $RetryDelayMs", script)
+        self.assertIn("Exit any running Ahk2Exe or MedEx Report Assistant", script)
 
     def test_assets_sync_after_validation_and_before_promotion(self) -> None:
         script = text(POWERSHELL, "utf-8-sig")
@@ -69,8 +81,12 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         promotion = script.index("$stage = 'promote final executable'")
         self.assertLess(validate, assets)
         self.assertLess(assets, promotion)
-        self.assertIn("Get-ChildItem -LiteralPath $SourceDirectory -Force -Recurse", script)
+        self.assertIn("Get-ChildItem -LiteralPath $SourceDirectory -Force -Recurse -File", script)
         self.assertIn("Copy-Item -LiteralPath $item.FullName", script)
+        self.assertIn("Static asset source:", script)
+        self.assertIn("Static asset destination:", script)
+        self.assertIn("Static publish asset validation failed", script)
+        self.assertIn("Synchronized $assetCount static publish asset(s).", script)
         self.assertNotIn("Get-ChildItem -LiteralPath $publishDirectory", script)
 
     def test_transaction_preserves_and_restores_last_known_good(self) -> None:
