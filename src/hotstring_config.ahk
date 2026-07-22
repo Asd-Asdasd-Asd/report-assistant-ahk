@@ -47,8 +47,8 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
     if Type(defaults) != "Array"
         defaults := ReportHotstringDefaults.BuiltinDefinitions()
     lines := [
-        "; MedEx Report Assistant configuration",
-        "; Encoding: UTF-16 LE with BOM. Use \\n inside Text for a line break.",
+        "; MedEx Report Assistant 配置",
+        "; 请保持 UTF-16 LE 编码；Text 中的 \n 表示换行。",
         "[Config]",
         "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
         "",
@@ -64,6 +64,24 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         lines.Push("Text=" EncodeReportHotstringText(entry.Text))
         lines.Push("Mode=" entry.Mode)
     }
+    lines.Push("")
+    lines.Push("; ============================================================")
+    lines.Push("; 自定义快捷语示例")
+    lines.Push("; 请复制下面整段，不要直接修改这一段。")
+    lines.Push(";")
+    lines.Push("; 复制后必须把方括号里的 example 改成不重复的英文名称。")
+    lines.Push("; 这里只使用小写英文字母、数字和减号，例如 lung-note。")
+    lines.Push("; 不要使用中文、空格，也不要继续使用 example。")
+    lines.Push("; Name 和 Text 可以正常填写中文。")
+    lines.Push("; 最后把 Enabled 改成 true。")
+    lines.Push("; ============================================================")
+    lines.Push("")
+    lines.Push("[Hotstring.custom-example]")
+    lines.Push("Enabled=false")
+    lines.Push("Name=新的快捷语")
+    lines.Push("Trigger=;example")
+    lines.Push("Text=请输入内容")
+    lines.Push("Mode=text")
     return JoinConfigLines(lines) "`r`n"
 }
 

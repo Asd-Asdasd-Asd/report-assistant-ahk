@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Source revision: 57fba5152d6c4915d18f8918e9dc496a419d0201-dirty
-; Generated at: 2026-07-22 09:35:45 UTC
+; Source revision: b99ed65e34c11bdfbd1d34b8569e63e32fc50cf9-dirty
+; Generated at: 2026-07-22 10:26:33 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0-alpha.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0-alpha.0"
     static Channel := "internal-alpha-preparation"
-    static SourceRevision := "57fba5152d6c4915d18f8918e9dc496a419d0201-dirty"
+    static SourceRevision := "b99ed65e34c11bdfbd1d34b8569e63e32fc50cf9-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -11911,8 +11911,8 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
     if Type(defaults) != "Array"
         defaults := ReportHotstringDefaults.BuiltinDefinitions()
     lines := [
-        "; MedEx Report Assistant configuration",
-        "; Encoding: UTF-16 LE with BOM. Use \\n inside Text for a line break.",
+        "; MedEx Report Assistant 配置",
+        "; 请保持 UTF-16 LE 编码；Text 中的 \n 表示换行。",
         "[Config]",
         "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
         "",
@@ -11928,6 +11928,24 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         lines.Push("Text=" EncodeReportHotstringText(entry.Text))
         lines.Push("Mode=" entry.Mode)
     }
+    lines.Push("")
+    lines.Push("; ============================================================")
+    lines.Push("; 自定义快捷语示例")
+    lines.Push("; 请复制下面整段，不要直接修改这一段。")
+    lines.Push(";")
+    lines.Push("; 复制后必须把方括号里的 example 改成不重复的英文名称。")
+    lines.Push("; 这里只使用小写英文字母、数字和减号，例如 lung-note。")
+    lines.Push("; 不要使用中文、空格，也不要继续使用 example。")
+    lines.Push("; Name 和 Text 可以正常填写中文。")
+    lines.Push("; 最后把 Enabled 改成 true。")
+    lines.Push("; ============================================================")
+    lines.Push("")
+    lines.Push("[Hotstring.custom-example]")
+    lines.Push("Enabled=false")
+    lines.Push("Name=新的快捷语")
+    lines.Push("Trigger=;example")
+    lines.Push("Text=请输入内容")
+    lines.Push("Mode=text")
     return JoinConfigLines(lines) "`r`n"
 }
 

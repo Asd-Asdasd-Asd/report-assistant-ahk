@@ -65,6 +65,33 @@ class HotstringConfigTests(unittest.TestCase):
         self.assertIn('FileAppend BuildDefaultReportHotstringConfig(defaults), configPath, "UTF-16"', config)
         self.assertNotIn("IniWrite", config)
 
+    def test_new_config_contains_a_disabled_copyable_custom_example(self) -> None:
+        config = source("src/hotstring_config.ahk")
+        builder = config.split("BuildDefaultReportHotstringConfig(defaults := 0)", 1)[
+            1
+        ].split("\n}\n\nJoinConfigLines", 1)[0]
+        expected_lines = (
+            "[Hotstring.custom-example]",
+            "Enabled=false",
+            "Name=新的快捷语",
+            "Trigger=;example",
+            "Text=请输入内容",
+            "Mode=text",
+        )
+        for line in expected_lines:
+            self.assertIn(f'lines.Push("{line}")', builder)
+        self.assertIn("把方括号里的 example 改成不重复的英文名称", builder)
+        self.assertIn("小写英文字母、数字和减号", builder)
+        self.assertIn("不要使用中文、空格，也不要继续使用 example", builder)
+        self.assertLess(
+            builder.index('for entry in defaults'),
+            builder.index('lines.Push("[Hotstring.custom-example]")'),
+        )
+
+        reconciliation = source("src/config_reconciliation.ahk")
+        bootstrap = source("src/config_bootstrap.ahk")
+        self.assertNotIn("Hotstring.custom-example", reconciliation + bootstrap)
+
     def test_loader_only_parses_supported_fields(self) -> None:
         config = source("src/hotstring_config.ahk")
         hotstrings = source("src/hotstrings.ahk")

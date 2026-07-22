@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added Ahk2Exe version metadata derived from the canonical `AppMetadata.Version` and Git source-revision stamping for generated release builds.
 - Added a root-level one-click Windows build workflow that compiles through a validated temporary EXE, transactionally replaces the last-known-good artifact, and outputs `publish/麦旋风.exe`.
 - Added recursive overlay synchronization for static release resources under `assets/publish/`, including separate Chinese first-use and configuration guides.
+- Added a copyable, disabled custom-hotstring example to newly created user configuration files without modifying existing configurations.
 
 ### Documentation
 
