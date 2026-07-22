@@ -107,7 +107,7 @@ Mode=red-reset
 GlobalHjklArrows=true
 ```
 
-重启后，`RAlt+H/J/K/L` 分别发送 `Left/Down/Up/Right`。该功能保持 legacy 的全局作用域，不受 MedEx-only hotstring guard 限制；`Ctrl+Alt+Esc` 可以随其他普通功能一起暂停它。启用前应退出仍在运行的 `legacy/karabiner.ahk` 或 compatibility script，避免相同 hotkey 被两个进程同时注册。
+重启后，`RAlt+H/J/K/L` 分别发送 `Left/Down/Up/Right`。该功能保持 legacy 的全局作用域，不受 MedEx-only hotstring guard 限制；`Ctrl+Alt+Esc` 可以随其他普通功能一起暂停它。启用前必须退出原始 `legacy/karabiner.ahk`。当前清理后的 `medex_legacy_compat.ahk` 已移除这四个重复按键，可以与 EXE 同时运行。
 
 ## 下一开发路线
 

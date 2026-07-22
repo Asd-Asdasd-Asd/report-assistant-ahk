@@ -101,6 +101,99 @@ ContextMeasurementProvider
 - command text: `复制SUVMax值`；
 - validate and parse SUVMax。
 
+## v0.6.0 first implementation contract
+
+本节是 v0.6.0 首版实现的固定运行契约。后续 remote development 以本节为准；现场证据推翻某项假设时，先更新本节，再修改 production workflow。
+
+### Product boundary and assumptions
+
+- 用户在报告编辑时负责保证当前报告与阅片窗口中的检查对应。工具不读取患者姓名、检查号、窗口正文或其他临床内容，也不尝试纠正检查错配。
+- 首版只要求存在可用的 `MedExNMFusion.exe` 阅片窗口，不实现 study identity matching。
+- 阅片窗口由软件设置固定位置，不能由用户任意拖动。首版允许使用集中维护的 screen-coordinate profile 定位可靠图像区域。
+- 图像位置只能由单一 profile/resolver 提供，不得把坐标散落在 hotstring、clipboard 或 report-editor modules 中。
+- profile 至少校验 screen bounds 和目标 viewer window/client bounds。Windows 现场验收后，可在不改变调用方接口的前提下增加 UIA-relative resolver 或用户校验步骤。
+
+### Preferred no-focus-switch transport
+
+首版不得主动激活 `MedExNMFusion.exe`，不得移动鼠标，也不得为读取测量值切换报告编辑器焦点。优先直接向 viewer HWND 发送后台窗口消息：
+
+```text
+;fzg triggered in the report editor
+-> capture originalReportHwnd and originalReportProcess
+-> verify originalReportHwnd exists and process is in the report allowlist
+-> locate MedExNMFusion.exe viewer HWND
+-> resolve a profile-owned image screen point
+-> validate the point against screen and viewer bounds
+-> convert the screen point to viewer client coordinates
+-> save ClipboardAll and clear the clipboard or install a unique sentinel
+-> send WM_RBUTTONDOWN and WM_RBUTTONUP directly to the viewer HWND
+-> wait for a newly created #32770 popup containing “复制SUVMax值”
+-> obtain the command runtime control ID
+-> send WM_COMMAND to that popup
+-> wait for a new clipboard result
+-> copy the returned text into a local value
+-> close only the popup created by this operation if cleanup is required
+-> restore the original ClipboardAll in finally
+-> run zero-wait report-target guards
+-> run the existing red-left4 insertion
+-> insert the formatted value only when the measurement state is FOUND
+```
+
+The transport must not call `WinActivate`, `WinWaitActive`, `MouseMove`, `MouseClick`, `ControlClick`, or an equivalent focus-changing fallback. Required popup and clipboard waits must be bounded; the report-target guards themselves must not sleep or retry.
+
+If background `WM_RBUTTONDOWN` + `WM_RBUTTONUP` cannot open a usable popup on the Windows workstation, return `AUTOMATION_FAILED`. Do not silently switch to a focus-changing implementation. A future UIA caret capture/restore path is a separately reviewed fallback, not part of this first contract.
+
+### Report-target guards
+
+Capture the original report HWND before measurement acquisition. Immediately before any report insertion, perform only inexpensive synchronous checks:
+
+1. `originalReportHwnd` still exists.
+2. Its current process name remains in the existing report-process allowlist.
+3. `originalReportHwnd` is still the active foreground window.
+
+If any guard fails, do not send text, caret movement, paste commands, or measurement content. Return a structured failure and use only non-focus-stealing feedback. These guards protect against an unexpected foreground change during the short script-owned operation; they do not perform patient or study matching.
+
+### `;fzg` orchestration
+
+Measurement acquisition happens before the existing report insertion. The measurement text must be copied into a local value before the acquisition transaction restores the user's clipboard. The existing CF_HTML transaction then owns the report insertion independently.
+
+```text
+ReadCurrentSuvMaxWithoutFocusSwitch()
+-> verify original report target
+-> insert “放射性摄取增高，SUVmax约（见图）” through the existing workflow
+-> restore the user's clipboard
+-> send the existing Left 4
+-> FOUND: insert the formatted numeric value at the current caret
+-> NOT_ANNOTATED: insert nothing and leave the caret for manual input
+-> AUTOMATION_FAILED: insert nothing, leave the caret for manual input,
+   and emit explicit non-focus-stealing failure feedback
+```
+
+The existing `Left 4` is unconditional after a successful red-left4 insertion. Do not replace it with `Left 5`, calculate a new caret offset from the measurement text, or run Color Reset for `;fzg`.
+
+This automatic behavior belongs to the builtin `;fzg` workflow. It must not be attached to every configurable `red-left4` template.
+
+### SUVMax state mapping
+
+For the first implementation:
+
+- valid `SUVMax: N` where `N > 0` -> `FOUND`；
+- valid `SUVMax: 0.000` or another exact numeric zero -> `NOT_ANNOTATED`；
+- popup not created, command not found, invocation failed, clipboard did not produce a new result, or returned text did not match the expected format -> `AUTOMATION_FAILED`。
+
+Only `FOUND` may insert a numeric value. `NOT_ANNOTATED` and `AUTOMATION_FAILED` both preserve the manual-input caret position, but `AUTOMATION_FAILED` must remain visibly or diagnostically distinguishable from a normal no-annotation result.
+
+### Explicit exclusions
+
+- no patient/study content matching；
+- no screen OCR or measurement-text pixel recognition；
+- no latest-log-value fallback；
+- no old clipboard-value reuse；
+- no automatic foreground switching；
+- no UIA caret restoration in the first implementation；
+- no automatic retry through a second transport strategy；
+- no report submission, review, or final confirmation。
+
 ## Do not hard-code runtime identities
 
 不要把以下内容当作稳定生产标识：

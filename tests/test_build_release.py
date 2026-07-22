@@ -77,7 +77,7 @@ class BuildReleaseEncodingTests(unittest.TestCase):
     def test_generated_release_contains_compiler_and_runtime_metadata(self) -> None:
         release_text = RELEASE.read_text(encoding="utf-8")
         self.assertIn(";@Ahk2Exe-SetFileVersion 0.5.0.0", release_text)
-        self.assertIn(";@Ahk2Exe-SetProductVersion 0.5.0-alpha.0", release_text)
+        self.assertIn(";@Ahk2Exe-SetProductVersion 0.5.0", release_text)
         self.assertIn(";@Ahk2Exe-SetName MedEx Report Assistant", release_text)
         self.assertRegex(
             release_text,

@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | `;cmx` | 新项目 | 源码行为已对齐；Windows 回归通过 |
 | `;red`、`;fzg`、`;fwj`、`;fjd` | 新项目 current mainline；legacy duplicate 必须停用 | Candidate G generated release 已验证；继续完成 phrase regression 与 MedEx-only entry guard |
-| RAlt+H/J/K/L | compatibility，Windows 验证后切换到新项目 | 新项目已提供默认关闭的 `GlobalHjklArrows`；完成 generated-release 实测前不得双开 |
+| RAlt+H/J/K/L | 新项目 | 将 `GlobalHjklArrows` 设为 `true`；compatibility 不再注册这四个按键 |
 | Legacy viewer/annotation hotkeys | compatibility | 用户确认仍需要，且未被新项目逐项验证替代 |
 | Shift+Alt+R snapshot save | 原 legacy only，compatibility 不启用 | 只为旧 `red_not.clip` 流程服务；新项目验证后退役 |
 | Ctrl+Alt+Esc / Ctrl+Alt+Q | 新项目 | 注意它们不控制 compatibility 进程 |
@@ -42,7 +42,7 @@
 
 ### Hotkeys
 
-`GlobalHjklArrows=true` 会与 compatibility 的 RAlt+H/J/K/L 产生字面冲突，启用前必须退出 compatibility 或禁用其中相同按键。该 navigation 保持 global；后续 MedEx/MxNMSoft 动作仍应增加 `#HotIf` 或等价窗口范围，并由外部 config 控制是否注册。
+Compatibility 已移除 RAlt+H/J/K/L；与 EXE 同时运行时，这四个方向键只由新项目注册。需要该功能时必须将 `GlobalHjklArrows=true`；保持 `false` 时两个进程都不会提供这四个方向键。该 navigation 保持 global；后续 MedEx/MxNMSoft 动作仍应增加 `#HotIf` 或等价窗口范围，并由外部 config 控制是否注册。
 
 ### Clipboard
 
@@ -81,7 +81,7 @@ Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 scre
 
 ## 逐版本缩减 compatibility
 
-1. v0.5.0：新项目接管经过验证的报告 hotstrings；compatibility 保留全部未迁移的 active keyboard/viewer actions。
+1. v0.5.0：新项目接管经过验证的报告 hotstrings；随后由新项目 `GlobalHjklArrows` 接管 RAlt+H/J/K/L，compatibility 只保留其余未迁移 viewer actions。
 2. v0.5.x：逐项加入 window guard、DPI/layout validation、retry 和 diagnostics；每迁移并验证一个动作，就从下一版 compatibility 中禁用一个动作。
 3. v0.6.0：测量读取采用 structured states；验证后才考虑替代相关 legacy measurement hotkeys。
 4. Later：完成配置 GUI、更新支持及必要的 direct editor command；compatibility 清空后归档，不删除原始 legacy reference。
@@ -102,7 +102,6 @@ Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 scre
 - Shift+Alt+B/H/L 三组固定数值流程；
 - Shift+Alt+S 快速标图；
 - Ctrl+Win+Shift+S/M/A/C；
-- RAlt+H/J/K/L；
 - SUV 3 秒复按与 Arrow 1 秒复按的“清除”语义是否必须原样保留。
 
 XButton1 notification 是历史测试项，不属于正式 compatibility 功能；除非发现实际 hotkey conflict，否则忽略。

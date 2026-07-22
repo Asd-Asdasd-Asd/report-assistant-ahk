@@ -361,7 +361,8 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 ## Compatibility staged tests
 
 - [ ] 原始 `karabiner.ahk` 和 `string_change.ahk` instances 均已退出。
-- [ ] New executable 与 `medex_legacy_compat.ahk` 同时运行时没有重复 hotkeys/hotstrings。
+- [ ] 将 EXE 配置设为 `GlobalHjklArrows=true`，再与 `medex_legacy_compat.ahk` 同时运行；确认五个 report hotstrings 和 RAlt+H/J/K/L 都只有 EXE 一个 owner。
+- [ ] 逐项验证 RAlt+H/J/K/L 为 Left/Down/Up/Right，并确认 compatibility 不再注册相同按键。
 - [ ] Compatibility tray tooltip 可与新项目区分。
 - [ ] 每个保留的 legacy hotkey 在用户确认的工作站和窗口上逐项测试。
 - [ ] Shift+Alt+S 与新 clipboard transaction 不并发触发。

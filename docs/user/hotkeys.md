@@ -26,7 +26,7 @@
 | RAlt+K | 向上 |
 | RAlt+L | 向右 |
 
-启用前请退出仍在运行的 legacy/compatibility 脚本，修改配置后需要重启工具。
+启用前请退出原始 `legacy/karabiner.ahk`。清理后的 `medex_legacy_compat.ahk` 已不再注册这四个方向键，可以与工具同时运行。修改配置后需要重启工具。
 
 如果工具行为异常，先按 Ctrl+Alt+Esc 暂停。
 

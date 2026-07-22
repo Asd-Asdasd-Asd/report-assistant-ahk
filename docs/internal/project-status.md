@@ -1,13 +1,13 @@
 # 项目状态与交接
 
-更新时间：2026-07-22（portable startup/version-safety 已实现；等待 Windows EXE 验证）
+更新时间：2026-07-22（当前版本命名为 v0.5.0；等待 Windows 内测验收）
 
 ## 冻结基线
 
 - Branch：`main`
 - Step 4 baseline commit：`5193403 perf: remove fzg cursor settle delay`
 - Tag：`v0.6.0-candidate-g`
-- App source version：`0.5.0-alpha.0`
+- App source version：`0.5.0`
 - Production default：`relativeMousePixelValidated`
 - Explicit comparison/rollback：`uiaInvoke`
 - Automatic fallback：无
@@ -26,6 +26,8 @@
 - Portable startup 在配置初始化前建立固定 `Local\MedExReportAssistant.Singleton` mutex；conflict process 中文提示后退出，不终止现有实例。
 - `AppMetadata.Version` 是唯一人工版本来源；generated release 写入 Ahk2Exe metadata、Git source revision 和独立 startup log。
 - User config 保持在 `%LocalAppData%\MedExReportAssistant\config.ini`，EXE 路径不参与 config path 计算。
+- 原生设置窗口复用现有 INI 模型；保存前校验，安全写入后执行全脚本 `Reload()`。
+- 一键构建生成 portable EXE，并把静态发布资源同步到 `publish/`。
 
 ### Windows 现场已验证
 
@@ -57,7 +59,8 @@
 ### 有意延期
 
 - 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 layout 的正式支持。
-- Portable EXE 的 Windows 编译与现场验证、GUI/updater、measurement capture 和其他 viewer workflow migration。
+- v0.5.0 设置窗口与 portable EXE 的完整 Windows 现场验收。
+- updater、measurement capture 和其他 viewer workflow migration。
 - 直接 Electron/editor API 路线。
 
 ## 当前 production flow
@@ -92,11 +95,8 @@
 
 ## 下一检查点
 
-Step 1–5 已完成验收；Step 5 独立提交后才可规划 Step 6 per-machine calibration。主要指标仍为：
+1. 完成 v0.5.0 Windows 内测验收，重点检查设置保存与重启、portable build、单实例和 legacy compatibility 共存。
+2. 验收通过后进入 v0.6.0 Measurement Capture：通过当前图像右键菜单读取长短轴与 SUVMax。
+3. v0.6.0 必须严格区分 `FOUND`、`NOT_ANNOTATED` 和 `AUTOMATION_FAILED`，不得复用旧剪贴板值或旧 SUV log。
 
-```text
-TriggerToBlackClickMs = BlackClickSentMs - HotstringTriggeredMs
-PasteToClipboardRestoreMs = ClipboardRestoreStartedMs - PasteCommandSentMs
-```
-
-完整 Step 0–6、Windows pass/failure 分类和简短结果续接规则见 `docs/internal/performance-optimization-checkpoints.md`。收到例如 `Step 1 passed ...` 或 `Step 3 failed ...` 后，应直接按该文档进入对应下一动作，不要求用户重述架构。
+测量读取的现场证据、消息调用链、解析规则和安全边界见 `docs/internal/mxnmsoft-measurement-investigation.md`；版本范围见 `docs/internal/roadmap.md`。
