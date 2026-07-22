@@ -211,6 +211,7 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 - import/export of user configuration；
 - automatic update support；
 - possible replacement of coordinate interaction with a direct Electron/editor command；
+- v0.6.0 稳定后可安排一次 1–2 个专注会话的只读 ZeroMQ 勘察，只判断现有广播是否包含可安全复用的 viewport、layout 或 measurement 状态；不默认进入 production，详见 `docs/internal/passive-zmq-exploration.md`；
 - 如果当前 popup UIA 路线持续不可靠，评估经过现场校准的 Candidate G relative-mouse profile；
 - workstation profiles and calibration；
 - 经过逐项验证的其他 viewer actions。
