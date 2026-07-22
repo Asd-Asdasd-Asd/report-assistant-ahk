@@ -15,19 +15,24 @@ def source(path: str) -> str:
 
 
 class TrayMenuTests(unittest.TestCase):
-    def test_reload_item_is_inserted_before_standard_exit(self) -> None:
+    def test_settings_and_reload_items_are_inserted_before_standard_exit(self) -> None:
         tray = source("src/tray_menu.ahk")
+        self.assertIn('static SettingsItemName := "设置…"', tray)
         self.assertIn('static ReloadItemName := "重新加载配置"', tray)
         self.assertIn('static ExitItemName := "E&xit"', tray)
         self.assertIn("A_TrayMenu.Insert(", tray)
+        self.assertIn("ShowReportAssistantSettings", tray)
         self.assertIn("ReloadReportAssistantFromTray", tray)
         self.assertNotIn('A_TrayMenu.Add("Exit', tray)
         self.assertNotIn('A_TrayMenu.Add("退出', tray)
 
-    def test_double_click_remains_unassigned(self) -> None:
+    def test_double_click_opens_settings(self) -> None:
         tray = source("src/tray_menu.ahk")
-        self.assertIn('A_TrayMenu.Default := ""', tray)
-        self.assertNotIn("A_TrayMenu.ClickCount", tray)
+        self.assertIn(
+            "A_TrayMenu.Default := ReportAssistantTrayDefaults.SettingsItemName",
+            tray,
+        )
+        self.assertIn("A_TrayMenu.ClickCount := 2", tray)
 
     def test_reload_uses_builtin_restart_without_singleton_bypass(self) -> None:
         tray = source("src/tray_menu.ahk")
@@ -46,20 +51,27 @@ class TrayMenuTests(unittest.TestCase):
 
     def test_tray_setup_runs_after_runtime_modules_are_included(self) -> None:
         main = source("src/main.ahk")
+        self.assertIn("#Include settings_ui.ahk", main)
         self.assertIn("#Include tray_menu.ahk", main)
         setup = main.index("ConfigureReportAssistantTrayMenu()")
         self.assertLess(main.index("#Include hotstrings.ahk"), setup)
         self.assertLess(main.index("#Include features.ahk"), setup)
+        self.assertLess(main.index("#Include settings_ui.ahk"), setup)
         self.assertLess(main.index("#Include tray_menu.ahk"), setup)
 
     def test_release_builder_places_tray_module_before_main(self) -> None:
         builder = source("scripts/build_release.py")
+        self.assertLess(builder.index('"settings_ui.ahk"'), builder.index('"tray_menu.ahk"'))
         self.assertLess(builder.index('"tray_menu.ahk"'), builder.index('"main.ahk"'))
 
     def test_generated_release_contains_the_same_tray_policy(self) -> None:
         release = source("release/report_assistant.ahk")
+        self.assertIn('static SettingsItemName := "设置…"', release)
         self.assertIn('static ReloadItemName := "重新加载配置"', release)
-        self.assertIn('A_TrayMenu.Default := ""', release)
+        self.assertIn(
+            "A_TrayMenu.Default := ReportAssistantTrayDefaults.SettingsItemName",
+            release,
+        )
         self.assertIn("try Reload()", release)
         tray_end = release.index("; --- END tray_menu.ahk ---")
         setup_call = release.index("ConfigureReportAssistantTrayMenu()", tray_end)

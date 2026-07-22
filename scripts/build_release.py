@@ -31,6 +31,7 @@ ORDER = [
     "feature_model.ahk",
     "hotstring_model.ahk",
     "hotstring_config.ahk",
+    "hotstring_config_editor.ahk",
     "config_reconciliation.ahk",
     "config_bootstrap.ahk",
     "hotstring_normalization.ahk",
@@ -41,6 +42,7 @@ ORDER = [
     "hotkey_registration.ahk",
     "global_hjkl_arrows.ahk",
     "features.ahk",
+    "settings_ui.ahk",
     "tray_menu.ahk",
     "main.ahk",
 ]

@@ -22,6 +22,7 @@
 #Include feature_model.ahk
 #Include hotstring_model.ahk
 #Include hotstring_config.ahk
+#Include hotstring_config_editor.ahk
 #Include config_reconciliation.ahk
 #Include config_bootstrap.ahk
 #Include hotstring_normalization.ahk
@@ -32,6 +33,7 @@
 #Include hotkey_registration.ahk
 #Include global_hjkl_arrows.ahk
 #Include features.ahk
+#Include settings_ui.ahk
 #Include tray_menu.ahk
 
 ConfigureReportAssistantTrayMenu()

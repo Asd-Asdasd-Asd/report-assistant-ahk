@@ -1,4 +1,5 @@
 class ReportAssistantTrayDefaults {
+    static SettingsItemName := "设置…"
     static ReloadItemName := "重新加载配置"
     static ExitItemName := "E&xit"
 }
@@ -6,11 +7,16 @@ class ReportAssistantTrayDefaults {
 ConfigureReportAssistantTrayMenu() {
     A_TrayMenu.Insert(
         ReportAssistantTrayDefaults.ExitItemName,
+        ReportAssistantTrayDefaults.SettingsItemName,
+        ShowReportAssistantSettings
+    )
+    A_TrayMenu.Insert(
+        ReportAssistantTrayDefaults.ExitItemName,
         ReportAssistantTrayDefaults.ReloadItemName,
         ReloadReportAssistantFromTray
     )
-    ; Keep tray-icon double-click unassigned for the future settings UI.
-    A_TrayMenu.Default := ""
+    A_TrayMenu.Default := ReportAssistantTrayDefaults.SettingsItemName
+    A_TrayMenu.ClickCount := 2
 }
 
 ReloadReportAssistantFromTray(*) {

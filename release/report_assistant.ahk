@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Source revision: 3906ceeab24ce37adb7a5276f48c8e6c2a8a05f7-dirty
-; Generated at: 2026-07-22 10:39:11 UTC
+; Source revision: f15c1656c14a9f66355eadff2350c9f41cc3d41d-dirty
+; Generated at: 2026-07-22 14:33:32 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0-alpha.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0-alpha.0"
     static Channel := "internal-alpha-preparation"
-    static SourceRevision := "3906ceeab24ce37adb7a5276f48c8e6c2a8a05f7-dirty"
+    static SourceRevision := "f15c1656c14a9f66355eadff2350c9f41cc3d41d-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -11997,6 +11997,365 @@ DecodeReportHotstringText(value) {
 
 ; --- END hotstring_config.ahk ---
 
+; --- BEGIN hotstring_config_editor.ahk ---
+class EditableReportHotstringEntry {
+    __New(section, enabled, name, trigger, text, mode, isBuiltin := false) {
+        this.Section := String(section)
+        this.Enabled := enabled = true
+        this.Name := String(name)
+        this.Trigger := String(trigger)
+        this.Text := String(text)
+        this.Mode := String(mode)
+        this.IsBuiltin := isBuiltin = true
+    }
+}
+
+class ReportHotstringEditorLoadResult {
+    __New(ok, configPath := "", originalText := "", entries := 0,
+        message := "") {
+        this.Ok := ok = true
+        this.ConfigPath := String(configPath)
+        this.OriginalText := String(originalText)
+        this.Entries := Type(entries) = "Array" ? entries : []
+        this.Message := String(message)
+    }
+}
+
+class ReportHotstringEditorValidationResult {
+    __New(ok, row := 0, field := "", message := "") {
+        this.Ok := ok = true
+        this.Row := row
+        this.Field := String(field)
+        this.Message := String(message)
+    }
+}
+
+class ReportHotstringEditorSaveResult {
+    __New(ok, message := "", savedText := "") {
+        this.Ok := ok = true
+        this.Message := String(message)
+        this.SavedText := String(savedText)
+    }
+}
+
+LoadEditableReportHotstringConfig(configPath := "") {
+    if configPath = "" {
+        try configPath := ReportAssistantConfig.Path()
+        catch
+            return ReportHotstringEditorLoadResult(
+                false, , , , "无法取得配置文件路径。"
+            )
+    }
+    if !FileExist(configPath)
+        return ReportHotstringEditorLoadResult(
+            false, configPath, , , "配置文件不存在，请重新启动程序后重试。"
+        )
+
+    try originalText := FileRead(configPath)
+    catch
+        return ReportHotstringEditorLoadResult(
+            false, configPath, , , "无法读取配置文件。"
+        )
+
+    try {
+        schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+        sectionList := IniRead(configPath)
+    } catch {
+        return ReportHotstringEditorLoadResult(
+            false, configPath, originalText, , "配置文件格式无法读取。"
+        )
+    }
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion) {
+        return ReportHotstringEditorLoadResult(
+            false, configPath, originalText, ,
+            "配置文件版本与当前程序不兼容，未进行任何修改。"
+        )
+    }
+
+    entries := []
+    seenSections := Map()
+    for section in StrSplit(sectionList, "`n", "`r") {
+        if !IsReportHotstringSection(section)
+            continue
+        sectionKey := StrLower(section)
+        if seenSections.Has(sectionKey) {
+            return ReportHotstringEditorLoadResult(
+                false, configPath, originalText, ,
+                "配置文件中存在重复的模板记录，未进行任何修改。"
+            )
+        }
+        seenSections[sectionKey] := true
+        try raw := ReadReportHotstringSection(configPath, section)
+        catch {
+            return ReportHotstringEditorLoadResult(
+                false, configPath, originalText, ,
+                "其中一个模板无法读取，未进行任何修改。"
+            )
+        }
+        enabled := ParseReportHotstringEnabled(raw.Enabled)
+        if enabled = "INVALID" {
+            return ReportHotstringEditorLoadResult(
+                false, configPath, originalText, ,
+                "模板的启用状态无法识别：" raw.Name
+            )
+        }
+        entries.Push(EditableReportHotstringEntry(
+            raw.Section,
+            enabled,
+            raw.Name,
+            raw.Trigger,
+            raw.Text,
+            raw.Mode,
+            IsBuiltinReportHotstringSection(raw.Section)
+        ))
+    }
+    if entries.Length = 0 {
+        return ReportHotstringEditorLoadResult(
+            false, configPath, originalText, ,
+            "配置文件中没有可编辑的报告模板。"
+        )
+    }
+    return ReportHotstringEditorLoadResult(
+        true, configPath, originalText, entries
+    )
+}
+
+IsBuiltinReportHotstringSection(section) {
+    return RegExMatch(section, "i)^Hotstring\.builtin-.+$")
+}
+
+IsCustomReportHotstringSection(section) {
+    return RegExMatch(section, "i)^Hotstring\.custom-.+$")
+}
+
+CreateEditableReportHotstring(entries, reservedSections := 0) {
+    sectionBase := "Hotstring.custom-ui-" FormatTime(, "yyyyMMddHHmmss")
+    section := sectionBase
+    suffix := 2
+    while EditableReportHotstringSectionExists(entries, section)
+        || EditableReportHotstringSectionIsReserved(reservedSections, section) {
+        section := sectionBase "-" suffix
+        suffix += 1
+    }
+    return EditableReportHotstringEntry(
+        section, true, "新的模板", "", "", ReportHotstringMode.TEXT, false
+    )
+}
+
+NormalizeEditableReportHotstringText(value) {
+    value := StrReplace(String(value), "`r`n", "`n")
+    return StrReplace(value, "`r", "`n")
+}
+
+EditableReportHotstringSectionIsReserved(reservedSections, section) {
+    return Type(reservedSections) = "Map"
+        && reservedSections.Has(StrLower(section))
+}
+
+EditableReportHotstringSectionExists(entries, section) {
+    sectionKey := StrLower(section)
+    for entry in entries {
+        if StrLower(entry.Section) = sectionKey
+            return true
+    }
+    return false
+}
+
+ValidateEditableReportHotstringEntries(entries) {
+    if Type(entries) != "Array" || entries.Length = 0 {
+        return ReportHotstringEditorValidationResult(
+            false, 0, "", "至少需要保留一个报告模板。"
+        )
+    }
+
+    seenSections := Map()
+    seenTriggers := Map()
+    for index, entry in entries {
+        sectionKey := StrLower(Trim(entry.Section, " `t`r`n"))
+        if sectionKey = "" || seenSections.Has(sectionKey) {
+            return ReportHotstringEditorValidationResult(
+                false, index, "Name", "模板的内部记录发生冲突，请重新打开设置。"
+            )
+        }
+        if entry.IsBuiltin {
+            if !IsBuiltinReportHotstringSection(entry.Section) {
+                return ReportHotstringEditorValidationResult(
+                    false, index, "Name", "内置模板记录无效，请重新打开设置。"
+                )
+            }
+        } else if !IsCustomReportHotstringSection(entry.Section) {
+            return ReportHotstringEditorValidationResult(
+                false, index, "Name", "自定义模板记录无效，请重新打开设置。"
+            )
+        }
+        seenSections[sectionKey] := true
+
+        name := Trim(entry.Name, " `t`r`n")
+        if name = "" || InStr(entry.Name, "`r") || InStr(entry.Name, "`n") {
+            return ReportHotstringEditorValidationResult(
+                false, index, "Name", "模板名称不能为空或包含换行。"
+            )
+        }
+
+        trigger := Trim(entry.Trigger, " `t`r`n")
+        if trigger = "" || InStr(entry.Trigger, "`r") || InStr(entry.Trigger, "`n") {
+            return ReportHotstringEditorValidationResult(
+                false, index, "Trigger", "触发词不能为空或包含换行。"
+            )
+        }
+        triggerKey := StrLower(trigger)
+        if seenTriggers.Has(triggerKey) {
+            return ReportHotstringEditorValidationResult(
+                false, index, "Trigger",
+                "触发词“" trigger "”与其他模板重复。"
+            )
+        }
+        seenTriggers[triggerKey] := true
+
+        mode := StrLower(Trim(entry.Mode, " `t`r`n"))
+        if !IsSupportedReportHotstringMode(mode) {
+            return ReportHotstringEditorValidationResult(
+                false, index, "Mode", "请选择有效的模板模式。"
+            )
+        }
+    }
+    return ReportHotstringEditorValidationResult(true)
+}
+
+SaveEditableReportHotstringConfig(entries, deletedSections, originalText,
+    configPath := "") {
+    validation := ValidateEditableReportHotstringEntries(entries)
+    if !validation.Ok
+        return ReportHotstringEditorSaveResult(false, validation.Message)
+
+    if configPath = "" {
+        try configPath := ReportAssistantConfig.Path()
+        catch
+            return ReportHotstringEditorSaveResult(false, "无法取得配置文件路径。")
+    }
+    try currentText := FileRead(configPath)
+    catch
+        return ReportHotstringEditorSaveResult(false, "无法重新读取配置文件。")
+    if currentText != originalText {
+        return ReportHotstringEditorSaveResult(
+            false,
+            "配置文件已被其他程序修改。请关闭设置窗口并重新打开，避免覆盖新内容。"
+        )
+    }
+
+    tempPath := configPath ".settings.tmp.ini"
+    backupPath := ""
+    promoted := false
+    try {
+        try FileDelete tempPath
+        backupPath := CreateReportAssistantConfigBackup(configPath)
+        FileCopy configPath, tempPath, true
+
+        deletedKeys := Map()
+        if Type(deletedSections) = "Array" {
+            for section in deletedSections {
+                if !IsCustomReportHotstringSection(section)
+                    throw Error("Only custom template sections can be deleted")
+                sectionKey := StrLower(section)
+                if deletedKeys.Has(sectionKey)
+                    continue
+                deletedKeys[sectionKey] := true
+                IniDelete(tempPath, section)
+            }
+        }
+
+        for entry in entries {
+            IniWrite(
+                entry.Enabled ? "true" : "false",
+                tempPath, entry.Section, "Enabled"
+            )
+            IniWrite(
+                Trim(entry.Name, " `t`r`n"),
+                tempPath, entry.Section, "Name"
+            )
+            IniWrite(
+                Trim(entry.Trigger, " `t`r`n"),
+                tempPath, entry.Section, "Trigger"
+            )
+            IniWrite(
+                EncodeReportHotstringText(
+                    NormalizeEditableReportHotstringText(entry.Text)
+                ),
+                tempPath, entry.Section, "Text"
+            )
+            IniWrite(
+                StrLower(Trim(entry.Mode, " `t`r`n")),
+                tempPath, entry.Section, "Mode"
+            )
+        }
+
+        savedLoad := LoadEditableReportHotstringConfig(tempPath)
+        if !savedLoad.Ok
+            throw Error("Saved configuration could not be read: " savedLoad.Message)
+        if !EditableReportHotstringEntriesMatch(entries, savedLoad.Entries)
+            throw Error("Saved configuration did not match the edited templates")
+        for sectionKey, unused in deletedKeys {
+            if EditableReportHotstringSectionExists(savedLoad.Entries, sectionKey)
+                throw Error("A deleted template section remained in the file")
+        }
+
+        FileMove tempPath, configPath, true
+        promoted := true
+        savedText := FileRead(configPath)
+        finalLoad := LoadEditableReportHotstringConfig(configPath)
+        if !finalLoad.Ok
+            throw Error("Final configuration validation failed")
+        if !EditableReportHotstringEntriesMatch(entries, finalLoad.Entries)
+            throw Error("Final configuration did not match the edited templates")
+        return ReportHotstringEditorSaveResult(true, , savedText)
+    } catch as err {
+        try FileDelete tempPath
+        OutputDebug "Report Assistant settings save failed: " err.Message
+        if promoted && backupPath != "" && FileExist(backupPath) {
+            try {
+                FileCopy backupPath, configPath, true
+                promoted := false
+            } catch as restoreError {
+                OutputDebug "Report Assistant settings restore failed: " restoreError.Message
+                return ReportHotstringEditorSaveResult(
+                    false,
+                    "配置保存失败，并且无法自动恢复。请联系维护者。`n" .
+                    "备份文件：" backupPath
+                )
+            }
+        }
+        return ReportHotstringEditorSaveResult(
+            false, "无法保存配置，原配置未被本次操作覆盖。"
+        )
+    }
+}
+
+EditableReportHotstringEntriesMatch(expected, actual) {
+    if Type(expected) != "Array" || Type(actual) != "Array"
+        return false
+    if expected.Length != actual.Length
+        return false
+    for index, expectedEntry in expected {
+        actualEntry := actual[index]
+        if expectedEntry.Section != actualEntry.Section
+            return false
+        if expectedEntry.Enabled != actualEntry.Enabled
+            return false
+        if Trim(expectedEntry.Name, " `t`r`n") != actualEntry.Name
+            return false
+        if Trim(expectedEntry.Trigger, " `t`r`n") != actualEntry.Trigger
+            return false
+        if NormalizeEditableReportHotstringText(expectedEntry.Text)
+            != actualEntry.Text
+            return false
+        if StrLower(Trim(expectedEntry.Mode, " `t`r`n")) != actualEntry.Mode
+            return false
+    }
+    return true
+}
+
+; --- END hotstring_config_editor.ahk ---
+
 ; --- BEGIN config_reconciliation.ahk ---
 PrepareReportAssistantConfig(managedDefaults, configPath := "") {
     if configPath = "" {
@@ -12424,8 +12783,419 @@ RegisterConfiguredFeatures(settings) {
 
 ; --- END features.ahk ---
 
+; --- BEGIN settings_ui.ahk ---
+class ReportAssistantSettingsDefaults {
+    static WindowTitle := "MedEx Report Assistant 设置"
+
+    static ModeLabels() {
+        return [
+            "普通文字",
+            "红色标记并恢复黑色",
+            "红色标记并调整光标"
+        ]
+    }
+
+    static ModeValues() {
+        return [
+            ReportHotstringMode.TEXT,
+            ReportHotstringMode.RED_RESET,
+            ReportHotstringMode.RED_LEFT4
+        ]
+    }
+}
+
+ShowReportAssistantSettings(*) {
+    ReportAssistantSettingsWindow.ShowSettings()
+}
+
+class ReportAssistantSettingsWindow {
+    static Current := 0
+
+    static ShowSettings() {
+        if IsObject(this.Current) {
+            this.Current.Activate()
+            return
+        }
+
+        loadResult := LoadEditableReportHotstringConfig()
+        if !loadResult.Ok {
+            MsgBox(
+                loadResult.Message,
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Icon!"
+            )
+            return
+        }
+
+        this.Current := ReportAssistantSettingsWindow(loadResult)
+        this.Current.Activate()
+    }
+
+    __New(loadResult) {
+        this.ConfigPath := loadResult.ConfigPath
+        this.OriginalText := loadResult.OriginalText
+        this.Entries := loadResult.Entries
+        this.OriginalSections := Map()
+        for entry in this.Entries
+            this.OriginalSections[StrLower(entry.Section)] := true
+        this.DeletedSections := []
+        this.DeletedSectionKeys := Map()
+        this.SelectedRow := 0
+        this.Dirty := false
+        this.LoadingControls := false
+        this.Closing := false
+
+        this.Window := Gui(, ReportAssistantSettingsDefaults.WindowTitle)
+        this.Window.SetFont("s9", "Segoe UI")
+        this.Window.OnEvent("Close", this.OnClose.Bind(this))
+        this.Window.OnEvent("Escape", this.OnClose.Bind(this))
+
+        this.Tabs := this.Window.Add(
+            "Tab3", "x12 y12 w876 h570",
+            ["报告模板", "快捷键", "其他"]
+        )
+
+        this.Tabs.UseTab(1)
+        this.TemplateList := this.Window.Add(
+            "ListView", "x28 y52 w844 h220 -Multi",
+            ["状态", "模板名称", "触发词", "模式"]
+        )
+        this.TemplateList.ModifyCol(1, 70)
+        this.TemplateList.ModifyCol(2, 230)
+        this.TemplateList.ModifyCol(3, 160)
+        this.TemplateList.ModifyCol(4, 350)
+        this.TemplateList.OnEvent(
+            "ItemSelect", this.OnTemplateSelected.Bind(this)
+        )
+
+        this.AddButton := this.Window.Add(
+            "Button", "x28 y282 w92 h28", "添加模板"
+        )
+        this.AddButton.OnEvent("Click", this.OnAddTemplate.Bind(this))
+        this.DeleteButton := this.Window.Add(
+            "Button", "x128 y282 w92 h28", "删除模板"
+        )
+        this.DeleteButton.OnEvent("Click", this.OnDeleteTemplate.Bind(this))
+
+        this.EnabledInput := this.Window.Add(
+            "CheckBox", "x28 y326 w120", "启用此模板"
+        )
+        this.EnabledInput.OnEvent("Click", this.OnEditorChanged.Bind(this))
+
+        this.Window.Add("Text", "x28 y364 w68", "模板名称")
+        this.NameInput := this.Window.Add(
+            "Edit", "x102 y360 w330 h24"
+        )
+        this.NameInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
+
+        this.Window.Add("Text", "x456 y364 w54", "触发词")
+        this.TriggerInput := this.Window.Add(
+            "Edit", "x516 y360 w356 h24"
+        )
+        this.TriggerInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
+
+        this.Window.Add("Text", "x28 y402 w68", "模板模式")
+        this.ModeInput := this.Window.Add(
+            "DropDownList", "x102 y398 w330",
+            ReportAssistantSettingsDefaults.ModeLabels()
+        )
+        this.ModeInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
+
+        this.Window.Add("Text", "x28 y440 w68", "模板文字")
+        this.TextInput := this.Window.Add(
+            "Edit", "x28 y462 w844 h94 +Multi +VScroll"
+        )
+        this.TextInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
+
+        this.Tabs.UseTab(2)
+        this.Window.Add(
+            "Text", "x40 y70 w820 h30 Center", "快捷键设置将在后续版本开放。"
+        )
+
+        this.Tabs.UseTab(3)
+        this.Window.Add(
+            "Text", "x40 y70 w820 h30 Center", "其他设置将在后续版本开放。"
+        )
+
+        this.Tabs.UseTab()
+        this.SaveButton := this.Window.Add(
+            "Button", "x688 y598 w90 h30 Default", "保存"
+        )
+        this.SaveButton.OnEvent("Click", this.OnSave.Bind(this))
+        this.CancelButton := this.Window.Add(
+            "Button", "x786 y598 w90 h30", "取消"
+        )
+        this.CancelButton.OnEvent("Click", this.OnClose.Bind(this))
+
+        this.RefreshTemplateList()
+        if this.Entries.Length > 0
+            this.SelectRow(1)
+    }
+
+    Activate() {
+        this.Window.Show("w900 h640")
+        try WinActivate("ahk_id " this.Window.Hwnd)
+    }
+
+    RefreshTemplateList() {
+        this.LoadingControls := true
+        try {
+            this.TemplateList.Delete()
+            for entry in this.Entries {
+                this.TemplateList.Add(
+                    ,
+                    entry.Enabled ? "启用" : "停用",
+                    entry.Name,
+                    entry.Trigger,
+                    ReportAssistantSettingsModeLabel(entry.Mode)
+                )
+            }
+        } finally {
+            this.LoadingControls := false
+        }
+    }
+
+    SelectRow(row) {
+        if row < 1 || row > this.Entries.Length {
+            this.SelectedRow := 0
+            this.ClearEditor()
+            return
+        }
+        this.LoadingControls := true
+        try {
+            this.TemplateList.Modify(0, "-Select")
+            this.TemplateList.Modify(row, "Select Focus Vis")
+            this.SelectedRow := row
+            this.LoadEditor(this.Entries[row])
+        } finally {
+            this.LoadingControls := false
+        }
+    }
+
+    LoadEditor(entry) {
+        this.EnabledInput.Value := entry.Enabled ? 1 : 0
+        this.NameInput.Text := entry.Name
+        this.TriggerInput.Text := entry.Trigger
+        this.TextInput.Text := entry.Text
+        this.ModeInput.Choose(ReportAssistantSettingsModeIndex(entry.Mode))
+        this.DeleteButton.Enabled := !entry.IsBuiltin
+    }
+
+    ClearEditor() {
+        this.LoadingControls := true
+        try {
+            this.EnabledInput.Value := 0
+            this.NameInput.Text := ""
+            this.TriggerInput.Text := ""
+            this.TextInput.Text := ""
+            this.ModeInput.Choose(0)
+            this.DeleteButton.Enabled := false
+        } finally {
+            this.LoadingControls := false
+        }
+    }
+
+    StoreEditorToEntry() {
+        if this.SelectedRow < 1 || this.SelectedRow > this.Entries.Length
+            return
+        entry := this.Entries[this.SelectedRow]
+        entry.Enabled := this.EnabledInput.Value = 1
+        entry.Name := this.NameInput.Text
+        entry.Trigger := this.TriggerInput.Text
+        entry.Text := NormalizeEditableReportHotstringText(this.TextInput.Text)
+        entry.Mode := ReportAssistantSettingsModeValue(this.ModeInput.Value)
+        this.TemplateList.Modify(
+            this.SelectedRow,
+            ,
+            entry.Enabled ? "启用" : "停用",
+            entry.Name,
+            entry.Trigger,
+            ReportAssistantSettingsModeLabel(entry.Mode)
+        )
+    }
+
+    OnEditorChanged(*) {
+        if this.LoadingControls
+            return
+        this.StoreEditorToEntry()
+        this.Dirty := true
+    }
+
+    OnTemplateSelected(control, row, selected) {
+        if this.LoadingControls || !selected
+            return
+        this.StoreEditorToEntry()
+        this.SelectedRow := row
+        this.LoadingControls := true
+        try {
+            this.LoadEditor(this.Entries[row])
+        } finally {
+            this.LoadingControls := false
+        }
+    }
+
+    OnAddTemplate(*) {
+        this.StoreEditorToEntry()
+        this.Entries.Push(CreateEditableReportHotstring(
+            this.Entries, this.DeletedSectionKeys
+        ))
+        row := this.TemplateList.Add(, "启用", "新的模板", "", "普通文字")
+        this.Dirty := true
+        this.SelectRow(row)
+        this.TriggerInput.Focus()
+    }
+
+    OnDeleteTemplate(*) {
+        if this.SelectedRow < 1 || this.SelectedRow > this.Entries.Length
+            return
+        entry := this.Entries[this.SelectedRow]
+        if entry.IsBuiltin {
+            MsgBox(
+                "内置模板不能删除。如暂时不用，可以取消启用。",
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Iconi"
+            )
+            return
+        }
+        answer := MsgBox(
+            "确定删除模板“" entry.Name "”吗？",
+            ReportAssistantSettingsDefaults.WindowTitle,
+            "YesNo Icon! Default2"
+        )
+        if answer != "Yes"
+            return
+
+        sectionKey := StrLower(entry.Section)
+        if this.OriginalSections.Has(sectionKey)
+            && !this.DeletedSectionKeys.Has(sectionKey) {
+            this.DeletedSections.Push(entry.Section)
+            this.DeletedSectionKeys[sectionKey] := true
+        }
+        deletedRow := this.SelectedRow
+        this.LoadingControls := true
+        try {
+            this.Entries.RemoveAt(deletedRow)
+            this.TemplateList.Delete(deletedRow)
+        } finally {
+            this.LoadingControls := false
+        }
+        this.Dirty := true
+        if this.Entries.Length = 0 {
+            this.SelectedRow := 0
+            this.ClearEditor()
+            return
+        }
+        this.SelectRow(Min(deletedRow, this.Entries.Length))
+    }
+
+    OnSave(*) {
+        this.StoreEditorToEntry()
+        validation := ValidateEditableReportHotstringEntries(this.Entries)
+        if !validation.Ok {
+            if validation.Row > 0
+                this.FocusValidationError(validation)
+            MsgBox(
+                validation.Message,
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Icon!"
+            )
+            return
+        }
+
+        if !this.Dirty {
+            this.DestroyWindow()
+            return
+        }
+
+        saveResult := SaveEditableReportHotstringConfig(
+            this.Entries,
+            this.DeletedSections,
+            this.OriginalText,
+            this.ConfigPath
+        )
+        if !saveResult.Ok {
+            MsgBox(
+                saveResult.Message,
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Icon!"
+            )
+            return
+        }
+
+        this.OriginalText := saveResult.SavedText
+        this.Dirty := false
+        try Reload()
+        catch as err {
+            OutputDebug "Report Assistant settings reload failed: " err.Message
+            MsgBox(
+                "配置已保存，但程序未能重新启动。`n" .
+                "请通过系统托盘选择“重新加载配置”后重试。",
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Icon!"
+            )
+        }
+    }
+
+    FocusValidationError(validation) {
+        this.SelectRow(validation.Row)
+        if validation.Field = "Name"
+            this.NameInput.Focus()
+        else if validation.Field = "Trigger"
+            this.TriggerInput.Focus()
+        else if validation.Field = "Mode"
+            this.ModeInput.Focus()
+    }
+
+    OnClose(*) {
+        if this.Closing
+            return true
+        if this.Dirty {
+            answer := MsgBox(
+                "设置尚未保存，确定放弃修改吗？",
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "YesNo Icon! Default2"
+            )
+            if answer != "Yes"
+                return true
+        }
+        this.DestroyWindow()
+        return true
+    }
+
+    DestroyWindow() {
+        this.Closing := true
+        this.Window.Destroy()
+        ReportAssistantSettingsWindow.Current := 0
+    }
+}
+
+ReportAssistantSettingsModeIndex(mode) {
+    mode := StrLower(Trim(mode, " `t`r`n"))
+    for index, value in ReportAssistantSettingsDefaults.ModeValues() {
+        if mode = value
+            return index
+    }
+    return 0
+}
+
+ReportAssistantSettingsModeValue(index) {
+    values := ReportAssistantSettingsDefaults.ModeValues()
+    if index < 1 || index > values.Length
+        return ""
+    return values[index]
+}
+
+ReportAssistantSettingsModeLabel(mode) {
+    index := ReportAssistantSettingsModeIndex(mode)
+    labels := ReportAssistantSettingsDefaults.ModeLabels()
+    return index > 0 ? labels[index] : "未选择"
+}
+
+; --- END settings_ui.ahk ---
+
 ; --- BEGIN tray_menu.ahk ---
 class ReportAssistantTrayDefaults {
+    static SettingsItemName := "设置…"
     static ReloadItemName := "重新加载配置"
     static ExitItemName := "E&xit"
 }
@@ -12433,11 +13203,16 @@ class ReportAssistantTrayDefaults {
 ConfigureReportAssistantTrayMenu() {
     A_TrayMenu.Insert(
         ReportAssistantTrayDefaults.ExitItemName,
+        ReportAssistantTrayDefaults.SettingsItemName,
+        ShowReportAssistantSettings
+    )
+    A_TrayMenu.Insert(
+        ReportAssistantTrayDefaults.ExitItemName,
         ReportAssistantTrayDefaults.ReloadItemName,
         ReloadReportAssistantFromTray
     )
-    ; Keep tray-icon double-click unassigned for the future settings UI.
-    A_TrayMenu.Default := ""
+    A_TrayMenu.Default := ReportAssistantTrayDefaults.SettingsItemName
+    A_TrayMenu.ClickCount := 2
 }
 
 ReloadReportAssistantFromTray(*) {
