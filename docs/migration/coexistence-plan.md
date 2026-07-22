@@ -38,7 +38,7 @@
 
 ### Hotstrings
 
-同一个 trigger 只能由一个进程注册。Compatibility 中不注册 `;red`、`;fzg`、`;fwj`、`;fjd`、`;cmx`。如需回滚到 legacy 报告 hotstrings，必须先退出新项目实例，不能让两套同名 triggers 并行注册。
+同一个 trigger 只能由一个进程注册。Compatibility 中不注册 `;red`、`;fzg`、`;fwj`、`;fjd`、`;cmx`。如需临时改回人工或 legacy workflow，必须先退出新项目实例，不能让两套同名 triggers 并行注册。
 
 ### Hotkeys
 
@@ -86,14 +86,14 @@ Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 scre
 3. v0.6.0：测量读取采用 structured states；验证后才考虑替代相关 legacy measurement hotkeys。
 4. Later：完成配置 GUI、更新支持及必要的 direct editor command；compatibility 清空后归档，不删除原始 legacy reference。
 
-每次缩减必须在 Chinese maintainer/update notes 中写明：移除了哪个 compatibility capability、由哪个新模块接管、验证结果、回滚方法。
+每次缩减必须在 Chinese maintainer/update notes 中写明：移除了哪个 compatibility capability、由哪个新模块接管、验证结果，以及出现问题时如何停止测试并恢复人工 workflow。
 
-## 回滚原则
+## 停止测试原则
 
-- 保留上一版 internal-test executable 和上一版 compatibility script。
-- 回滚时同时退出新旧两个进程，再启动已知可用组合。
+- 同时退出新项目和 compatibility 进程。
 - 不覆盖用户配置。
 - 不删除原始 legacy scripts 或 `red_not.clip` 用户副本，直到用户明确确认不再需要。
+- 应用不查找、备份、替换或恢复其他 EXE；是否保留历史文件不属于应用职责。
 
 ## 启用 compatibility scaffold 前的用户确认
 

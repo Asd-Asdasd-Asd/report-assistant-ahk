@@ -213,7 +213,7 @@ MaxRetries=1
 建议日志路径：
 
 ```text
-%LocalAppData%\MedExAHK\logs\medex-ahk.log
+%LocalAppData%\MedExReportAssistant\logs\medex-report-assistant.log
 ```
 
 日志事件使用 stable keys：

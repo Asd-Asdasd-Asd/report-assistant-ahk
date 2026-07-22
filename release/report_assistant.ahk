@@ -1,19 +1,155 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Generated at: 2026-07-21 14:02:43 UTC
+; Source revision: 57fba5152d6c4915d18f8918e9dc496a419d0201-dirty
+; Generated at: 2026-07-22 09:35:45 UTC
+;@Ahk2Exe-SetFileVersion 0.5.0.0
+;@Ahk2Exe-SetProductVersion 0.5.0-alpha.0
+;@Ahk2Exe-SetName MedEx Report Assistant
 
 #Requires AutoHotkey v2.0
-#SingleInstance Force
+#SingleInstance Off
 #Warn
 
 ; --- BEGIN app_metadata.ahk ---
 class AppMetadata {
     static Version := "0.5.0-alpha.0"
     static Channel := "internal-alpha-preparation"
-    static SourceRevision := "UNSTAMPED"
+    static SourceRevision := "57fba5152d6c4915d18f8918e9dc496a419d0201-dirty"
 }
 
 ; --- END app_metadata.ahk ---
+
+; --- BEGIN app_config.ahk ---
+class ReportAssistantConfigDefaults {
+    static SchemaVersion := 1
+    static DirectoryName := "MedExReportAssistant"
+    static FileName := "config.ini"
+}
+
+class ReportAssistantConfig {
+    static Path() {
+        localAppData := EnvGet("LOCALAPPDATA")
+        if localAppData = ""
+            throw Error("LOCALAPPDATA is unavailable")
+        return localAppData "\" ReportAssistantConfigDefaults.DirectoryName "\" ReportAssistantConfigDefaults.FileName
+    }
+}
+
+class ManagedConfigEntry {
+    __New(section, key, defaultValue) {
+        this.Section := String(section)
+        this.Key := String(key)
+        this.DefaultValue := String(defaultValue)
+    }
+}
+
+; --- END app_config.ahk ---
+
+; --- BEGIN app_startup.ahk ---
+class ReportAssistantStartupDefaults {
+    static MutexName := "Local\MedExReportAssistant.Singleton"
+    static ErrorAlreadyExists := 183
+    static LogDirectoryName := "logs"
+    static LogFileName := "startup.log"
+}
+
+global REPORT_ASSISTANT_SINGLETON_HANDLE := 0
+
+StartReportAssistantRuntime()
+
+StartReportAssistantRuntime() {
+    global REPORT_ASSISTANT_SINGLETON_HANDLE
+
+    handle := DllCall(
+        "CreateMutexW",
+        "Ptr", 0,
+        "Int", false,
+        "Str", ReportAssistantStartupDefaults.MutexName,
+        "Ptr"
+    )
+    createError := A_LastError
+
+    if !handle {
+        WriteReportAssistantStartupDiagnostic("SINGLETON_UNAVAILABLE")
+        MsgBox(
+            "MedEx Report Assistant 无法建立单实例保护。`n" .
+            "为避免同时运行多个版本，程序不会启动。`n" .
+            "请联系维护者。",
+            "MedEx Report Assistant"
+        )
+        ExitApp
+    }
+
+    if createError = ReportAssistantStartupDefaults.ErrorAlreadyExists {
+        DllCall("CloseHandle", "Ptr", handle)
+        WriteReportAssistantStartupDiagnostic("INSTANCE_CONFLICT")
+        MsgBox(
+            "MedEx Report Assistant 已在运行。`n" .
+            "请先通过系统托盘退出当前版本，再启动此版本。",
+            "MedEx Report Assistant"
+        )
+        ExitApp
+    }
+
+    REPORT_ASSISTANT_SINGLETON_HANDLE := handle
+    OnExit CloseReportAssistantSingleton
+    WriteReportAssistantStartupDiagnostic("STARTED")
+}
+
+CloseReportAssistantSingleton(*) {
+    global REPORT_ASSISTANT_SINGLETON_HANDLE
+
+    if !REPORT_ASSISTANT_SINGLETON_HANDLE
+        return
+    DllCall("CloseHandle", "Ptr", REPORT_ASSISTANT_SINGLETON_HANDLE)
+    REPORT_ASSISTANT_SINGLETON_HANDLE := 0
+}
+
+WriteReportAssistantStartupDiagnostic(startupResult) {
+    try configPath := ReportAssistantConfig.Path()
+    catch
+        configPath := "UNAVAILABLE"
+
+    block := FormatReportAssistantStartupDiagnostic(startupResult, configPath)
+    if configPath = "UNAVAILABLE" {
+        OutputDebug block
+        return false
+    }
+
+    try {
+        logPath := ReportAssistantStartupLogPath(configPath)
+        SplitPath logPath, , &logDirectory
+        if !DirExist(logDirectory)
+            DirCreate logDirectory
+        FileAppend block "`r`n`r`n", logPath, "UTF-8"
+        return true
+    } catch {
+        OutputDebug block
+        return false
+    }
+}
+
+ReportAssistantStartupLogPath(configPath) {
+    SplitPath configPath, , &configDirectory
+    return configDirectory "\" ReportAssistantStartupDefaults.LogDirectoryName "\" ReportAssistantStartupDefaults.LogFileName
+}
+
+FormatReportAssistantStartupDiagnostic(startupResult, configPath) {
+    lines := [
+        "Timestamp=" FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "StartupResult=" startupResult,
+        "AppVersion=" AppMetadata.Version,
+        "SourceRevision=" AppMetadata.SourceRevision,
+        "ExecutablePath=" A_ScriptFullPath,
+        "ConfigPath=" configPath
+    ]
+    output := ""
+    for index, line in lines
+        output .= (index = 1 ? "" : "`r`n") line
+    return output
+}
+
+; --- END app_startup.ahk ---
 
 ; --- BEGIN Lib/UIA.ahk ---
 /*
@@ -7981,32 +8117,6 @@ COORDINATES := Map(
 )
 
 ; --- END config.example.ahk ---
-
-; --- BEGIN app_config.ahk ---
-class ReportAssistantConfigDefaults {
-    static SchemaVersion := 1
-    static DirectoryName := "MedExReportAssistant"
-    static FileName := "config.ini"
-}
-
-class ReportAssistantConfig {
-    static Path() {
-        localAppData := EnvGet("LOCALAPPDATA")
-        if localAppData = ""
-            throw Error("LOCALAPPDATA is unavailable")
-        return localAppData "\" ReportAssistantConfigDefaults.DirectoryName "\" ReportAssistantConfigDefaults.FileName
-    }
-}
-
-class ManagedConfigEntry {
-    __New(section, key, defaultValue) {
-        this.Section := String(section)
-        this.Key := String(key)
-        this.DefaultValue := String(defaultValue)
-    }
-}
-
-; --- END app_config.ahk ---
 
 ; --- BEGIN window_guard.ahk ---
 RequireReportEditor() {

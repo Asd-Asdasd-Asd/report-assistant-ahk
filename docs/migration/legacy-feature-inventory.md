@@ -39,7 +39,7 @@
 | 鼠标位置恢复 | 多数 legacy 动作手工保存/恢复；Shift+Alt+B/H/L 不恢复；颜色复位固定坐标后恢复 | `WithMouseRestore()` 可恢复，但尚未用于实际 viewer workflow | 部分基础设施 | 中 | 两脚本同时移动鼠标时最终位置不可预测 | 禁止并发触发；迁移时统一 transaction boundary | v0.5.x |
 | 用户配置 | 通过直接改 legacy 源码中的坐标、数值和热键 | `config.example.ahk` + optional `config.local.ahk`，但 hotkeys/hotstrings 仍硬编码，若干 config keys 未被消费 | 部分基础设施 | 高 | 两个进程各自有配置和硬编码状态，无法统一禁用冲突项 | v0.5.0 引入 centralized normalized config；compatibility 使用显式 feature switches | v0.5.0 |
 | MedEx process name | Legacy report hotstrings 不校验进程 | 现场确认主进程 `medexworkstations.exe`；runtime compatibility candidate `medexworkstation.exe` | 主进程已确认，compatibility candidate 暂保留 | 高 | global entry 仍可能在错误应用先插入文本；重复 process query 增加路径开销 | 加 shared MedEx entry guard；其后移除冗余 process query，保留 click 前 active HWND checks | 下一性能检查点 |
-| 启动与单实例 | 两个 legacy 文件均无 `#SingleInstance`，也无启动提示 | 新项目 `#SingleInstance Force`，启动时 Tooltip | 部分迁移 | 中 | 可同时产生多个 legacy 进程；新项目只约束自身同名实例 | compat scaffold 使用 `#SingleInstance Force`；启动时明确脚本身份 | v0.5.0 |
+| 启动与单实例 | 两个 legacy 文件均无 `#SingleInstance`，也无启动提示 | 新项目使用固定 `Local\MedExReportAssistant.Singleton` mutex；冲突进程中文提示后退出 | 已实现，待 Windows 跨版本验证 | 中 | 无 mutex 的旧版本仍可能并行；policy-aware builds 在文件名/目录变化后仍互斥 | compat scaffold 保持独立身份；新项目 singleton 不终止其他进程 | v0.5.0 |
 | Tray/menu | legacy 使用 AHK 默认 tray；无自定义 menu | 新项目也使用 AHK 默认 tray；无自定义 menu | 未定制 | 中 | 同时运行会出现多个相似 AHK tray icons，用户可能退出错误进程 | compat scaffold 设置不同 tray tooltip；v0.5.x 考虑清晰 menu/status | v0.5.x |
 | Diagnostic logging | 无 | 无；只有 Tooltip/Beep | 未实现 | 高（内测定位问题需要） | 无日志时难以区分新项目失败还是 legacy 点击失败 | 只记录非临床元数据和结构化 result code | v0.5.0 |
 

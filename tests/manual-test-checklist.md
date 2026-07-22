@@ -324,7 +324,23 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] Built-in 与 user-defined trigger collision 被检测并 fail-safe。
 - [ ] Configured hotkeys、built-in triggers/replacements 和 user-defined hotstrings 正确注册。
 - [ ] User replacement 只作为 text data，不执行 AHK code。
-- [ ] 更新 executable 后 `%LocalAppData%\MedExAHK\config.ini` 保持不变。
+- [ ] 更新 executable 后 `%LocalAppData%\MedExReportAssistant\config.ini` 保持不变。
+
+## Portable release 与 singleton
+
+- [ ] 将 ZIP 复制到本机并完整解压，不直接从共享盘或压缩包内运行。
+- [ ] EXE 从任意普通本地目录启动正常。
+- [ ] EXE 从 Desktop 启动正常。
+- [ ] EXE 放在 Windows Startup folder 时启动正常。
+- [ ] 启动后 config 仍为 `%LocalAppData%\MedExReportAssistant\config.ini`。
+- [ ] 对完整测试配置记录 SHA-256；删除或替换 EXE 后 config SHA-256 与 custom sections 不变。
+- [ ] 同一 EXE 启动两次时只有一个 active instance。
+- [ ] 改名后的两个 EXE 启动时只有一个 active instance。
+- [ ] 两个不同目录、不同 metadata 的 policy-aware builds 启动时只有一个 active instance。
+- [ ] 第二进程显示“MedEx Report Assistant 已在运行”，随后 clean exit。
+- [ ] 原进程 PID、tray、suspend state 和 hotkey registrations 没有被终止或 reload。
+- [ ] `%LocalAppData%\MedExReportAssistant\logs\startup.log` 记录 version、revision、executable path 和 config path。
+- [ ] 没有创建 installer、shortcut、registry state、EXE backup、rollback、self-update 或 old-version cleanup。
 
 ## Compatibility staged tests
 
@@ -334,4 +350,4 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] 每个保留的 legacy hotkey 在用户确认的工作站和窗口上逐项测试。
 - [ ] Shift+Alt+S 与新 clipboard transaction 不并发触发。
 - [ ] SUV 3000 ms 与 Arrow 1000 ms 复按行为保持用户确认的语义。
-- [ ] 回滚时能够同时退出两个进程并启动上一版已知可用组合。
+- [ ] 停止测试时能够同时退出新项目和 compatibility，且 user config 保持不变。

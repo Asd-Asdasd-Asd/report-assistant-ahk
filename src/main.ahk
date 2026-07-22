@@ -1,11 +1,12 @@
 #Requires AutoHotkey v2.0
-#SingleInstance Force
+#SingleInstance Off
 #Warn
 
 #Include app_metadata.ahk
+#Include app_config.ahk
+#Include app_startup.ahk
 #Include config.example.ahk
 #Include *i config.local.ahk
-#Include app_config.ahk
 #Include window_guard.ahk
 #Include utils.ahk
 #Include clipboard_html.ahk

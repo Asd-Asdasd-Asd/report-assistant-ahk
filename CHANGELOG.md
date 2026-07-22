@@ -6,8 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Added a stable `Local\MedExReportAssistant.Singleton` mutex before configuration initialization. Conflicting policy-aware versions now show a Chinese message and exit without terminating or reloading the existing process.
+- Added startup metadata logging under `%LOCALAPPDATA%\MedExReportAssistant\logs\startup.log`, including application version, source revision, executable path, and configuration path.
+- Added Ahk2Exe version metadata derived from the canonical `AppMetadata.Version` and Git source-revision stamping for generated release builds.
+- Added a root-level one-click Windows build workflow that compiles through a validated temporary EXE, transactionally replaces the last-known-good artifact, and outputs `publish/麦旋风.exe`.
+- Added recursive overlay synchronization for static release resources under `assets/publish/`, including separate Chinese first-use and configuration guides.
+
 ### Documentation
 
+- Defined the initial portable single-EXE update model, local ZIP extraction requirement, arbitrary executable location, and explicit exclusion of installer/updater/rollback/old-EXE management behavior.
 - Synchronized project state with `2369b68` / `v0.6.0-candidate-g`, including the promoted `relativeMousePixelValidated` default, field-confirmed `medexworkstations.exe`, phrase-specific no-reset `;fzg`, and recorded `75 tests passed` promotion baseline.
 - Added the ordered critical-path optimization checkpoints, timing schema, clipboard minimum-interval safety contract, MedEx-only hotstring scope plan, Windows result continuation rules, and deferred per-machine calibration design.
 

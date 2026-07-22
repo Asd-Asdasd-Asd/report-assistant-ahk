@@ -13,10 +13,10 @@
 
 ## 启动前
 
-1. 保存当前已知可用版本，确保可以回滚。
-2. 退出原始 legacy scripts。
-3. 确认维护者提供了匹配版本的新 executable 和 compatibility script。
-4. 不删除 `%LocalAppData%\MedExAHK\config.ini`。
+1. 退出当前 MedEx Report Assistant 和原始 legacy scripts。
+2. 确认维护者提供了匹配版本的新 executable 和 compatibility script。
+3. 先把 ZIP 复制到本机并完整解压，不要直接从共享盘或压缩包内运行。
+4. 不删除 `%LocalAppData%\MedExReportAssistant\config.ini`。
 
 ## 启动顺序
 
@@ -36,8 +36,6 @@
 
 不要发送患者信息、报告文字、剪贴板内容或包含临床信息的截图。
 
-## 回滚
+## 停止本次测试
 
-1. 退出新项目和 compatibility 两个进程。
-2. 启动维护者指定的上一版已知可用组合。
-3. 保留 user config 和 diagnostics，等待维护者判断；不要自行覆盖配置。
+退出新项目和 compatibility 两个进程，保留 user config 和 diagnostics，等待维护者判断；应用不会自动下载、替换或恢复其他 EXE。

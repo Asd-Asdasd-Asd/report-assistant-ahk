@@ -1,6 +1,6 @@
 # 项目状态与交接
 
-更新时间：2026-07-20（Step 5 Windows 验收通过；准备独立提交）
+更新时间：2026-07-22（portable startup/version-safety 已实现；等待 Windows EXE 验证）
 
 ## 冻结基线
 
@@ -23,6 +23,9 @@
 - 第一次 signature 立即采样；只在失败时等待 20 ms 再采一次。
 - `;fzg` 使用 phrase-specific no-reset 路径：paste → clipboard restore → `Left 4`，返回 `COLOR_RESET_NOT_REQUIRED`；Step 4 Windows A/B 已确认不需要额外 50 ms settle。
 - Production success 无 heavy log；production failure 写 lightweight privacy-safe log；field mode 才写详细诊断。
+- Portable startup 在配置初始化前建立固定 `Local\MedExReportAssistant.Singleton` mutex；conflict process 中文提示后退出，不终止现有实例。
+- `AppMetadata.Version` 是唯一人工版本来源；generated release 写入 Ahk2Exe metadata、Git source revision 和独立 startup log。
+- User config 保持在 `%LocalAppData%\MedExReportAssistant\config.ini`，EXE 路径不参与 config path 计算。
 
 ### Windows 现场已验证
 
@@ -38,6 +41,7 @@
 
 - CF_HTML UTF-8 offsets、Candidate G pure geometry/signature rules、dispatcher boundary、at-most-once clicks、no-fallback、report orchestration 和 generated-release integration。
 - Step 5 已通过 89 项自动测试和 Windows G1/G2 metadata-override 验收；版本 mismatch/unknown 仅改变 diagnostics，四项 layout gates 保留。
+- Portable singleton/build metadata 已通过当前 macOS `141/141` 自动测试；same/cross-version mutex、Desktop/Startup folder 和 compiled EXE 尚待 Windows 验证。
 - 当前 macOS 环境可能缺少 `pytest`；无法重跑表示本次 review 未独立复验，不表示 mainline 从未测试。
 
 ### 当前性能检查点
@@ -53,7 +57,7 @@
 ### 有意延期
 
 - 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 layout 的正式支持。
-- Configuration runtime、internal-test executable、GUI/updater、measurement capture 和其他 viewer workflow migration。
+- Portable EXE 的 Windows 编译与现场验证、GUI/updater、measurement capture 和其他 viewer workflow migration。
 - 直接 Electron/editor API 路线。
 
 ## 当前 production flow

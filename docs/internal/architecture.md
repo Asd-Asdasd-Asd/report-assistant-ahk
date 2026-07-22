@@ -92,7 +92,9 @@ MxNMSoft 测量值读取计划通过未来的 `ContextMeasurementProvider` adapt
 
 `release/` 保存生成后的单文件脚本，便于复制到 Windows 工作站进行测试。生成文件来自 `scripts/build_release.py`，维护者应优先修改 `src/`，不要手工修改 release 文件。
 
-v0.5.0 增加 internal-test executable。Executable、单文件 `.ahk` 和模块化 source 都不能包含真实 user config。用户配置保存在 `%LocalAppData%\MedExAHK\config.ini`，更新应用 artifact 时必须保留。
+v0.5.0 增加 portable internal-test executable。Executable、单文件 `.ahk` 和模块化 source 都不能包含真实 user config。用户配置保存在 `%LocalAppData%\MedExReportAssistant\config.ini`，替换应用 artifact 时必须保留。
+
+Executable 不绑定安装位置。固定 `Local\MedExReportAssistant.Singleton` mutex 在 config bootstrap 和功能注册前建立，确保采用该策略的不同版本、文件名和目录不能并行运行。mutex 检测不读取或创建配置；成功创建的 handle 保持到退出并用 `CloseHandle` 释放。应用不取得 mutex ownership，因此不调用 `ReleaseMutex`。
 
 ## Editor adapter boundary
 

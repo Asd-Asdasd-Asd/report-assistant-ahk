@@ -12,7 +12,7 @@ v0.5.0 内测阶段开始增加 internal-test executable，降低普通用户的
 
 后续产品化阶段可以再加入完整 tray menu、version display、calibration mode、diagnostics export 和更容易远程支持的工具。
 
-Executable 只改变交付形式，不改变源代码真相来源、配置保存位置或回滚要求。
+Executable 只改变交付形式，不改变源代码真相来源或配置保存位置。初始内测采用 portable single-EXE，不提供 installer、固定安装路径、自动更新、旧 EXE backup 或 rollback system。
 
 ## v0.1.0 项目初始化
 
@@ -165,7 +165,7 @@ Explicitly deferred，除非已经实现且稳定：
 | M3 High-frequency viewer migration | F12、SUV/Arrow、SUVMax/line measurement | M2 完成 | 每项 structured result、fail-closed 和现场验证完成 | 真实 viewer 必须逐项验证 | 否；稳定 compatibility 可临时承接 |
 | M4 Report-image workflows | montage、caption、cover images | 相应 UI survey 足够 | 参数、相对区域和业务输出逐项验证 | 真实 viewer/双屏验证 | 否；稳定 compatibility 可临时承接 |
 | M5 Minimum config/diagnostics | 独立 user config、safe defaults、必要日志和 feature ownership | M1/M2 interfaces 稳定 | 更新不覆盖配置；日志无临床内容；能禁用冲突入口 | 配置持久性和失败日志 smoke test | 最小范围是 |
-| M6 Package and rollback | compiled EXE、pinned dependency、版本、中文说明、回滚 | M0/M1/M2/最小 M5 完成 | 无管理员权限启动；dependency bundled；上一版可恢复 | compiled workstation smoke test | 是 |
+| M6 Portable package | compiled EXE、pinned dependency、版本、中文说明、跨版本单实例 | M0/M1/M2/最小 M5 完成 | 任意本地路径且无管理员权限启动；dependency bundled；配置独立保留 | compiled workstation smoke test | 是 |
 
 M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/clipboard 冲突地提供对应日常功能时才不阻塞首次有限内测。如果 compatibility 缺失、已知不稳定或与新 build 冲突，对应功能立即重新成为 blocker。
 

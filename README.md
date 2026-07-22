@@ -22,6 +22,12 @@ Step 4 基线为 `5193403`；`2369b68`（tag `v0.6.0-candidate-g`）是 Candidat
 - Step 3 已将 Candidate G 移到 clipboard restore 前，并以 field-approved 300 ms minimum paste-to-restore interval 保护 fast failure；Windows success/fast-failure 均已通过。
 - Step 5 candidate 不再用 exact MedEx version 阻止 runtime/calibration；实际版本、校准版本和 match state 继续写入 diagnostics。Resolution、DPI、scaling 和所有 interaction guards 保持 hard gate。
 
+## 便携式内部发布
+
+普通用户发布物为 `麦旋风.exe`，可放在任意本地目录、Desktop 或 Windows Startup folder。程序不安装自身、不要求管理员权限，也不创建 shortcut、注册表状态或自动更新任务。下载的 ZIP 必须先复制到本机并完整解压，不能直接从共享盘运行。
+
+跨版本单实例由固定 `Local\MedExReportAssistant.Singleton` mutex 保护；第二个采用该策略的版本只会显示中文冲突提示并退出，不会终止或重载当前实例。启动记录写入 `%LOCALAPPDATA%\MedExReportAssistant\logs\startup.log`，配置仍独立保存在 `%LOCALAPPDATA%\MedExReportAssistant\config.ini`。
+
 ## 自定义报告热字符串
 
 程序首次启动时会创建：
@@ -153,8 +159,9 @@ tests/    Static tests and manual workstation checkpoints.
 
 1. 修改 `src/` 或 `docs/`；应用版本只修改 `src/app_metadata.ahk`。
 2. 源码变化后运行 `python scripts/build_release.py`；纯文档变化不需要刷新 generated release。
-3. 在 Windows 工作站使用 AutoHotkey v2 测试生成文件。
-4. 按 `tests/manual-test-checklist.md` 和当前 performance checkpoint 完成验证。
+3. Windows 构建机安装 AutoHotkey v2 与 Ahk2Exe 后，双击根目录 `Build EXE.cmd`。
+4. 测试 `publish/麦旋风.exe`，按 `tests/manual-test-checklist.md` 和当前 performance checkpoint 完成验证。
+5. 只压缩并分发 `publish/` 的内容；不要分发仓库或构建脚本。
 
 当前状态入口：
 

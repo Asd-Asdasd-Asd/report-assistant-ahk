@@ -7,7 +7,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.build_release import build_release_text, strip_leading_component_bom
+from scripts.build_release import (
+    build_release_text,
+    stamp_source_revision,
+    strip_leading_component_bom,
+    windows_file_version,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +24,9 @@ class BuildReleaseEncodingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             source_dir = Path(directory)
             (source_dir / "app_metadata.ahk").write_bytes(
-                b'\xef\xbb\xbfclass AppMetadata {\n    static Version := "test"\n}\n'
+                b'\xef\xbb\xbfclass AppMetadata {\n'
+                b'    static Version := "1.2.3-test.1"\n'
+                b'    static SourceRevision := "UNSTAMPED"\n}\n'
             )
             (source_dir / "component.ahk").write_bytes(
                 b"\xef\xbb\xbf; component\nExample() {\n    return true\n}\n"
@@ -29,10 +36,23 @@ class BuildReleaseEncodingTests(unittest.TestCase):
                 source_dir=source_dir,
                 order=["app_metadata.ahk", "component.ahk"],
                 timestamp="TEST",
+                source_revision="abc123",
             )
 
             self.assertEqual(merged.count("\ufeff"), 0)
             self.assertIn("; --- BEGIN component.ahk ---\n; component", merged)
+            self.assertIn('static SourceRevision := "abc123"', merged)
+
+    def test_windows_file_version_is_derived_from_canonical_version(self) -> None:
+        self.assertEqual(windows_file_version("0.5.0-alpha.0"), "0.5.0.0")
+        self.assertEqual(windows_file_version("2.7.11"), "2.7.11.0")
+
+    def test_source_revision_stamp_requires_metadata_field(self) -> None:
+        with self.assertRaisesRegex(ValueError, "SourceRevision"):
+            stamp_source_revision(
+                'class AppMetadata {\n    static Version := "1.2.3"\n}\n',
+                "abc123",
+            )
 
     def test_only_a_leading_component_bom_is_removed(self) -> None:
         value = "\ufefffirst\ufeffsecond"
@@ -48,11 +68,21 @@ class BuildReleaseEncodingTests(unittest.TestCase):
         first_component = release_text.index("; --- BEGIN app_metadata.ahk ---")
         for directive in (
             "#Requires AutoHotkey v2.0",
-            "#SingleInstance Force",
+            "#SingleInstance Off",
             "#Warn",
         ):
             self.assertEqual(release_text.count(directive), 1)
             self.assertLess(release_text.index(directive), first_component)
+
+    def test_generated_release_contains_compiler_and_runtime_metadata(self) -> None:
+        release_text = RELEASE.read_text(encoding="utf-8")
+        self.assertIn(";@Ahk2Exe-SetFileVersion 0.5.0.0", release_text)
+        self.assertIn(";@Ahk2Exe-SetProductVersion 0.5.0-alpha.0", release_text)
+        self.assertIn(";@Ahk2Exe-SetName MedEx Report Assistant", release_text)
+        self.assertRegex(
+            release_text,
+            r'static SourceRevision := "(?:[0-9a-f]{40}(?:-dirty)?|UNSTAMPED)"',
+        )
 
 
 if __name__ == "__main__":

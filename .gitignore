@@ -6,6 +6,7 @@ logs/
 tmp/
 screenshots/
 release/*.exe
+/publish/
 .DS_Store
 .vscode/
 .idea/

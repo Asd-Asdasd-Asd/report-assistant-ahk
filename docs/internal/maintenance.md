@@ -16,16 +16,35 @@
 4. 运行 `git add ...` 暂存相关文件。
 5. 运行 `git commit -m "..."` 提交。
 6. 运行 `git push` 推送到 private repo。
-7. 拷贝 `release/report_assistant.ahk` 到 Windows 测试。
-8. 按 `tests/manual-test-checklist.md` 或 `docs/internal/release-checklist.md` 完成测试。
+7. 按 `tests/manual-test-checklist.md` 或 `docs/internal/release-checklist.md` 完成测试。
+
+## Windows 一键构建
+
+Windows 构建机需安装 AutoHotkey v2，并包含 Ahk2Exe compiler。默认使用：
+
+- `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`
+- `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`
+
+双击仓库根目录的 `Build EXE.cmd`。脚本会重新生成 `release/report_assistant.ahk`，编译并验证临时 EXE，同步 `assets/publish/` 中的静态发布资源，最后把产物安全提升为：
+
+```text
+publish\麦旋风.exe
+```
+
+构建成功后先测试 EXE，再压缩 `publish/` 的内容用于内部发布。不要分发仓库根目录或构建脚本；此流程不会创建 installer 或 automatic updater。
+
+静态资源使用 overlay 同步：构建只复制 `assets/publish/` 中当前存在的文件，不审核或删除 `publish/` 中的其他文档、图标。若静态资源被删除或重命名，正式发布前应手工清空 `publish/`，再从 clean commit 重新构建。
 
 v0.5.0 起还必须：
 
 - 从 source truth 生成 internal-test executable，不手改 generated artifact；
+- 只从 clean Git commit 构建正式 EXE，确认 startup metadata 中 `SourceRevision` 是该 source commit；
 - 为每个 internal release 编写中文 maintainer/update notes；
 - 核对 `%LocalAppData%\MedExReportAssistant\config.ini` 的已有值保持不变；若新版本补充 managed defaults，核对备份、补项和验证流程；
 - 核对 compatibility script 与新 build 没有重复 hotkeys/hotstrings；
-- 记录本 release 从 compatibility 移除了哪些 capability 以及 rollback method。
+- 记录本 release 从 compatibility 移除了哪些 capability，以及出现问题时如何停止测试和恢复人工工作流。
+
+初始内测使用 portable single-EXE：不提供 installer、固定安装路径、shortcut、自动更新、旧 EXE backup 或 rollback system。ZIP 必须先复制到本机并完整解压，不能直接从共享盘运行。
 
 ## 如何记录问题
 

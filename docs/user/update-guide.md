@@ -1,24 +1,28 @@
 # 更新说明
 
-普通用户只需要使用维护者提供的新文件，不要自己修改脚本内容。个人配置与程序文件分开保存；更新不会覆盖已有配置值，但可能在备份后补充新版本缺少的默认项。
+MedEx Report Assistant 采用便携式单文件 EXE。程序不要求固定安装目录，也不会自动下载、替换或清理其他版本。
 
-## 更新步骤
+## 更新方法
 
-1. 先关闭旧脚本。
-2. 按本次内部更新说明退出 compatibility script；不要同时运行原始 legacy script 和 compatibility script。
-3. 用维护者提供的新文件替换旧程序文件，不删除 `%LocalAppData%\MedExReportAssistant\config.ini`。
-4. 双击运行新文件，再按维护者说明启动 compatibility script。
-5. 打开无患者信息的测试区域，简单测试 `;cmx` 和本次更新指定项目。
+1. 在系统托盘中退出旧版 MedEx Report Assistant。
+2. 删除或覆盖原来的 `麦旋风.exe`。
+3. 下载并解压新版。
+4. 运行新的 `麦旋风.exe`。
 
-## 如果出错
+原有自定义配置保存在本机用户目录中，不会因删除 EXE 而丢失：
 
-1. 按 Ctrl+Alt+Q 退出新脚本。
-2. 换回旧文件。
-3. 联系维护者。
+```text
+%LOCALAPPDATA%\MedExReportAssistant\config.ini
+```
 
-## 注意
+## 下载位置
 
-- 不要自己打开脚本修改内容。
-- 不要删除或手动覆盖 `%LocalAppData%\MedExReportAssistant\config.ini`；自动补项前的备份保存在同目录的 `backups` 文件夹。
-- 不要把患者信息发给维护者。
-- 不要在不确定时反复尝试异常功能。
+请先把维护者提供的 ZIP 复制到本机磁盘，再完整解压到 Desktop、普通本地文件夹或其他自选位置。不要直接从共享盘、共享驱动器或 ZIP 压缩包内部运行 EXE。
+
+如果需要开机自动运行，可以由用户手工把 EXE 放入 Windows Startup folder；程序本身不会创建 Startup shortcut。
+
+## 如果无法启动
+
+如果看到“MedEx Report Assistant 已在运行”，请先通过系统托盘退出当前版本，再启动新版本。程序不会自动终止或替换正在运行的版本。
+
+不要删除或手动覆盖 `config.ini`，也不要发送患者信息、报告文字、剪贴板内容或包含临床信息的截图给维护者。

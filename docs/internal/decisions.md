@@ -113,7 +113,7 @@
 
 背景：Hotkeys、built-in hotstring triggers/replacements 和 user-defined hotstrings 需要可配置，同时更新不能覆盖用户配置。
 
-决策：普通用户配置保存在 `%LocalAppData%\MedExAHK\config.ini`，通过 defaults → read → validate → migrate → normalize 的单一 pipeline 加载。
+决策：普通用户配置保存在 `%LocalAppData%\MedExReportAssistant\config.ini`，通过 defaults → read → validate → migrate → normalize 的单一 pipeline 加载。
 
 影响：
 
@@ -133,7 +133,7 @@
 影响：
 
 - 同一个 trigger 只能有一个 active owner。
-- 每次新 release 逐项缩减 compatibility，并提供中文 update notes 和 rollback method。
+- 每次新 release 逐项缩减 compatibility，并提供中文 update notes 和停止测试/恢复人工 workflow 的说明。
 - 在用户确认依赖和新实现 validation 之前，不删除 legacy capability。
 
 ## Decision 009: 冻结 field-validated production baseline
@@ -149,3 +149,13 @@
 - Generated release 可以 self-contained，不依赖 `debug/` 或 global UIA installation。
 - Field debug 与 production 不复制 resolver。
 - 正式 config/log paths 和 executable packaging 留到下一里程碑。
+
+## Decision 010: 初始内测采用 portable single-EXE 和稳定 mutex
+
+状态：Accepted for implementation
+
+决策：普通用户可以把发布物 `麦旋风.exe` 放在任意本地目录。应用不提供 installer、固定路径、shortcut、registry installation state、自动更新、旧 EXE backup、rollback 或历史版本 cleanup。
+
+采用固定 `Local\MedExReportAssistant.Singleton` named mutex。singleton 检测先于配置初始化，以 object existence 判断冲突；不取得 ownership，不调用 `ReleaseMutex`。成功创建的 handle 保持到退出并调用 `CloseHandle`。
+
+应用版本唯一人工来源是 `AppMetadata.Version`；正式构建写入 source commit，并记录 executable/config paths。用户配置继续独立保存在 `%LocalAppData%\MedExReportAssistant\config.ini`。
