@@ -36,7 +36,7 @@ Step 4 基线为 `5193403`；`2369b68`（tag `v0.6.0-candidate-g`）是 Candidat
 %LOCALAPPDATA%\MedExReportAssistant\config.ini
 ```
 
-配置只在启动时读取，不支持 hot reload；修改后必须退出并重新启动 Report Assistant。程序不会覆盖已有配置值，但新版本可能自动补充缺失的程序默认项。补充前会把原文件保存到 `%LOCALAPPDATA%\MedExReportAssistant\backups\`，更新失败则继续使用原文件和安全的内存默认值。建议先退出脚本，再在 Windows 文件资源管理器地址栏粘贴上面的路径，用“记事本”打开。文件编码必须保持为带 BOM 的 **UTF-16 LE**（新版记事本“另存为”窗口的编码选项可选择 `UTF-16 LE`），这样中文才能被 Windows INI API 稳定读取。
+配置在程序启动时读取。修改并保存后，右键系统托盘图标并选择“重新加载配置”；程序会重新启动并应用新配置，无需手工退出再打开。程序不会覆盖已有配置值，但新版本可能自动补充缺失的程序默认项。补充前会把原文件保存到 `%LOCALAPPDATA%\MedExReportAssistant\backups\`，更新失败则继续使用原文件和安全的内存默认值。修改前先保存正在编辑的报告，再在 Windows 文件资源管理器地址栏粘贴上面的路径，用“记事本”打开。文件编码必须保持为带 BOM 的 **UTF-16 LE**（新版记事本“另存为”窗口的编码选项可选择 `UTF-16 LE`），这样中文才能被 Windows INI API 稳定读取。
 
 最终 schema 为：
 

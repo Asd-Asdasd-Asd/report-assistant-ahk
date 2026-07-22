@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0-alpha.0
-; Source revision: b99ed65e34c11bdfbd1d34b8569e63e32fc50cf9-dirty
-; Generated at: 2026-07-22 10:26:33 UTC
+; Source revision: 3906ceeab24ce37adb7a5276f48c8e6c2a8a05f7-dirty
+; Generated at: 2026-07-22 10:39:11 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0-alpha.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0-alpha.0"
     static Channel := "internal-alpha-preparation"
-    static SourceRevision := "b99ed65e34c11bdfbd1d34b8569e63e32fc50cf9-dirty"
+    static SourceRevision := "3906ceeab24ce37adb7a5276f48c8e6c2a8a05f7-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -12424,8 +12424,40 @@ RegisterConfiguredFeatures(settings) {
 
 ; --- END features.ahk ---
 
+; --- BEGIN tray_menu.ahk ---
+class ReportAssistantTrayDefaults {
+    static ReloadItemName := "重新加载配置"
+    static ExitItemName := "E&xit"
+}
+
+ConfigureReportAssistantTrayMenu() {
+    A_TrayMenu.Insert(
+        ReportAssistantTrayDefaults.ExitItemName,
+        ReportAssistantTrayDefaults.ReloadItemName,
+        ReloadReportAssistantFromTray
+    )
+    ; Keep tray-icon double-click unassigned for the future settings UI.
+    A_TrayMenu.Default := ""
+}
+
+ReloadReportAssistantFromTray(*) {
+    try Reload()
+    catch as err {
+        OutputDebug "Report Assistant reload failed: " err.Message
+        MsgBox(
+            "无法重新加载配置。当前版本将继续运行。`n" .
+            "请检查配置文件后重试。",
+            "MedEx Report Assistant"
+        )
+    }
+}
+
+; --- END tray_menu.ahk ---
+
 ; --- BEGIN main.ahk ---
 
+
+ConfigureReportAssistantTrayMenu()
 
 #SuspendExempt
 

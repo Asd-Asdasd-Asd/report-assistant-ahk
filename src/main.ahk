@@ -32,6 +32,9 @@
 #Include hotkey_registration.ahk
 #Include global_hjkl_arrows.ahk
 #Include features.ahk
+#Include tray_menu.ahk
+
+ConfigureReportAssistantTrayMenu()
 
 #SuspendExempt
 

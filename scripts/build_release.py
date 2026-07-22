@@ -41,6 +41,7 @@ ORDER = [
     "hotkey_registration.ahk",
     "global_hjkl_arrows.ahk",
     "features.ahk",
+    "tray_menu.ahk",
     "main.ahk",
 ]
 

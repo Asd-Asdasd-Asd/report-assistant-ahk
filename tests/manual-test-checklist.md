@@ -11,6 +11,9 @@
 5. [ ] 验证按住四个组合键的重复行为；确认不受 MedEx-only hotstring guard 限制。
 6. [ ] 按 `Ctrl+Alt+Esc` 后确认 HJKL 和 hotstrings 均暂停，再按一次确认恢复；暂停期间 `Ctrl+Alt+Q` 仍可退出。
 7. [ ] 重新启动 release，确认现有 `config.ini` 未被重写且开关继续生效；最后复测五个 production hotstrings。
+8. [ ] 修改并保存一个 hotstring，右键托盘选择“重新加载配置”；确认旧 PID 退出、新 PID 启动、只有一个托盘实例，且新配置生效。
+9. [ ] 分别在 Suspend 和 Pause 状态执行“重新加载配置”，确认重启后恢复 active；双击托盘图标仍无动作。
+10. [ ] 核对 reload 没有触发 singleton conflict，startup log 新增一条 `STARTED`。
 8. [ ] 使用不支持的 `SchemaVersion` 和只读配置分别启动，确认原文件不被修改、release 不崩溃且 HJKL 保持关闭。
 
 ## Candidate G sidebar horizontal translation（待 Windows 验证）

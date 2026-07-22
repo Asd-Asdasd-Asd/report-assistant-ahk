@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added a root-level one-click Windows build workflow that compiles through a validated temporary EXE, transactionally replaces the last-known-good artifact, and outputs `publish/麦旋风.exe`.
 - Added recursive overlay synchronization for static release resources under `assets/publish/`, including separate Chinese first-use and configuration guides.
 - Added a copyable, disabled custom-hotstring example to newly created user configuration files without modifying existing configurations.
+- Added a tray-menu “重新加载配置” action that restarts the current application to apply configuration changes while keeping tray-icon double-click reserved for a future settings UI.
 
 ### Documentation
 
