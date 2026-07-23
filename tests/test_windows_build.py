@@ -40,6 +40,10 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         self.assertIn("Split-Path -Parent $PSScriptRoot", script)
         self.assertIn("Join-Path $PSScriptRoot 'build_release.py'", script)
         self.assertIn("Join-Path $repositoryRoot 'release\\report_assistant.ahk'", script)
+        self.assertIn(
+            "Join-Path $repositoryRoot 'assets\\icon\\generated\\medex-icon.ico'",
+            script,
+        )
         self.assertIn("Join-Path $repositoryRoot 'assets\\publish'", script)
         self.assertIn("Join-Path $repositoryRoot 'publish'", script)
 
@@ -51,12 +55,22 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         self.assertIn("Release generator was not found", script)
         self.assertIn("Ahk2Exe compiler was not found", script)
         self.assertIn("AutoHotkey v2 64-bit base executable was not found", script)
+        self.assertIn("Application icon was not found", script)
+        self.assertIn("Application icon is empty", script)
         self.assertIn("Generated release script", script)
 
     def test_ahk2exe_arguments_and_temporary_validation_are_present(self) -> None:
         script = text(POWERSHELL, "utf-8-sig")
-        for argument in ("'/in'", "'/out'", "'/base'", "'/silent'", "'verbose'"):
+        for argument in (
+            "'/in'",
+            "'/out'",
+            "'/base'",
+            "'/icon'",
+            "'/silent'",
+            "'verbose'",
+        ):
             self.assertIn(argument, script)
+        self.assertIn("('\"{0}\"' -f $iconPath)", script)
         self.assertIn("Start-Process", script)
         self.assertIn("-Wait", script)
         self.assertIn("-PassThru", script)
@@ -140,6 +154,18 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         self.assertIn("/publish/", gitignore)
         self.assertTrue((ROOT / "assets" / "publish" / "首次使用.md").is_file())
         self.assertTrue((ROOT / "assets" / "publish" / "配置指南.md").is_file())
+        self.assertTrue(
+            (ROOT / "assets" / "icon" / "source" / "medex-icon.svg").is_file()
+        )
+        self.assertTrue(
+            (
+                ROOT
+                / "assets"
+                / "icon"
+                / "generated"
+                / "medex-icon.ico"
+            ).is_file()
+        )
 
 
 if __name__ == "__main__":

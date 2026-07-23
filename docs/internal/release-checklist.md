@@ -35,6 +35,7 @@
 - [ ] 从 source truth 生成 internal-test executable，不手改生成产物。
 - [ ] Windows 构建机已安装 AutoHotkey v2 与 Ahk2Exe；双击根目录 `Build EXE.cmd` 后窗口保持打开并明确报告结果。
 - [ ] 确认最终 artifact 为 `publish\麦旋风.exe`，文件非空且修改时间属于本轮成功构建。
+- [ ] 确认构建输出显示 `assets\icon\generated\medex-icon.ico`，并在资源管理器和系统托盘中看到新的应用图标。
 - [ ] 确认 `assets/publish/首次使用.md` 与 `assets/publish/配置指南.md` 已同步到 `publish/`；构建没有审核或删除其他手工文档、图标。
 - [ ] 连续构建两次，确认 final 被干净替换，且没有遗留 `麦旋风.building.exe` 或 `麦旋风.previous.exe`。
 - [ ] 临时改错 compiler path，确认构建以非零退出码失败、清理 `.building.exe`，并保留构建前 last-known-good final 的内容和修改时间。

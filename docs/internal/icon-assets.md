@@ -22,4 +22,4 @@ brew install librsvg imagemagick
 assets/icon/generated/medex-icon.ico
 ```
 
-Windows 使用 Ahk2Exe 编译 EXE 时，应把这个 ICO 文件作为图标输入。生成的 PNG 与 ICO 均随源 SVG 一起提交到仓库。
+Windows 一键构建脚本会自动把这个 ICO 文件通过 Ahk2Exe `/icon` 参数嵌入 EXE；缺少或为空时构建会立即失败。生成的 PNG 与 ICO 均随源 SVG 一起提交到仓库。

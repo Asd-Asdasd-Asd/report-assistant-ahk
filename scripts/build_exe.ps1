@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $buildReleaseScript = Join-Path $PSScriptRoot 'build_release.py'
 $releaseScript = Join-Path $repositoryRoot 'release\report_assistant.ahk'
+$iconPath = Join-Path $repositoryRoot 'assets\icon\generated\medex-icon.ico'
 $publishDirectory = Join-Path $repositoryRoot 'publish'
 $publishAssetsDirectory = Join-Path $repositoryRoot 'assets\publish'
 $buildingExe = Join-Path $publishDirectory '麦旋风.building.exe'
@@ -216,6 +217,13 @@ try {
     if (-not (Test-Path -LiteralPath $BasePath -PathType Leaf)) {
         throw "AutoHotkey v2 64-bit base executable was not found: $BasePath"
     }
+    if (-not (Test-Path -LiteralPath $iconPath -PathType Leaf)) {
+        throw "Application icon was not found: $iconPath"
+    }
+    if ((Get-Item -LiteralPath $iconPath).Length -le 0) {
+        throw "Application icon is empty: $iconPath"
+    }
+    Write-Host "Application icon: $iconPath"
     $python = Resolve-PythonCommand
 
     $stage = 'generate release script'
@@ -233,6 +241,7 @@ try {
         '/in', ('"{0}"' -f $releaseScript),
         '/out', ('"{0}"' -f $buildingExe),
         '/base', ('"{0}"' -f $BasePath),
+        '/icon', ('"{0}"' -f $iconPath),
         '/silent', 'verbose'
     )
     $compilerStdoutLog = [System.IO.Path]::GetTempFileName()
