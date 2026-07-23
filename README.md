@@ -87,7 +87,7 @@ Trigger=;warning
 Text=请重点关注该病灶
 ```
 
-旧 Schema 1 配置首次由本版本启动时，会先进行只读审计，再创建时间戳备份、写入临时文件并验证，最后才替换为 Schema 2。旧 `text`、`red-reset`、`red-left4` 和 builtin `cmx` 会按已知语义迁移；无法无歧义保留的自定义项会阻止迁移并保留原文件。Schema 2 不能由已发布的旧 EXE 正确读取；若要降级，必须退出程序并恢复迁移前备份。
+旧 Schema 1 配置首次由本版本启动时，会先进行只读审计，再创建时间戳备份、写入临时文件并验证，最后才替换为 Schema 2。旧 `text`、`red-reset`、`red-left4` 和 builtin `cmx` 会按已知语义迁移；无法无歧义保留的自定义项会阻止迁移并保留原文件。开发阶段已生成的 Schema 2 配置若仍保留旧版 builtin 默认文字，程序只会把与旧默认值完全一致的项目升级为显式红色 token；用户修改过的 builtin 和所有 custom template 均保持不变。Schema 2 不能由已发布的旧 EXE 正确读取；若要降级，必须退出程序并恢复迁移前备份。
 
 ## 可选全局 HJKL 方向键
 

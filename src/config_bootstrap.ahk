@@ -44,9 +44,12 @@ PrepareReportAssistantConfig(managedDefaults, configPath := "") {
         )
     }
 
-    try reconciled := ReconcileManagedConfigDefaults(configPath, managedDefaults)
-    catch
+    try {
+        reconciled := ReconcileSchema2BuiltinTemplateDefaults(configPath)
+            && ReconcileManagedConfigDefaults(configPath, managedDefaults)
+    } catch {
         reconciled := false
+    }
     if !reconciled {
         return ReportConfigMigrationResult(
             false, "CONFIG_RECONCILIATION_FAILED",

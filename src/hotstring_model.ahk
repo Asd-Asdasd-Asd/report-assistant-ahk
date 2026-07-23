@@ -28,6 +28,29 @@ class ReportHotstringDefaults {
             )
         ]
     }
+
+    static LegacySchema2BuiltinTextUpgrades() {
+        currentBySection := Map()
+        for entry in this.BuiltinDefinitions()
+            currentBySection[StrLower(entry.Section)] := entry.Text
+        legacyTexts := Map(
+            "Hotstring.builtin-red", "（见图）",
+            "Hotstring.builtin-fzg",
+            "放射性摄取增高，SUVmax约为{{cursor}}（见图）",
+            "Hotstring.builtin-fwj", "放射性摄取未见明显增高（见图）",
+            "Hotstring.builtin-fjd", "放射性摄取降低（见图）"
+        )
+        upgrades := []
+        for section, legacyText in legacyTexts {
+            sectionKey := StrLower(section)
+            upgrades.Push({
+                Section: section,
+                FromText: legacyText,
+                ToText: currentBySection[sectionKey]
+            })
+        }
+        return upgrades
+    }
 }
 
 class RawHotstringEntry {

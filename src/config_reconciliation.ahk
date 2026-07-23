@@ -19,6 +19,95 @@ ReconcileManagedConfigDefaults(configPath, managedDefaults) {
     return ApplyMissingManagedConfigDefaults(configPath, missingDefaults)
 }
 
+ReconcileSchema2BuiltinTemplateDefaults(configPath) {
+    static MissingValue := "{A3FE0E44-FC11-4A12-83C4-ED719CA613A8}"
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+
+    updates := []
+    for definition in ReportHotstringDefaults.LegacySchema2BuiltinTextUpgrades() {
+        try encodedText := IniRead(
+            configPath,
+            definition.Section,
+            "Text",
+            MissingValue
+        )
+        catch
+            return false
+        if encodedText = MissingValue
+            continue
+        if DecodeReportHotstringText(encodedText) != definition.FromText
+            continue
+        updates.Push({
+            Section: definition.Section,
+            ExpectedEncodedText: encodedText,
+            NewEncodedText: EncodeReportHotstringText(definition.ToText)
+        })
+    }
+    if updates.Length = 0
+        return true
+    return ApplySchema2BuiltinTemplateUpdates(configPath, updates)
+}
+
+ApplySchema2BuiltinTemplateUpdates(configPath, updates) {
+    tempPath := configPath ".builtin-template-update.tmp.ini"
+    backupPath := ""
+    promoted := false
+    try {
+        try FileDelete tempPath
+        backupPath := CreateReportAssistantConfigBackup(configPath)
+        FileCopy configPath, tempPath, true
+        for update in updates {
+            if IniRead(tempPath, update.Section, "Text", "")
+                != update.ExpectedEncodedText
+                throw Error("Builtin template changed during reconciliation")
+            IniWrite(
+                update.NewEncodedText,
+                tempPath,
+                update.Section,
+                "Text"
+            )
+        }
+        if !ValidateSchema2BuiltinTemplateUpdates(tempPath, updates)
+            throw Error("Builtin template update validation failed")
+        FileMove tempPath, configPath, true
+        promoted := true
+        if !ValidateSchema2BuiltinTemplateUpdates(configPath, updates)
+            throw Error("Final builtin template validation failed")
+        return true
+    } catch {
+        try FileDelete tempPath
+        if promoted && backupPath != "" && FileExist(backupPath) {
+            try FileCopy backupPath, configPath, true
+            catch
+                return false
+        }
+        return false
+    }
+}
+
+ValidateSchema2BuiltinTemplateUpdates(configPath, updates) {
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+    for update in updates {
+        try encodedText := IniRead(configPath, update.Section, "Text", "")
+        catch
+            return false
+        if encodedText != update.NewEncodedText
+            return false
+        plan := BuildReportTemplatePlan(DecodeReportHotstringText(encodedText))
+        if !plan.Ok
+            return false
+    }
+    return true
+}
+
 HasUniqueManagedConfigDefaults(managedDefaults) {
     if Type(managedDefaults) != "Array"
         return false

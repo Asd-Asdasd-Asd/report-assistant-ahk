@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0
-; Source revision: b5207d3efd7f540e180b2588ae2b4a1fc5f86623-dirty
-; Generated at: 2026-07-23 15:18:44 UTC
+; Source revision: 16bc5f2bc6abce56f1b129847d4222d058163a1e-dirty
+; Generated at: 2026-07-23 15:27:01 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0"
     static Channel := "internal-test"
-    static SourceRevision := "b5207d3efd7f540e180b2588ae2b4a1fc5f86623-dirty"
+    static SourceRevision := "16bc5f2bc6abce56f1b129847d4222d058163a1e-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -12080,6 +12080,29 @@ class ReportHotstringDefaults {
             )
         ]
     }
+
+    static LegacySchema2BuiltinTextUpgrades() {
+        currentBySection := Map()
+        for entry in this.BuiltinDefinitions()
+            currentBySection[StrLower(entry.Section)] := entry.Text
+        legacyTexts := Map(
+            "Hotstring.builtin-red", "（见图）",
+            "Hotstring.builtin-fzg",
+            "放射性摄取增高，SUVmax约为{{cursor}}（见图）",
+            "Hotstring.builtin-fwj", "放射性摄取未见明显增高（见图）",
+            "Hotstring.builtin-fjd", "放射性摄取降低（见图）"
+        )
+        upgrades := []
+        for section, legacyText in legacyTexts {
+            sectionKey := StrLower(section)
+            upgrades.Push({
+                Section: section,
+                FromText: legacyText,
+                ToText: currentBySection[sectionKey]
+            })
+        }
+        return upgrades
+    }
 }
 
 class RawHotstringEntry {
@@ -12498,6 +12521,95 @@ ReconcileManagedConfigDefaults(configPath, managedDefaults) {
     if missingDefaults.Length = 0
         return true
     return ApplyMissingManagedConfigDefaults(configPath, missingDefaults)
+}
+
+ReconcileSchema2BuiltinTemplateDefaults(configPath) {
+    static MissingValue := "{A3FE0E44-FC11-4A12-83C4-ED719CA613A8}"
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+
+    updates := []
+    for definition in ReportHotstringDefaults.LegacySchema2BuiltinTextUpgrades() {
+        try encodedText := IniRead(
+            configPath,
+            definition.Section,
+            "Text",
+            MissingValue
+        )
+        catch
+            return false
+        if encodedText = MissingValue
+            continue
+        if DecodeReportHotstringText(encodedText) != definition.FromText
+            continue
+        updates.Push({
+            Section: definition.Section,
+            ExpectedEncodedText: encodedText,
+            NewEncodedText: EncodeReportHotstringText(definition.ToText)
+        })
+    }
+    if updates.Length = 0
+        return true
+    return ApplySchema2BuiltinTemplateUpdates(configPath, updates)
+}
+
+ApplySchema2BuiltinTemplateUpdates(configPath, updates) {
+    tempPath := configPath ".builtin-template-update.tmp.ini"
+    backupPath := ""
+    promoted := false
+    try {
+        try FileDelete tempPath
+        backupPath := CreateReportAssistantConfigBackup(configPath)
+        FileCopy configPath, tempPath, true
+        for update in updates {
+            if IniRead(tempPath, update.Section, "Text", "")
+                != update.ExpectedEncodedText
+                throw Error("Builtin template changed during reconciliation")
+            IniWrite(
+                update.NewEncodedText,
+                tempPath,
+                update.Section,
+                "Text"
+            )
+        }
+        if !ValidateSchema2BuiltinTemplateUpdates(tempPath, updates)
+            throw Error("Builtin template update validation failed")
+        FileMove tempPath, configPath, true
+        promoted := true
+        if !ValidateSchema2BuiltinTemplateUpdates(configPath, updates)
+            throw Error("Final builtin template validation failed")
+        return true
+    } catch {
+        try FileDelete tempPath
+        if promoted && backupPath != "" && FileExist(backupPath) {
+            try FileCopy backupPath, configPath, true
+            catch
+                return false
+        }
+        return false
+    }
+}
+
+ValidateSchema2BuiltinTemplateUpdates(configPath, updates) {
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+    for update in updates {
+        try encodedText := IniRead(configPath, update.Section, "Text", "")
+        catch
+            return false
+        if encodedText != update.NewEncodedText
+            return false
+        plan := BuildReportTemplatePlan(DecodeReportHotstringText(encodedText))
+        if !plan.Ok
+            return false
+    }
+    return true
 }
 
 HasUniqueManagedConfigDefaults(managedDefaults) {
@@ -13595,9 +13707,12 @@ PrepareReportAssistantConfig(managedDefaults, configPath := "") {
         )
     }
 
-    try reconciled := ReconcileManagedConfigDefaults(configPath, managedDefaults)
-    catch
+    try {
+        reconciled := ReconcileSchema2BuiltinTemplateDefaults(configPath)
+            && ReconcileManagedConfigDefaults(configPath, managedDefaults)
+    } catch {
         reconciled := false
+    }
     if !reconciled {
         return ReportConfigMigrationResult(
             false, "CONFIG_RECONCILIATION_FAILED",

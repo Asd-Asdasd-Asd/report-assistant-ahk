@@ -46,6 +46,51 @@ class ConfigReconciliationTests(unittest.TestCase):
         self.assertIn("this.GlobalHjklArrowsKey", model)
         self.assertIn("this.GlobalHjklArrowsDefault", model)
 
+    def test_interim_schema2_builtin_defaults_upgrade_to_explicit_red_tokens(
+        self,
+    ) -> None:
+        model = source("src/hotstring_model.ahk")
+        reconciliation = source("src/config_reconciliation.ahk")
+        bootstrap = source("src/config_bootstrap.ahk")
+        for legacy_text in (
+            '"Hotstring.builtin-red", "（见图）"',
+            '"放射性摄取增高，SUVmax约为{{cursor}}（见图）"',
+            '"Hotstring.builtin-fwj", "放射性摄取未见明显增高（见图）"',
+            '"Hotstring.builtin-fjd", "放射性摄取降低（见图）"',
+        ):
+            self.assertIn(legacy_text, model)
+        self.assertIn("LegacySchema2BuiltinTextUpgrades()", model)
+        self.assertIn(
+            "DecodeReportHotstringText(encodedText) != definition.FromText",
+            reconciliation,
+        )
+        self.assertIn(
+            "ApplySchema2BuiltinTemplateUpdates(configPath, updates)",
+            reconciliation,
+        )
+        self.assertIn(
+            "ReconcileSchema2BuiltinTemplateDefaults(configPath)", bootstrap
+        )
+
+    def test_builtin_upgrade_is_exact_transactional_and_preserves_custom_text(
+        self,
+    ) -> None:
+        reconciliation = source("src/config_reconciliation.ahk")
+        update = reconciliation.split(
+            "ApplySchema2BuiltinTemplateUpdates(configPath, updates) {", 1
+        )[1].split("\n}\n\nValidateSchema2BuiltinTemplateUpdates(", 1)[0]
+        self.assertIn("CreateReportAssistantConfigBackup(configPath)", update)
+        self.assertIn("FileCopy configPath, tempPath, true", update)
+        self.assertIn("update.ExpectedEncodedText", update)
+        self.assertIn("IniWrite(", update)
+        self.assertIn("tempPath,", update)
+        self.assertIn(
+            "ValidateSchema2BuiltinTemplateUpdates(tempPath, updates)", update
+        )
+        self.assertIn("FileMove tempPath, configPath, true", update)
+        self.assertIn("FileCopy backupPath, configPath, true", update)
+        self.assertNotIn("Hotstring.custom-", reconciliation)
+
     def test_reconciliation_only_updates_missing_supported_defaults(self) -> None:
         reconciliation = source("src/config_reconciliation.ahk")
         find_missing = reconciliation.split(

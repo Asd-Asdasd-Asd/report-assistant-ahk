@@ -16,9 +16,48 @@ RunTemplateEngineRegression()
 RunTemplateEngineRegression() {
     TestTemplatePlans()
     TestSchema1Migration()
+    TestInterimSchema2BuiltinDefaultUpgrade()
     TestUnsafeMigrationLeavesOriginalUntouched()
     MsgBox "Template engine regression passed.", "MedEx test", "Iconi"
     ExitApp 0
+}
+
+TestInterimSchema2BuiltinDefaultUpgrade() {
+    testDirectory := A_Temp "\MedExSchema2Builtin-" A_TickCount
+    DirCreate testDirectory
+    configPath := testDirectory "\config.ini"
+    try {
+        FileAppend InterimSchema2Fixture(), configPath, "UTF-16"
+        result := ReconcileSchema2BuiltinTemplateDefaults(configPath)
+        AssertTemplateTest(result, "schema 2 builtin upgrade failed")
+        AssertTemplateTest(
+            DecodeReportHotstringText(
+                IniRead(configPath, "Hotstring.builtin-red", "Text", "")
+            ) = "{{red:（见图）}}",
+            "red builtin was not upgraded"
+        )
+        AssertTemplateTest(
+            DecodeReportHotstringText(
+                IniRead(configPath, "Hotstring.builtin-fzg", "Text", "")
+            ) = "放射性摄取增高，SUVmax约为{{cursor}}"
+                . "{{red:（见图）}}",
+            "fzg builtin was not upgraded"
+        )
+        AssertTemplateTest(
+            DecodeReportHotstringText(
+                IniRead(configPath, "Hotstring.builtin-fjd", "Text", "")
+            ) = "用户已修改（见图）",
+            "modified builtin text was overwritten"
+        )
+        AssertTemplateTest(
+            DecodeReportHotstringText(
+                IniRead(configPath, "Hotstring.custom-note", "Text", "")
+            ) = "自定义内容（见图）",
+            "custom template text was overwritten"
+        )
+    } finally {
+        try DirDelete testDirectory, true
+    }
 }
 
 TestTemplatePlans() {
@@ -220,6 +259,46 @@ UnsafeSchema1Fixture() {
         "Trigger=;unsafe",
         "Text=content",
         "Mode=unknown-mode"
+    ]) "`r`n"
+}
+
+InterimSchema2Fixture() {
+    return JoinConfigLines([
+        "[Config]",
+        "SchemaVersion=2",
+        "",
+        "[Features]",
+        "GlobalHjklArrows=false",
+        "",
+        "[Hotstring.builtin-red]",
+        "Enabled=true",
+        "Name=Red",
+        "Trigger=;red",
+        "Text=（见图）",
+        "",
+        "[Hotstring.builtin-fzg]",
+        "Enabled=true",
+        "Name=FZG",
+        "Trigger=;fzg",
+        "Text=放射性摄取增高，SUVmax约为{{cursor}}（见图）",
+        "",
+        "[Hotstring.builtin-fwj]",
+        "Enabled=true",
+        "Name=FWJ",
+        "Trigger=;fwj",
+        "Text=放射性摄取未见明显增高（见图）",
+        "",
+        "[Hotstring.builtin-fjd]",
+        "Enabled=true",
+        "Name=FJD",
+        "Trigger=;fjd",
+        "Text=用户已修改（见图）",
+        "",
+        "[Hotstring.custom-note]",
+        "Enabled=true",
+        "Name=Custom",
+        "Trigger=;custom",
+        "Text=自定义内容（见图）"
     ]) "`r`n"
 }
 
