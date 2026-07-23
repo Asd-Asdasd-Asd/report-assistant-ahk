@@ -21,8 +21,12 @@ Optional global navigation, enabled with `GlobalHjklArrows=true` in the
 
 | Hotstring | Action |
 | --- | --- |
-| `;red` | Paste `（见图）` through the safe clipboard skeleton |
-| `;fzg` | Insert `放射性摄取增高，SUVmax约（见图）` and move cursor left 4 |
-| `;fwj` | Insert `放射性摄取未见明显增高（见图）` |
-| `;fjd` | Insert `放射性摄取降低（见图）` |
-| `;cmx` | Insert `cm×cm` and move cursor left 2 |
+| `;red` | Render the explicit red `（见图）` element and restore black insertion color |
+| `;fzg` | Insert `放射性摄取增高，SUVmax约为（见图）` and place the caret before the red suffix |
+| `;fwj` | Insert `放射性摄取未见明显增高（见图）` with an explicit red suffix |
+| `;fjd` | Insert `放射性摄取降低（见图）` with an explicit red suffix |
+| `;cmx` | Insert `cm×cm` and place the caret between the two units |
+
+The active Schema 2 model derives caret movement and color restoration from
+`{{cursor}}`, `{{date}}`, and `{{red:（见图）}}`. Plain literal `（见图）`
+remains black.

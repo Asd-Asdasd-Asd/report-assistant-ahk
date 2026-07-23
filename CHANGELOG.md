@@ -13,14 +13,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added Ahk2Exe version metadata derived from the canonical `AppMetadata.Version` and Git source-revision stamping for generated release builds.
 - Added a root-level one-click Windows build workflow that compiles through a validated temporary EXE, transactionally replaces the last-known-good artifact, and outputs `publish/麦旋风.exe`.
 - Added recursive overlay synchronization for static release resources under `assets/publish/`, including separate Chinese first-use and configuration guides.
-- Added a copyable, disabled custom-hotstring example to newly created user configuration files without modifying existing configurations.
-- Added a tray-menu “重新加载配置” action that restarts the current application to apply configuration changes while keeping tray-icon double-click reserved for a future settings UI.
+- Added Schema 2 templates with `{{cursor}}`, `{{date}}`, and the exact red suffix `{{red:（见图）}}`; plain literal `（见图）` remains black.
+- Added one-time, audited Schema 1 → 2 configuration migration with backup, temporary-file validation, and fail-closed recovery.
+- Added a native Settings UI for creating, editing, enabling, disabling, sorting, and deleting custom report templates, including a compact template-element insertion control.
+- Added tray “设置…” and “重新加载配置” actions; double-clicking the tray icon opens the single Settings window.
+- Added the original SVG, deterministic multi-size PNG/ICO generation pipeline, and Ahk2Exe icon integration.
 
 ### Documentation
 
 - Defined the initial portable single-EXE update model, local ZIP extraction requirement, arbitrary executable location, and explicit exclusion of installer/updater/rollback/old-EXE management behavior.
-- Synchronized project state with `2369b68` / `v0.6.0-candidate-g`, including the promoted `relativeMousePixelValidated` default, field-confirmed `medexworkstations.exe`, phrase-specific no-reset `;fzg`, and recorded `75 tests passed` promotion baseline.
-- Added the ordered critical-path optimization checkpoints, timing schema, clipboard minimum-interval safety contract, MedEx-only hotstring scope plan, Windows result continuation rules, and deferred per-machine calibration design.
+- Updated v0.5.0 architecture, configuration, build, validation, migration, release, and non-technical user documentation to match the current mainline.
+- Added `assets/publish/更新说明.md` for the v0.5.0 internal release and synchronized first-use/update guidance around full-folder replacement.
+- Recorded the deferred first-run color-menu limitation: black may be selected while the popup remains open once after recompilation; subsequent attempts are normally unaffected.
 
 ### Fixed
 

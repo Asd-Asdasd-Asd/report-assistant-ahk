@@ -8,8 +8,8 @@
 6. 确认 user config 位于 `%LocalAppData%\MedExReportAssistant\config.ini`，替换 EXE 不会覆盖它。
 7. 按 `tests/manual-test-checklist.md` 和 `docs/internal/release-checklist.md` 在 Windows 工作站测试。
 8. 核对 compatibility script 与新 build 没有 hotkey/hotstring conflicts。
-9. 更新 `CHANGELOG.md`，并为每个 internal release 编写中文 maintainer/update notes。
-10. 更新简单中文 portable update instructions；明确 ZIP 先复制到本地再解压运行。
+9. 更新 `CHANGELOG.md`、maintainer notes 和 `assets/publish/更新说明.md`。
+10. 核对 `assets/publish/首次使用.md`、`配置指南.md`、`更新说明.md`；明确 ZIP 先复制到本地再解压运行。
 11. 确认 source revision 不是 `UNSTAMPED` 或 `-dirty`，再 Tag version；只压缩并分发 `publish/` 的内容，不分发仓库根目录或构建脚本。
 
 Executable 没有固定安装目录。发布流程不得创建 installer、shortcut、registry state、旧 EXE backup、rollback package、self-update 或历史 EXE cleanup。维护者不应要求应用查找或处理其他目录中的 EXE。
@@ -17,3 +17,5 @@ Executable 没有固定安装目录。发布流程不得创建 installer、short
 Release artifacts 不得包含 patient data、hospital identifiers、credentials、screenshots、真实 user config 或包含临床内容的 logs。
 
 `assets/publish/` 到 `publish/` 采用 overlay 同步，不删除 `publish/` 中的手工文档或图标。删除或重命名静态资源后，正式发布前应手工清空 `publish/` 再构建。构建失败时保留构建开始前已有的 last-known-good `麦旋风.exe`，并以非零退出码明确报告失败；不得把旧修改时间当作本轮成功。
+
+Generated release source 和 icon assets 属于需要提交的可复现产物：source 变化后提交 `release/report_assistant.ahk`；图标变化后提交 `assets/icon/source/medex-icon.svg`、全部 generated PNG 和 ICO。`publish/麦旋风.exe` 不提交。

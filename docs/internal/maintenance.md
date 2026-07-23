@@ -10,13 +10,21 @@
 
 ## 常规流程
 
-1. 修改 `src/` 或 `docs/`。
-2. 运行 `python scripts/build_release.py`。
-3. 运行 `git status` 查看改动。
-4. 运行 `git add ...` 暂存相关文件。
-5. 运行 `git commit -m "..."` 提交。
-6. 运行 `git push` 推送到 private repo。
-7. 按 `tests/manual-test-checklist.md` 或 `docs/internal/release-checklist.md` 完成测试。
+1. 修改 source、tests 或 documentation。
+2. 运行对应 tests 和 `git diff --check`。
+3. source 或 release metadata 有变化时，运行 `python scripts/build_release.py`；纯文档修改不应重写 generated release。
+4. 审查 `git status` 和 diff，确认没有混入本机配置、日志或患者资料。
+5. 按 `tests/manual-test-checklist.md` 或 `docs/internal/release-checklist.md` 完成测试。
+6. 只在验证完成后提交并推送。
+
+## Source truth 与 generated files
+
+- `src/app_metadata.ahk` 是 application version 的唯一人工维护来源。
+- `release/report_assistant.ahk` 由 `scripts/build_release.py` 生成；source 变化后必须重新生成并提交，不得手改。
+- `assets/icon/source/medex-icon.svg` 是图标唯一可编辑来源。
+- `assets/icon/generated/*.png` 与 `assets/icon/generated/medex-icon.ico` 由 `scripts/generate-icon.sh` 生成，并与 SVG 一起提交。
+- `assets/publish/*.md` 是发布包静态资源的 source truth；Windows 构建时 overlay 到 `publish/`。
+- `publish/*.exe` 是本地发布 staging artifact，不提交。
 
 ## Windows 一键构建
 
@@ -35,12 +43,12 @@ publish\麦旋风.exe
 
 静态资源使用 overlay 同步：构建只复制 `assets/publish/` 中当前存在的文件，不审核或删除 `publish/` 中的其他文档、图标。若静态资源被删除或重命名，正式发布前应手工清空 `publish/`，再从 clean commit 重新构建。
 
-v0.5.0 起还必须：
+v0.5.0 release 还必须：
 
 - 从 source truth 生成 internal-test executable，不手改 generated artifact；
 - 只从 clean Git commit 构建正式 EXE，确认 startup metadata 中 `SourceRevision` 是该 source commit；
-- 为每个 internal release 编写中文 maintainer/update notes；
-- 核对 `%LocalAppData%\MedExReportAssistant\config.ini` 的已有值保持不变；若新版本补充 managed defaults，核对备份、补项和验证流程；
+- 为每个 internal release 编写中文 maintainer notes，并更新 `assets/publish/更新说明.md`；
+- 核对 `%LocalAppData%\MedExReportAssistant\config.ini` 的 Schema 1 → 2 备份、迁移和验证流程；失败不得产生半迁移文件；
 - 核对 compatibility script 与新 build 没有重复 hotkeys/hotstrings；
 - 记录本 release 从 compatibility 移除了哪些 capability，以及出现问题时如何停止测试和恢复人工工作流。
 
@@ -84,4 +92,4 @@ v0.5.0 起还必须：
 - 编译出的 `.exe`
 - 未经确认的坐标校准文件
 
-`%LocalAppData%\MedExReportAssistant\config.ini` 是用户持久数据，不属于 release source。应用只能在创建备份后补充缺失的 managed defaults，不得覆盖已有值或删除用户 section。诊断日志可以在用户授权的本机内测流程中生成，但不得提交到仓库，也不得包含患者信息或 report text。
+`%LocalAppData%\MedExReportAssistant\config.ini` 是用户持久数据，不属于 release source。Schema migration 和 managed-default reconciliation 必须先备份、使用临时文件并复验；除明确的 Schema 1 → 2 migration 外，不得覆盖已有用户值或删除用户 section。诊断日志可以在用户授权的本机内测流程中生成，但不得提交到仓库，也不得包含患者信息或 report text。

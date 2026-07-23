@@ -360,7 +360,7 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 
 - [ ] `config.ini` 不存在时使用 safe defaults。
 - [ ] 单项 invalid value 只使对应项回退或禁用，不使整个应用崩溃。
-- [ ] Higher unsupported `ConfigVersion` 不覆盖原配置，并明确提示 incompatibility。
+- [ ] Higher unsupported `SchemaVersion` 不覆盖原配置，并明确提示 incompatibility。
 - [ ] Built-in 与 user-defined trigger collision 被检测并 fail-safe。
 - [ ] Configured hotkeys、built-in triggers/replacements 和 user-defined hotstrings 正确注册。
 - [ ] User replacement 只作为 text data，不执行 AHK code。
@@ -369,6 +369,7 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 ## Portable release 与 singleton
 
 - [ ] 将 ZIP 复制到本机并完整解压，不直接从共享盘或压缩包内运行。
+- [ ] `publish/` 包含 `麦旋风.exe`、`首次使用.md`、`配置指南.md` 和 `更新说明.md`，且 EXE 与 tray 使用正式图标。
 - [ ] EXE 从任意普通本地目录启动正常。
 - [ ] EXE 从 Desktop 启动正常。
 - [ ] EXE 放在 Windows Startup folder 时启动正常。
@@ -381,6 +382,7 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] 原进程 PID、tray、suspend state 和 hotkey registrations 没有被终止或 reload。
 - [ ] `%LocalAppData%\MedExReportAssistant\logs\startup.log` 记录 version、revision、executable path 和 config path。
 - [ ] 没有创建 installer、shortcut、registry state、EXE backup、rollback、self-update 或 old-version cleanup。
+- [ ] 重新编译后的第一次颜色下拉若已选中黑色但菜单未关闭，记录现象并确认后续一次恢复正常；不要用重复点击掩盖。
 
 ## Compatibility staged tests
 

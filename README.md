@@ -1,162 +1,98 @@
-# Report Assistant AHK
+# 麦旋风（MedEx Report Assistant）
 
-Report Assistant AHK 是一个私有 AutoHotkey v2 项目，用于 Windows 报告书写和阅片窗口自动化辅助。
+麦旋风是一个基于 AutoHotkey v2 的 Windows 报告书写辅助工具。当前版本为 **v0.5.0 内部测试版**，用于少量工作站验证，不替代人工审核，也不会自动提交报告。
 
-## 当前状态
+## 当前能力
 
-Step 4 基线为 `5193403`；`2369b68`（tag `v0.6.0-candidate-g`）是 Candidate G promotion 基线。Step 5 已通过 Windows G1/G2 metadata-override 与 generated-release 验收：MedEx version 现在是 diagnostics-only metadata。`relativeMousePixelValidated` 已是 production default：UIA 精确定位 `Name="检查所见"`，经过 profile geometry 校验后以相对坐标打开颜色菜单，四点 popup signature 匹配后最多单击一次黑色。horizontal-translation v2 不再用绝对 screen X 限制 region anchor，使 sidebar 伸缩造成的工具栏整体水平平移能够沿用相同相对坐标和安全门。`uiaInvoke` 仅保留为显式 comparison/rollback；两种策略之间没有 automatic fallback。
+- 报告快捷语只在允许的 MedEx 报告窗口中生效。
+- `Ctrl+Alt+Esc` 暂停或恢复，`Ctrl+Alt+Q` 退出；两者保持全局可用。
+- 双击托盘图标或右键选择“设置…”可打开原生设置窗口。
+- 设置窗口支持新增、修改、启用、停用和按列查看快捷语；builtin 可编辑但不能删除，custom template 可删除。
+- 保存设置后执行完整 `Reload()`，不使用进程内热更新。
+- portable EXE 不绑定安装目录；跨版本单实例由固定 `Local\MedExReportAssistant.Singleton` mutex 保护。
 
-2026-07-16 Windows 现场已验证 generated release、Candidate G black reset、phrase-specific `;fzg` caret workflow 和最终 mainline behavior；promotion 当时记录为 `75 tests passed`。本项目仍是早期内部原型，不适合科室范围推广或无人值守使用。当前 layout 只在 MedEx 0.0.1.0、1920×1080、100% scaling、DPI 96 上完成校准和现场验证。
+当前颜色恢复只在 MedEx `0.0.1.0`、1920×1080、100% scaling、DPI 96 的既有 profile 上完成现场验证。其他布局继续 fail closed，不能因为版本检测放宽而视为已支持。
 
-进程状态不再是“完全未确认”：现场确认的主进程是 `medexworkstations.exe`；代码暂时兼容保留 `medexworkstation.exe`。
+## Schema 2 模板
 
-## 当前行为边界
-
-- `;red`、`;fwj`、`;fjd`：由显式 `{{red:（见图）}}` 模板元素插入红色 `（见图）`；最终光标位于末尾时运行 Candidate G，将后续输入恢复为黑色。
-- `;fzg`：`{{cursor}}` 将光标定位在红色 `（见图）` 前；移动距离由渲染结果计算，不运行 Candidate G。
-- `;cmx`：模板 `cm×{{cursor}}cm` 插入 `cm×cm`，并将光标定位在两个单位之间。
-- Production success 不写 heavy log；failure 写 privacy-safe lightweight log；field mode 才写详细 timing、geometry、UIA 和 pixel diagnostics。
-- 全局 pause/exit 分别为 `Ctrl+Alt+Esc`、`Ctrl+Alt+Q`。
-- Step 2 的 MedEx-only shared `#HotIf` guard 已由 `7a0d9a2` 提交。
-- Step 3 已将 Candidate G 移到 clipboard restore 前，并以 field-approved 300 ms minimum paste-to-restore interval 保护 fast failure；Windows success/fast-failure 均已通过。
-- Step 5 candidate 不再用 exact MedEx version 阻止 runtime/calibration；实际版本、校准版本和 match state 继续写入 diagnostics。Resolution、DPI、scaling 和所有 interaction guards 保持 hard gate。
-
-## 便携式内部发布
-
-普通用户发布物为 `麦旋风.exe`，可放在任意本地目录、Desktop 或 Windows Startup folder。程序不安装自身、不要求管理员权限，也不创建 shortcut、注册表状态或自动更新任务。下载的 ZIP 必须先复制到本机并完整解压，不能直接从共享盘运行。
-
-跨版本单实例由固定 `Local\MedExReportAssistant.Singleton` mutex 保护；第二个采用该策略的版本只会显示中文冲突提示并退出，不会终止或重载当前实例。启动记录写入 `%LOCALAPPDATA%\MedExReportAssistant\logs\startup.log`，配置仍独立保存在 `%LOCALAPPDATA%\MedExReportAssistant\config.ini`。
-
-## 自定义报告热字符串
-
-程序首次启动时会创建：
+配置位于：
 
 ```text
 %LOCALAPPDATA%\MedExReportAssistant\config.ini
 ```
 
-配置在程序启动时读取。修改并保存后，右键系统托盘图标并选择“重新加载配置”；程序会重新启动并应用新配置，无需手工退出再打开。程序不会覆盖已有配置值，但新版本可能自动补充缺失的程序默认项。补充前会把原文件保存到 `%LOCALAPPDATA%\MedExReportAssistant\backups\`，更新失败则继续使用原文件和安全的内存默认值。修改前先保存正在编辑的报告，再在 Windows 文件资源管理器地址栏粘贴上面的路径，用“记事本”打开。文件编码必须保持为带 BOM 的 **UTF-16 LE**（新版记事本“另存为”窗口的编码选项可选择 `UTF-16 LE`），这样中文才能被 Windows INI API 稳定读取。
+EXE 的位置不参与配置路径计算。普通用户应通过设置窗口修改快捷语，不需要手工编辑或删除 `config.ini`。
 
-最终 schema 为：
+每个 Schema 2 template 只保存 `Enabled`、`Name`、`Trigger` 和 `Text`。支持：
 
-```ini
-[Config]
-SchemaVersion=2
+- `{{cursor}}`：最终 caret 位置；最多一个。
+- `{{date}}`：触发时展开为本机日期 `yyyy-MM-dd`；可重复。
+- `{{red:（见图）}}`：唯一合法的红色元素；最多一个且必须位于模板末尾。
 
-[Features]
-GlobalHjklArrows=false
+普通字面量 `（见图）` 始终按黑字处理。`template_renderer.ahk` 将模板转换为 `ReportTemplatePlan`，由 plan 的最终 caret 位置推导移动距离，并且仅在 caret 位于红色尾标记之后时请求 Candidate G。纯黑模板和 caret 位于正文内部的模板不会调用 Candidate G。
 
-[Hotstring.builtin-red]
-Enabled=true
-Name=红字插入
-Trigger=;red
-Text={{red:（见图）}}
-```
+Schema 1 首次启动时执行一次性迁移：先审计旧 `Mode`，再备份、写入临时文件、验证并替换。不能无歧义保留的配置会阻止迁移并保留原文件。Schema 2 配置不能再交给旧版 EXE 使用。
 
-`[Features]` 保存非 hotstring 功能开关。`GlobalHjklArrows` 默认关闭；旧配置缺少该键时，程序会安全补入 `false`。手动改为 `true` 并重启后，会在所有应用中启用 `RAlt+H/J/K/L` 方向键。无效值保持原样但运行时视为关闭。
+详细边界见：
 
-每个热字符串 section 必须命名为 `Hotstring.builtin-<stable-id>` 或 `Hotstring.custom-<user-id>`。Schema 2 只使用 `Enabled`、`Name`、`Trigger`、`Text` 四个字段，不再使用 `Mode` 或固定 Left 数。`Text` 中使用两个字符 `\n` 表示换行，使用 `\\` 表示一个普通反斜杠。配置文本只作为文字发送或经过 HTML escaping 后粘贴，不会作为 AHK 代码执行。
-
-模板支持以下双花括号元素：
-
-- `{{cursor}}`：插入后光标停留的位置；每个模板最多一个。
-- `{{date}}`：触发时的本机日期，格式为 `yyyy-MM-dd`；可以重复使用。
-- `{{red:（见图）}}`：插入红色 `（见图）`；每个模板最多一个，并且必须是模板最后一个元素。
-
-普通单花括号仍是普通文字。未知、拼错、未闭合、重复或位置错误的模板元素会在设置窗口中被拒绝，不会原样插入报告。普通字面量 `（见图）` 始终是黑字；只有精确的 `{{red:（见图）}}` 具有红字含义，不支持其他 `{{red:...}}`。光标若位于插入文字内部，程序只移动光标而不运行 Candidate G；光标在红色尾标记之后时才恢复黑色。普通黑字模板不会调用 Candidate G。
-
-section 在文件中的先后顺序就是注册顺序，不使用单独排序字段。`Trigger` 必须保持不重复。现有配置无法读取、Schema 不支持或迁移不安全时，报告模板会 fail closed，不再回退到另一套内置模板。
-
-内置默认项如下：
-
-| Section | Trigger | Text | Enabled |
-| --- | --- | --- | --- |
-| `Hotstring.builtin-red` | `;red` | `{{red:（见图）}}` | `true` |
-| `Hotstring.builtin-fzg` | `;fzg` | `放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}` | `true` |
-| `Hotstring.builtin-fwj` | `;fwj` | `放射性摄取未见明显增高{{red:（见图）}}` | `true` |
-| `Hotstring.builtin-fjd` | `;fjd` | `放射性摄取降低{{red:（见图）}}` | `true` |
-| `Hotstring.builtin-cmx` | `;cmx` | `cm×{{cursor}}cm` | `true` |
-
-可在文件末尾添加自定义项，例如：
-
-```ini
-[Hotstring.custom-warning]
-Enabled=true
-Name=重点提示
-Trigger=;warning
-Text=请重点关注该病灶
-```
-
-旧 Schema 1 配置首次由本版本启动时，会先进行只读审计，再创建时间戳备份、写入临时文件并验证，最后才替换为 Schema 2。旧 `text`、`red-reset`、`red-left4` 和 builtin `cmx` 会按已知语义迁移；无法无歧义保留的自定义项会阻止迁移并保留原文件。开发阶段已生成的 Schema 2 配置若仍保留旧版 builtin 默认文字，程序只会把与旧默认值完全一致的项目升级为显式红色 token；用户修改过的 builtin 和所有 custom template 均保持不变。Schema 2 不能由已发布的旧 EXE 正确读取；若要降级，必须退出程序并恢复迁移前备份。
-
-## 可选全局 HJKL 方向键
-
-将配置改为：
-
-```ini
-[Features]
-GlobalHjklArrows=true
-```
-
-重启后，`RAlt+H/J/K/L` 分别发送 `Left/Down/Up/Right`。该功能保持 legacy 的全局作用域，不受 MedEx-only hotstring guard 限制；`Ctrl+Alt+Esc` 可以随其他普通功能一起暂停它。启用前必须退出原始 `legacy/karabiner.ahk`。当前清理后的 `medex_legacy_compat.ahk` 已移除这四个重复按键，可以与 EXE 同时运行。
-
-## 下一开发路线
-
-下一目标是缩短用户可见的关键路径，而不是泛化地缩短函数总运行时间。主要指标是：
-
-```text
-TriggerToBlackClickMs = BlackClickSentMs - HotstringTriggeredMs
-```
-
-计划按独立检查点推进：基线 timing diagnostics → MedEx-only hotstring scope 与冗余 process check 清理 → 将 clipboard restoration 移到 black click 后并保留安全最小间隔 → 独立验证移除 `;fzg` 的 `Sleep 50` → 独立移除 MedEx version hard gate → 经另行授权后实现本机 layout calibration。
-
-详细顺序、pass/failure 判定以及 Windows 简短结果的续接规则见 `docs/internal/performance-optimization-checkpoints.md`。
-
-## 文档分层
-
-- `docs/internal/`：维护状态、架构、路线图、检查点和发布流程。
-- `docs/user/`：普通用户说明、故障处理和紧急停止。
-- `docs/technical-investigations/`：有证据边界的技术调查。
-- `docs/migration/`：legacy inventory、共存所有权和渐进替代计划。
-
-## 开发原则
-
-- Code and identifiers in English.
-- Human-facing documentation in Chinese when appropriate.
-- No patient data or credentials.
-- No automatic final submission by default.
-- Coordinate actions require local calibration and fail-closed checks.
-- 不提交患者信息、医院敏感信息、截图、真实内网地址或敏感日志。
-
-## Requirements
-
-- Windows
-- AutoHotkey v2
-- Target report-writing workstation
-- Local calibration for coordinate-sensitive actions
-
-## Repository Layout
-
-```text
-legacy/   Preserved historical scripts and compatibility references.
-src/      AutoHotkey v2 source modules.
-docs/     Maintainer, user, investigation, and migration documentation.
-scripts/  Development and release helpers.
-release/  Generated single-file release script.
-tests/    Static tests and manual workstation checkpoints.
-```
-
-## Quick Start for Maintainers
-
-1. 修改 `src/` 或 `docs/`；应用版本只修改 `src/app_metadata.ahk`。
-2. 源码变化后运行 `python scripts/build_release.py`；纯文档变化不需要刷新 generated release。
-3. Windows 构建机安装 AutoHotkey v2 与 Ahk2Exe 后，双击根目录 `Build EXE.cmd`。
-4. 测试 `publish/麦旋风.exe`，按 `tests/manual-test-checklist.md` 和当前 performance checkpoint 完成验证。
-5. 只压缩并分发 `publish/` 的内容；不要分发仓库或构建脚本。
-
-当前状态入口：
-
-- `docs/internal/project-status.md`
+- `docs/internal/configuration-architecture.md`
 - `docs/internal/architecture.md`
-- `docs/internal/performance-optimization-checkpoints.md`
-- `docs/migration/legacy-feature-inventory.md`
+
+## 设置窗口
+
+`settings_ui.ahk` 使用原生 `Gui + Tab3 + ListView`。报告模板页隐藏 section 与 stable ID，只显示状态、名称、触发词和模板文字。“插入模板元素”下拉框可在当前选区或 caret 位置插入：
+
+- 光标位置
+- 当前日期
+- 红色“（见图）”
+
+保存前会检查空值、重复 trigger、模板语法和外部文件变化。写入使用备份、临时文件和最终复读验证；成功后执行全脚本 `Reload()`。
+
+## Portable build
+
+Windows 构建机安装 AutoHotkey v2 与 Ahk2Exe 后，双击根目录 `Build EXE.cmd`：
+
+```text
+existing source
+→ scripts/build_release.py
+→ release/report_assistant.ahk
+→ Ahk2Exe + assets/icon/generated/medex-icon.ico
+→ publish/麦旋风.building.exe
+→ validate
+→ publish/麦旋风.exe
+```
+
+构建会 overlay 同步 `assets/publish/`，不会审核或删除 `publish/` 中的其他文件。失败时删除本轮 `.building.exe` 并保留 last-known-good final；promotion 阶段使用短期 `.previous.exe` 恢复保护。
+
+需要提交到 Git 的生成文件：
+
+- `release/report_assistant.ahk`（源码变化后生成）
+- `assets/icon/generated/medex-icon-*.png`
+- `assets/icon/generated/medex-icon.ico`
+
+`assets/icon/source/medex-icon.svg` 是图标唯一可编辑源文件；macOS 生成方法见 `docs/internal/icon-assets.md`。编译出的 EXE 和 `publish/` 不提交。
+
+## 发布验证
+
+1. 运行全部 Python tests。
+2. 源码变化时运行 `python3 scripts/build_release.py`；纯文档变化不刷新 generated release。
+3. 运行 `git diff --check`。
+4. 从 clean commit 在 Windows 双击 `Build EXE.cmd`。
+5. 按 `docs/internal/release-checklist.md` 和 `tests/manual-test-checklist.md` 完成 Windows/MedEx 验收。
+6. 只压缩并分发 `publish/` 的内容。
+
+当前已知延期：重新编译后的首次颜色下拉操作，偶尔会正确选中黑色但菜单仍留在屏幕上；之后的操作通常正常。本问题暂不通过额外盲点或重复点击规避，发布验收时应单独记录。
+
+## 目录
+
+```text
+assets/    发布文档与图标源/生成物
+docs/      架构、维护、调查和用户文档
+legacy/    历史脚本与 compatibility reference
+release/   生成的单文件 AHK source
+scripts/   release、EXE 和图标生成工具
+src/       模块化 AutoHotkey v2 source
+tests/     Python static tests 与 Windows/manual harnesses
+```
+
+项目不得提交患者信息、医院敏感信息、真实用户配置、截图、凭据或包含临床内容的日志。

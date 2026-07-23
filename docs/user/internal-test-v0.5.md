@@ -1,27 +1,27 @@
-# v0.5.0 内部测试说明（草案）
+# 麦旋风 v0.5.0 内部测试说明
 
-> 当前尚未发布 v0.5.0 executable。本文件用于准备内测流程，只有维护者明确通知后才能按此启用。
+只有维护者明确通知后才能开始内测。版本变化和升级方法请先看发布文件夹中的 `更新说明.md`。
 
 ## 这次内测的目标
 
 - 检查红色 `（见图）` 是否正确插入。
 - 检查插入后继续输入是否恢复黑色。
-- 检查个人 hotkeys/hotstrings 配置是否正确加载。
-- 收集不包含患者信息的 failure result 和 timing logs。
+- 检查设置界面中的快捷语是否正确保存和生效。
+- 收集不包含患者信息的问题现象和日志。
 
-本次不测试 automatic SUVmax、long-axis/short-axis retrieval、automatic updater 或 complete settings GUI。
+本次不测试自动提取 SUVmax、长短轴或自动更新。
 
 ## 启动前
 
-1. 退出当前 MedEx Report Assistant 和原始 legacy scripts。
-2. 确认维护者提供了匹配版本的新 executable 和 compatibility script。
+1. 退出当前麦旋风和原始 legacy scripts。
+2. 确认维护者提供了完整的 v0.5.0 发布文件夹和匹配的 compatibility script。
 3. 先把 ZIP 复制到本机并完整解压，不要直接从共享盘或压缩包内运行。
 4. 不删除 `%LocalAppData%\MedExReportAssistant\config.ini`。
 
 ## 启动顺序
 
-1. 启动 v0.5.0 internal-test executable。
-2. 确认启动提示。
+1. 启动 `麦旋风.exe`。
+2. 确认麦旋风图标出现在系统托盘。
 3. 启动 `medex_legacy_compat.ahk`。
 4. 确认没有同时运行原始 `karabiner.ahk` 或 `string_change.ahk`。
 
@@ -32,9 +32,10 @@
 3. 必要时按 Ctrl+Alt+Q 退出新项目。
 4. 从独立 tray icon 退出 compatibility script；新项目快捷键不会自动停止它。
 5. 检查报告中可见文字和颜色，必要时手工修正。
-6. 联系维护者，只提供时间、版本、result code 和操作名称。
+6. 截图并遮住患者信息，记录使用了哪个快捷语、预期结果和实际结果。
+7. 保留配置和日志，联系维护者。
 
-不要发送患者信息、报告文字、剪贴板内容或包含临床信息的截图。
+不要删除配置或反复重装。不要发送患者信息、报告文字、剪贴板内容或未遮挡敏感内容的截图。
 
 ## 停止本次测试
 

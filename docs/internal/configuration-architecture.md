@@ -1,259 +1,176 @@
-# v0.5.0 用户配置架构
+# v0.5.0 配置与模板架构
 
-## 决策摘要
+## 持久化边界
 
-v0.5.0 采用外部 INI 文件作为普通用户支持的配置格式。运行时配置目录为：
+用户数据固定保存在：
 
 ```text
 %LocalAppData%\MedExReportAssistant\
 ├── config.ini
 ├── backups\
-│   └── config-YYYYMMDD-HHMMSS.ini
+│   └── config-YYYYMMDD-HHMMSS[-N].ini
 └── logs\
+    └── startup.log
 ```
 
-配置不得放在 executable 同目录作为唯一来源，也不得编译进 executable。替换或升级应用文件时不能覆盖已有配置值；新增的 managed defaults 可以在唯一备份、临时副本写入和重新验证后补入。
+路径由 `ReportAssistantConfig.Path()` 无副作用地计算，不依赖 EXE 所在目录。路径 helper 不读取、创建或修改配置；singleton 更早建立且不依赖配置初始化。
 
-选择 INI 的原因：
+真实 `config.ini`、backup 和 log 不属于 release artifact，不得编译或提交。删除、移动或替换 EXE 不得影响用户配置。
 
-- AHK v2 原生提供 `IniRead()` / `IniWrite()`，不需要引入或维护第三方 JSON parser。
-- 对当前单行 trigger、replacement、hotkey 和 Boolean 配置足够直观。
-- 非技术用户在维护者指导下可以查看，未来 GUI 也能读写同一 normalized model。
-- `ConfigVersion` 和稳定 feature IDs 可以支持显式迁移。
-- v0.5.0 内测阶段减少 parser、escaping 和打包依赖风险。
+## 当前模块所有权
 
-没有选择 JSON 的主要原因不是数据模型不适合，而是 AHK v2 没有内置 JSON parser。未来若 GUI 或嵌套配置复杂度显著增加，可以在版本化 migration 后切换，不能让 feature modules 同时读取两种格式。
+- `app_config.ahk`：Schema version、配置目录和通用 managed-entry model。
+- `hotstring_model.ahk`：builtin defaults、Schema 2 raw/normalized hotstring model、模板元素常量。
+- `hotstring_config.ahk`：Schema 2 INI 读取、默认文件生成、Text 换行与反斜杠 codec。
+- `template_renderer.ahk`：严格模板校验、执行时展开和 `ReportTemplatePlan`。
+- `hotstring_normalization.ahk`：字段、trigger collision 和模板校验；任一报告模板不安全时整体 fail closed。
+- `hotstring_config_migration.ahk`：唯一允许读取 Schema 1 `Mode` 的模块；负责审计、迁移、备份和复验。
+- `config_reconciliation.ahk`：补充缺失 managed defaults，并只把仍等于开发期旧默认值的 builtin 升级为显式红色 token。
+- `config_bootstrap.ahk`：启动顺序协调；在任何 hotstring 注册前完成创建、迁移和 reconciliation。
+- `hotstring_config_editor.ahk`：设置窗口的严格读取、校验和事务保存。
+- `settings_ui.ahk`：GUI state 与事件；不直接实现运行时 hotstring。
+- `hotstring_registration.ahk`：基于 normalized entries 调用 `Hotstring()`。
+- `hotstrings.ahk`：执行 `ReportTemplatePlan`，不读取 INI。
 
-INI 的限制必须明确：v0.5.0 replacement 只支持单行文字；不承诺保留值首尾空格；复杂换行、富文本或嵌套对象不进入首版配置。普通用户仍不需要编辑 AHK source。
+Feature 和 MedEx adapter 不得自行读取或重写 template config。
 
-## Centralized load flow
-
-唯一受支持的入口应为：
-
-```text
-Load defaults
-→ Read user config
-→ Parse typed values
-→ Validate
-→ Migrate if required
-→ Resolve collisions
-→ Return normalized config
-```
-
-建议模块边界：
-
-```text
-src/config_defaults.ahk   ; compiled safe defaults and stable IDs
-src/config_loader.ahk     ; locate/read/parse INI
-src/config_validator.ahk  ; type, range, trigger and collision validation
-src/config_migrations.ahk ; ConfigVersion migrations
-src/runtime_registry.ahk  ; register configured Hotkey()/Hotstring() callbacks
-```
-
-业务模块只能接收 normalized config 或通过单一 `GetConfig()` read-only accessor 读取。不得在 `hotstrings.ahk`、`report_editor.ahk`、MedEx adapter 等 feature modules 中散落直接 `IniRead()`。
-
-## Proposed INI structure
+## Schema 2
 
 ```ini
-[General]
-ConfigVersion=1
+[Config]
+SchemaVersion=2
 
 [Features]
-MedEx.Enabled=true
-MedEx.ColorReset.Enabled=true
-Diagnostics.Enabled=true
+GlobalHjklArrows=false
 
-[Hotkeys]
-EmergencySuspend=^!Esc
-EmergencyExit=^!q
-
-[BuiltInHotstringTriggers]
-RedFigure=;red
-UptakeIncreased=;fzg
-UptakeNotIncreased=;fwj
-UptakeDecreased=;fjd
-Dimensions=;cmx
-
-[BuiltInHotstringReplacements]
-RedFigure=（见图）
-UptakeIncreased=放射性摄取增高，SUVmax约
-UptakeNotIncreased=放射性摄取未见明显增高
-UptakeDecreased=放射性摄取降低
-Dimensions=cm×cm
-
-[UserHotstring.001]
-Enabled=false
-Trigger=;example
-Replacement=示例文字
-Options=*?
-
-[UserHotstring.002]
-Enabled=false
-Trigger=
-Replacement=
-Options=*?
+[Hotstring.builtin-red]
+Enabled=true
+Name=红字插入
+Trigger=;red
+Text={{red:（见图）}}
 ```
 
-不能把 `;trigger` 直接用作 INI key，因为行首分号可能被解析为注释。用户自定义项必须使用编号 section 或稳定 ID，将 `Trigger` 作为 value 保存。
+报告模板 section 仅使用：
 
-## Normalized config model
+- `Enabled`
+- `Name`
+- `Trigger`
+- `Text`
 
-读取完成后返回单一对象，概念结构如下：
+Section 使用稳定且不区分大小写的 identity：
 
 ```text
-Config
-├── version
-├── paths
-│   ├── configFile
-│   └── logDirectory
-├── features
-│   ├── medExEnabled
-│   ├── medExColorResetEnabled
-│   └── diagnosticsEnabled
-├── hotkeys
-│   ├── emergencySuspend
-│   └── emergencyExit
-├── builtInHotstrings[]
-│   ├── id
-│   ├── enabled
-│   ├── trigger
-│   ├── replacement
-│   ├── options
-│   └── handlerId
-└── userHotstrings[]
-    ├── id
-    ├── enabled
-    ├── trigger
-    ├── replacement
-    └── options
+Hotstring.builtin-<stable-id>
+Hotstring.custom-<stable-id>
 ```
 
-Built-in replacement 与 handler 必须分开。例如 `UptakeIncreased` 仍需要在红字插入成功后执行特定 cursor movement，不能把所有 built-ins 降级成简单 text-to-text map。
+ListView row number 不是 identity。Settings UI 使用隐藏 `Section` 映射排序后的视觉行，选择、编辑、保存和删除均按 `Section` 查找模型。
 
-## Validation and safe defaults
+Text codec 将真实换行保存为 `\n`，普通反斜杠保存为 `\\`；Windows Edit 的 CRLF 在 UI 边界归一化，重复打开和保存不得 double escaping。
 
-启动时至少执行以下校验：
+## 模板语法
 
-- `ConfigVersion` 是受支持的正整数。
-- Boolean 只接受明确白名单，例如 `true/false`、`1/0`。
-- Hotkey syntax 可以被 AHK v2 `Hotkey()` 注册；注册失败时不使整个应用崩溃。
-- Hotstring trigger 非空、长度受限、不包含 CR/LF/NUL。
-- Replacement 长度受限、不包含 NUL；v0.5.0 拒绝 multiline。
-- Options 只允许受支持白名单，不允许用户注入任意 AHK code。
-- Built-in 与 user-defined triggers 之间不能重复。
-- 两个 hotkeys 之间不能重复；不能覆盖由应用保留的 emergency controls，除非未来提供明确的安全替代策略。
-- MedEx executable name、比例和 timeout 使用安全范围。
+支持的元素只有：
 
-错误处理采用每项 fail-safe，而不是整份配置 all-or-nothing：
+- `{{cursor}}`：最终 caret 位置；最多一个。不出现时默认为渲染文本末尾。
+- `{{date}}`：执行时读取本机日期并展开为 `yyyy-MM-dd`；可重复。
+- `{{red:（见图）}}`：渲染为红色 `（见图）`；最多一个且必须是模板最后一个元素。
 
-- 配置文件不存在：使用 compiled safe defaults，可选择首次复制一个 user template。
-- 某个 built-in trigger 无效：该项回退到对应默认值并记录非敏感 warning。
-- 某个 user-defined item 无效或冲突：只禁用该项并记录 section ID 和 reason，不记录 replacement text。
-- `ConfigVersion` 高于程序支持版本：不得猜测解析；使用 safe defaults，明确提示 config incompatible，且不覆盖原文件。
-- 解析异常：使用 safe defaults，保留原文件，避免自动写坏。
+未知、拼错、未闭合、嵌套、位置错误或多个 cursor/red element 均拒绝。普通单花括号不作为模板语法。普通字面量 `（见图）` 始终是黑色正文，不产生红色语义。
 
-## Migration policy
-
-每个发布版本声明 `SupportedConfigVersion`。迁移步骤必须是顺序函数，例如：
+Parser 返回已展开文本、caret index 和红色尾段位置。`BuildReportTemplatePlan()` 生成：
 
 ```text
-MigrateV1ToV2(config)
-MigrateV2ToV3(config)
+ReportTemplatePlan
+├── RenderedText
+├── PlainText
+├── RedText
+├── CaretLeftCount
+└── RequiresColorReset
 ```
 
-迁移建议：
-
-1. 读取原始文件并保留未知 sections/keys。
-2. 在 `backups` 目录创建带时间戳且不覆盖已有文件的备份。
-3. 在内存中迁移并重新验证。
-4. 只有验证成功才写入临时文件并替换目标文件。
-5. 迁移失败时保留原文件，并 fail closed 停用无法安全解释的报告模板；不得用另一套 defaults 掩盖配置问题。
-
-当前 `SchemaVersion=2` 使用 `{{cursor}}`、`{{date}}` 与唯一合法的红色尾标记 `{{red:（见图）}}` 表达模板行为。普通字面量 `（见图）` 不携带颜色语义；红色尾标记最多一个且必须是最后一个元素。Schema 1 只在一次性迁移器中读取：审计通过后备份、临时写入、验证并替换；不安全项阻止迁移。future-version 继续 fail closed。已发布的旧 EXE 无法理解 Schema 2，手工降级必须恢复迁移前备份。
-
-## Runtime registration
-
-硬编码 label hotstrings 不能满足动态 trigger。v0.5.0 应通过 AHK v2 的 `Hotstring()` 和 `Hotkey()` functions 注册 normalized config 中的 callbacks。
-
-注册过程需要：
-
-- 先完成全部 validation 和 collision detection；
-- 使用 stable handler IDs 映射到已知 functions；
-- 用户 replacement 只作为 data 传递，绝不当作 AHK code 执行；
-- 记录成功/禁用的 item IDs，不记录 replacement content；
-- 在单次启动中保持确定的注册顺序。
-
-## MedEx-specific settings
-
-首版至少提供：
-
-```ini
-[Features]
-MedEx.Enabled=true
-MedEx.ColorReset.Enabled=true
-Diagnostics.Enabled=true
-```
-
-更细的 V1 geometry/timing 可以先作为 validated defaults，不必全部暴露给普通用户。若内测显示工作站差异确实需要调整，再加入专门 section：
-
-```ini
-[MedExColorReset]
-LayoutProfile=medex-0.0.1-baseline
-ColorArrowOffsetX=143
-ColorArrowOffsetY=0
-MenuOpenTimeoutMs=500
-MenuPollIntervalMs=25
-MaxRetries=1
-```
-
-首个内测版本可以把 layout profile 保持为受版本控制的 adapter profile，而不向普通用户开放位置校准。若后续开放 override，上述数值必须限制范围；错误配置不得导致 blind clicks。旧 `ArrowHorizontalRatio=0.337` 属于已废弃的双锚点模型，不再是生产配置候选。
-
-## Diagnostics
-
-建议日志路径：
+决策只来自渲染结果：
 
 ```text
-%LocalAppData%\MedExReportAssistant\logs\medex-report-assistant.log
+caret 在渲染文本内部
+→ 发送派生的 Left count
+→ 不运行 Candidate G
+
+caret 在文本末尾 + 存在显式红色尾段
+→ 不移动 caret
+→ 运行 Candidate G
+
+caret 在文本末尾 + 纯黑正文
+→ 不移动 caret
+→ 不运行 Candidate G
 ```
 
-日志事件使用 stable keys：
+当前 `;fzg` 会派生 `CaretLeftCount=4`，但这是 `{{cursor}}{{red:（见图）}}` 渲染后的结果，不是配置字段。
+
+## 启动与 Schema 1 → 2 migration
 
 ```text
-timestamp
-appVersion
-action
-resultCode
-processName
-layoutProfileName
-regionAnchorRect
-fontSizeRect
-fontSizeMatchedName
-optionalRightAnchorRect
-colorArrowOffsetX
-colorArrowOffsetY
-calculatedPoint
-elapsedMs
-retryCount
-medExVersion
+singleton established
+→ resolve config path
+→ config missing: create Schema 2 defaults
+→ Schema 1: audit and migrate
+→ Schema 2: reconcile exact old builtin defaults and missing managed keys
+→ strict load and normalize
+→ register features and hotstrings
 ```
 
-不得记录 report text、hotstring replacement、clipboard payload、患者标识、窗口正文或 screenshot。M1 field debug 不显示任何提示，只写 clipboard/log/file；未来 ordinary runtime 是否采用非模态提示需另行验证其不会干扰 MedEx focus 和 insertion state。
+Schema 1 migration 是唯一保留 legacy `text`、`red-reset` 和 `red-left4` 解释的路径：
+
+- `text` 保持普通模板语义；
+- `red-reset` 转换为显式红色尾标记；
+- `red-left4` 按旧最终 Left 语义插入 `{{cursor}}`，已知 builtin 使用精确 mapping；
+- builtin `cmx` 转换为 `cm×{{cursor}}cm`；
+- 未知 Mode、重复字段/trigger、已有双花括号或无法验证的语义均阻止迁移。
+
+迁移顺序：
+
+1. 只读审计原文件；
+2. 创建不覆盖的时间戳 backup；
+3. 复制到临时文件；
+4. 只重写已审计的 hotstring sections 并更新 SchemaVersion；
+5. 严格读取，比较渲染文字、caret、红色范围和颜色恢复决策；
+6. 验证后替换原文件；
+7. final validation 失败时从 backup 恢复。
+
+迁移失败不得产生半迁移文件，也不得用另一套 defaults 掩盖错误。升级成功后不能再使用旧 EXE 打开配置。
+
+## Settings UI 保存
+
+设置窗口使用与运行时相同的 template validator 和 Text codec。GUI 隐藏 section、builtin/custom 分类和内部 identity，只显示用户概念。
+
+“插入模板元素”下拉数据定义集中在 `TemplateElementDefinitions()`；当前可插入 cursor、date 和 red element。插入使用原生 Edit selection：有选区时替换，否则在 caret 处插入，随后 caret 位于 token 后并恢复编辑框焦点。
+
+保存前检查：
+
+- 名称与 trigger 非空且不含换行；
+- 所有 entries（包括停用项）的 trigger 不区分大小写且不重复；
+- template grammar 有效；
+- 原文件内容仍与窗口打开时一致；
+- builtin 不能删除，custom 只能按 stable Section 明确删除。
+
+保存使用 backup + 同目录临时文件。未修改的 hotstring section、`[Features]`、未知 sections/keys 和注释通过复制原文件保留；只重写 UI 明确修改的 section。临时与 final 均重新读取并比较目标/非目标 sections。成功后调用完整 `Reload()`。
 
 ## Update preservation
 
-- Executable 和 source release 可以放在由维护者管理的版本目录。
-- 用户配置固定放在 `%LocalAppData%\MedExReportAssistant\config.ini`。
-- 打包脚本不得把真实 user config 包入 executable。
-- 更新过程只替换 app artifact，不删除配置目录或覆盖已有配置值。
-- release 可以通过 managed defaults 安全补充缺失项，但不能重建或整体覆盖已有 `config.ini`。
+- 新版本可以补充缺失的 managed defaults，但不能覆盖已有用户值。
+- 开发期 Schema 2 旧 builtin 只在 Text 与旧默认值完全一致时升级；用户修改的 builtin 和所有 custom templates 保持不变。
+- 所有写入先创建 backup；失败时保留或恢复原配置。
+- 应用不扫描、迁移或清理其他 EXE。
 
-## Advanced-user extension boundary
+## Diagnostics 与隐私
 
-v0.5.0 不需要支持可执行的 user AHK extension file。若未来保留该能力，必须放在与 `config.ini` 不同的显式 advanced path，并标明：
+`startup.log` 记录：
 
-- 不属于普通用户支持路径；
-- 可以执行任意本机代码；
-- 不自动加载，必须显式 opt-in；
-- 不能用来绕过正常 trigger/replacement config。
+```text
+AppVersion
+SourceRevision
+ExecutablePath
+ConfigPath
+```
 
-普通用户定义 custom hotstrings 的唯一正常路径是外部配置，不能要求编辑 executable 或 `src/*.ahk`。
+运行时失败日志和 field diagnostics 不得包含 report text、template Text、clipboard payload、患者标识、窗口正文或 screenshot。

@@ -14,13 +14,13 @@
 | Capability | Coexistence owner | Activation condition |
 | --- | --- | --- |
 | `;cmx` | 新项目 | 源码行为已对齐；Windows 回归通过 |
-| `;red`、`;fzg`、`;fwj`、`;fjd` | 新项目 current mainline；legacy duplicate 必须停用 | Candidate G generated release 已验证；继续完成 phrase regression 与 MedEx-only entry guard |
+| `;red`、`;fzg`、`;fwj`、`;fjd` | 新项目 current mainline；legacy duplicate 必须停用 | Candidate G、template plan 与 MedEx-only entry guard 已实现；release smoke test 仍必需 |
 | RAlt+H/J/K/L | 新项目 | 将 `GlobalHjklArrows` 设为 `true`；compatibility 不再注册这四个按键 |
 | Legacy viewer/annotation hotkeys | compatibility | 用户确认仍需要，且未被新项目逐项验证替代 |
 | Shift+Alt+R snapshot save | 原 legacy only，compatibility 不启用 | 只为旧 `red_not.clip` 流程服务；新项目验证后退役 |
 | Ctrl+Alt+Esc / Ctrl+Alt+Q | 新项目 | 注意它们不控制 compatibility 进程 |
 
-2026-07-16 Candidate G generated release 已在 baseline workstation 完成验证并成为 production mainline；internal-alpha package、configuration、MedEx-only hotstring guard 和完整 coexistence smoke test 仍未完成。因此 compatibility scaffold 与新项目仍不能直接视为完整日常替代组合，且 legacy duplicate report hotstrings 必须保持停用。
+2026-07-16 Candidate G generated release 已在 baseline workstation 完成验证并成为 production mainline。v0.5.0 现已具备 portable package、Schema 2 configuration、Settings UI 和 MedEx-only hotstring guard；正式内测前仍需按 release checklist 完成 clean-build 与 coexistence smoke test。Legacy duplicate report hotstrings 必须保持停用。
 
 ## 进程与启动顺序
 
@@ -84,7 +84,7 @@ Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 scre
 1. v0.5.0：新项目接管经过验证的报告 hotstrings；随后由新项目 `GlobalHjklArrows` 接管 RAlt+H/J/K/L，compatibility 只保留其余未迁移 viewer actions。
 2. v0.5.x：逐项加入 window guard、DPI/layout validation、retry 和 diagnostics；每迁移并验证一个动作，就从下一版 compatibility 中禁用一个动作。
 3. v0.6.0：测量读取采用 structured states；验证后才考虑替代相关 legacy measurement hotkeys。
-4. Later：完成配置 GUI、更新支持及必要的 direct editor command；compatibility 清空后归档，不删除原始 legacy reference。
+4. Later：扩展 Settings 的占位页，评估更新支持及必要的 direct editor command；compatibility 清空后归档，不删除原始 legacy reference。
 
 每次缩减必须在 Chinese maintainer/update notes 中写明：移除了哪个 compatibility capability、由哪个新模块接管、验证结果，以及出现问题时如何停止测试并恢复人工 workflow。
 

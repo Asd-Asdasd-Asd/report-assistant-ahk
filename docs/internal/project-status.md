@@ -1,102 +1,93 @@
 # 项目状态与交接
 
-更新时间：2026-07-22（当前版本命名为 v0.5.0；等待 Windows 内测验收）
+更新时间：2026-07-24
+当前版本：v0.5.0 internal test
 
-## 冻结基线
+## 当前 mainline
 
-- Branch：`main`
-- Step 4 baseline commit：`5193403 perf: remove fzg cursor settle delay`
-- Tag：`v0.6.0-candidate-g`
-- App source version：`0.5.0`
-- Production default：`relativeMousePixelValidated`
-- Explicit comparison/rollback：`uiaInvoke`
-- Automatic fallback：无
+- Application version source：`src/app_metadata.ahk`，值为 `0.5.0`。
+- Config：Schema 2，路径 `%LocalAppData%\MedExReportAssistant\config.ini`。
+- Portable artifact：`publish\麦旋风.exe`。
+- Production color-reset strategy：`relativeMousePixelValidated`。
+- Explicit comparison/rollback：`uiaInvoke`。
+- Automatic cross-strategy fallback：无。
+- 当前验证 profile：MedEx `0.0.1.0`、1920×1080、100% scaling、DPI 96。
 
-工作树中的 `debug/field-result-2026-07-14/` 和 `debug/field-result-2026-07-15/` 是未跟踪 raw field evidence，本次不改写、不纳入提交。
+## 当前已实现
 
-## 当前实现与验证状态
+- 固定 `Local\MedExReportAssistant.Singleton` 在 config bootstrap 前保护不同版本、文件名和目录。
+- Schema 2 template engine 支持 `{{cursor}}`、`{{date}}`、`{{red:（见图）}}`。
+- 普通字面量 `（见图）` 保持黑色；caret movement 和 Candidate G 均由 `ReportTemplatePlan` 派生。
+- Schema 1 配置可经只读审计、backup、临时写入和最终验证一次性升级；legacy Mode 只存在于 migration module。
+- 原生 Settings UI 支持稳定 Section identity、ListView sorting、custom add/delete、builtin edit/disable、template-element insertion、严格校验和事务保存。
+- 保存设置后执行完整 `Reload()`；托盘“重新加载配置”同样是全脚本 Reload。
+- report hotstrings 通过 shared MedEx-only foreground predicate 限制作用窗口；`Ctrl+Alt+Esc` 与 `Ctrl+Alt+Q` 保持 suspend-exempt/global。
+- CF_HTML、clipboard `finally` restoration、Candidate G popup signature 和 at-most-once clicks 保持 fail closed。
+- 正式图标以 `assets/icon/source/medex-icon.svg` 为 source，由 `scripts/generate-icon.sh` 生成多尺寸 PNG/ICO。
+- Windows 一键构建自动生成 release source、以 `/icon` 嵌入 ICO、编译 temporary EXE、同步静态发布资源并事务提升 final。
 
-### 当前代码已实现
-
-- `;red`、`;fwj`、`;fjd` 经 shared report orchestration 执行 CF_HTML paste、clipboard restoration 和 Candidate G reset。
-- Candidate G 使用 exact UIA `Name="检查所见"`、geometry validation、必要时的 ambiguity corroboration、client-bounds checks、at-most-once arrow/black clicks、四点 popup signature、鼠标恢复和 structured result。
-- 第一次 signature 立即采样；只在失败时等待 20 ms 再采一次。
-- `;fzg` 使用 phrase-specific no-reset 路径：paste → clipboard restore → `Left 4`，返回 `COLOR_RESET_NOT_REQUIRED`；Step 4 Windows A/B 已确认不需要额外 50 ms settle。
-- Production success 无 heavy log；production failure 写 lightweight privacy-safe log；field mode 才写详细诊断。
-- Portable startup 在配置初始化前建立固定 `Local\MedExReportAssistant.Singleton` mutex；conflict process 中文提示后退出，不终止现有实例。
-- `AppMetadata.Version` 是唯一人工版本来源；generated release 写入 Ahk2Exe metadata、Git source revision 和独立 startup log。
-- User config 保持在 `%LocalAppData%\MedExReportAssistant\config.ini`，EXE 路径不参与 config path 计算。
-- 原生设置窗口复用现有 INI 模型；保存前校验，安全写入后执行全脚本 `Reload()`。
-- 一键构建生成 portable EXE，并把静态发布资源同步到 `publish/`。
+## 验证状态
 
 ### Windows 现场已验证
 
-- MedEx `0.0.1.0`、1920×1080、DPI 96、100% scaling。
-- 主进程名为 `medexworkstations.exe`；`medexworkstation.exe` 仅作为 compatibility candidate 暂存。
-- Candidate G G1 calibration、G2 controlled interaction、caret-order A/B 和最终 generated release mainline validation 均通过。
-- `;fzg` no-reset 顺序连续 6 次得到正确 caret，最终 generated release 也已验证。
-- 验证 artifact SHA-256：`761a6c4261246a4bc14f44597e30eef4564db0bd1e48e92a31c1ac1e41f8ef11`。
-- Step 1 已由 `87dce53` 提交，Step 2 已由 `7a0d9a2` 提交，Step 3 已由 `6c2e2dc` 提交；Step 3 记录为 `86 tests passed`，Windows success/fast-failure 验收通过。验证 artifact SHA-256：`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
-- Step 4 五组 F9/F10 A/B、十次 generated-release `;fzg` 和一次 `;red` smoke test 均通过。验证 artifact SHA-256：`4de7f53a2498a2eda5ba4df8035339051b3d99653b5b004df0647a7517a936aa`。
+- Candidate G calibration、controlled interaction、caret-order A/B 和 generated-release mainline。
+- `;fzg` no-reset caret workflow、clipboard restoration 和 immediate black typing。
+- MedEx-only hotstring scope、foreground change fail-closed、version diagnostics-only behavior。
+- 当前 supported profile 上的 red marker 与 black reset 主路径。
 
-### 仅静态/Python 测试覆盖
+### 自动测试覆盖
 
-- CF_HTML UTF-8 offsets、Candidate G pure geometry/signature rules、dispatcher boundary、at-most-once clicks、no-fallback、report orchestration 和 generated-release integration。
-- Step 5 已通过 89 项自动测试和 Windows G1/G2 metadata-override 验收；版本 mismatch/unknown 仅改变 diagnostics，四项 layout gates 保留。
-- Portable singleton/build metadata 已通过当前 macOS `141/141` 自动测试；same/cross-version mutex、Desktop/Startup folder 和 compiled EXE 尚待 Windows 验证。
-- 当前 macOS 环境可能缺少 `pytest`；无法重跑表示本次 review 未独立复验，不表示 mainline 从未测试。
+- Schema 1→2 migration、Schema 2 template grammar、date/cursor/red plan semantics。
+- Settings Section identity、排序后选择/编辑/删除、Text codec 和事务保存。
+- CF_HTML offsets、Candidate G pure rules、dispatcher safety、single-instance/build integration。
+- icon generation inputs与 Windows Ahk2Exe `/icon` wiring。
 
-### 当前性能检查点
-
-- MedEx-only shared `#HotIf`/foreground entry predicate 已通过 Windows scope/foreground 验收并由 Step 2 提交。
-- critical-path timing fields 和 derived metrics 已由 Step 1 提交并完成 Windows baseline。
-- black click 前置、clipboard restoration 后置的新 transaction ordering 已通过 Step 3 Windows 验收；`SafeMinPasteToRestoreMs=300` 已批准。
-- Candidate G interaction path 的冗余 process-name queries 已移除，original active HWND checks 保留并通过 Windows 切窗验收。
-- Step 4 已独立移除 `;fzg` 的 `Sleep 50`，通过 Windows A/B 并由 `5193403` 提交。
-- Step 5 已将 runtime/calibration MedEx version 从 hard gate 改为 diagnostics-only metadata；Windows override validation 与 generated-release smoke test 已通过。
-- 面向用户的 per-machine layout calibration/profile。
-
-### 有意延期
-
-- 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 layout 的正式支持。
-- v0.5.0 设置窗口与 portable EXE 的完整 Windows 现场验收。
-- updater、measurement capture 和其他 viewer workflow migration。
-- 直接 Electron/editor API 路线。
+当前完整 Python suite 为 189 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
 
 ## 当前 production flow
 
 ```text
-;red / ;fwj / ;fjd
-→ InsertRedFigureTextAndRestoreState()
-→ CF_HTML paste
-→ ResetMedExInsertionColor() before restore
-→ relativeMousePixelValidated
-→ exact UIA Name="检查所见"
-→ geometry and client-bounds validation
-→ arrow click at most once
-→ four-point popup signature
-→ black click at most once
-→ mouse restore
-→ minimum paste-to-restore interval if still required
+configured report hotstring
+→ BuildReportTemplatePlan()
+→ send PlainText
+→ optional red CF_HTML transaction
+→ caret internal: derived Left count, no Candidate G
+→ caret after red suffix: Candidate G preflight and reset
+→ minimum paste-to-restore interval if required
 → ClipboardAll restoration in finally
 → structured result
 ```
 
-`uiaInvoke` 的 popup traversal、exact `000000` lookup 和 Invoke 仅属于显式 comparison/rollback，不是上述 production default flow。
+Candidate G：
 
-## 当前风险
+```text
+exact UIA Name="检查所见"
+→ supported profile geometry
+→ arrow click at most once
+→ four-point popup signature
+→ black click at most once
+→ mouse restore
+```
 
-- report hotstrings 已由 Step 2 限制为 MedEx-only；全局 pause/exit 保持 suspend-exempt。
-- ClipboardAll 过早恢复曾导致 MedEx 粘贴用户原剪贴板；任何优化都必须保留 `finally` 并为 fast failure 强制最小 paste-to-restore interval。
-- Step 3 保留 200 ms paste settle 和 100 ms post-restore settle，以 300 ms minimum interval 替代固定 pre-restore wait，并把 black click 移到 restore 前。
-- 四点 signature 来源于受控 35-point open/closed calibration grid，不是当前明显瓶颈，立即优化不得删除。
-- `RELATIVE_MOUSE_CHAIN_OK` 只表示 signature 通过且 black click 已发送；最终 insertion color 仍需人工确认。
-- Step 5 不再以 exact MedEx version 拒绝执行，但仅有校准环境完成真实验证；version mismatch override 不等于支持真实新版。
+## 已知限制与延期
 
-## 下一检查点
+- **重新编译后的首次颜色下拉操作**：偶尔会正确选中黑色，但颜色菜单仍留在屏幕上；之后的操作通常正常。当前不增加额外 blind click 或自动重试。Windows release 验收需记录是否复现、菜单状态和后续一次行为。
+- 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 MedEx layout 尚未正式支持。
+- Compatibility layer 的 Alt+Shift+S 只保证单次触发；持续按住修饰键连续按 S 延后到 compatibility 重构。
+- updater、installer、self-update、rollback、shortcut 和 registry installation state 均不在范围内。
+- Measurement capture、SUVMax/长短轴读取和 `size` placeholder 延后到 v0.6.0。
+- Settings 的“快捷键”“其他”标签页仍是占位页。
 
-1. 完成 v0.5.0 Windows 内测验收，重点检查设置保存与重启、portable build、单实例和 legacy compatibility 共存。
-2. 验收通过后进入 v0.6.0 Measurement Capture：通过当前图像右键菜单读取长短轴与 SUVMax。
-3. v0.6.0 必须严格区分 `FOUND`、`NOT_ANNOTATED` 和 `AUTOMATION_FAILED`，不得复用旧剪贴板值或旧 SUV log。
+## v0.5.0 发布前剩余验收
 
-测量读取的现场证据、消息调用链、解析规则和安全边界见 `docs/internal/mxnmsoft-measurement-investigation.md`；版本范围见 `docs/internal/roadmap.md`。
+1. 在 Windows 从 clean commit 双击 `Build EXE.cmd`，确认 EXE 与 tray 使用正式图标。
+2. 运行 `tests\windows\config_v2_migration_audit.ahk`、`template_engine_regression.ahk`、`settings_ui_regression.ahk` 和 `cmx_template_regression.ahk`。
+3. 验证旧配置 backup/migration、设置保存 Reload、排序后编辑/删除和 custom trigger。
+4. 验证 portable locations、跨版本 singleton 与 `publish/` 完整内容。
+5. 单独观察首次颜色下拉菜单残留限制，避免用重复点击掩盖。
+
+下一阶段证据和边界见：
+
+- `docs/internal/mxnmsoft-measurement-investigation.md`
+- `docs/internal/mxnmsoft-config-driven-automation.md`
+- `docs/internal/passive-zmq-exploration.md`

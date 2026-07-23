@@ -137,7 +137,7 @@ ContextMeasurementProvider
 -> close only the popup created by this operation if cleanup is required
 -> restore the original ClipboardAll in finally
 -> run zero-wait report-target guards
--> run the existing red-left4 insertion
+-> render and execute the current builtin ;fzg ReportTemplatePlan
 -> insert the formatted value only when the measurement state is FOUND
 ```
 
@@ -162,18 +162,19 @@ Measurement acquisition happens before the existing report insertion. The measur
 ```text
 ReadCurrentSuvMaxWithoutFocusSwitch()
 -> verify original report target
--> insert “放射性摄取增高，SUVmax约（见图）” through the existing workflow
+-> render the builtin template containing {{cursor}}{{red:（见图）}}
+-> insert “放射性摄取增高，SUVmax约为（见图）” through the existing workflow
 -> restore the user's clipboard
--> send the existing Left 4
+-> apply the caret relocation derived by ReportTemplatePlan
 -> FOUND: insert the formatted numeric value at the current caret
 -> NOT_ANNOTATED: insert nothing and leave the caret for manual input
 -> AUTOMATION_FAILED: insert nothing, leave the caret for manual input,
    and emit explicit non-focus-stealing failure feedback
 ```
 
-The existing `Left 4` is unconditional after a successful red-left4 insertion. Do not replace it with `Left 5`, calculate a new caret offset from the measurement text, or run Color Reset for `;fzg`.
+The current builtin template derives a caret relocation equivalent to the previously validated `Left 4`. Do not replace it with `Left 5`, hard-code another offset, or run Color Reset when the plan places the caret before the red suffix.
 
-This automatic behavior belongs to the builtin `;fzg` workflow. It must not be attached to every configurable `red-left4` template.
+This automatic behavior belongs to the builtin `;fzg` workflow. Measurement acquisition must not be attached to every configurable template that happens to contain `{{cursor}}` or `{{red:（见图）}}`.
 
 ### SUVMax state mapping
 

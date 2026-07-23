@@ -142,18 +142,16 @@ Required scope：
 12. 提供简单中文 internal-test user documentation。
 13. 每个 internal release 提供中文 maintainer/update notes。
 
-Explicitly deferred，除非已经实现且稳定：
+Explicitly deferred：
 
 - automatic SUVmax extraction；
 - automatic long-axis and short-axis extraction；
-- complete settings GUI；
+- Settings 中“快捷键”和“其他”页的后续功能；
 - Electron JavaScript injection；
 - automatic updater；
 - multi-editor support。
 
-当前冻结 mainline 已完成 Candidate G promotion：`relativeMousePixelValidated` 是 production default，使用 semantic `检查所见` localization、profile geometry、四点 popup signature 和 at-most-once relative clicks。旧 V1 `uiaInvoke` 仅显式 comparison/rollback，不能 automatic fallback。该 adapter boundary 不进入 generic clipboard module。
-
-下一条路线是按检查点缩短 `TriggerToBlackClickMs`：先测 baseline，再加入 MedEx-only entry guard/精简冗余 process checks，再把 clipboard restoration 安全地移到 black click 后，之后独立验证 `;fzg` 50 ms cleanup 和 MedEx-version gate。详细 pass/failure rules 见 `performance-optimization-checkpoints.md`。
+当前 v0.5.0 mainline 已完成 Candidate G promotion、MedEx-only entry guard、clipboard timing、Schema 2 template engine、原生 Settings UI、portable build 和正式图标。`relativeMousePixelValidated` 是 production default；旧 V1 `uiaInvoke` 仅显式 comparison/rollback，不能 automatic fallback。历史性能检查点及验证规则见 `performance-optimization-checkpoints.md`。
 
 ## 首次有限内测里程碑
 
@@ -175,7 +173,7 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 
 目标：处理内测暴露出的环境差异和可靠性问题。
 
-计划范围：
+已完成基础 configuration migration 和 diagnostics；后续计划范围：
 
 - DPI and display-scaling compatibility；
 - resolution and layout variation；
@@ -207,7 +205,7 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 
 计划范围：
 
-- simple configuration GUI；
+- Settings 中“快捷键”和“其他”页的后续功能；
 - import/export of user configuration；
 - automatic update support；
 - possible replacement of coordinate interaction with a direct Electron/editor command；
