@@ -2,7 +2,7 @@ class ReportEditorTimingDefaults {
     ; MedEx commits CF_HTML asynchronously. Give the red marker time to set the
     ; final caret before moving left; this wait remains inside the 300 ms
     ; paste-to-clipboard-restore safety interval.
-    static RedLeft4AfterPasteSettleMs := 60
+    static RedCaretAfterPasteSettleMs := 60
 }
 
 FocusReportEditor() {
@@ -27,18 +27,14 @@ RunRedResetInsertion(text, resetOptions := 0) {
     return operation
 }
 
-RunFzgInsertion(resetOptions := 0) {
-    return RunRedLeft4Insertion(
-        "放射性摄取增高，SUVmax约（见图）",
-        resetOptions
-    )
-}
-
-RunRedLeft4Insertion(text, resetOptions := 0) {
+RunRedCaretInsertion(text, caretLeftCount, resetOptions := 0) {
+    if caretLeftCount < 1
+        return false
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringStartMs")
     operation := InsertRedFigureTextForCaretRelocation(
         text,
+        caretLeftCount,
         performanceContext,
         resetOptions
     )
@@ -46,10 +42,20 @@ RunRedLeft4Insertion(text, resetOptions := 0) {
     return operation
 }
 
-InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext := 0,
-    resetOptions := 0) {
+; Field-debug compatibility wrapper. Production templates do not dispatch by
+; legacy mode or section identity.
+RunFzgInsertion(resetOptions := 0) {
+    return RunRedCaretInsertion(
+        "放射性摄取增高，SUVmax约（见图）",
+        4,
+        resetOptions
+    )
+}
+
+InsertRedFigureTextForCaretRelocation(text, caretLeftCount,
+    performanceContext := 0, resetOptions := 0) {
     cursorContext := Map(
-        "cursorRestoreRequestedCount", 4,
+        "cursorRestoreRequestedCount", caretLeftCount,
         "cursorRestoreCommandSent", false,
         "foregroundHwndBeforeCursorRestore", "UNKNOWN",
         "cursorRestoreTargetHwnd", "UNKNOWN"
@@ -59,6 +65,7 @@ InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext
         performanceContext,
         () => SendRedFigureCaretRelocation(
             cursorContext,
+            caretLeftCount,
             performanceContext,
             resetOptions
         )
@@ -117,8 +124,8 @@ InsertRedFigureTextForCaretRelocation(text := "（见图）", performanceContext
     }
 }
 
-SendRedFigureCaretRelocation(cursorContext, performanceContext := 0,
-    resetOptions := 0) {
+SendRedFigureCaretRelocation(cursorContext, caretLeftCount,
+    performanceContext := 0, resetOptions := 0) {
     foregroundHwnd := WinExist("A")
     formattedHwnd := foregroundHwnd ? Format("0x{:X}", foregroundHwnd) : "UNKNOWN"
     cursorContext["foregroundHwndBeforeCursorRestore"] := formattedHwnd
@@ -126,8 +133,8 @@ SendRedFigureCaretRelocation(cursorContext, performanceContext := 0,
     if MedExAdapterOption(resetOptions, "collectFocusDiagnostics", false)
         MergeContext(cursorContext,
             CaptureMedExFocusedElementContext("beforeCursorRestore"))
-    Sleep ReportEditorTimingDefaults.RedLeft4AfterPasteSettleMs
-    Send("{Left 4}")
+    Sleep ReportEditorTimingDefaults.RedCaretAfterPasteSettleMs
+    Send("{Left " caretLeftCount "}")
     cursorContext["cursorRestoreCommandSent"] := true
     RecordOptionalPerformanceTimestamp(performanceContext, "CursorRestoreSentMs")
     return true

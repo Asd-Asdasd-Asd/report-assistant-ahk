@@ -4,23 +4,28 @@ RegisterReportHotstrings(
 )
 
 RunConfiguredReportHotstring(entry, *) {
+    plan := BuildReportTemplatePlan(entry.Text)
+    if !plan.Ok {
+        OutputDebug "Report template render failed: INVALID_TEMPLATE"
+        return false
+    }
+
     resetReadiness := 0
-    if entry.Mode = ReportHotstringMode.RED_RESET {
+    if plan.RequiresColorReset {
         resetReadiness := PrepareMedExRedReset()
         if !resetReadiness.ok
             return false
     }
-    SendConfiguredReportText(entry.PlainText)
-    if entry.Mode = ReportHotstringMode.TEXT {
-        if entry.PostTextCaretLeftCount = 2
-            Send("{Left 2}")
+
+    SendConfiguredReportText(plan.PlainText)
+    if plan.RedText = "" {
+        if plan.CaretLeftCount > 0
+            Send("{Left " plan.CaretLeftCount "}")
         return true
     }
-    if entry.Mode = ReportHotstringMode.RED_RESET
-        return RunRedResetInsertion(entry.RedText, resetReadiness.options)
-    if entry.Mode = ReportHotstringMode.RED_LEFT4
-        return RunRedLeft4Insertion(entry.RedText)
-    return false
+    if plan.CaretLeftCount > 0
+        return RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)
+    return RunRedResetInsertion(plan.RedText, resetReadiness.options)
 }
 
 SendConfiguredReportText(text) {

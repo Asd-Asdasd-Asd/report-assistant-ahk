@@ -334,6 +334,30 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 
 ## v0.5.0 configuration staged tests
 
+### Production fixes: cold UIA, Settings identity and text codec
+
+- [ ] 完全退出并重新启动 release，在 approved non-clinical MedEx 报告编辑区首次输入一个末尾带 `{{red:（见图）}}` 的模板；确认首次即成功，或只提示界面尚未准备好且没有点击、正文或红字插入。
+- [ ] 对首次 readiness failure 检查 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log`；只包含 reason code、窗口/进程、次数和耗时，不包含报告文字、患者信息或 clipboard 内容。
+- [ ] 准备至少三个 custom templates；在正式设置窗口和 Windows regression harness 中对状态、名称、触发词分别升序、降序，确认视觉行解析到同一 `Section`。
+- [ ] 排序后分别选择、编辑和删除不同 custom template；确认对话框名称与视觉选中项一致。
+- [ ] 保存触发 Reload 后，目标 trigger 立即失效；再次启动后目标 section 仍不存在，其余 builtin/custom templates 和 triggers 保持不变。
+- [ ] builtin template 的删除按钮不可用，且不能通过持久化 helper 删除。
+- [ ] 分别保存单行、多行、空行、末尾换行、反斜杠和字面量 `\n`；连续打开并保存三次，Edit 内容及实际 trigger 输出保持不变。
+- [ ] compatibility layer 的 Alt+Shift+S 单次触发仍可用；持续按住 Alt+Shift 连续按 S 是本版本已知限制，不在本轮修复。
+
+### Schema 2 template engine
+
+- [ ] 先运行 `tests\windows\config_v2_migration_audit.ahk`；确认结果文件位于 `%TEMP%\MedExAHK\config-v2-migration-audit.txt`，不含任何 `Text` 或报告内容，且显示 `READY_FOR_SCHEMA_2_MIGRATION`。
+- [ ] 冷启动一次完成 Schema 1 → 2 升级；确认 `backups\` 中存在迁移前配置，现配置为 `SchemaVersion=2`，所有 hotstring section 均无 `Mode`。
+- [ ] 输入 `;fzg`，确认文字为“放射性摄取增高，SUVmax约为（见图）”，光标位于“为”和“（见图）”之间，且不执行 Candidate G。
+- [ ] 运行 `tests\windows\cmx_template_regression.ahk`；并在 MedEx 输入 `3.5;cmx`，确认得到 `3.5cm×cm`，光标位于 `×` 后、末尾 `cm` 前。
+- [ ] 测试 `{{cursor}}{{red:（见图）}}`、无 cursor 的红色尾标记、`{{date}}` 位于 cursor 前、多次 `{{date}}` 和纯黑模板；确认 Left 与 Candidate G 决策符合模板最终光标位置。
+- [ ] 确认普通字面量 `（见图）` 只插入黑字且不调用 Candidate G；只有精确 `{{red:（见图）}}` 插入红字。
+- [ ] 在设置中尝试多个 `{{cursor}}`、多个 `{{red:（见图）}}`、红色尾标记后追加正文或 placeholder、`{{red:重要}}`、`{{cursur}}`、`{{unknown}}`、未闭合 `{{` 和孤立 `}}`；确认均不能保存，普通 `{正文}` 可保存。
+- [ ] 在 Text 编辑框中分别选中正文和只放置 caret，通过“插入模板元素”插入三种 token；确认替换选区、caret 停在 token 后、焦点返回编辑框，并可连续插入同一项。
+- [ ] 将升级前配置复制到测试目录，制造未知 Mode、重复 trigger 或重复字段；确认审计失败且原文件 SHA-256 不变。另用 `text` mode 且以字面量 `（见图）` 结尾的模板确认迁移成功并保持黑字。
+- [ ] 迁移后使用设置窗口进行多行、空行、末尾换行、反斜杠、字面量 `\n` 和占位符的连续三次保存；确认无 double escaping。
+
 - [ ] `config.ini` 不存在时使用 safe defaults。
 - [ ] 单项 invalid value 只使对应项回退或禁用，不使整个应用崩溃。
 - [ ] Higher unsupported `ConfigVersion` 不覆盖原配置，并明确提示 incompatibility。

@@ -167,9 +167,9 @@ MigrateV2ToV3(config)
 2. 在 `backups` 目录创建带时间戳且不覆盖已有文件的备份。
 3. 在内存中迁移并重新验证。
 4. 只有验证成功才写入临时文件并替换目标文件。
-5. 迁移失败时继续使用能够安全解释的 defaults，并保留原文件供诊断。
+5. 迁移失败时保留原文件，并 fail closed 停用无法安全解释的报告模板；不得用另一套 defaults 掩盖配置问题。
 
-当前 `SchemaVersion=1` 对新增可选项采用 additive reconciliation：只补缺失的 managed defaults。只有不兼容格式变化才提升版本并增加顺序 migration；future-version 继续 fail closed。
+当前 `SchemaVersion=2` 使用 `{{cursor}}`、`{{date}}` 与唯一合法的红色尾标记 `{{red:（见图）}}` 表达模板行为。普通字面量 `（见图）` 不携带颜色语义；红色尾标记最多一个且必须是最后一个元素。Schema 1 只在一次性迁移器中读取：审计通过后备份、临时写入、验证并替换；不安全项阻止迁移。future-version 继续 fail closed。已发布的旧 EXE 无法理解 Schema 2，手工降级必须恢复迁移前备份。
 
 ## Runtime registration
 

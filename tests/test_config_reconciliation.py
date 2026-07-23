@@ -32,7 +32,7 @@ class ConfigReconciliationTests(unittest.TestCase):
 
         release = source("release/report_assistant.ahk")
         prepare = release.index(
-            "PrepareReportAssistantConfig(ReportAssistantManagedConfigDefaults())"
+            "PrepareReportAssistantConfig(\n    ReportAssistantManagedConfigDefaults()"
         )
         hotstrings = release.index("RegisterReportHotstrings(", prepare)
         features = release.index("RegisterConfiguredFeatures(", hotstrings)
@@ -102,14 +102,13 @@ class ConfigReconciliationTests(unittest.TestCase):
 
     def test_failures_leave_the_original_as_the_runtime_source(self) -> None:
         reconciliation = source("src/config_reconciliation.ahk")
-        prepare = reconciliation.split(
+        bootstrap = source("src/config_bootstrap.ahk")
+        prepare = bootstrap.split(
             'PrepareReportAssistantConfig(managedDefaults, configPath := "") {', 1
-        )[1].split("\n}\n\nReconcileManagedConfigDefaults(", 1)[0]
-        self.assertIn(
-            "try return ReconcileManagedConfigDefaults(configPath, managedDefaults)",
-            prepare,
-        )
-        self.assertIn("catch\n        return false", prepare)
+        )[1].split("\n}\n\nglobal ReportAssistantConfigStartupResult", 1)[0]
+        self.assertIn("MigrateReportAssistantConfigV1ToV2(configPath)", prepare)
+        self.assertIn("ReconcileManagedConfigDefaults(configPath, managedDefaults)", prepare)
+        self.assertIn('"CONFIG_RECONCILIATION_FAILED"', prepare)
         update = reconciliation.split(
             "ApplyMissingManagedConfigDefaults(configPath, missingDefaults) {", 1
         )[1].split("\n}\n\nCreateReportAssistantConfigBackup(", 1)[0]

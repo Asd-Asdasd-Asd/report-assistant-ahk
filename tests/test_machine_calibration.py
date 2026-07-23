@@ -76,7 +76,55 @@ class MachineCalibrationTests(unittest.TestCase):
         )[0]
         self.assertLess(body.index("PrepareMedExRedReset()"), body.index("SendConfiguredReportText"))
         self.assertIn("if !resetReadiness.ok\n            return false", body)
-        self.assertIn("RunRedResetInsertion(entry.RedText, resetReadiness.options)", body)
+        self.assertIn(
+            "RunRedResetInsertion(plan.RedText, resetReadiness.options)", body
+        )
+
+    def test_cold_start_preflight_reacquires_uia_and_waits_for_exact_anchor(self) -> None:
+        calibration = source("src/medex_calibration.ahk")
+        readiness = calibration.split(
+            "WaitForMedExCalibrationAnchor(hwnd, process)", 1
+        )[1].split("\n\nValidMedExCalibrationArrow", 1)[0]
+        activation = readiness.index(
+            "UIA.ActivateChromiumAccessibility(hwnd, false, 0)"
+        )
+        reacquire = readiness.index("UIA.ElementFromHandle(hwnd, , false)")
+        exact_query = readiness.index(
+            "Name: CandidateGRelativeMouseProfile.RegionAnchorName"
+        )
+        self.assertLess(activation, reacquire)
+        self.assertLess(reacquire, exact_query)
+        self.assertIn("AnchorReadyTimeoutMs := 400", calibration)
+        self.assertIn("AnchorReadyPollIntervalMs := 40", calibration)
+        self.assertNotIn("Children.Length", readiness)
+
+    def test_preflight_reasons_are_distinct_and_only_calibration_is_actionable(self) -> None:
+        calibration = source("src/medex_calibration.ahk")
+        for code in (
+            "UIA_INITIALIZING",
+            "ANCHOR_NOT_READY",
+            "NEED_CALIBRATION",
+            "UNSUPPORTED_PROFILE",
+        ):
+            self.assertIn(f'static {code} := "{code}"', calibration)
+        feedback = calibration.split(
+            "FinishMedExRedResetPreflightFailure(result)", 1
+        )[1].split("\n}\n\nCollectCurrentMedExProfileEnvironment", 1)[0]
+        self.assertEqual(feedback.count("ShowMedExCalibrationRequired()"), 1)
+        self.assertIn("ShowMedExRedResetPreflightStopped(", feedback)
+
+    def test_preflight_diagnostic_contains_only_bounded_readiness_metadata(self) -> None:
+        diagnostics = source("src/diagnostics.ahk")
+        for field in (
+            "preflightStage",
+            "readinessReason",
+            "uiaActivationAttempted",
+            "uiaRootReacquireCount",
+            "exactAnchorQueryCount",
+            "exactAnchorCandidateCount",
+            "readinessElapsedMs",
+        ):
+            self.assertIn(f'"{field}="', diagnostics)
 
     def test_calibration_hotkeys_are_suspendable_and_escape_is_scoped(self) -> None:
         main = source("src/main.ahk")

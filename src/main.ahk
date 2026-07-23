@@ -22,10 +22,12 @@
 #Include feature_model.ahk
 #Include hotstring_model.ahk
 #Include hotstring_config.ahk
-#Include hotstring_config_editor.ahk
-#Include config_reconciliation.ahk
-#Include config_bootstrap.ahk
+#Include template_renderer.ahk
 #Include hotstring_normalization.ahk
+#Include config_reconciliation.ahk
+#Include hotstring_config_migration.ahk
+#Include hotstring_config_editor.ahk
+#Include config_bootstrap.ahk
 #Include hotstring_registration.ahk
 #Include hotstrings.ahk
 #Include feature_config.ahk

@@ -1,18 +1,31 @@
 LoadReportHotstringConfig(configPath := "") {
-    entries := NormalizeReportHotstringEntries(
+    return NormalizeReportHotstringEntries(
         LoadRawReportHotstringConfig(configPath)
-    )
-    return entries.Length > 0 ? entries : NormalizeReportHotstringEntries(
-        ReportHotstringDefaults.BuiltinDefinitions()
     )
 }
 
 NormalizeReportHotstringEntries(rawEntries) {
     entries := []
+    seenTriggers := Map()
     for raw in rawEntries {
         entry := NormalizeReportHotstringEntry(raw)
-        if entry
-            entries.Push(entry)
+        if !entry {
+            OutputDebug(
+                "Report hotstring config rejected: INVALID_ENTRY Section=" .
+                raw.Section
+            )
+            return []
+        }
+        triggerKey := StrLower(entry.Trigger)
+        if seenTriggers.Has(triggerKey) {
+            OutputDebug(
+                "Report hotstring config rejected: DUPLICATE_TRIGGER Section=" .
+                raw.Section
+            )
+            return []
+        }
+        seenTriggers[triggerKey] := true
+        entries.Push(entry)
     }
     return entries
 }
@@ -22,48 +35,23 @@ NormalizeReportHotstringEntry(raw) {
     if enabled = "INVALID"
         return false
     section := raw.Section
+    name := Trim(raw.Name, " `t`r`n")
     trigger := Trim(raw.Trigger, " `t`r`n")
-    mode := StrLower(Trim(raw.Mode, " `t`r`n"))
+    if name = "" || InStr(raw.Name, "`r") || InStr(raw.Name, "`n")
+        return false
     if trigger = "" || InStr(trigger, "`r") || InStr(trigger, "`n")
         return false
-    if !IsSupportedReportHotstringMode(mode)
+    templateValidation := ValidateReportTemplate(raw.Text)
+    if !templateValidation.Ok
         return false
 
-    text := raw.Text
-    plainText := text
-    redText := ""
-    if IsRedReportHotstringMode(mode) {
-        marker := ReportHotstringDefaults.RedFigureMarker
-        plainText := TextEndsWith(text, marker)
-            ? SubStr(text, 1, StrLen(text) - StrLen(marker))
-            : text
-        redText := marker
-    }
-
-    postTextCaretLeftCount := section = "Hotstring.builtin-cmx"
-        && mode = ReportHotstringMode.TEXT ? 2 : 0
     return HotstringEntry(
         section,
         enabled,
-        raw.Name,
+        name,
         trigger,
-        mode,
-        plainText,
-        redText,
-        postTextCaretLeftCount
+        raw.Text
     )
-}
-
-IsRedReportHotstringMode(mode) {
-    return mode = ReportHotstringMode.RED_RESET
-        || mode = ReportHotstringMode.RED_LEFT4
-}
-
-TextEndsWith(text, suffix) {
-    if suffix = "" || StrLen(text) < StrLen(suffix)
-        return false
-    suffixStart := StrLen(text) - StrLen(suffix) + 1
-    return SubStr(text, suffixStart) = suffix
 }
 
 ParseReportHotstringEnabled(value) {
@@ -73,10 +61,4 @@ ParseReportHotstringEnabled(value) {
     if normalized = "false"
         return false
     return "INVALID"
-}
-
-IsSupportedReportHotstringMode(mode) {
-    return mode = ReportHotstringMode.TEXT
-        || mode = ReportHotstringMode.RED_RESET
-        || mode = ReportHotstringMode.RED_LEFT4
 }

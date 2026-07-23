@@ -1,20 +1,30 @@
 class ReportAssistantSettingsDefaults {
     static WindowTitle := "MedEx Report Assistant 设置"
 
-    static ModeLabels() {
+    static TemplateElementDefinitions() {
         return [
-            "普通文字",
-            "红色标记并恢复黑色",
-            "红色标记并调整光标"
+            {
+                Label: "光标位置",
+                Token: ReportHotstringDefaults.CursorPlaceholder
+            },
+            {
+                Label: "当前日期",
+                Token: ReportHotstringDefaults.DatePlaceholder
+            },
+            {
+                Label: "红色“（见图）”",
+                Token: ReportHotstringDefaults.RedFigureReferencePlaceholder
+            }
         ]
     }
 
-    static ModeValues() {
-        return [
-            ReportHotstringMode.TEXT,
-            ReportHotstringMode.RED_RESET,
-            ReportHotstringMode.RED_LEFT4
-        ]
+    static TemplateElementLabels(definitions := 0) {
+        if Type(definitions) != "Array"
+            definitions := this.TemplateElementDefinitions()
+        labels := []
+        for definition in definitions
+            labels.Push(definition.Label)
+        return labels
     }
 }
 
@@ -54,7 +64,8 @@ class ReportAssistantSettingsWindow {
             this.OriginalSections[StrLower(entry.Section)] := true
         this.DeletedSections := []
         this.DeletedSectionKeys := Map()
-        this.SelectedRow := 0
+        this.ModifiedSectionKeys := Map()
+        this.SelectedSection := ""
         this.Dirty := false
         this.LoadingControls := false
         this.Closing := false
@@ -72,12 +83,12 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(1)
         this.TemplateList := this.Window.Add(
             "ListView", "x28 y52 w844 h220 -Multi",
-            ["状态", "模板名称", "触发词", "模式"]
+            ["状态", "模板名称", "触发词", ""]
         )
         this.TemplateList.ModifyCol(1, 70)
-        this.TemplateList.ModifyCol(2, 230)
-        this.TemplateList.ModifyCol(3, 160)
-        this.TemplateList.ModifyCol(4, 350)
+        this.TemplateList.ModifyCol(2, 420)
+        this.TemplateList.ModifyCol(3, 350)
+        this.TemplateList.ModifyCol(4, 0)
         this.TemplateList.OnEvent(
             "ItemSelect", this.OnTemplateSelected.Bind(this)
         )
@@ -108,13 +119,25 @@ class ReportAssistantSettingsWindow {
         )
         this.TriggerInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
 
-        this.Window.Add("Text", "x28 y402 w68", "模板模式")
-        this.ModeInput := this.Window.Add(
-            "DropDownList", "x102 y398 w330",
-            ReportAssistantSettingsDefaults.ModeLabels()
+        this.TemplateElementDefinitions :=
+            ReportAssistantSettingsDefaults.TemplateElementDefinitions()
+        this.Window.Add("Text", "x28 y404 w88", "插入模板元素")
+        this.TemplateElementInput := this.Window.Add(
+            "DropDownList", "x122 y398 w220",
+            ReportAssistantSettingsDefaults.TemplateElementLabels(
+                this.TemplateElementDefinitions
+            )
         )
-        this.ModeInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
-
+        this.InsertTemplateElementButton := this.Window.Add(
+            "Button", "x350 y398 w68 h26", "插入"
+        )
+        this.InsertTemplateElementButton.OnEvent(
+            "Click", this.OnInsertTemplateElement.Bind(this)
+        )
+        this.Window.Add(
+            "Text", "x438 y404 w434",
+            "红色标记必须是模板最后一个元素。"
+        )
         this.Window.Add("Text", "x28 y440 w68", "模板文字")
         this.TextInput := this.Window.Add(
             "Edit", "x28 y462 w844 h94 +Multi +VScroll"
@@ -143,7 +166,7 @@ class ReportAssistantSettingsWindow {
 
         this.RefreshTemplateList()
         if this.Entries.Length > 0
-            this.SelectRow(1)
+            this.SelectSection(this.Entries[1].Section)
     }
 
     Activate() {
@@ -161,7 +184,7 @@ class ReportAssistantSettingsWindow {
                     entry.Enabled ? "启用" : "停用",
                     entry.Name,
                     entry.Trigger,
-                    ReportAssistantSettingsModeLabel(entry.Mode)
+                    entry.Section
                 )
             }
         } finally {
@@ -169,9 +192,11 @@ class ReportAssistantSettingsWindow {
         }
     }
 
-    SelectRow(row) {
-        if row < 1 || row > this.Entries.Length {
-            this.SelectedRow := 0
+    SelectSection(section) {
+        entryIndex := this.FindEntryIndexBySection(section)
+        row := this.FindListRowBySection(section)
+        if entryIndex = 0 || row = 0 {
+            this.SelectedSection := ""
             this.ClearEditor()
             return
         }
@@ -179,8 +204,8 @@ class ReportAssistantSettingsWindow {
         try {
             this.TemplateList.Modify(0, "-Select")
             this.TemplateList.Modify(row, "Select Focus Vis")
-            this.SelectedRow := row
-            this.LoadEditor(this.Entries[row])
+            this.SelectedSection := this.Entries[entryIndex].Section
+            this.LoadEditor(this.Entries[entryIndex])
         } finally {
             this.LoadingControls := false
         }
@@ -190,8 +215,7 @@ class ReportAssistantSettingsWindow {
         this.EnabledInput.Value := entry.Enabled ? 1 : 0
         this.NameInput.Text := entry.Name
         this.TriggerInput.Text := entry.Trigger
-        this.TextInput.Text := entry.Text
-        this.ModeInput.Choose(ReportAssistantSettingsModeIndex(entry.Mode))
+        this.TextInput.Text := ReportHotstringTextForMultilineEdit(entry.Text)
         this.DeleteButton.Enabled := !entry.IsBuiltin
     }
 
@@ -202,7 +226,6 @@ class ReportAssistantSettingsWindow {
             this.NameInput.Text := ""
             this.TriggerInput.Text := ""
             this.TextInput.Text := ""
-            this.ModeInput.Choose(0)
             this.DeleteButton.Enabled := false
         } finally {
             this.LoadingControls := false
@@ -210,39 +233,71 @@ class ReportAssistantSettingsWindow {
     }
 
     StoreEditorToEntry() {
-        if this.SelectedRow < 1 || this.SelectedRow > this.Entries.Length
+        entryIndex := this.FindEntryIndexBySection(this.SelectedSection)
+        if entryIndex = 0
             return
-        entry := this.Entries[this.SelectedRow]
+        entry := this.Entries[entryIndex]
         entry.Enabled := this.EnabledInput.Value = 1
         entry.Name := this.NameInput.Text
         entry.Trigger := this.TriggerInput.Text
-        entry.Text := NormalizeEditableReportHotstringText(this.TextInput.Text)
-        entry.Mode := ReportAssistantSettingsModeValue(this.ModeInput.Value)
-        this.TemplateList.Modify(
-            this.SelectedRow,
-            ,
-            entry.Enabled ? "启用" : "停用",
-            entry.Name,
-            entry.Trigger,
-            ReportAssistantSettingsModeLabel(entry.Mode)
-        )
+        entry.Text := ReportHotstringTextFromMultilineEdit(this.TextInput.Text)
+        row := this.FindListRowBySection(entry.Section)
+        if row > 0 {
+            this.TemplateList.Modify(
+                row,
+                ,
+                entry.Enabled ? "启用" : "停用",
+                entry.Name,
+                entry.Trigger,
+                entry.Section
+            )
+        }
     }
 
     OnEditorChanged(*) {
         if this.LoadingControls
             return
         this.StoreEditorToEntry()
+        if this.SelectedSection != ""
+            this.ModifiedSectionKeys[StrLower(this.SelectedSection)] := true
         this.Dirty := true
+    }
+
+    OnInsertTemplateElement(*) {
+        entryIndex := this.FindEntryIndexBySection(this.SelectedSection)
+        definitionIndex := this.TemplateElementInput.Value
+        if entryIndex = 0 || definitionIndex < 1
+            || definitionIndex > this.TemplateElementDefinitions.Length {
+            this.TextInput.Focus()
+            return
+        }
+
+        definition := this.TemplateElementDefinitions[definitionIndex]
+        ReplaceReportTemplateEditSelection(
+            this.TextInput,
+            definition.Token
+        )
+        this.TemplateElementInput.Choose(0)
+        this.StoreEditorToEntry()
+        this.ModifiedSectionKeys[StrLower(this.SelectedSection)] := true
+        this.Dirty := true
+        this.TextInput.Focus()
     }
 
     OnTemplateSelected(control, row, selected) {
         if this.LoadingControls || !selected
             return
+        section := this.SectionForListRow(row)
+        if section = ""
+            return
         this.StoreEditorToEntry()
-        this.SelectedRow := row
+        entryIndex := this.FindEntryIndexBySection(section)
+        if entryIndex = 0
+            return
+        this.SelectedSection := this.Entries[entryIndex].Section
         this.LoadingControls := true
         try {
-            this.LoadEditor(this.Entries[row])
+            this.LoadEditor(this.Entries[entryIndex])
         } finally {
             this.LoadingControls := false
         }
@@ -250,19 +305,21 @@ class ReportAssistantSettingsWindow {
 
     OnAddTemplate(*) {
         this.StoreEditorToEntry()
-        this.Entries.Push(CreateEditableReportHotstring(
+        entry := CreateEditableReportHotstring(
             this.Entries, this.DeletedSectionKeys
-        ))
-        row := this.TemplateList.Add(, "启用", "新的模板", "", "普通文字")
+        )
+        this.Entries.Push(entry)
+        this.RefreshTemplateList()
         this.Dirty := true
-        this.SelectRow(row)
+        this.SelectSection(entry.Section)
         this.TriggerInput.Focus()
     }
 
     OnDeleteTemplate(*) {
-        if this.SelectedRow < 1 || this.SelectedRow > this.Entries.Length
+        entryIndex := this.FindEntryIndexBySection(this.SelectedSection)
+        if entryIndex = 0
             return
-        entry := this.Entries[this.SelectedRow]
+        entry := this.Entries[entryIndex]
         if entry.IsBuiltin {
             MsgBox(
                 "内置模板不能删除。如暂时不用，可以取消启用。",
@@ -285,21 +342,16 @@ class ReportAssistantSettingsWindow {
             this.DeletedSections.Push(entry.Section)
             this.DeletedSectionKeys[sectionKey] := true
         }
-        deletedRow := this.SelectedRow
-        this.LoadingControls := true
-        try {
-            this.Entries.RemoveAt(deletedRow)
-            this.TemplateList.Delete(deletedRow)
-        } finally {
-            this.LoadingControls := false
-        }
+        this.Entries.RemoveAt(entryIndex)
         this.Dirty := true
+        this.RefreshTemplateList()
         if this.Entries.Length = 0 {
-            this.SelectedRow := 0
+            this.SelectedSection := ""
             this.ClearEditor()
             return
         }
-        this.SelectRow(Min(deletedRow, this.Entries.Length))
+        nextIndex := Min(entryIndex, this.Entries.Length)
+        this.SelectSection(this.Entries[nextIndex].Section)
     }
 
     OnSave(*) {
@@ -325,6 +377,7 @@ class ReportAssistantSettingsWindow {
             this.Entries,
             this.DeletedSections,
             this.OriginalText,
+            this.ModifiedSectionKeys,
             this.ConfigPath
         )
         if !saveResult.Ok {
@@ -351,13 +404,14 @@ class ReportAssistantSettingsWindow {
     }
 
     FocusValidationError(validation) {
-        this.SelectRow(validation.Row)
+        if validation.Section != ""
+            this.SelectSection(validation.Section)
         if validation.Field = "Name"
             this.NameInput.Focus()
         else if validation.Field = "Trigger"
             this.TriggerInput.Focus()
-        else if validation.Field = "Mode"
-            this.ModeInput.Focus()
+        else if validation.Field = "Text"
+            this.TextInput.Focus()
     }
 
     OnClose(*) {
@@ -381,26 +435,47 @@ class ReportAssistantSettingsWindow {
         this.Window.Destroy()
         ReportAssistantSettingsWindow.Current := 0
     }
-}
 
-ReportAssistantSettingsModeIndex(mode) {
-    mode := StrLower(Trim(mode, " `t`r`n"))
-    for index, value in ReportAssistantSettingsDefaults.ModeValues() {
-        if mode = value
-            return index
+    FindEntryIndexBySection(section) {
+        sectionKey := StrLower(String(section))
+        if sectionKey = ""
+            return 0
+        for index, entry in this.Entries {
+            if StrLower(entry.Section) = sectionKey
+                return index
+        }
+        return 0
     }
-    return 0
+
+    SectionForListRow(row) {
+        if row < 1 || row > this.TemplateList.GetCount()
+            return ""
+        return this.TemplateList.GetText(row, 4)
+    }
+
+    FindListRowBySection(section) {
+        sectionKey := StrLower(String(section))
+        if sectionKey = ""
+            return 0
+        Loop this.TemplateList.GetCount() {
+            if StrLower(this.SectionForListRow(A_Index)) = sectionKey
+                return A_Index
+        }
+        return 0
+    }
 }
 
-ReportAssistantSettingsModeValue(index) {
-    values := ReportAssistantSettingsDefaults.ModeValues()
-    if index < 1 || index > values.Length
-        return ""
-    return values[index]
-}
-
-ReportAssistantSettingsModeLabel(mode) {
-    index := ReportAssistantSettingsModeIndex(mode)
-    labels := ReportAssistantSettingsDefaults.ModeLabels()
-    return index > 0 ? labels[index] : "未选择"
+ReplaceReportTemplateEditSelection(editControl, replacementText) {
+    if !IsObject(editControl)
+        return false
+    replacement := String(replacementText)
+    DllCall(
+        "SendMessageW",
+        "Ptr", editControl.Hwnd,
+        "UInt", 0x00C2,
+        "Ptr", 1,
+        "Ptr", StrPtr(replacement),
+        "Ptr"
+    )
+    return true
 }

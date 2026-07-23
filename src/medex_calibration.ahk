@@ -10,6 +10,18 @@ class MedExCalibrationDefaults {
     static BlackLookupTimeoutMs := 1200
     static BlackLookupPollIntervalMs := 60
     static MenuCloseValidationDelayMs := 60
+    static AnchorReadyTimeoutMs := 400
+    static AnchorReadyPollIntervalMs := 40
+}
+
+class MedExRedResetPreflightCode {
+    static OK := "PREFLIGHT_OK"
+    static UIA_INITIALIZING := "UIA_INITIALIZING"
+    static ANCHOR_NOT_READY := "ANCHOR_NOT_READY"
+    static NEED_CALIBRATION := "NEED_CALIBRATION"
+    static UNSUPPORTED_PROFILE := "UNSUPPORTED_PROFILE"
+    static UIA_UNAVAILABLE := "UIA_UNAVAILABLE"
+    static FOREGROUND_CHANGED := "FOREGROUND_CHANGED"
 }
 
 global MEDEX_CALIBRATION_SESSION := 0
@@ -43,7 +55,8 @@ BeginMedExCalibration() {
     )
     if !contextResult.ok {
         ShowMedExCalibrationToolTip(
-            "MedEx 校准`n环境检查失败：" contextResult.reason .
+            "MedEx 校准`n环境检查失败：" .
+            MedExRedResetPreflightReasonMessage(contextResult.code) .
             "`n请保持 MedEx 前台、DPI 100%，然后重试。",
             contextResult.context
         )
@@ -259,26 +272,118 @@ FailMedExCalibration(message, reason) {
 PrepareMedExRedReset() {
     options := 0
     environment := CollectCurrentMedExProfileEnvironment()
-    if environment {
-        builtinResult := ValidateCandidateGRuntimeProfile(environment)
-        if builtinResult.ok
-            options := Map()
+    if !environment {
+        result := MakeMedExRedResetPreflightResult(
+            false,
+            MedExRedResetPreflightCode.UNSUPPORTED_PROFILE,
+            "environmentUnavailable"
+        )
+        FinishMedExRedResetPreflightFailure(result)
+        return {ok: false, options: 0, code: result.code}
     }
+    builtinResult := ValidateCandidateGRuntimeProfile(environment)
+    if builtinResult.ok
+        options := Map()
     if !options {
         profile := LoadValidatedMedExMachineProfile()
         if profile
             options := BuildMedExMachineProfileOptions(profile)
     }
     if !options {
-        ShowMedExCalibrationRequired()
-        return {ok: false, options: 0}
+        unsupportedReason := MedExContextValue(
+            builtinResult.context,
+            "unsupportedProfileReason",
+            "profileMismatch"
+        )
+        code := MedExProfileMismatchNeedsCalibration(unsupportedReason)
+            ? MedExRedResetPreflightCode.NEED_CALIBRATION
+            : MedExRedResetPreflightCode.UNSUPPORTED_PROFILE
+        result := MakeMedExRedResetPreflightResult(
+            false,
+            code,
+            unsupportedReason,
+            builtinResult.context
+        )
+        FinishMedExRedResetPreflightFailure(result)
+        return {ok: false, options: 0, code: result.code}
     }
     contextResult := CollectMedExCalibrationContext(options)
     if !contextResult.ok {
-        ShowMedExCalibrationRequired(contextResult.reason)
-        return {ok: false, options: 0}
+        result := MakeMedExRedResetPreflightResult(
+            false,
+            contextResult.code,
+            contextResult.reason,
+            contextResult.context
+        )
+        FinishMedExRedResetPreflightFailure(result)
+        return {ok: false, options: 0, code: result.code}
     }
-    return {ok: true, options: options}
+    return {
+        ok: true,
+        options: options,
+        code: MedExRedResetPreflightCode.OK
+    }
+}
+
+MedExProfileMismatchNeedsCalibration(reason) {
+    return reason = "screenWidthMismatch"
+        || reason = "screenHeightMismatch"
+}
+
+MakeMedExRedResetPreflightResult(ok, code, reason, context := 0) {
+    if Type(context) != "Map"
+        context := Map()
+    context["timestamp"] := FormatTime(, "yyyy-MM-ddTHH:mm:ss")
+    context["appVersion"] := AppMetadata.Version
+    context["preflightStage"] := "redResetReadiness"
+    context["readinessReason"] := reason
+    return MakeColorResetResult(ok, code, context)
+}
+
+FinishMedExRedResetPreflightFailure(result) {
+    try WriteMedExColorResetFailureDiagnostic(result)
+    catch as err
+        OutputDebug "MedEx red-reset preflight diagnostic failed: " Type(err)
+
+    if result.code = MedExRedResetPreflightCode.NEED_CALIBRATION {
+        ShowMedExCalibrationRequired()
+        return
+    }
+    if result.code = MedExRedResetPreflightCode.UIA_INITIALIZING
+        || result.code = MedExRedResetPreflightCode.ANCHOR_NOT_READY {
+        ShowMedExRedResetPreflightStopped(
+            "MedEx 界面尚未准备好，请稍后重新输入快捷语。"
+        )
+        return
+    }
+    if result.code = MedExRedResetPreflightCode.FOREGROUND_CHANGED {
+        ShowMedExRedResetPreflightStopped(
+            "MedEx 前台窗口已经改变，请返回报告编辑器后重试。"
+        )
+        return
+    }
+    if result.code = MedExRedResetPreflightCode.UIA_UNAVAILABLE {
+        ShowMedExRedResetPreflightStopped(
+            "当前无法连接 MedEx 界面，请重新加载程序后重试。"
+        )
+        return
+    }
+    ShowMedExRedResetPreflightStopped(
+        "当前显示环境暂不支持红字恢复。"
+    )
+}
+
+MedExRedResetPreflightReasonMessage(code) {
+    if code = MedExRedResetPreflightCode.UIA_INITIALIZING
+        || code = MedExRedResetPreflightCode.ANCHOR_NOT_READY
+        return "MedEx 界面尚未准备好"
+    if code = MedExRedResetPreflightCode.NEED_CALIBRATION
+        return "此电脑尚未完成布局校准"
+    if code = MedExRedResetPreflightCode.UIA_UNAVAILABLE
+        return "无法连接 MedEx 界面"
+    if code = MedExRedResetPreflightCode.FOREGROUND_CHANGED
+        return "前台 MedEx 窗口已经改变"
+    return "当前显示环境不受支持"
 }
 
 CollectCurrentMedExProfileEnvironment() {
@@ -304,35 +409,60 @@ CollectCurrentMedExProfileEnvironment() {
 CollectMedExCalibrationContext(options := 0) {
     hwnd := WinExist("A")
     if !hwnd
-        return {ok: false, reason: "未检测到前台窗口", context: Map()}
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.FOREGROUND_CHANGED,
+            reason: "noForegroundWindow",
+            context: Map()
+        }
     try process := WinGetProcessName("ahk_id " hwnd)
     catch
-        return {ok: false, reason: "无法读取前台进程", context: Map()}
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.FOREGROUND_CHANGED,
+            reason: "processLookupFailed",
+            context: Map()
+        }
     if !MedExProcessNameIsApproved(process, MedExColorResetDefaults.ProvisionalProcessNames)
-        return {ok: false, reason: "前台不是已批准的 MedEx 进程", context: Map()}
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.FOREGROUND_CHANGED,
+            reason: "wrongForegroundProcess",
+            context: Map()
+        }
 
     environmentContext := Map()
     CollectMedExEnvironmentContext(hwnd, environmentContext)
     if MedExContextValue(environmentContext, "dpi", "UNKNOWN") != 96
-        return {ok: false, reason: "仅支持 Windows 缩放 100% (DPI 96)", context: Map()}
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.UNSUPPORTED_PROFILE,
+            reason: "dpiMismatch",
+            context: environmentContext
+        }
     global UIA
     if !IsSet(UIA)
-        return {ok: false, reason: "UIA 不可用", context: Map()}
-    try windowElement := UIA.ElementFromHandle(hwnd)
-    catch
-        return {ok: false, reason: "无法连接 MedEx UIA", context: Map()}
-    try regionElements := windowElement.FindElements({
-        Type: "Text",
-        Name: CandidateGRelativeMouseProfile.RegionAnchorName
-    })
-    catch
-        return {ok: false, reason: "无法查找 检查所见 anchor", context: Map()}
-    conversion := UiaTextElementsToAnchors(regionElements, false)
-    textAnchors := conversion.anchors
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.UIA_UNAVAILABLE,
+            reason: "uiaNotIncluded",
+            context: environmentContext
+        }
+
+    readiness := WaitForMedExCalibrationAnchor(hwnd, process)
+    if !readiness.ok
+        return readiness
+    windowElement := readiness.context["windowElement"]
+    textAnchors := readiness.context["textAnchors"]
     if textAnchors.Length > 1 {
         try textAnchors := CollectMedExTextAnchorSnapshot(windowElement, false).anchors
         catch
-            return {ok: false, reason: "anchor 重复且无法完成校验", context: Map()}
+            return {
+                ok: false,
+                code: MedExRedResetPreflightCode.UNSUPPORTED_PROFILE,
+                reason: "ambiguousAnchorSnapshotFailed",
+                context: readiness.context
+            }
     }
     clientRect := GetClientRectScreenMap(hwnd)
     layoutOptions := BuildCandidateGRuntimeLayoutOptions(options)
@@ -340,7 +470,12 @@ CollectMedExCalibrationContext(options := 0) {
         layoutOptions["validateInteractionPoints"] := options["validateInteractionPoints"]
     rowResult := ResolveCandidateGToolbarRow(textAnchors, clientRect, layoutOptions)
     if !rowResult.ok
-        return {ok: false, reason: "检查所见 anchor 不唯一或位置不合理", context: Map()}
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.UNSUPPORTED_PROFILE,
+            reason: "anchorGeometryUnsupported",
+            context: readiness.context
+        }
     context := Map(
         "hwnd", hwnd,
         "process", process,
@@ -353,7 +488,103 @@ CollectMedExCalibrationContext(options := 0) {
         "medExVersion", MedExContextValue(environmentContext, "medExVersion", "UNKNOWN"),
         "resolution", A_ScreenWidth "x" A_ScreenHeight
     )
-    return {ok: true, reason: "ok", context: context}
+    MergeContext(context, readiness.context)
+    context.Delete("textAnchors")
+    return {
+        ok: true,
+        code: MedExRedResetPreflightCode.OK,
+        reason: "ok",
+        context: context
+    }
+}
+
+WaitForMedExCalibrationAnchor(hwnd, process) {
+    startedAt := A_TickCount
+    context := Map(
+        "foregroundProcess", process,
+        "foregroundWindowHandle", Format("0x{:X}", hwnd),
+        "uiaActivationAttempted", true,
+        "uiaRootReacquireCount", 0,
+        "exactAnchorQueryCount", 0,
+        "exactAnchorCandidateCount", 0,
+        "readinessElapsedMs", 0
+    )
+    try UIA.ActivateChromiumAccessibility(hwnd, false, 0)
+    catch {
+        context["readinessElapsedMs"] := A_TickCount - startedAt
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.UIA_INITIALIZING,
+            reason: "chromiumActivationFailed",
+            context: context
+        }
+    }
+
+    deadline := startedAt + MedExCalibrationDefaults.AnchorReadyTimeoutMs
+    rootAcquired := false
+    exactQuerySucceeded := false
+    Loop {
+        if !MedExForegroundTargetMatches(hwnd, process) {
+            context["readinessElapsedMs"] := A_TickCount - startedAt
+            return {
+                ok: false,
+                code: MedExRedResetPreflightCode.FOREGROUND_CHANGED,
+                reason: "foregroundChangedDuringReadiness",
+                context: context
+            }
+        }
+
+        windowElement := 0
+        try {
+            windowElement := UIA.ElementFromHandle(hwnd, , false)
+            rootAcquired := true
+            context["uiaRootReacquireCount"] += 1
+        }
+        if windowElement {
+            try {
+                context["exactAnchorQueryCount"] += 1
+                regionElements := windowElement.FindElements({
+                    Type: "Text",
+                    Name: CandidateGRelativeMouseProfile.RegionAnchorName
+                })
+                exactQuerySucceeded := true
+                conversion := UiaTextElementsToAnchors(regionElements, false)
+                textAnchors := conversion.anchors
+                context["exactAnchorCandidateCount"] := textAnchors.Length
+                if textAnchors.Length > 0 {
+                    context["windowElement"] := windowElement
+                    context["textAnchors"] := textAnchors
+                    context["readinessElapsedMs"] := A_TickCount - startedAt
+                    return {
+                        ok: true,
+                        code: MedExRedResetPreflightCode.OK,
+                        reason: "exactAnchorReady",
+                        context: context
+                    }
+                }
+            }
+        }
+
+        if A_TickCount >= deadline
+            break
+        Sleep MedExCalibrationDefaults.AnchorReadyPollIntervalMs
+    }
+
+    context["readinessElapsedMs"] := A_TickCount - startedAt
+    if rootAcquired && exactQuerySucceeded {
+        return {
+            ok: false,
+            code: MedExRedResetPreflightCode.ANCHOR_NOT_READY,
+            reason: "exactAnchorNotReady",
+            context: context
+        }
+    }
+    return {
+        ok: false,
+        code: MedExRedResetPreflightCode.UIA_INITIALIZING,
+        reason: "uiaRootNotReady",
+        context: context
+    }
 }
 
 ValidMedExCalibrationArrow(offsetX, offsetY, point, clientRect, regionRect) {
@@ -386,6 +617,16 @@ ShowMedExCalibrationRequired(reason := "此电脑尚未通过布局校准") {
         context
     )
     SetTimer ClearMedExCalibrationToolTip, -6000
+}
+
+ShowMedExRedResetPreflightStopped(reason) {
+    context := Map("clientRect", GetSafeMedExForegroundClientRect())
+    ShowMedExCalibrationToolTip(
+        "红字恢复已停止`n" reason .
+        "`n未插入任何正文或红字。",
+        context
+    )
+    SetTimer ClearMedExCalibrationToolTip, -5000
 }
 
 ShowMedExCalibrationToolTip(message, context := 0) {

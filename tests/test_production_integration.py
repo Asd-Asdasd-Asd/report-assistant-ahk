@@ -23,8 +23,12 @@ def function_body(text: str, name: str, next_name: str) -> str:
 class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_hotstrings_use_report_editor_orchestration(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        self.assertIn("RunRedResetInsertion(entry.RedText, resetReadiness.options)", hotstrings)
-        self.assertIn("RunRedLeft4Insertion(entry.RedText)", hotstrings)
+        self.assertIn(
+            "RunRedResetInsertion(plan.RedText, resetReadiness.options)", hotstrings
+        )
+        self.assertIn(
+            "RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)", hotstrings
+        )
         self.assertNotIn("ResetMedExInsertionColor(", hotstrings)
 
     def test_plain_text_precedes_fixed_red_marker_insertion(self) -> None:
@@ -33,12 +37,12 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
             "\n}\n\nSendConfiguredReportText", 1
         )[0]
         self.assertLess(
-            dispatcher.index("SendConfiguredReportText(entry.PlainText)"),
-            dispatcher.index("RunRedResetInsertion(entry.RedText, resetReadiness.options)"),
+            dispatcher.index("SendConfiguredReportText(plan.PlainText)"),
+            dispatcher.index("RunRedResetInsertion(plan.RedText, resetReadiness.options)"),
         )
         self.assertLess(
-            dispatcher.index("SendConfiguredReportText(entry.PlainText)"),
-            dispatcher.index("RunRedLeft4Insertion(entry.RedText)"),
+            dispatcher.index("SendConfiguredReportText(plan.PlainText)"),
+            dispatcher.index("RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)"),
         )
 
     def test_report_hotstrings_share_medex_only_scope(self) -> None:
@@ -72,45 +76,40 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertLess(suspend_exempt, pause)
         self.assertLess(pause, exit_hotkey)
 
-    def test_fzg_removes_settle_and_preserves_phrase_specific_cursor_contract(self) -> None:
+    def test_template_caret_path_preserves_validated_settle_contract(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
         report_editor = source("src/report_editor.ahk")
         release = source("release/report_assistant.ahk")
-        fzg = report_editor.split("RunRedLeft4Insertion(text, resetOptions := 0)", 1)[1].split(
-            "\n\nInsertRedFigureTextForCaretRelocation(text :=", 1
+        caret = report_editor.split(
+            "RunRedCaretInsertion(text, caretLeftCount, resetOptions := 0)", 1
+        )[1].split(
+            "\n\nInsertRedFigureTextForCaretRelocation(text, caretLeftCount,", 1
         )[0]
         self.assertNotIn("FzgCursorRestoreDelayMs", report_editor)
         self.assertNotIn("ReportHotstringTimingDefaults", report_editor)
-        self.assertNotIn("Sleep", fzg)
+        self.assertNotIn("Sleep", caret)
         self.assertNotIn("FzgCursorRestoreDelayMs", release)
-        self.assertIn("static RedLeft4AfterPasteSettleMs := 60", report_editor)
+        self.assertIn("static RedCaretAfterPasteSettleMs := 60", report_editor)
         self.assertIn(
-            "Sleep ReportEditorTimingDefaults.RedLeft4AfterPasteSettleMs",
+            "Sleep ReportEditorTimingDefaults.RedCaretAfterPasteSettleMs",
             report_editor,
         )
-        self.assertNotIn('Send("{Left 4}")', fzg)
-        self.assertEqual(report_editor.count('Send("{Left 4}")'), 1)
+        self.assertIn('Send("{Left " caretLeftCount "}")', report_editor)
         self.assertNotIn('Send("{Left 3}")', hotstrings + report_editor)
-        self.assertIn('Send("{Left 4}")', report_editor)
-        self.assertNotIn('Send("{Left 4}")', source("src/adapters/medex_report_editor.ahk"))
-        self.assertIn("InsertRedFigureTextForCaretRelocation", fzg)
-        self.assertNotIn("InsertRedFigureTextAndRestoreState", fzg)
-        self.assertNotIn("ResetMedExInsertionColor", fzg)
+        self.assertIn("InsertRedFigureTextForCaretRelocation", caret)
+        self.assertNotIn("InsertRedFigureTextAndRestoreState", caret)
+        self.assertNotIn("ResetMedExInsertionColor", caret)
 
     def test_fzg_caret_relocation_skips_color_reset_with_structured_status(self) -> None:
         report_editor = source("src/report_editor.ahk")
         logic = source("src/medex_color_reset_logic.ahk")
         body = report_editor.split(
-            "InsertRedFigureTextForCaretRelocation(text :=", 1
-        )[1].split("\n\nInsertRedFigureTextAndRestoreState(text :=", 1)[0]
+            "InsertRedFigureTextForCaretRelocation(text, caretLeftCount,", 1
+        )[1].split("\n\nSendRedFigureCaretRelocation(", 1)[0]
         self.assertIn("PasteRedFigureTextDetailed(", body)
         self.assertIn("() => SendRedFigureCaretRelocation(", body)
         self.assertIn("if !pasteResult.beforeRestoreSucceeded", body)
-        self.assertIn('Send("{Left 4}")', body)
-        self.assertLess(
-            body.index("PasteRedFigureTextDetailed("),
-            body.index('Send("{Left 4}")'),
-        )
+        self.assertIn("caretLeftCount", body)
         self.assertIn("ColorResetCode.NOT_REQUIRED", body)
         self.assertIn('"colorResetReason", "caretMovesBeforeRedMarker"', body)
         self.assertNotIn("ResetMedExInsertionColor", body)
@@ -466,7 +465,9 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         report_editor = source("src/report_editor.ahk")
         clipboard = source("src/clipboard_html.ahk")
         adapter = source("src/adapters/medex_report_editor.ahk")
-        wrapper = function_body(report_editor, "RunRedInsertion", "RunFzgInsertion")
+        wrapper = function_body(
+            report_editor, "RunRedResetInsertion", "RunRedCaretInsertion"
+        )
         orchestration = function_body(
             report_editor,
             "InsertRedFigureTextAndRestoreState",

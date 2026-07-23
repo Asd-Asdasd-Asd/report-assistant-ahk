@@ -1,19 +1,3 @@
-PrepareReportAssistantConfig(managedDefaults, configPath := "") {
-    if configPath = "" {
-        try configPath := ReportAssistantConfig.Path()
-        catch
-            return false
-    }
-    if !FileExist(configPath) {
-        try return CreateDefaultReportHotstringConfig(configPath)
-        catch
-            return false
-    }
-    try return ReconcileManagedConfigDefaults(configPath, managedDefaults)
-    catch
-        return false
-}
-
 ReconcileManagedConfigDefaults(configPath, managedDefaults) {
     if !HasUniqueManagedConfigDefaults(managedDefaults)
         return false

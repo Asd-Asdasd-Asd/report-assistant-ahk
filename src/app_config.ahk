@@ -1,5 +1,5 @@
 class ReportAssistantConfigDefaults {
-    static SchemaVersion := 1
+    static SchemaVersion := 2
     static DirectoryName := "MedExReportAssistant"
     static FileName := "config.ini"
 }

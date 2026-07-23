@@ -12,10 +12,9 @@ Step 4 基线为 `5193403`；`2369b68`（tag `v0.6.0-candidate-g`）是 Candidat
 
 ## 当前行为边界
 
-- `;red`：把配置的 `Text` 作为 CF_HTML 红字粘贴，再运行 Candidate G 将后续输入颜色恢复为黑色，最后由 `finally` 恢复 clipboard。
-- `;fwj`、`;fjd`：保留历史混合颜色行为；完整 `Text` 末尾的 `（见图）` 单独作为红色 CF_HTML，之前的文字按普通黑字输入，再运行 Candidate G。
-- `;fzg`：保留历史混合颜色行为；黑色前缀之后仅粘贴红色 `（见图）`，依次执行 clipboard restore、固定 `Left 4`；不运行 Color Reset，也不增加额外 settle。
-- `;cmx`：插入 `cm×cm` 并 `Left 2`。
+- `;red`、`;fwj`、`;fjd`：由显式 `{{red:（见图）}}` 模板元素插入红色 `（见图）`；最终光标位于末尾时运行 Candidate G，将后续输入恢复为黑色。
+- `;fzg`：`{{cursor}}` 将光标定位在红色 `（见图）` 前；移动距离由渲染结果计算，不运行 Candidate G。
+- `;cmx`：模板 `cm×{{cursor}}cm` 插入 `cm×cm`，并将光标定位在两个单位之间。
 - Production success 不写 heavy log；failure 写 privacy-safe lightweight log；field mode 才写详细 timing、geometry、UIA 和 pixel diagnostics。
 - 全局 pause/exit 分别为 `Ctrl+Alt+Esc`、`Ctrl+Alt+Q`。
 - Step 2 的 MedEx-only shared `#HotIf` guard 已由 `7a0d9a2` 提交。
@@ -42,7 +41,7 @@ Step 4 基线为 `5193403`；`2369b68`（tag `v0.6.0-candidate-g`）是 Candidat
 
 ```ini
 [Config]
-SchemaVersion=1
+SchemaVersion=2
 
 [Features]
 GlobalHjklArrows=false
@@ -51,37 +50,32 @@ GlobalHjklArrows=false
 Enabled=true
 Name=红字插入
 Trigger=;red
-Text=（见图）
-Mode=red-reset
+Text={{red:（见图）}}
 ```
 
 `[Features]` 保存非 hotstring 功能开关。`GlobalHjklArrows` 默认关闭；旧配置缺少该键时，程序会安全补入 `false`。手动改为 `true` 并重启后，会在所有应用中启用 `RAlt+H/J/K/L` 方向键。无效值保持原样但运行时视为关闭。
 
-每个热字符串 section 必须命名为 `Hotstring.builtin-<stable-id>` 或 `Hotstring.custom-<user-id>`。支持的字段只有 `Enabled`、`Name`、`Trigger`、`Text`、`Mode`；未知字段会被忽略，不要添加 `Order`。`Text` 中使用两个字符 `\n` 表示换行，使用 `\\` 表示一个普通反斜杠。配置文本只作为文字发送或经过 HTML escaping 后粘贴，不会作为 AHK 代码执行。
+每个热字符串 section 必须命名为 `Hotstring.builtin-<stable-id>` 或 `Hotstring.custom-<user-id>`。Schema 2 只使用 `Enabled`、`Name`、`Trigger`、`Text` 四个字段，不再使用 `Mode` 或固定 Left 数。`Text` 中使用两个字符 `\n` 表示换行，使用 `\\` 表示一个普通反斜杠。配置文本只作为文字发送或经过 HTML escaping 后粘贴，不会作为 AHK 代码执行。
 
-支持三种 `Mode`：
+模板支持以下双花括号元素：
 
-- `text`：在当前 caret 位置插入普通黑字。
-- `red-reset`：将 `Text` 作为普通黑字输入，在末尾插入红色 `（见图）`，然后运行现有 Candidate G black reset。
-- `red-left4`：将 `Text` 作为普通黑字输入，在末尾插入红色 `（见图）`，跳过 Candidate G，并在 clipboard restore 后执行固定 `Left 4`。
+- `{{cursor}}`：插入后光标停留的位置；每个模板最多一个。
+- `{{date}}`：触发时的本机日期，格式为 `yyyy-MM-dd`；可以重复使用。
+- `{{red:（见图）}}`：插入红色 `（见图）`；每个模板最多一个，并且必须是模板最后一个元素。
 
-如果 red mode 的 `Text` 已经以 `（见图）` 结尾，该标记会被拆出并作为唯一的红色内容，不会重复追加。`Text` 其他位置的所有内容都保持黑色；`text` mode 不追加红色标记。
+普通单花括号仍是普通文字。未知、拼错、未闭合、重复或位置错误的模板元素会在设置窗口中被拒绝，不会原样插入报告。普通字面量 `（见图）` 始终是黑字；只有精确的 `{{red:（见图）}}` 具有红字含义，不支持其他 `{{red:...}}`。光标若位于插入文字内部，程序只移动光标而不运行 Candidate G；光标在红色尾标记之后时才恢复黑色。普通黑字模板不会调用 Candidate G。
 
-section 在文件中的先后顺序就是优先级；不使用单独的排序字段。`Trigger` 重复时，第一个 enabled、字段有效并且成功注册的 entry 生效。`Enabled=false` 不注册该项。空 `Trigger`、未知 `Mode` 或无效 `Enabled` 的 section 会跳过，其他有效 section 仍会工作；文件缺失、不可读、schema 不支持或没有任何有效 entry 时，运行时安全回退到内置默认值。
+section 在文件中的先后顺序就是注册顺序，不使用单独排序字段。`Trigger` 必须保持不重复。现有配置无法读取、Schema 不支持或迁移不安全时，报告模板会 fail closed，不再回退到另一套内置模板。
 
 内置默认项如下：
 
-| Section | Trigger | Text | Mode | Enabled |
-| --- | --- | --- | --- | --- |
-| `Hotstring.builtin-red` | `;red` | `（见图）` | `red-reset` | `true` |
-| `Hotstring.builtin-fzg` | `;fzg` | `放射性摄取增高，SUVmax约（见图）` | `red-left4` | `true` |
-| `Hotstring.builtin-fwj` | `;fwj` | `放射性摄取未见明显增高（见图）` | `red-reset` | `true` |
-| `Hotstring.builtin-fjd` | `;fjd` | `放射性摄取降低（见图）` | `red-reset` | `true` |
-| `Hotstring.builtin-cmx` | `;cmx` | `cm×cm` | `text` | `true` |
-
-`builtin-cmx` 在默认 `text` 模式下继续保留历史固定 `Left 2` 行为；它不是用户配置字段。所有其他 position、color、coordinate、timing、offset 和 Left-count 均不可配置。
-
-所有 builtin 和 custom entry 使用相同的 red mode 规则：正文保持普通黑字，只有末尾完整的 `（见图）` 使用红色 CF_HTML。现有 builtin 的 `Text` 已包含该标记，因此运行时会拆分而不是再次追加，已有用户配置文件无需重写。
+| Section | Trigger | Text | Enabled |
+| --- | --- | --- | --- |
+| `Hotstring.builtin-red` | `;red` | `{{red:（见图）}}` | `true` |
+| `Hotstring.builtin-fzg` | `;fzg` | `放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}` | `true` |
+| `Hotstring.builtin-fwj` | `;fwj` | `放射性摄取未见明显增高{{red:（见图）}}` | `true` |
+| `Hotstring.builtin-fjd` | `;fjd` | `放射性摄取降低{{red:（见图）}}` | `true` |
+| `Hotstring.builtin-cmx` | `;cmx` | `cm×{{cursor}}cm` | `true` |
 
 可在文件末尾添加自定义项，例如：
 
@@ -91,12 +85,9 @@ Enabled=true
 Name=重点提示
 Trigger=;warning
 Text=请重点关注该病灶
-Mode=red-reset
 ```
 
-上述示例最终输出黑色 `请重点关注该病灶`，并在末尾追加红色 `（见图）`。
-
-内置项和自定义项进入同一个 `HotstringEntry` 模型、动态 `Hotstring()` 注册器和 mode dispatcher，并继续共用 MedEx-only foreground guard。
+旧 Schema 1 配置首次由本版本启动时，会先进行只读审计，再创建时间戳备份、写入临时文件并验证，最后才替换为 Schema 2。旧 `text`、`red-reset`、`red-left4` 和 builtin `cmx` 会按已知语义迁移；无法无歧义保留的自定义项会阻止迁移并保留原文件。Schema 2 不能由已发布的旧 EXE 正确读取；若要降级，必须退出程序并恢复迁移前备份。
 
 ## 可选全局 HJKL 方向键
 

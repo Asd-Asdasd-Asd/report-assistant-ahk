@@ -1,11 +1,10 @@
 class EditableReportHotstringEntry {
-    __New(section, enabled, name, trigger, text, mode, isBuiltin := false) {
+    __New(section, enabled, name, trigger, text, isBuiltin := false) {
         this.Section := String(section)
         this.Enabled := enabled = true
         this.Name := String(name)
         this.Trigger := String(trigger)
         this.Text := String(text)
-        this.Mode := String(mode)
         this.IsBuiltin := isBuiltin = true
     }
 }
@@ -22,11 +21,12 @@ class ReportHotstringEditorLoadResult {
 }
 
 class ReportHotstringEditorValidationResult {
-    __New(ok, row := 0, field := "", message := "") {
+    __New(ok, row := 0, field := "", message := "", section := "") {
         this.Ok := ok = true
         this.Row := row
         this.Field := String(field)
         this.Message := String(message)
+        this.Section := String(section)
     }
 }
 
@@ -105,7 +105,6 @@ LoadEditableReportHotstringConfig(configPath := "") {
             raw.Name,
             raw.Trigger,
             raw.Text,
-            raw.Mode,
             IsBuiltinReportHotstringSection(raw.Section)
         ))
     }
@@ -113,6 +112,12 @@ LoadEditableReportHotstringConfig(configPath := "") {
         return ReportHotstringEditorLoadResult(
             false, configPath, originalText, ,
             "配置文件中没有可编辑的报告模板。"
+        )
+    }
+    validation := ValidateEditableReportHotstringEntries(entries)
+    if !validation.Ok {
+        return ReportHotstringEditorLoadResult(
+            false, configPath, originalText, , validation.Message
         )
     }
     return ReportHotstringEditorLoadResult(
@@ -138,13 +143,12 @@ CreateEditableReportHotstring(entries, reservedSections := 0) {
         suffix += 1
     }
     return EditableReportHotstringEntry(
-        section, true, "新的模板", "", "", ReportHotstringMode.TEXT, false
+        section, true, "新的模板", "", "", false
     )
 }
 
 NormalizeEditableReportHotstringText(value) {
-    value := StrReplace(String(value), "`r`n", "`n")
-    return StrReplace(value, "`r", "`n")
+    return NormalizeReportHotstringTextNewlines(value)
 }
 
 EditableReportHotstringSectionIsReserved(reservedSections, section) {
@@ -174,18 +178,24 @@ ValidateEditableReportHotstringEntries(entries) {
         sectionKey := StrLower(Trim(entry.Section, " `t`r`n"))
         if sectionKey = "" || seenSections.Has(sectionKey) {
             return ReportHotstringEditorValidationResult(
-                false, index, "Name", "模板的内部记录发生冲突，请重新打开设置。"
+                false, index, "Name",
+                "模板的内部记录发生冲突，请重新打开设置。",
+                entry.Section
             )
         }
         if entry.IsBuiltin {
             if !IsBuiltinReportHotstringSection(entry.Section) {
                 return ReportHotstringEditorValidationResult(
-                    false, index, "Name", "内置模板记录无效，请重新打开设置。"
+                    false, index, "Name",
+                    "内置模板记录无效，请重新打开设置。",
+                    entry.Section
                 )
             }
         } else if !IsCustomReportHotstringSection(entry.Section) {
             return ReportHotstringEditorValidationResult(
-                false, index, "Name", "自定义模板记录无效，请重新打开设置。"
+                false, index, "Name",
+                "自定义模板记录无效，请重新打开设置。",
+                entry.Section
             )
         }
         seenSections[sectionKey] := true
@@ -193,37 +203,49 @@ ValidateEditableReportHotstringEntries(entries) {
         name := Trim(entry.Name, " `t`r`n")
         if name = "" || InStr(entry.Name, "`r") || InStr(entry.Name, "`n") {
             return ReportHotstringEditorValidationResult(
-                false, index, "Name", "模板名称不能为空或包含换行。"
+                false, index, "Name",
+                "模板名称不能为空或包含换行。",
+                entry.Section
             )
         }
 
         trigger := Trim(entry.Trigger, " `t`r`n")
         if trigger = "" || InStr(entry.Trigger, "`r") || InStr(entry.Trigger, "`n") {
             return ReportHotstringEditorValidationResult(
-                false, index, "Trigger", "触发词不能为空或包含换行。"
+                false, index, "Trigger",
+                "触发词不能为空或包含换行。",
+                entry.Section
             )
         }
         triggerKey := StrLower(trigger)
         if seenTriggers.Has(triggerKey) {
             return ReportHotstringEditorValidationResult(
                 false, index, "Trigger",
-                "触发词“" trigger "”与其他模板重复。"
+                "触发词“" trigger "”与其他模板重复。",
+                entry.Section
             )
         }
         seenTriggers[triggerKey] := true
 
-        mode := StrLower(Trim(entry.Mode, " `t`r`n"))
-        if !IsSupportedReportHotstringMode(mode) {
+        templateValidation := ValidateReportTemplate(entry.Text)
+        if !templateValidation.Ok {
             return ReportHotstringEditorValidationResult(
-                false, index, "Mode", "请选择有效的模板模式。"
+                false, index, "Text",
+                "模板文字有误：" templateValidation.Message,
+                entry.Section
             )
         }
     }
     return ReportHotstringEditorValidationResult(true)
 }
 
-SaveEditableReportHotstringConfig(entries, deletedSections, originalText,
-    configPath := "") {
+SaveEditableReportHotstringConfig(
+    entries,
+    deletedSections,
+    originalText,
+    modifiedSectionKeys,
+    configPath := ""
+) {
     validation := ValidateEditableReportHotstringEntries(entries)
     if !validation.Ok
         return ReportHotstringEditorSaveResult(false, validation.Message)
@@ -242,6 +264,17 @@ SaveEditableReportHotstringConfig(entries, deletedSections, originalText,
             "配置文件已被其他程序修改。请关闭设置窗口并重新打开，避免覆盖新内容。"
         )
     }
+    originalLoad := LoadEditableReportHotstringConfig(configPath)
+    if !originalLoad.Ok
+        return ReportHotstringEditorSaveResult(
+            false, "无法验证保存前的模板配置，未进行任何修改。"
+        )
+    originalBySection := EditableReportHotstringEntriesBySection(
+        originalLoad.Entries
+    )
+    modifiedKeys := NormalizeEditableReportHotstringSectionKeys(
+        modifiedSectionKeys
+    )
 
     tempPath := configPath ".settings.tmp.ini"
     backupPath := ""
@@ -265,6 +298,11 @@ SaveEditableReportHotstringConfig(entries, deletedSections, originalText,
         }
 
         for entry in entries {
+            sectionKey := StrLower(entry.Section)
+            if originalBySection.Has(sectionKey)
+                && !modifiedKeys.Has(sectionKey)
+                continue
+            IniDelete(tempPath, entry.Section)
             IniWrite(
                 entry.Enabled ? "true" : "false",
                 tempPath, entry.Section, "Enabled"
@@ -283,10 +321,6 @@ SaveEditableReportHotstringConfig(entries, deletedSections, originalText,
                 ),
                 tempPath, entry.Section, "Text"
             )
-            IniWrite(
-                StrLower(Trim(entry.Mode, " `t`r`n")),
-                tempPath, entry.Section, "Mode"
-            )
         }
 
         savedLoad := LoadEditableReportHotstringConfig(tempPath)
@@ -294,10 +328,14 @@ SaveEditableReportHotstringConfig(entries, deletedSections, originalText,
             throw Error("Saved configuration could not be read: " savedLoad.Message)
         if !EditableReportHotstringEntriesMatch(entries, savedLoad.Entries)
             throw Error("Saved configuration did not match the edited templates")
-        for sectionKey, unused in deletedKeys {
-            if EditableReportHotstringSectionExists(savedLoad.Entries, sectionKey)
-                throw Error("A deleted template section remained in the file")
-        }
+        if !ValidateEditableReportHotstringSaveResult(
+            originalLoad.Entries,
+            entries,
+            deletedKeys,
+            modifiedKeys,
+            savedLoad.Entries
+        )
+            throw Error("Saved configuration changed an unintended template")
 
         FileMove tempPath, configPath, true
         promoted := true
@@ -307,6 +345,14 @@ SaveEditableReportHotstringConfig(entries, deletedSections, originalText,
             throw Error("Final configuration validation failed")
         if !EditableReportHotstringEntriesMatch(entries, finalLoad.Entries)
             throw Error("Final configuration did not match the edited templates")
+        if !ValidateEditableReportHotstringSaveResult(
+            originalLoad.Entries,
+            entries,
+            deletedKeys,
+            modifiedKeys,
+            finalLoad.Entries
+        )
+            throw Error("Final configuration changed an unintended template")
         return ReportHotstringEditorSaveResult(true, , savedText)
     } catch as err {
         try FileDelete tempPath
@@ -335,21 +381,97 @@ EditableReportHotstringEntriesMatch(expected, actual) {
         return false
     if expected.Length != actual.Length
         return false
-    for index, expectedEntry in expected {
-        actualEntry := actual[index]
-        if expectedEntry.Section != actualEntry.Section
+    actualBySection := EditableReportHotstringEntriesBySection(actual)
+    if actualBySection.Count != actual.Length
+        return false
+    for expectedEntry in expected {
+        sectionKey := StrLower(expectedEntry.Section)
+        if !actualBySection.Has(sectionKey)
             return false
-        if expectedEntry.Enabled != actualEntry.Enabled
-            return false
-        if Trim(expectedEntry.Name, " `t`r`n") != actualEntry.Name
-            return false
-        if Trim(expectedEntry.Trigger, " `t`r`n") != actualEntry.Trigger
-            return false
-        if NormalizeEditableReportHotstringText(expectedEntry.Text)
-            != actualEntry.Text
-            return false
-        if StrLower(Trim(expectedEntry.Mode, " `t`r`n")) != actualEntry.Mode
+        if !EditableReportHotstringEntryMatches(
+            expectedEntry,
+            actualBySection[sectionKey]
+        )
             return false
     }
     return true
+}
+
+EditableReportHotstringEntryMatches(expected, actual) {
+    if StrLower(expected.Section) != StrLower(actual.Section)
+        return false
+    if expected.Enabled != actual.Enabled
+        return false
+    if Trim(expected.Name, " `t`r`n") != actual.Name
+        return false
+    if Trim(expected.Trigger, " `t`r`n") != actual.Trigger
+        return false
+    return NormalizeEditableReportHotstringText(expected.Text) = actual.Text
+}
+
+EditableReportHotstringEntriesBySection(entries) {
+    bySection := Map()
+    if Type(entries) != "Array"
+        return bySection
+    for entry in entries {
+        sectionKey := StrLower(entry.Section)
+        if bySection.Has(sectionKey)
+            return Map()
+        bySection[sectionKey] := entry
+    }
+    return bySection
+}
+
+ValidateEditableReportHotstringSaveResult(
+    originalEntries,
+    intendedEntries,
+    deletedKeys,
+    modifiedKeys,
+    actualEntries
+) {
+    if !EditableReportHotstringEntriesMatch(intendedEntries, actualEntries)
+        return false
+
+    intendedBySection := EditableReportHotstringEntriesBySection(intendedEntries)
+    actualBySection := EditableReportHotstringEntriesBySection(actualEntries)
+    if intendedBySection.Count != intendedEntries.Length
+        || actualBySection.Count != actualEntries.Length
+        return false
+
+    if Type(deletedKeys) = "Map" {
+        for sectionKey, unused in deletedKeys {
+            if actualBySection.Has(sectionKey)
+                return false
+        }
+    }
+
+    for originalEntry in originalEntries {
+        sectionKey := StrLower(originalEntry.Section)
+        wasDeleted := Type(deletedKeys) = "Map" && deletedKeys.Has(sectionKey)
+        if wasDeleted
+            continue
+        if !intendedBySection.Has(sectionKey) || !actualBySection.Has(sectionKey)
+            return false
+        wasModified := Type(modifiedKeys) = "Map"
+            && modifiedKeys.Has(sectionKey)
+        if !wasModified
+            && !EditableReportHotstringEntryMatches(
+                originalEntry,
+                intendedBySection[sectionKey]
+            )
+            return false
+    }
+    return true
+}
+
+NormalizeEditableReportHotstringSectionKeys(keys) {
+    normalized := Map()
+    if Type(keys) = "Map" {
+        for key, unused in keys
+            normalized[StrLower(String(key))] := true
+    } else if Type(keys) = "Array" {
+        for key in keys
+            normalized[StrLower(String(key))] := true
+    }
+    return normalized
 }
