@@ -17,7 +17,7 @@ MedEx 0.0.1.0、1920×1080、100% scaling、DPI 96；观察到 process `medexwor
 
 ## Rollback
 
-若后续 packaging/configuration 工作造成回归，回退到 annotated tag `v0.5.0-color-reset-field-validated`。该 tag 是 source baseline，不是已发布 installer/executable。
+若后续 packaging/configuration 工作造成回归，回退到 historical source baseline commit `ce0bbac`。该 commit 不是已发布 installer/executable。
 
 ## Recalibration
 

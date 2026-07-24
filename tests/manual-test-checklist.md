@@ -40,7 +40,7 @@
 
 ## Current baseline and next checkpoint
 
-- Candidate G promotion baseline：`2369b68` / `v0.6.0-candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`，Step 3=`6c2e2dc`，Step 4=`5193403`。
+- Candidate G promotion baseline：`2369b68` / `candidate-g`；Step 1=`87dce53`，Step 2=`7a0d9a2`，Step 3=`6c2e2dc`，Step 4=`5193403`。
 - Step 3 已记录 `86 tests passed`；验收 release SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`。
 - Step 5 已记录 `89 tests passed`；Windows version-metadata validation 与 generated-release smoke test 已通过。
 - `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅显式 comparison/rollback；无 fallback。
