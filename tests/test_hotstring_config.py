@@ -102,6 +102,7 @@ class HotstringConfigTests(unittest.TestCase):
         self.assertIn('token = "cursor"', renderer)
         self.assertIn('token = "date"', renderer)
         self.assertIn('token = "suvmax"', renderer)
+        self.assertIn('token = "size"', renderer)
         self.assertIn('token = "red:（见图）"', renderer)
         self.assertIn("RedFigureStartIndex", renderer)
         self.assertIn("必须是模板最后一个元素", renderer)
@@ -126,6 +127,7 @@ class HotstringConfigTests(unittest.TestCase):
             "plan := BuildReportTemplatePlan(entry.Text, runtimeContext)", body
         )
         self.assertIn("MxNMMeasurementProvider.ReadSuvMax()", body)
+        self.assertIn("MxNMMeasurementProvider.ReadLineAxes()", body)
         self.assertIn("ExecuteReportTemplatePlan(plan, reportHwnd)", body)
         executor = hotstrings.split("ExecuteReportTemplatePlan(", 1)[1]
         self.assertIn("if plan.RequiresColorReset", executor)

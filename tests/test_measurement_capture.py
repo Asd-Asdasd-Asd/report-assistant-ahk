@@ -25,6 +25,28 @@ def parse_suvmax_fixture(raw_text: str) -> tuple[str, str]:
     return ("FOUND", f"{value:.1f}")
 
 
+def parse_line_axes_fixture(raw_text: str) -> tuple[str, str]:
+    normalized = raw_text.strip(" \t\r\n\u200b\ufeff")
+    if normalized == "":
+        return ("NOT_ANNOTATED", "")
+    patterns = (
+        r"(\d+(?:\.\d+)?)cm",
+        r"(\d+(?:\.\d+)?)cm×(\d+(?:\.\d+)?)cm \(长径×短径\)",
+        r"(\d+(?:\.\d+)?)cm×(\d+(?:\.\d+)?)cm×"
+        r"(\d+(?:\.\d+)?)cm \(长径×短径×上下径\)",
+    )
+    match = next(
+        (match for pattern in patterns if (match := re.fullmatch(pattern, normalized))),
+        None,
+    )
+    if match is None:
+        return ("AUTOMATION_FAILED", "")
+    values = sorted((float(value) for value in match.groups()), reverse=True)
+    if any(value <= 0 for value in values):
+        return ("AUTOMATION_FAILED", "")
+    return ("FOUND", "×".join(f"{value:.1f}cm" for value in values))
+
+
 class MeasurementCaptureTests(unittest.TestCase):
     def test_result_contract_uses_state_as_the_canonical_outcome(self) -> None:
         model = source("src/measurement_model.ahk")
@@ -56,6 +78,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             "this.measurementType := String(measurementType)",
             "this.commandText := String(commandText)",
             "this.parserCallback := parserCallback",
+            "this.acceptEmptyClipboard := acceptEmptyClipboard = true",
             "IsValidMeasurementCommandSpec(spec)",
             'static INVALID_MEASUREMENT_SPEC := "INVALID_MEASUREMENT_SPEC"',
         ):
@@ -64,6 +87,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             "static ReadMeasurement(spec, options := 0)",
             "ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0)",
             "BuildSuvMaxMeasurementCommandSpec()",
+            "BuildLineAxesMeasurementCommandSpec()",
             "return this.ReadMeasurement(BuildSuvMaxMeasurementCommandSpec(), options)",
         ):
             self.assertIn(required, provider)
@@ -92,6 +116,39 @@ class MeasurementCaptureTests(unittest.TestCase):
         for raw_text, expected in fixtures.items():
             with self.subTest(raw_text=raw_text):
                 self.assertEqual(parse_suvmax_fixture(raw_text), expected)
+
+    def test_line_axes_parser_is_strict_sorted_and_empty_aware(self) -> None:
+        parser = source("src/measurement_parser.ahk")
+        for required in (
+            "ParseLineAxesMeasurement(rawText)",
+            r"\x{200B}",
+            r"\x{FEFF}",
+            "SortLineAxisValuesDescending(values)",
+            'role: "axis_" index',
+            'Format("{:.1f}", value)',
+        ):
+            self.assertIn(required, parser)
+
+        fixtures = {
+            "": ("NOT_ANNOTATED", ""),
+            "\u200b 2.6cm \ufeff": ("FOUND", "2.6cm"),
+            "1.2cm×2.2cm (长径×短径)": (
+                "FOUND",
+                "2.2cm×1.2cm",
+            ),
+            "3.1cm×2.8cm×3.2cm (长径×短径×上下径)": (
+                "FOUND",
+                "3.2cm×3.1cm×2.8cm",
+            ),
+            "0cm": ("AUTOMATION_FAILED", ""),
+            "-1cm": ("AUTOMATION_FAILED", ""),
+            "1.2cm×2.2cm": ("AUTOMATION_FAILED", ""),
+            "1cm×2cm (短径×长径)": ("AUTOMATION_FAILED", ""),
+            "1cm×2cm×3cm×4cm": ("AUTOMATION_FAILED", ""),
+        }
+        for raw_text, expected in fixtures.items():
+            with self.subTest(raw_text=raw_text):
+                self.assertEqual(parse_line_axes_fixture(raw_text), expected)
 
     def test_measurement_clipboard_transaction_has_one_restore_owner(self) -> None:
         transaction = source("src/measurement_clipboard.ahk")
@@ -132,6 +189,19 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertIn('"User32\\GetClipboardOwner"', transaction)
         self.assertIn("static busy := false", transaction)
         self.assertIn("MeasurementFailureReason.PROVIDER_BUSY", transaction)
+
+    def test_fresh_empty_clipboard_is_opt_in_and_stabilized(self) -> None:
+        model = source("src/measurement_model.ahk")
+        transaction = source("src/measurement_clipboard.ahk")
+        provider = source("src/context_measurement_provider.ahk")
+        self.assertIn("acceptEmptyClipboard := false", model)
+        self.assertIn('"acceptEmptyClipboard", false', transaction)
+        self.assertIn("static EmptyResultSettleMs := 40", transaction)
+        self.assertIn("sequence != sequenceBeforeCommand", transaction)
+        self.assertIn("acceptEmptyClipboard && rawText = \"\"", transaction)
+        self.assertIn("spec.acceptEmptyClipboard", provider)
+        self.assertIn("ParseLineAxesMeasurement", provider)
+        self.assertIn("ContextMeasurementDefaults.LineAxesCommandText", provider)
 
     def test_provider_uses_background_messages_and_dynamic_runtime_identity(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
@@ -180,6 +250,7 @@ class MeasurementCaptureTests(unittest.TestCase):
         hotstrings = source("src/hotstrings.ahk")
         self.assertNotIn("ContextMeasurementProvider", hotstrings)
         self.assertIn("MxNMMeasurementProvider.ReadSuvMax()", hotstrings)
+        self.assertIn("MxNMMeasurementProvider.ReadLineAxes()", hotstrings)
         self.assertIn("MxNMAnnotationCleaner.DeleteAll(", hotstrings)
 
     def test_cleanup_reuses_context_transport_and_verifies_postcondition(
@@ -266,6 +337,31 @@ class MeasurementCaptureTests(unittest.TestCase):
             "static ReadMeasurement(spec, options := 0)",
         ):
             self.assertIn(symbol, release)
+
+    def test_line_axes_field_harness_is_privacy_safe_and_non_intrusive(
+        self,
+    ) -> None:
+        harness = source("tests/windows/mxnm_line_axes_field.ahk")
+        for required in (
+            "MxNMMeasurementProvider.WarmTarget()",
+            "MxNMMeasurementProvider.ReadLineAxes()",
+            "MeasurementType.LINE_AXES",
+            "mxnm_line_axes_field.txt",
+            "ClipboardCaptureSucceeded=",
+            "ClipboardRestoreSucceeded=",
+            "VerificationState=",
+            "ForegroundUnchanged=",
+            "MouseUnchanged=",
+        ):
+            self.assertIn(required, harness)
+        for forbidden in (
+            "rawValue",
+            "formattedValue=",
+            "SoundBeep",
+            "MouseMove",
+            "WinActivate",
+        ):
+            self.assertNotIn(forbidden, harness)
 
     def test_windows_harness_uses_production_measurement_modules(self) -> None:
         harness = source("tests/windows/measurement_capture_regression.ahk")

@@ -91,6 +91,52 @@ RunMeasurementCaptureRegression() {
         )
     }
 
+    AssertLineAxesResult(
+        ParseLineAxesMeasurement(""),
+        MeasurementState.NOT_ANNOTATED,
+        "",
+        0,
+        "empty line measurement"
+    )
+    AssertLineAxesResult(
+        ParseLineAxesMeasurement(Chr(0x200B) "2.6cm" Chr(0xFEFF)),
+        MeasurementState.FOUND,
+        "2.6cm",
+        1,
+        "single line measurement"
+    )
+    AssertLineAxesResult(
+        ParseLineAxesMeasurement("1.2cm×2.2cm (长径×短径)"),
+        MeasurementState.FOUND,
+        "2.2cm×1.2cm",
+        2,
+        "sorted two-axis measurement"
+    )
+    AssertLineAxesResult(
+        ParseLineAxesMeasurement(
+            "3.1cm×2.8cm×3.2cm (长径×短径×上下径)"
+        ),
+        MeasurementState.FOUND,
+        "3.2cm×3.1cm×2.8cm",
+        3,
+        "sorted three-axis measurement"
+    )
+    for malformedLine in [
+        "0cm",
+        "-1cm",
+        "1.2cm×2.2cm",
+        "1cm×2cm (短径×长径)",
+        "1cm×2cm×3cm×4cm"
+    ] {
+        lineParseResult := ParseLineAxesMeasurement(malformedLine)
+        AssertMeasurement(
+            lineParseResult.state = MeasurementState.AUTOMATION_FAILED
+                && lineParseResult.failureReason
+                    = MeasurementFailureReason.UNEXPECTED_FORMAT,
+            "malformed line measurement: " malformedLine
+        )
+    }
+
     A_Clipboard := "MEASUREMENT_ORIGINAL"
     capture := CaptureMeasurementClipboardText(
         () => SetMeasurementFixtureClipboard("SUVMax: 2.14"),
@@ -105,6 +151,23 @@ RunMeasurementCaptureRegression() {
     AssertMeasurement(
         A_Clipboard = "MEASUREMENT_ORIGINAL",
         "fresh capture clipboard restore"
+    )
+
+    emptyCapture := CaptureMeasurementClipboardText(
+        () => SetMeasurementFixtureClipboard(""),
+        Map(
+            "acceptEmptyClipboard", true,
+            "emptyResultSettleMs", 0,
+            "clipboardTimeoutMs", 100,
+            "clipboardPollIntervalMs", 5,
+            "restoreSettleMs", 0
+        )
+    )
+    AssertMeasurement(emptyCapture.ok, "fresh empty clipboard capture")
+    AssertMeasurement(emptyCapture.rawText = "", "fresh empty raw text")
+    AssertMeasurement(
+        A_Clipboard = "MEASUREMENT_ORIGINAL",
+        "fresh empty capture clipboard restore"
     )
 
     noUpdate := CaptureMeasurementClipboardText(
@@ -170,6 +233,24 @@ AssertSuvMaxResult(result, expectedState, expectedFormatted, label) {
     AssertMeasurement(
         result.formattedValue = expectedFormatted,
         label " formatted value"
+    )
+}
+
+AssertLineAxesResult(
+    result,
+    expectedState,
+    expectedFormatted,
+    expectedComponentCount,
+    label
+) {
+    AssertMeasurement(result.state = expectedState, label " state")
+    AssertMeasurement(
+        result.formattedValue = expectedFormatted,
+        label " formatted value"
+    )
+    AssertMeasurement(
+        result.components.Length = expectedComponentCount,
+        label " component count"
     )
 }
 

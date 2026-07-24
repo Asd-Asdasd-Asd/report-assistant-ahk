@@ -18,9 +18,26 @@
 3 条：3.1cm×2.8cm×3.2cm (长径×短径×上下径)
 ```
 
+没有直线测量标注时，该命令会产生一次新的 clipboard update，并把已有
+clipboard 内容覆盖为空。只有检测到命令后的新 clipboard sequence，才可将
+这个空值解释为 `NOT_ANNOTATED`；sequence 未更新仍是
+`AUTOMATION_FAILED / CLIPBOARD_NOT_UPDATED`。SUVMax command 不接受空值。
+
 第三条现场样本在首个数字前曾携带一个不可见的 `U+200B ZERO
 WIDTH SPACE`。parser 应只在整个 payload 的首尾兼容并移除普通空白、
 `U+200B` 和 `U+FEFF`；不得在数值、单位、乘号或轴向标签内部静默删除未知字符。
+
+产品输出不采用 vendor 标签推断临床轴向语义。严格识别 1-3 个正数后，按数值
+从大到小排序，并统一格式化为一位小数、逐项 `cm` 和 Unicode `×`：
+
+```text
+2.6cm
+3.1cm×2.8cm
+3.2cm×3.1cm×2.8cm
+```
+
+zero、negative、malformed、标签不匹配或 4 条及以上均返回
+`AUTOMATION_FAILED / UNEXPECTED_FORMAT`。
 
 已验证调用链：
 
@@ -78,7 +95,7 @@ SUVMax: 3.599
 ContextMeasurementProvider
 ├── open_context_popup()
 ├── invoke_copy_command(command_text)
-├── read_line_measurement()
+├── read_line_axes()
 └── read_suvmax()
 ```
 
@@ -97,7 +114,7 @@ ContextMeasurementProvider
 - 等待剪贴板更新；
 - 返回剪贴板文本。
 
-`read_line_measurement()` 职责：
+`read_line_axes()` 职责：
 
 - command text: `复制直线测量值`；
 - validate and parse line axes。
@@ -192,6 +209,27 @@ movement with hard-coded `Left 4`/`Left 5`.
 Automation is opt-in by token: built-in and custom templates containing
 `{{suvmax}}` trigger acquisition; templates containing only `{{cursor}}` or
 `{{red:（见图）}}` retain their previous behavior.
+
+### `{{size}}` orchestration
+
+`{{size}}` 使用相同的 target resolver、context popup transport、clipboard
+transaction、report transaction 和 annotation cleaner。区别仅在 command
+spec、parser 和 fresh-empty policy：
+
+```text
+MxNMMeasurementProvider.ReadLineAxes()
+-> FOUND: insert 1-3 axes in descending numeric order
+-> NOT_ANNOTATED/AUTOMATION_FAILED: expand to empty and force {{size}}
+   to become the manual-input caret anchor
+-> FOUND + report transaction success: invoke 删除全部标注
+-> verify cleanup by reading line axes again; fresh empty must map to
+   NOT_ANNOTATED
+```
+
+人工路径不新增第二套尺寸模板逻辑：用户在锚点键入第一个数值后，继续调用
+现有 `;cmx`，得到 `cm×{{cursor}}cm`。首版每个模板最多一个 `{{size}}`，
+并且同一模板不得同时使用 `{{size}}` 与 `{{suvmax}}`，避免两个自动读取和
+人工锚点之间产生歧义。
 
 ### SUVMax state mapping
 

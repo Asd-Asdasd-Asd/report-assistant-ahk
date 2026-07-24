@@ -38,10 +38,12 @@ class MeasurementFailureReason {
 }
 
 class MeasurementCommandSpec {
-    __New(measurementType, commandText, parserCallback) {
+    __New(measurementType, commandText, parserCallback,
+        acceptEmptyClipboard := false) {
         this.measurementType := String(measurementType)
         this.commandText := String(commandText)
         this.parserCallback := parserCallback
+        this.acceptEmptyClipboard := acceptEmptyClipboard = true
     }
 }
 
@@ -51,6 +53,7 @@ IsValidMeasurementCommandSpec(spec) {
         && spec.commandText != ""
         && IsObject(spec.parserCallback)
         && HasMethod(spec.parserCallback, "Call")
+        && Type(spec.acceptEmptyClipboard) = "Integer"
 }
 
 class MeasurementResult {

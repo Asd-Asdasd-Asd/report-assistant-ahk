@@ -3,6 +3,7 @@ class ReportHotstringDefaults {
     static CursorPlaceholder := "{{cursor}}"
     static DatePlaceholder := "{{date}}"
     static SuvMaxPlaceholder := "{{suvmax}}"
+    static SizePlaceholder := "{{size}}"
     static RedFigureReferencePlaceholder := "{{red:（见图）}}"
 
     static BuiltinDefinitions() {

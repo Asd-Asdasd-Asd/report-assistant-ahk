@@ -16,6 +16,10 @@ class ReportAssistantSettingsDefaults {
                 Token: ReportHotstringDefaults.SuvMaxPlaceholder
             },
             {
+                Label: "自动获取尺寸",
+                Token: ReportHotstringDefaults.SizePlaceholder
+            },
+            {
                 Label: "红色“（见图）”",
                 Token: ReportHotstringDefaults.RedFigureReferencePlaceholder
             }

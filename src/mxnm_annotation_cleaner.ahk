@@ -17,17 +17,20 @@ class MxNMAnnotationCleanupCode {
 
 class MxNMAnnotationCleaner {
     static DeleteAll(expectedViewerHwnd := 0, expectedViewerPid := 0,
-        options := 0) {
+        options := 0,
+        cleanupMeasurementType := MeasurementType.SUVMAX) {
         return DeleteAllMxNMAnnotations(
             expectedViewerHwnd,
             expectedViewerPid,
-            options
+            options,
+            cleanupMeasurementType
         )
     }
 }
 
 DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
-    options := 0) {
+    options := 0,
+    cleanupMeasurementType := MeasurementType.SUVMAX) {
     result := {
         ok: false,
         code: MxNMAnnotationCleanupCode.UNEXPECTED_ERROR,
@@ -122,7 +125,9 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
     verificationOptions := CloneMeasurementOptions(options)
     verificationOptions["expectedViewerHwnd"] := expectedViewerHwnd
     verificationOptions["expectedViewerPid"] := expectedViewerPid
-    verification := MxNMMeasurementProvider.ReadSuvMax(verificationOptions)
+    verification := cleanupMeasurementType = MeasurementType.LINE_AXES
+        ? MxNMMeasurementProvider.ReadLineAxes(verificationOptions)
+        : MxNMMeasurementProvider.ReadSuvMax(verificationOptions)
     result.verificationState := verification.state
     if verification.state != MeasurementState.NOT_ANNOTATED {
         result.code := MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED

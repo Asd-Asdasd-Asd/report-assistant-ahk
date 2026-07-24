@@ -25,6 +25,8 @@ def render(
     date: str = "2001-03-13",
     suv_state: str | None = None,
     suv_text: str = "",
+    size_state: str | None = None,
+    size_text: str = "",
 ) -> Plan:
     output: list[str] = []
     cursor: int | None = None
@@ -32,6 +34,9 @@ def render(
     suv_anchor: int | None = None
     suv_count = 0
     force_suv_anchor = False
+    size_anchor: int | None = None
+    size_count = 0
+    force_size_anchor = False
     position = 0
     while position < len(template):
         opener = template.find("{{", position)
@@ -55,6 +60,8 @@ def render(
         elif token == "date":
             output.append(date)
         elif token == "suvmax":
+            if size_count:
+                raise ValueError("mixed measurement placeholders")
             suv_count += 1
             if suv_count > 1:
                 raise ValueError("multiple suvmax")
@@ -69,6 +76,36 @@ def render(
                 force_suv_anchor = True
             else:
                 raise ValueError("missing suvmax runtime")
+        elif token == "size":
+            if suv_count:
+                raise ValueError("mixed measurement placeholders")
+            size_count += 1
+            if size_count > 1:
+                raise ValueError("multiple size")
+            size_anchor = len("".join(output))
+            size_components = size_text.split("×")
+            size_values = [
+                float(match.group(1))
+                for component in size_components
+                if (
+                    match := re.fullmatch(
+                        r"((?:0|[1-9]\d*)\.\d)cm",
+                        component,
+                    )
+                )
+            ]
+            valid_size = (
+                1 <= len(size_components) <= 3
+                and len(size_values) == len(size_components)
+                and all(value > 0 for value in size_values)
+                and size_values == sorted(size_values, reverse=True)
+            )
+            if size_state == "FOUND" and valid_size:
+                output.append(size_text)
+            elif size_state in ("NOT_ANNOTATED", "AUTOMATION_FAILED"):
+                force_size_anchor = True
+            else:
+                raise ValueError("missing size runtime")
         elif token == "red:（见图）":
             if red_text:
                 raise ValueError("multiple red token")
@@ -80,7 +117,9 @@ def render(
             raise ValueError("unknown")
         position = closer + 2
     text = "".join(output)
-    if force_suv_anchor:
+    if force_size_anchor:
+        cursor = size_anchor
+    elif force_suv_anchor:
         cursor = suv_anchor
     elif cursor is None:
         cursor = len(text)
@@ -94,6 +133,56 @@ def render(
 
 
 class TemplateEngineBehaviorTests(unittest.TestCase):
+    def test_size_found_and_manual_anchor(self) -> None:
+        found = render(
+            "大小{{size}}{{red:（见图）}}",
+            size_state="FOUND",
+            size_text="3.2cm×3.1cm×2.8cm",
+        )
+        self.assertEqual(found.text, "大小3.2cm×3.1cm×2.8cm（见图）")
+        self.assertEqual(found.left, 0)
+        self.assertTrue(found.reset)
+
+        for state in ("NOT_ANNOTATED", "AUTOMATION_FAILED"):
+            manual = render(
+                "{{cursor}}大小{{size}}{{red:（见图）}}",
+                size_state=state,
+            )
+            self.assertEqual(manual.text, "大小（见图）")
+            self.assertEqual(manual.left, len(MARKER))
+            self.assertFalse(manual.reset)
+
+    def test_size_runtime_count_and_measurement_exclusivity(self) -> None:
+        with self.assertRaises(ValueError):
+            render("{{size}}")
+        with self.assertRaises(ValueError):
+            render(
+                "{{size}}{{size}}",
+                size_state="FOUND",
+                size_text="1.0cm",
+            )
+        with self.assertRaises(ValueError):
+            render(
+                "{{suvmax}}{{size}}",
+                suv_state="FOUND",
+                suv_text="3.2",
+                size_state="FOUND",
+                size_text="1.0cm",
+            )
+        for invalid_size in (
+            "0.0cm",
+            "1.0cm×2.0cm",
+            "1.0cm×0.0cm",
+            "1.0cm×2.0cm×3.0cm×4.0cm",
+        ):
+            with self.subTest(invalid_size=invalid_size):
+                with self.assertRaises(ValueError):
+                    render(
+                        "{{size}}",
+                        size_state="FOUND",
+                        size_text=invalid_size,
+                    )
+
     def test_suvmax_found_uses_cursor_or_default_end(self) -> None:
         default_end = render(
             "SUVmax{{suvmax}}{{red:（见图）}}",

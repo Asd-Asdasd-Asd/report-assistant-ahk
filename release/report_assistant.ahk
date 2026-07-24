@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0
-; Source revision: 82c3869f541dae8d9838d67e8851a1c588d1a5be-dirty
-; Generated at: 2026-07-24 11:53:49 UTC
+; Source revision: 3d83dc090a520ee04adba9d836a32533da4ae573-dirty
+; Generated at: 2026-07-24 12:21:59 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0"
     static Channel := "internal-test"
-    static SourceRevision := "82c3869f541dae8d9838d67e8851a1c588d1a5be-dirty"
+    static SourceRevision := "3d83dc090a520ee04adba9d836a32533da4ae573-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -8644,10 +8644,12 @@ class MeasurementFailureReason {
 }
 
 class MeasurementCommandSpec {
-    __New(measurementType, commandText, parserCallback) {
+    __New(measurementType, commandText, parserCallback,
+        acceptEmptyClipboard := false) {
         this.measurementType := String(measurementType)
         this.commandText := String(commandText)
         this.parserCallback := parserCallback
+        this.acceptEmptyClipboard := acceptEmptyClipboard = true
     }
 }
 
@@ -8657,6 +8659,7 @@ IsValidMeasurementCommandSpec(spec) {
         && spec.commandText != ""
         && IsObject(spec.parserCallback)
         && HasMethod(spec.parserCallback, "Call")
+        && Type(spec.acceptEmptyClipboard) = "Integer"
 }
 
 class MeasurementResult {
@@ -8740,6 +8743,104 @@ ParseSuvMaxMeasurement(rawText) {
     )
 }
 
+ParseLineAxesMeasurement(rawText) {
+    rawValue := String(rawText)
+    normalized := RegExReplace(
+        rawValue,
+        "^[\s\x{200B}\x{FEFF}]+|[\s\x{200B}\x{FEFF}]+$"
+    )
+    if normalized = "" {
+        return MakeMeasurementResult(
+            MeasurementState.NOT_ANNOTATED,
+            MeasurementType.LINE_AXES,
+            rawValue
+        )
+    }
+
+    values := []
+    if RegExMatch(
+        normalized,
+        "^(\d+(?:\.\d+)?)cm$",
+        &match
+    ) {
+        values.Push(match[1] + 0)
+    } else if RegExMatch(
+        normalized,
+        "^(\d+(?:\.\d+)?)cm×(\d+(?:\.\d+)?)cm "
+            . "\(长径×短径\)$",
+        &match
+    ) {
+        values.Push(match[1] + 0, match[2] + 0)
+    } else if RegExMatch(
+        normalized,
+        "^(\d+(?:\.\d+)?)cm×(\d+(?:\.\d+)?)cm×"
+            . "(\d+(?:\.\d+)?)cm \(长径×短径×上下径\)$",
+        &match
+    ) {
+        values.Push(match[1] + 0, match[2] + 0, match[3] + 0)
+    } else {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            MeasurementType.LINE_AXES,
+            rawValue,
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.UNEXPECTED_FORMAT
+        )
+    }
+
+    for value in values {
+        if value <= 0 {
+            return MakeMeasurementResult(
+                MeasurementState.AUTOMATION_FAILED,
+                MeasurementType.LINE_AXES,
+                rawValue,
+                "",
+                MeasurementSource.MXNM_CONTEXT_COMMAND,
+                MeasurementFailureReason.UNEXPECTED_FORMAT
+            )
+        }
+    }
+    SortLineAxisValuesDescending(values)
+    components := []
+    formattedValue := ""
+    for index, value in values {
+        formattedComponent := Format("{:.1f}", value)
+        formattedValue .= (index = 1 ? "" : "×")
+            . formattedComponent "cm"
+        components.Push({
+            role: "axis_" index,
+            value: value,
+            unit: "cm"
+        })
+    }
+    return MakeMeasurementResult(
+        MeasurementState.FOUND,
+        MeasurementType.LINE_AXES,
+        rawValue,
+        formattedValue,
+        MeasurementSource.MXNM_CONTEXT_COMMAND,
+        MeasurementFailureReason.NONE,
+        0,
+        components
+    )
+}
+
+SortLineAxisValuesDescending(values) {
+    index := 2
+    while index <= values.Length {
+        current := values[index]
+        insertionIndex := index - 1
+        while insertionIndex >= 1
+            && values[insertionIndex] < current {
+            values[insertionIndex + 1] := values[insertionIndex]
+            insertionIndex -= 1
+        }
+        values[insertionIndex + 1] := current
+        index += 1
+    }
+}
+
 ; --- END measurement_parser.ahk ---
 
 ; --- BEGIN measurement_clipboard.ahk ---
@@ -8748,6 +8849,7 @@ class MeasurementClipboardDefaults {
     static PollIntervalMs := 20
     static SentinelTimeoutSeconds := 0.5
     static RestoreSettleMs := 100
+    static EmptyResultSettleMs := 40
 }
 
 CaptureMeasurementClipboardText(actionCallback, options := 0,
@@ -8902,7 +9004,17 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
         MeasurementClipboardDefaults.PollIntervalMs
     )
     deadline := A_TickCount + Max(0, Integer(timeoutMs))
+    acceptEmptyClipboard := MeasurementOption(
+        options, "acceptEmptyClipboard", false
+    )
+    emptyResultSettleMs := MeasurementOption(
+        options,
+        "emptyResultSettleMs",
+        MeasurementClipboardDefaults.EmptyResultSettleMs
+    )
     lastSequence := sequenceBeforeCommand
+    emptySequence := 0
+    emptyDeadline := 0
     loop {
         sequence := GetMeasurementClipboardSequenceNumber()
         if sequence != sequenceBeforeCommand {
@@ -8918,6 +9030,23 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
                     rawText: rawText,
                     sequence: sequence,
                     ownerHwnd: ownerHwnd
+                }
+            }
+            if acceptEmptyClipboard && rawText = "" {
+                if sequence != emptySequence {
+                    emptySequence := sequence
+                    emptyDeadline := A_TickCount
+                        + Max(0, Integer(emptyResultSettleMs))
+                }
+                if A_TickCount >= emptyDeadline {
+                    return {
+                        ok: true,
+                        rawText: "",
+                        sequence: sequence,
+                        ownerHwnd: DllCall(
+                            "User32\GetClipboardOwner", "Ptr"
+                        )
+                    }
                 }
             }
         }
@@ -9659,6 +9788,7 @@ ReadMxNMBcryptUIntProperty(algorithmHandle, propertyName) {
 class ContextMeasurementDefaults {
     static ViewerExe := "MedExNMFusion.exe"
     static SuvMaxCommandText := "复制SUVMax值"
+    static LineAxesCommandText := "复制直线测量值"
     static PopupClass := "#32770"
     static PopupTimeoutMs := 1000
     static PopupPollIntervalMs := 20
@@ -9673,6 +9803,13 @@ class ContextMeasurementProvider {
     static ReadSuvMax(options := 0) {
         return this.ReadMeasurement(BuildSuvMaxMeasurementCommandSpec(), options)
     }
+
+    static ReadLineAxes(options := 0) {
+        return this.ReadMeasurement(
+            BuildLineAxesMeasurementCommandSpec(),
+            options
+        )
+    }
 }
 
 ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
@@ -9684,6 +9821,15 @@ BuildSuvMaxMeasurementCommandSpec() {
         MeasurementType.SUVMAX,
         ContextMeasurementDefaults.SuvMaxCommandText,
         ParseSuvMaxMeasurement
+    )
+}
+
+BuildLineAxesMeasurementCommandSpec() {
+    return MeasurementCommandSpec(
+        MeasurementType.LINE_AXES,
+        ContextMeasurementDefaults.LineAxesCommandText,
+        ParseLineAxesMeasurement,
+        true
     )
 }
 
@@ -9776,10 +9922,13 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
         "commandControlHwnd", 0,
         "commandRuntimeId", 0
     )
+    captureOptions := CloneContextMeasurementOptions(options)
+    captureOptions["acceptEmptyClipboard"] :=
+        spec.acceptEmptyClipboard
     try {
         capture := CaptureMeasurementClipboardText(
             () => InvokePreparedMxNMContextCommand(actionContext),
-            options,
+            captureOptions,
             () => PrepareMxNMContextCommand(
                 viewer,
                 pointResult.clientPoint,
@@ -9852,6 +10001,15 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
     }
     result.context := context
     return result
+}
+
+CloneContextMeasurementOptions(options := 0) {
+    clone := Map()
+    if Type(options) = "Map" {
+        for key, value in options
+            clone[key] := value
+    }
+    return clone
 }
 
 ResolveContextMeasurementViewer(viewerExe, options := 0) {
@@ -10963,54 +11121,17 @@ class MxNMMeasurementProvider {
     static CachedTarget := 0
 
     static ReadSuvMax(options := 0) {
-        startedAt := A_TickCount
-        targetStartedAt := A_TickCount
-        target := this.ResolveTarget(options)
-        targetResolutionMs := A_TickCount - targetStartedAt
-        if !target.ok
-            return MakeMxNMTargetFailureMeasurement(
-                target,
-                targetResolutionMs,
-                A_TickCount - startedAt
-            )
+        return ReadMxNMMeasurementWithTarget(
+            BuildSuvMaxMeasurementCommandSpec(),
+            options
+        )
+    }
 
-        providerOptions := CloneMeasurementOptions(options)
-        expectedViewerHwnd := MeasurementOption(
-            options, "expectedViewerHwnd", 0
+    static ReadLineAxes(options := 0) {
+        return ReadMxNMMeasurementWithTarget(
+            BuildLineAxesMeasurementCommandSpec(),
+            options
         )
-        expectedViewerPid := MeasurementOption(
-            options, "expectedViewerPid", 0
-        )
-        if (expectedViewerHwnd && target.actionHwnd != expectedViewerHwnd)
-            || (expectedViewerPid && target.actionPid != expectedViewerPid) {
-            return MakeMeasurementResult(
-                MeasurementState.AUTOMATION_FAILED,
-                MeasurementType.SUVMAX,
-                "",
-                "",
-                MeasurementSource.MXNM_CONTEXT_COMMAND,
-                MeasurementFailureReason.VIEWER_TARGET_CHANGED,
-                Map(
-                    "targetCode", target.code,
-                    "targetActionHwnd", target.actionHwnd,
-                    "targetActionPid", target.actionPid,
-                    "targetResolutionMs", targetResolutionMs,
-                    "totalReadMs", A_TickCount - startedAt
-                )
-            )
-        }
-        providerOptions["imageScreenPoint"] := target.screenPoint
-        providerOptions["expectedViewerHwnd"] := target.actionHwnd
-        providerOptions["expectedViewerPid"] := target.actionPid
-        result := ContextMeasurementProvider.ReadSuvMax(providerOptions)
-        result.context["targetCode"] := target.code
-        result.context["targetActionHwnd"] := target.actionHwnd
-        result.context["targetActionPid"] := target.actionPid
-        result.context["targetScreenX"] := target.screenPoint.x
-        result.context["targetScreenY"] := target.screenPoint.y
-        result.context["targetResolutionMs"] := targetResolutionMs
-        result.context["totalReadMs"] := A_TickCount - startedAt
-        return result
     }
 
     static ResolveTarget(options := 0) {
@@ -11045,6 +11166,62 @@ class MxNMMeasurementProvider {
     static WarmTarget() {
         return this.ResolveTarget().ok
     }
+}
+
+ReadMxNMMeasurementWithTarget(spec, options := 0) {
+    requestedMeasurementType := spec.measurementType
+    startedAt := A_TickCount
+    targetStartedAt := A_TickCount
+    target := MxNMMeasurementProvider.ResolveTarget(options)
+    targetResolutionMs := A_TickCount - targetStartedAt
+    if !target.ok
+        return MakeMxNMTargetFailureMeasurement(
+            target,
+            requestedMeasurementType,
+            targetResolutionMs,
+            A_TickCount - startedAt
+        )
+
+    providerOptions := CloneMeasurementOptions(options)
+    expectedViewerHwnd := MeasurementOption(
+        options, "expectedViewerHwnd", 0
+    )
+    expectedViewerPid := MeasurementOption(
+        options, "expectedViewerPid", 0
+    )
+    if (expectedViewerHwnd && target.actionHwnd != expectedViewerHwnd)
+        || (expectedViewerPid && target.actionPid != expectedViewerPid) {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.VIEWER_TARGET_CHANGED,
+            Map(
+                "targetCode", target.code,
+                "targetActionHwnd", target.actionHwnd,
+                "targetActionPid", target.actionPid,
+                "targetResolutionMs", targetResolutionMs,
+                "totalReadMs", A_TickCount - startedAt
+            )
+        )
+    }
+    providerOptions["imageScreenPoint"] := target.screenPoint
+    providerOptions["expectedViewerHwnd"] := target.actionHwnd
+    providerOptions["expectedViewerPid"] := target.actionPid
+    result := ContextMeasurementProvider.ReadMeasurement(
+        spec,
+        providerOptions
+    )
+    result.context["targetCode"] := target.code
+    result.context["targetActionHwnd"] := target.actionHwnd
+    result.context["targetActionPid"] := target.actionPid
+    result.context["targetScreenX"] := target.screenPoint.x
+    result.context["targetScreenY"] := target.screenPoint.y
+    result.context["targetResolutionMs"] := targetResolutionMs
+    result.context["totalReadMs"] := A_TickCount - startedAt
+    return result
 }
 
 CloneMeasurementOptions(options := 0) {
@@ -11090,6 +11267,7 @@ MxNMMeasurementRectsEqual(leftRect, rightRect) {
 
 MakeMxNMTargetFailureMeasurement(
     target,
+    requestedType := MeasurementType.SUVMAX,
     targetResolutionMs := 0,
     totalReadMs := 0
 ) {
@@ -11106,7 +11284,7 @@ MakeMxNMTargetFailureMeasurement(
     )
     return MakeMeasurementResult(
         MeasurementState.AUTOMATION_FAILED,
-        MeasurementType.SUVMAX,
+        requestedType,
         "",
         "",
         MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -11137,17 +11315,20 @@ class MxNMAnnotationCleanupCode {
 
 class MxNMAnnotationCleaner {
     static DeleteAll(expectedViewerHwnd := 0, expectedViewerPid := 0,
-        options := 0) {
+        options := 0,
+        cleanupMeasurementType := MeasurementType.SUVMAX) {
         return DeleteAllMxNMAnnotations(
             expectedViewerHwnd,
             expectedViewerPid,
-            options
+            options,
+            cleanupMeasurementType
         )
     }
 }
 
 DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
-    options := 0) {
+    options := 0,
+    cleanupMeasurementType := MeasurementType.SUVMAX) {
     result := {
         ok: false,
         code: MxNMAnnotationCleanupCode.UNEXPECTED_ERROR,
@@ -11242,7 +11423,9 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
     verificationOptions := CloneMeasurementOptions(options)
     verificationOptions["expectedViewerHwnd"] := expectedViewerHwnd
     verificationOptions["expectedViewerPid"] := expectedViewerPid
-    verification := MxNMMeasurementProvider.ReadSuvMax(verificationOptions)
+    verification := cleanupMeasurementType = MeasurementType.LINE_AXES
+        ? MxNMMeasurementProvider.ReadLineAxes(verificationOptions)
+        : MxNMMeasurementProvider.ReadSuvMax(verificationOptions)
     result.verificationState := verification.state
     if verification.state != MeasurementState.NOT_ANNOTATED {
         result.code := MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED
@@ -14838,6 +15021,7 @@ class ReportHotstringDefaults {
     static CursorPlaceholder := "{{cursor}}"
     static DatePlaceholder := "{{date}}"
     static SuvMaxPlaceholder := "{{suvmax}}"
+    static SizePlaceholder := "{{size}}"
     static RedFigureReferencePlaceholder := "{{red:（见图）}}"
 
     static BuiltinDefinitions() {
@@ -14967,6 +15151,8 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         "; 请保持 UTF-16 LE 编码；Text 中的 \n 表示换行。",
         "; Text 可使用 {{cursor}} 标记光标位置，使用 {{date}} 插入当天日期。",
         "; 使用 {{suvmax}} 自动获取 SUVMax；失败时该位置作为人工输入光标。",
+        "; 使用 {{size}} 自动获取 1-3 个直线测量值；失败时该位置作为人工输入光标。",
+        "; 同一个模板不能同时使用 {{suvmax}} 和 {{size}}。",
         "; 只有 {{red:（见图）}} 会插入红色（见图），且必须放在模板最后。",
         "[Config]",
         "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
@@ -14991,7 +15177,7 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
     lines.Push("; 这里只使用小写英文字母、数字和减号，例如 lung-note。")
     lines.Push("; 不要使用中文、空格，也不要继续使用 example。")
     lines.Push("; Name 和 Text 可以正常填写中文。")
-    lines.Push("; 可在 Text 中使用 {{cursor}}、{{date}}、{{suvmax}} 和 {{red:（见图）}}。")
+    lines.Push("; 可在 Text 中使用 {{cursor}}、{{date}}、{{suvmax}}、{{size}} 和 {{red:（见图）}}。")
     lines.Push("; 最后把 Enabled 改成 true。")
     lines.Push("; ============================================================")
     lines.Push("")
@@ -15082,7 +15268,8 @@ class ReportTemplateParseResult {
     __New(ok, renderedText := "", caretIndex := 0, cursorCount := 0,
         redFigureStartIndex := -1, redFigureCount := 0, message := "",
         suvMaxIndex := -1, suvMaxCount := 0,
-        suvMaxCaretForced := false) {
+        suvMaxCaretForced := false, sizeIndex := -1,
+        sizeCount := 0, sizeCaretForced := false) {
         this.Ok := ok = true
         this.RenderedText := String(renderedText)
         this.CaretIndex := caretIndex
@@ -15093,6 +15280,9 @@ class ReportTemplateParseResult {
         this.SuvMaxIndex := suvMaxIndex
         this.SuvMaxCount := suvMaxCount
         this.SuvMaxCaretForced := suvMaxCaretForced = true
+        this.SizeIndex := sizeIndex
+        this.SizeCount := sizeCount
+        this.SizeCaretForced := sizeCaretForced = true
     }
 }
 
@@ -15127,6 +15317,9 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
     suvMaxIndex := -1
     suvMaxCount := 0
     suvMaxCaretForced := false
+    sizeIndex := -1
+    sizeCount := 0
+    sizeCaretForced := false
     position := 1
 
     while position <= StrLen(sourceText) {
@@ -15170,6 +15363,12 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
             output .= expandDate ? FormatTime(, "yyyy-MM-dd")
                 : ReportHotstringDefaults.DatePlaceholder
         } else if token = "suvmax" {
+            if sizeCount > 0 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "{{suvmax}} 和 {{size}} 不能在同一模板中使用。"
+                )
+            }
             suvMaxCount += 1
             if suvMaxCount > 1 {
                 return ReportTemplateParseResult(
@@ -15209,6 +15408,52 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
                     )
                 }
             }
+        } else if token = "size" {
+            if suvMaxCount > 0 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "{{suvmax}} 和 {{size}} 不能在同一模板中使用。"
+                )
+            }
+            sizeCount += 1
+            if sizeCount > 1 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "每个模板最多只能使用一个 {{size}}。",
+                    suvMaxIndex, suvMaxCount, suvMaxCaretForced,
+                    sizeIndex, sizeCount
+                )
+            }
+            sizeIndex := StrLen(output)
+            if expandDate {
+                runtimeState := ReportTemplateRuntimeValue(
+                    runtimeContext, "sizeState", ""
+                )
+                runtimeText := String(ReportTemplateRuntimeValue(
+                    runtimeContext, "sizeText", ""
+                ))
+                if runtimeState = "FOUND" {
+                    if !IsValidRenderedLineAxesValue(runtimeText) {
+                        return ReportTemplateParseResult(
+                            false, , , cursorCount, , redFigureCount,
+                            "尺寸运行时结果格式无效。",
+                            suvMaxIndex, suvMaxCount,
+                            suvMaxCaretForced, sizeIndex, sizeCount
+                        )
+                    }
+                    output .= runtimeText
+                } else if runtimeState = "NOT_ANNOTATED"
+                    || runtimeState = "AUTOMATION_FAILED" {
+                    sizeCaretForced := true
+                } else {
+                    return ReportTemplateParseResult(
+                        false, , , cursorCount, , redFigureCount,
+                        "模板缺少尺寸运行时结果。",
+                        suvMaxIndex, suvMaxCount,
+                        suvMaxCaretForced, sizeIndex, sizeCount
+                    )
+                }
+            }
         } else if token = "red:（见图）" {
             redFigureCount += 1
             if redFigureCount > 1 {
@@ -15238,14 +15483,17 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
         position := closer + 2
     }
 
-    if suvMaxCaretForced
+    if sizeCaretForced
+        caretIndex := sizeIndex
+    else if suvMaxCaretForced
         caretIndex := suvMaxIndex
     else if caretIndex < 0
         caretIndex := StrLen(output)
     return ReportTemplateParseResult(
         true, output, caretIndex, cursorCount,
         redFigureStartIndex, redFigureCount, "",
-        suvMaxIndex, suvMaxCount, suvMaxCaretForced
+        suvMaxIndex, suvMaxCount, suvMaxCaretForced,
+        sizeIndex, sizeCount, sizeCaretForced
     )
 }
 
@@ -15255,6 +15503,28 @@ ReportTemplateRuntimeValue(runtimeContext, key, defaultValue := "") {
     if IsObject(runtimeContext) && runtimeContext.HasOwnProp(key)
         return runtimeContext.%key%
     return defaultValue
+}
+
+IsValidRenderedLineAxesValue(value) {
+    components := StrSplit(String(value), "×")
+    if components.Length < 1 || components.Length > 3
+        return false
+    previousValue := 0
+    for index, component in components {
+        if !RegExMatch(
+            component,
+            "^((?:0|[1-9]\d*)\.\d)cm$",
+            &match
+        )
+            return false
+        numericValue := Number(match[1])
+        if numericValue <= 0
+            return false
+        if index > 1 && numericValue > previousValue
+            return false
+        previousValue := numericValue
+    }
+    return true
 }
 
 BuildReportTemplatePlan(templateText, runtimeContext := 0) {
@@ -16638,11 +16908,20 @@ RunConfiguredReportHotstring(entry, *) {
     reportHwnd := WinExist("A")
     runtimeContext := 0
     measurement := 0
+    selectedMeasurementType := ""
     if templateInfo.SuvMaxCount = 1 {
         measurement := MxNMMeasurementProvider.ReadSuvMax()
+        selectedMeasurementType := MeasurementType.SUVMAX
         runtimeContext := Map(
             "suvmaxState", measurement.state,
             "suvmaxText", measurement.formattedValue
+        )
+    } else if templateInfo.SizeCount = 1 {
+        measurement := MxNMMeasurementProvider.ReadLineAxes()
+        selectedMeasurementType := MeasurementType.LINE_AXES
+        runtimeContext := Map(
+            "sizeState", measurement.state,
+            "sizeText", measurement.formattedValue
         )
     }
 
@@ -16663,7 +16942,11 @@ RunConfiguredReportHotstring(entry, *) {
     if !IsObject(measurement)
         return true
     if measurement.state = MeasurementState.AUTOMATION_FAILED {
-        ShowReportAssistantVisualFeedback("SUVMax 获取失败，请手动输入")
+        ShowReportAssistantVisualFeedback(
+            selectedMeasurementType = MeasurementType.LINE_AXES
+                ? "尺寸获取失败，请手动输入"
+                : "SUVMax 获取失败，请手动输入"
+        )
         return true
     }
     if measurement.state = MeasurementState.NOT_ANNOTATED
@@ -16676,7 +16959,9 @@ RunConfiguredReportHotstring(entry, *) {
             ),
             ReportMeasurementContextValue(
                 measurement.context, "targetActionPid", 0
-            )
+            ),
+            0,
+            selectedMeasurementType
         )
         if !cleanup.ok {
             OutputDebug "MxNM annotation cleanup failed: " cleanup.code
@@ -16961,6 +17246,10 @@ class ReportAssistantSettingsDefaults {
             {
                 Label: "自动获取 SUVMax",
                 Token: ReportHotstringDefaults.SuvMaxPlaceholder
+            },
+            {
+                Label: "自动获取尺寸",
+                Token: ReportHotstringDefaults.SizePlaceholder
             },
             {
                 Label: "红色“（见图）”",

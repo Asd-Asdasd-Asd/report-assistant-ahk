@@ -1,6 +1,6 @@
 # Legacy 与新项目功能清单
 
-更新日期：2026-07-22
+更新日期：2026-07-24
 
 本清单依据原始 legacy scripts、新项目源码以及 `debug/legacy-automation-survey-2026-07-13/` 的现场记录编写。名称相似不代表功能等价；业务语义已由现场记录确认时单独注明，实现可靠性仍需逐项验证。
 
@@ -32,7 +32,7 @@
 | Ctrl+Win+Shift+A Arrow activate/clear | `legacy/karabiner.ahk:158-180` | 无 | 未迁移 | 高频；1000 ms repeat semantics 已确认 | 同上 | compatibility 保留；不得与 SUV clear control 合并 | M3 |
 | Ctrl+Win+Shift+C cover images | `legacy/karabiner.ahk:182-196` | 无 | 未迁移 | 高价值；左 MIP/右 coronal sectional/fusion 已确认 | 多个固定坐标、无 window guard；中途失败仍继续 | compatibility 保留；保持独立于 montage，M4 逐步校验并 fail closed | M4 |
 | Copy SUVMax | 现场 context menu Name=`复制SUVMax值` | 仅调查文档 | 未迁移 | 计划功能 | `SUVMax: 0.000` 仍会更新 clipboard，不能当作 meaningful ROI | M3 使用 named Button/Invoke 和 sentinel；区分 zero value 与 automation failure | M3 |
-| Copy line measurements | 现场 context menu Name=`复制直线测量值` | 仅调查文档 | 未迁移 | 计划功能 | no-line 可能不更新 clipboard；第四条及以后忽略 | M3 保持创建顺序，区分 no update、valid、unexpected 和 invoke failure | M3 |
+| Copy line measurements | 现场 context menu Name=`复制直线测量值` | `MxNMMeasurementProvider.ReadLineAxes()` → `{{size}}` | candidate 已实现，待 Windows 验收 | 计划功能 | no-line 会新鲜更新为空；sequence 未更新仍是失败；只接受严格 1-3 轴 | M3 按数值降序输出，区分 fresh empty、valid、unexpected 和 invoke failure | v0.6.0 |
 | 紧急暂停/恢复 | 无 | `src/main.ahk:14-23`，Ctrl+Alt+Esc，`#SuspendExempt` | 新项目新增 | 高 | legacy 脚本是独立进程；暂停新项目不会暂停 legacy compatibility | 共存文档明确两个进程的边界；兼容脚本暂不新增冲突热键 | v0.5.0 |
 | 紧急退出 | 无 | `src/main.ahk:25-28`，Ctrl+Alt+Q | 新项目新增 | 高 | 只退出新项目，不会退出 legacy compatibility | 用户文档必须说明需从 tray 单独退出兼容脚本 | v0.5.0 |
 | 窗口校验 | legacy 坐标动作无校验 | `src/window_guard.ahk` 可激活配置的进程，但当前 viewer placeholder 未调用实际动作 | 部分基础设施 | 高 | legacy 可在错误窗口 blind click；新旧并行不会共享 guard | compatibility 暂保留但标红风险；迁移每个动作时加入专用 guard | v0.5.x |

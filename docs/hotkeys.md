@@ -28,6 +28,12 @@ Optional global navigation, enabled with `GlobalHjklArrows=true` in the
 | `;cmx` | Insert `cm×cm` and place the caret between the two units |
 
 The active Schema 2 model derives caret movement and color restoration from
-`{{cursor}}`, `{{date}}`, `{{suvmax}}`, and `{{red:（见图）}}`.
-`{{suvmax}}` is available to built-in and custom templates. Plain literal `（见图）`
-remains black.
+`{{cursor}}`, `{{date}}`, `{{suvmax}}`, `{{size}}`, and
+`{{red:（见图）}}`. `{{suvmax}}` and `{{size}}` are available to built-in
+and custom templates, but cannot be used together in one template.
+
+`{{size}}` reads 1-3 line measurements and inserts them in descending numeric
+order, for example `3.2cm×3.1cm×2.8cm`. If no annotation is present or
+automation fails, it inserts no text and leaves the caret at that position.
+The user can then type the first number and use `;cmx` for the existing manual
+two-axis workflow. Plain literal `（见图）` remains black.

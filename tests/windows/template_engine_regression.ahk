@@ -87,6 +87,60 @@ TestTemplatePlans() {
         !BuildReportTemplatePlan("{{suvmax}}").Ok,
         "SUVMax template accepted a missing runtime result"
     )
+    sizeFound := BuildReportTemplatePlan(
+        "大小{{size}}{{red:（见图）}}",
+        Map(
+            "sizeState", "FOUND",
+            "sizeText", "3.2cm×3.1cm×2.8cm"
+        )
+    )
+    AssertTemplateTest(
+        sizeFound.Ok
+            && sizeFound.RenderedText
+                = "大小3.2cm×3.1cm×2.8cm（见图）"
+            && sizeFound.CaretLeftCount = 0
+            && sizeFound.RequiresColorReset,
+        "FOUND line axes did not use the default end caret"
+    )
+    for state in ["NOT_ANNOTATED", "AUTOMATION_FAILED"] {
+        sizeMissing := BuildReportTemplatePlan(
+            "{{cursor}}大小{{size}}{{red:（见图）}}",
+            Map("sizeState", state, "sizeText", "")
+        )
+        AssertTemplateTest(
+            sizeMissing.Ok
+                && sizeMissing.RenderedText = "大小（见图）"
+                && sizeMissing.CaretLeftCount = 4
+                && !sizeMissing.RequiresColorReset,
+            state " line axes did not force the manual-input anchor"
+        )
+    }
+    AssertTemplateTest(
+        !BuildReportTemplatePlan("{{size}}").Ok,
+        "line-axes template accepted a missing runtime result"
+    )
+    AssertTemplateTest(
+        !ValidateReportTemplate("{{size}}{{size}}").Ok,
+        "duplicate line-axes placeholders were accepted"
+    )
+    AssertTemplateTest(
+        !ValidateReportTemplate("{{suvmax}}{{size}}").Ok,
+        "mixed measurement placeholders were accepted"
+    )
+    for invalidSize in [
+        "0.0cm",
+        "1.0cm×2.0cm",
+        "1.0cm×0.0cm",
+        "1.0cm×2.0cm×3.0cm×4.0cm"
+    ] {
+        AssertTemplateTest(
+            !BuildReportTemplatePlan(
+                "{{size}}",
+                Map("sizeState", "FOUND", "sizeText", invalidSize)
+            ).Ok,
+            "invalid line-axes runtime value was accepted"
+        )
+    }
 
     internal := BuildReportTemplatePlan(
         "检查日期：{{date}}，SUVmax约为{{cursor}}{{red:（见图）}}"

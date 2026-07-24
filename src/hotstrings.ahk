@@ -22,11 +22,20 @@ RunConfiguredReportHotstring(entry, *) {
     reportHwnd := WinExist("A")
     runtimeContext := 0
     measurement := 0
+    selectedMeasurementType := ""
     if templateInfo.SuvMaxCount = 1 {
         measurement := MxNMMeasurementProvider.ReadSuvMax()
+        selectedMeasurementType := MeasurementType.SUVMAX
         runtimeContext := Map(
             "suvmaxState", measurement.state,
             "suvmaxText", measurement.formattedValue
+        )
+    } else if templateInfo.SizeCount = 1 {
+        measurement := MxNMMeasurementProvider.ReadLineAxes()
+        selectedMeasurementType := MeasurementType.LINE_AXES
+        runtimeContext := Map(
+            "sizeState", measurement.state,
+            "sizeText", measurement.formattedValue
         )
     }
 
@@ -47,7 +56,11 @@ RunConfiguredReportHotstring(entry, *) {
     if !IsObject(measurement)
         return true
     if measurement.state = MeasurementState.AUTOMATION_FAILED {
-        ShowReportAssistantVisualFeedback("SUVMax 获取失败，请手动输入")
+        ShowReportAssistantVisualFeedback(
+            selectedMeasurementType = MeasurementType.LINE_AXES
+                ? "尺寸获取失败，请手动输入"
+                : "SUVMax 获取失败，请手动输入"
+        )
         return true
     }
     if measurement.state = MeasurementState.NOT_ANNOTATED
@@ -60,7 +73,9 @@ RunConfiguredReportHotstring(entry, *) {
             ),
             ReportMeasurementContextValue(
                 measurement.context, "targetActionPid", 0
-            )
+            ),
+            0,
+            selectedMeasurementType
         )
         if !cleanup.ok {
             OutputDebug "MxNM annotation cleanup failed: " cleanup.code

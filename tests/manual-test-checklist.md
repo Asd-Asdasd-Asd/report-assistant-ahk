@@ -428,6 +428,23 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] 制造多个 viewer window、越界 image point 和错误进程环境；确认 provider fail closed，不激活 viewer、不移动鼠标、不调用第二 transport。
 - [x] 本阶段 provider 未接入 `;fzg`；任何 field result 都不得导致报告插入、caret movement 或 Color Reset。
 
+### Line axes production candidate
+
+- [x] 2026-07-24 用户回报长短轴 candidate 在 Windows 一次端到端通过；本条只记录 smoke pass，不替代以下逐项结果与 field output。
+- [ ] 先运行 `tests\windows\measurement_capture_regression.ahk`；确认新增的空值、1/2/3 轴、首尾 `U+200B`、zero、negative、malformed 和 4 轴 fixtures 全部通过，无 `#Warn` 或 parser error。
+- [ ] 单独启动 `tests\windows\mxnm_line_axes_field.ahk`；保持报告编辑器为前台、鼠标静止，且不要同时运行 production release。
+- [ ] 无直线测量标注时按 `Ctrl+Alt+F11`；确认 `MeasurementState=NOT_ANNOTATED`、`ClipboardCaptureSucceeded=true`、`ClipboardRestoreSucceeded=true`，foreground/mouse 均不变。
+- [ ] 分别创建 1、2、3 条非临床测试测量后按 `Ctrl+Alt+F11`；确认 `MeasurementState=FOUND`、`ComponentCount=1/2/3`，视觉提示依次使用逐项 `cm` 和 Unicode `×`。
+- [ ] 特意让 vendor 返回值不按大小排列；确认视觉提示已按数值从大到小排列，而不是沿用 vendor 创建顺序。
+- [ ] 有测量时按 `Ctrl+Alt+F12`；确认 `CleanupState=OK`、`VerificationState=NOT_ANNOTATED`，报告前台、鼠标和原 clipboard 保持不变。
+- [ ] 检查 `%TEMP%\MedExAHK\mxnm_line_axes_field.txt` 不包含 raw/formatted measurement、clipboard payload、患者信息、检查信息或报告正文。
+- [ ] 在 custom template 中配置 `大小{{size}}{{red:（见图）}}`，重新加载 release，无 `#Warn`、解析错误或提示音。
+- [ ] 1/2/3 轴分别触发 custom hotstring；确认报告插入 `1.2cm`、`2.2cm×1.2cm` 或三轴降序格式，并在写入成功后清除 viewer 标注。
+- [ ] 无标注时触发：不插入尺寸、不提示，caret 留在 `{{size}}`；键入第一个数值后运行 `;cmx`，确认继续得到手动 `cm×cm` 流程。
+- [ ] 关闭 viewer 或制造 command failure：其余报告内容仍写入，caret 留在空位，仅显示短暂视觉提示“尺寸获取失败，请手动输入”。
+- [ ] 在设置中确认同一模板不能保存两个 `{{size}}`，也不能同时保存 `{{size}}` 与 `{{suvmax}}`。
+- [ ] 清除失败时不回滚已经写入的尺寸，只显示简短视觉提示。
+
 ## Portable release 与 singleton
 
 - [ ] 将 ZIP 复制到本机并完整解压，不直接从共享盘或压缩包内运行。

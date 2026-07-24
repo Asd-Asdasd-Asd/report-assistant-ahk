@@ -201,7 +201,7 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 
 技术自动化失败不等同于“无标注”。`AUTOMATION_FAILED` 不得触发静默的空值或旧值 fallback。
 
-Implementation status（2026-07-24）：foundation、config/UIA automatic target、production `FOUND` insertion、context-menu `删除全部标注` + `NOT_ANNOTATED` postcondition 和 target-cache latency 已通过 Windows checkpoint。通用 `{{suvmax}}`、报告事务及无焦点视觉提示已接入；`NOT_ANNOTATED`/automation failure 的 production 组合验收仍需完成，未完成前不标记 v0.6.0 release-ready。
+Implementation status（2026-07-24）：foundation、config/UIA automatic target、SUVMax production `FOUND` insertion、context-menu `删除全部标注` + `NOT_ANNOTATED` postcondition 和 target-cache latency 已通过 Windows checkpoint。通用 `{{suvmax}}`、报告事务及无焦点视觉提示已接入。长短轴 candidate 已复用同一 transport/target/report/cleanup 架构，新增 `{{size}}`、严格 1-3 轴 parser、降序格式化和“新鲜空剪贴板 = NOT_ANNOTATED”策略，并已完成一次 Windows 端到端 smoke pass；逐项 failure-path evidence 未补齐前不标记 v0.6.0 release-ready。
 
 Config-first target resolver foundation 和 field-only automatic target checkpoint 均已通过 Windows 验证。resolver 从声明的 `ShowModel1..N` 计算跨布局 maximin point，再以 UIA geometry 和 action HWND ownership 校验；当前配置由 AHK 实测 logical `(63,95)` / screen `(2686,217)`。自动 transport 已从非目标活动 pane 返回 `FOUND`，foreground、mouse、clipboard、popup 和 runtime ID invariants 全部通过；viewer missing 时在 provider/clipboard 前 fail closed。总 UIA Pane 数可在 9/10 间变化，仅唯一 geometry match 是硬门槛。该 field 结论现已用于 production adapter；底层 command/type/parser provider 仍保持通用边界。
 

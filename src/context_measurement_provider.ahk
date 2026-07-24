@@ -1,6 +1,7 @@
 class ContextMeasurementDefaults {
     static ViewerExe := "MedExNMFusion.exe"
     static SuvMaxCommandText := "复制SUVMax值"
+    static LineAxesCommandText := "复制直线测量值"
     static PopupClass := "#32770"
     static PopupTimeoutMs := 1000
     static PopupPollIntervalMs := 20
@@ -15,6 +16,13 @@ class ContextMeasurementProvider {
     static ReadSuvMax(options := 0) {
         return this.ReadMeasurement(BuildSuvMaxMeasurementCommandSpec(), options)
     }
+
+    static ReadLineAxes(options := 0) {
+        return this.ReadMeasurement(
+            BuildLineAxesMeasurementCommandSpec(),
+            options
+        )
+    }
 }
 
 ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
@@ -26,6 +34,15 @@ BuildSuvMaxMeasurementCommandSpec() {
         MeasurementType.SUVMAX,
         ContextMeasurementDefaults.SuvMaxCommandText,
         ParseSuvMaxMeasurement
+    )
+}
+
+BuildLineAxesMeasurementCommandSpec() {
+    return MeasurementCommandSpec(
+        MeasurementType.LINE_AXES,
+        ContextMeasurementDefaults.LineAxesCommandText,
+        ParseLineAxesMeasurement,
+        true
     )
 }
 
@@ -118,10 +135,13 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
         "commandControlHwnd", 0,
         "commandRuntimeId", 0
     )
+    captureOptions := CloneContextMeasurementOptions(options)
+    captureOptions["acceptEmptyClipboard"] :=
+        spec.acceptEmptyClipboard
     try {
         capture := CaptureMeasurementClipboardText(
             () => InvokePreparedMxNMContextCommand(actionContext),
-            options,
+            captureOptions,
             () => PrepareMxNMContextCommand(
                 viewer,
                 pointResult.clientPoint,
@@ -194,6 +214,15 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
     }
     result.context := context
     return result
+}
+
+CloneContextMeasurementOptions(options := 0) {
+    clone := Map()
+    if Type(options) = "Map" {
+        for key, value in options
+            clone[key] := value
+    }
+    return clone
 }
 
 ResolveContextMeasurementViewer(viewerExe, options := 0) {

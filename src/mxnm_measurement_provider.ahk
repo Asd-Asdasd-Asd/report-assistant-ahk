@@ -2,54 +2,17 @@ class MxNMMeasurementProvider {
     static CachedTarget := 0
 
     static ReadSuvMax(options := 0) {
-        startedAt := A_TickCount
-        targetStartedAt := A_TickCount
-        target := this.ResolveTarget(options)
-        targetResolutionMs := A_TickCount - targetStartedAt
-        if !target.ok
-            return MakeMxNMTargetFailureMeasurement(
-                target,
-                targetResolutionMs,
-                A_TickCount - startedAt
-            )
+        return ReadMxNMMeasurementWithTarget(
+            BuildSuvMaxMeasurementCommandSpec(),
+            options
+        )
+    }
 
-        providerOptions := CloneMeasurementOptions(options)
-        expectedViewerHwnd := MeasurementOption(
-            options, "expectedViewerHwnd", 0
+    static ReadLineAxes(options := 0) {
+        return ReadMxNMMeasurementWithTarget(
+            BuildLineAxesMeasurementCommandSpec(),
+            options
         )
-        expectedViewerPid := MeasurementOption(
-            options, "expectedViewerPid", 0
-        )
-        if (expectedViewerHwnd && target.actionHwnd != expectedViewerHwnd)
-            || (expectedViewerPid && target.actionPid != expectedViewerPid) {
-            return MakeMeasurementResult(
-                MeasurementState.AUTOMATION_FAILED,
-                MeasurementType.SUVMAX,
-                "",
-                "",
-                MeasurementSource.MXNM_CONTEXT_COMMAND,
-                MeasurementFailureReason.VIEWER_TARGET_CHANGED,
-                Map(
-                    "targetCode", target.code,
-                    "targetActionHwnd", target.actionHwnd,
-                    "targetActionPid", target.actionPid,
-                    "targetResolutionMs", targetResolutionMs,
-                    "totalReadMs", A_TickCount - startedAt
-                )
-            )
-        }
-        providerOptions["imageScreenPoint"] := target.screenPoint
-        providerOptions["expectedViewerHwnd"] := target.actionHwnd
-        providerOptions["expectedViewerPid"] := target.actionPid
-        result := ContextMeasurementProvider.ReadSuvMax(providerOptions)
-        result.context["targetCode"] := target.code
-        result.context["targetActionHwnd"] := target.actionHwnd
-        result.context["targetActionPid"] := target.actionPid
-        result.context["targetScreenX"] := target.screenPoint.x
-        result.context["targetScreenY"] := target.screenPoint.y
-        result.context["targetResolutionMs"] := targetResolutionMs
-        result.context["totalReadMs"] := A_TickCount - startedAt
-        return result
     }
 
     static ResolveTarget(options := 0) {
@@ -84,6 +47,62 @@ class MxNMMeasurementProvider {
     static WarmTarget() {
         return this.ResolveTarget().ok
     }
+}
+
+ReadMxNMMeasurementWithTarget(spec, options := 0) {
+    requestedMeasurementType := spec.measurementType
+    startedAt := A_TickCount
+    targetStartedAt := A_TickCount
+    target := MxNMMeasurementProvider.ResolveTarget(options)
+    targetResolutionMs := A_TickCount - targetStartedAt
+    if !target.ok
+        return MakeMxNMTargetFailureMeasurement(
+            target,
+            requestedMeasurementType,
+            targetResolutionMs,
+            A_TickCount - startedAt
+        )
+
+    providerOptions := CloneMeasurementOptions(options)
+    expectedViewerHwnd := MeasurementOption(
+        options, "expectedViewerHwnd", 0
+    )
+    expectedViewerPid := MeasurementOption(
+        options, "expectedViewerPid", 0
+    )
+    if (expectedViewerHwnd && target.actionHwnd != expectedViewerHwnd)
+        || (expectedViewerPid && target.actionPid != expectedViewerPid) {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.VIEWER_TARGET_CHANGED,
+            Map(
+                "targetCode", target.code,
+                "targetActionHwnd", target.actionHwnd,
+                "targetActionPid", target.actionPid,
+                "targetResolutionMs", targetResolutionMs,
+                "totalReadMs", A_TickCount - startedAt
+            )
+        )
+    }
+    providerOptions["imageScreenPoint"] := target.screenPoint
+    providerOptions["expectedViewerHwnd"] := target.actionHwnd
+    providerOptions["expectedViewerPid"] := target.actionPid
+    result := ContextMeasurementProvider.ReadMeasurement(
+        spec,
+        providerOptions
+    )
+    result.context["targetCode"] := target.code
+    result.context["targetActionHwnd"] := target.actionHwnd
+    result.context["targetActionPid"] := target.actionPid
+    result.context["targetScreenX"] := target.screenPoint.x
+    result.context["targetScreenY"] := target.screenPoint.y
+    result.context["targetResolutionMs"] := targetResolutionMs
+    result.context["totalReadMs"] := A_TickCount - startedAt
+    return result
 }
 
 CloneMeasurementOptions(options := 0) {
@@ -129,6 +148,7 @@ MxNMMeasurementRectsEqual(leftRect, rightRect) {
 
 MakeMxNMTargetFailureMeasurement(
     target,
+    requestedType := MeasurementType.SUVMAX,
     targetResolutionMs := 0,
     totalReadMs := 0
 ) {
@@ -145,7 +165,7 @@ MakeMxNMTargetFailureMeasurement(
     )
     return MakeMeasurementResult(
         MeasurementState.AUTOMATION_FAILED,
-        MeasurementType.SUVMAX,
+        requestedType,
         "",
         "",
         MeasurementSource.MXNM_CONTEXT_COMMAND,

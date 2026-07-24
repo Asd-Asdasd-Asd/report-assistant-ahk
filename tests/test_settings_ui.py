@@ -29,6 +29,7 @@ class SettingsUiTests(unittest.TestCase):
             "光标位置",
             "当前日期",
             "自动获取 SUVMax",
+            "自动获取尺寸",
             "红色“（见图）”",
         ):
             self.assertIn(label, ui)

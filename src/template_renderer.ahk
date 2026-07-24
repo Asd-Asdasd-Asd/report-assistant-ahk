@@ -2,7 +2,8 @@ class ReportTemplateParseResult {
     __New(ok, renderedText := "", caretIndex := 0, cursorCount := 0,
         redFigureStartIndex := -1, redFigureCount := 0, message := "",
         suvMaxIndex := -1, suvMaxCount := 0,
-        suvMaxCaretForced := false) {
+        suvMaxCaretForced := false, sizeIndex := -1,
+        sizeCount := 0, sizeCaretForced := false) {
         this.Ok := ok = true
         this.RenderedText := String(renderedText)
         this.CaretIndex := caretIndex
@@ -13,6 +14,9 @@ class ReportTemplateParseResult {
         this.SuvMaxIndex := suvMaxIndex
         this.SuvMaxCount := suvMaxCount
         this.SuvMaxCaretForced := suvMaxCaretForced = true
+        this.SizeIndex := sizeIndex
+        this.SizeCount := sizeCount
+        this.SizeCaretForced := sizeCaretForced = true
     }
 }
 
@@ -47,6 +51,9 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
     suvMaxIndex := -1
     suvMaxCount := 0
     suvMaxCaretForced := false
+    sizeIndex := -1
+    sizeCount := 0
+    sizeCaretForced := false
     position := 1
 
     while position <= StrLen(sourceText) {
@@ -90,6 +97,12 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
             output .= expandDate ? FormatTime(, "yyyy-MM-dd")
                 : ReportHotstringDefaults.DatePlaceholder
         } else if token = "suvmax" {
+            if sizeCount > 0 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "{{suvmax}} 和 {{size}} 不能在同一模板中使用。"
+                )
+            }
             suvMaxCount += 1
             if suvMaxCount > 1 {
                 return ReportTemplateParseResult(
@@ -129,6 +142,52 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
                     )
                 }
             }
+        } else if token = "size" {
+            if suvMaxCount > 0 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "{{suvmax}} 和 {{size}} 不能在同一模板中使用。"
+                )
+            }
+            sizeCount += 1
+            if sizeCount > 1 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "每个模板最多只能使用一个 {{size}}。",
+                    suvMaxIndex, suvMaxCount, suvMaxCaretForced,
+                    sizeIndex, sizeCount
+                )
+            }
+            sizeIndex := StrLen(output)
+            if expandDate {
+                runtimeState := ReportTemplateRuntimeValue(
+                    runtimeContext, "sizeState", ""
+                )
+                runtimeText := String(ReportTemplateRuntimeValue(
+                    runtimeContext, "sizeText", ""
+                ))
+                if runtimeState = "FOUND" {
+                    if !IsValidRenderedLineAxesValue(runtimeText) {
+                        return ReportTemplateParseResult(
+                            false, , , cursorCount, , redFigureCount,
+                            "尺寸运行时结果格式无效。",
+                            suvMaxIndex, suvMaxCount,
+                            suvMaxCaretForced, sizeIndex, sizeCount
+                        )
+                    }
+                    output .= runtimeText
+                } else if runtimeState = "NOT_ANNOTATED"
+                    || runtimeState = "AUTOMATION_FAILED" {
+                    sizeCaretForced := true
+                } else {
+                    return ReportTemplateParseResult(
+                        false, , , cursorCount, , redFigureCount,
+                        "模板缺少尺寸运行时结果。",
+                        suvMaxIndex, suvMaxCount,
+                        suvMaxCaretForced, sizeIndex, sizeCount
+                    )
+                }
+            }
         } else if token = "red:（见图）" {
             redFigureCount += 1
             if redFigureCount > 1 {
@@ -158,14 +217,17 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
         position := closer + 2
     }
 
-    if suvMaxCaretForced
+    if sizeCaretForced
+        caretIndex := sizeIndex
+    else if suvMaxCaretForced
         caretIndex := suvMaxIndex
     else if caretIndex < 0
         caretIndex := StrLen(output)
     return ReportTemplateParseResult(
         true, output, caretIndex, cursorCount,
         redFigureStartIndex, redFigureCount, "",
-        suvMaxIndex, suvMaxCount, suvMaxCaretForced
+        suvMaxIndex, suvMaxCount, suvMaxCaretForced,
+        sizeIndex, sizeCount, sizeCaretForced
     )
 }
 
@@ -175,6 +237,28 @@ ReportTemplateRuntimeValue(runtimeContext, key, defaultValue := "") {
     if IsObject(runtimeContext) && runtimeContext.HasOwnProp(key)
         return runtimeContext.%key%
     return defaultValue
+}
+
+IsValidRenderedLineAxesValue(value) {
+    components := StrSplit(String(value), "×")
+    if components.Length < 1 || components.Length > 3
+        return false
+    previousValue := 0
+    for index, component in components {
+        if !RegExMatch(
+            component,
+            "^((?:0|[1-9]\d*)\.\d)cm$",
+            &match
+        )
+            return false
+        numericValue := Number(match[1])
+        if numericValue <= 0
+            return false
+        if index > 1 && numericValue > previousValue
+            return false
+        previousValue := numericValue
+    }
+    return true
 }
 
 BuildReportTemplatePlan(templateText, runtimeContext := 0) {

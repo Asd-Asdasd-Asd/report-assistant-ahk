@@ -3,6 +3,7 @@ class MeasurementClipboardDefaults {
     static PollIntervalMs := 20
     static SentinelTimeoutSeconds := 0.5
     static RestoreSettleMs := 100
+    static EmptyResultSettleMs := 40
 }
 
 CaptureMeasurementClipboardText(actionCallback, options := 0,
@@ -157,7 +158,17 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
         MeasurementClipboardDefaults.PollIntervalMs
     )
     deadline := A_TickCount + Max(0, Integer(timeoutMs))
+    acceptEmptyClipboard := MeasurementOption(
+        options, "acceptEmptyClipboard", false
+    )
+    emptyResultSettleMs := MeasurementOption(
+        options,
+        "emptyResultSettleMs",
+        MeasurementClipboardDefaults.EmptyResultSettleMs
+    )
     lastSequence := sequenceBeforeCommand
+    emptySequence := 0
+    emptyDeadline := 0
     loop {
         sequence := GetMeasurementClipboardSequenceNumber()
         if sequence != sequenceBeforeCommand {
@@ -173,6 +184,23 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
                     rawText: rawText,
                     sequence: sequence,
                     ownerHwnd: ownerHwnd
+                }
+            }
+            if acceptEmptyClipboard && rawText = "" {
+                if sequence != emptySequence {
+                    emptySequence := sequence
+                    emptyDeadline := A_TickCount
+                        + Max(0, Integer(emptyResultSettleMs))
+                }
+                if A_TickCount >= emptyDeadline {
+                    return {
+                        ok: true,
+                        rawText: "",
+                        sequence: sequence,
+                        ownerHwnd: DllCall(
+                            "User32\GetClipboardOwner", "Ptr"
+                        )
+                    }
                 }
             }
         }
