@@ -113,6 +113,7 @@ ContextMeasurementProvider
 - 首版只要求存在可用的 `MedExNMFusion.exe` 阅片窗口，不实现 study identity matching。
 - 阅片窗口由软件设置固定位置，不能由用户任意拖动。首版允许使用集中维护的 screen-coordinate profile 定位可靠图像区域。
 - 图像位置只能由单一 profile/resolver 提供，不得把坐标散落在 hotstring、clipboard 或 report-editor modules 中。
+- 同一 `MedExNMFusion.exe` 进程可能暴露多个可见顶层窗口。已有 screen point 时，通过 `WindowFromPoint` 定位该点所属窗口并校验进程名；没有可用 point 时才要求进程窗口唯一。不得从多个候选中任取第一个窗口。
 - profile 至少校验 screen bounds 和目标 viewer window/client bounds。Windows 现场验收后，可在不改变调用方接口的前提下增加 config-derived resolver、UIA-relative resolver 或用户校验步骤。
 
 ### Preferred no-focus-switch transport

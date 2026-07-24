@@ -152,6 +152,10 @@ class MeasurementCaptureTests(unittest.TestCase):
     def test_geometry_is_owned_by_one_resolver_and_fails_closed(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
         self.assertIn("ResolveContextMeasurementImagePoint(", provider)
+        self.assertIn("ResolveContextMeasurementViewerFromPoint(", provider)
+        self.assertIn('"User32\\WindowFromPoint"', provider)
+        self.assertIn('"User32\\GetAncestor"', provider)
+        self.assertIn("WinGetProcessName", provider)
         self.assertIn('"imagePointResolver"', provider)
         self.assertIn('"imageScreenPoint"', provider)
         self.assertIn('ImagePointKey := "measurement_image_point"', provider)
@@ -205,12 +209,15 @@ class MeasurementCaptureTests(unittest.TestCase):
     def test_field_harness_is_non_focus_stealing_and_privacy_safe(self) -> None:
         harness = source("tests/windows/context_measurement_provider_field.ahk")
         self.assertIn("ContextMeasurementProvider.ReadSuvMax(", harness)
+        self.assertIn('CoordMode "Mouse", "Screen"', harness)
         self.assertIn("MouseGetPos", harness)
         self.assertNotIn("MouseMove", harness)
         self.assertNotIn("WinActivate", harness)
         self.assertNotIn("WinWaitActive", harness)
         self.assertNotIn("result.rawValue", harness)
         self.assertNotIn("result.formattedValue", harness)
+        self.assertNotIn("SoundBeep", harness)
+        self.assertIn("ToolTip message", harness)
         self.assertIn(
             r'A_Temp "\MedExAHK\context_measurement_provider_field.txt"',
             harness,

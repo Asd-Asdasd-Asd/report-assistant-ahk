@@ -201,7 +201,7 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 
 技术自动化失败不等同于“无标注”。`AUTOMATION_FAILED` 不得触发静默的空值或旧值 fallback。
 
-Implementation status（2026-07-24）：首个 foundation checkpoint 已实现 structured SUVMax result、strict parser、独立 measurement clipboard transaction、dynamic popup/command provider 和 privacy-safe Windows harness。Provider 尚未接入 `;fzg`，Windows background-message、clipboard freshness/restoration 和 no-focus/no-mouse field validation 尚未完成；在这些验收通过前不得自动插入测量值或移除 legacy measurement capability。
+Implementation status（2026-07-24）：首个 foundation checkpoint 已实现 structured SUVMax result、strict parser、独立 measurement clipboard transaction、dynamic popup/command provider 和 privacy-safe Windows harness。Windows 已验证 `FOUND`、`NOT_ANNOTATED`、`VIEWER_NOT_FOUND`、background popup/command、clipboard freshness/restoration 以及 no-focus/no-mouse invariants；现场发现的同进程多窗口歧义已改为由已校验 image point 唯一定位 viewer。Provider 尚未接入 `;fzg`，完整异常矩阵和 report orchestration 属于后续独立 checkpoint；在对应验收通过前不得自动插入测量值或移除 legacy measurement capability。
 
 ## Later versions
 

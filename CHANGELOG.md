@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added tray “设置…” and “重新加载配置” actions; double-clicking the tray icon opens the single Settings window.
 - Added the original SVG, deterministic multi-size PNG/ICO generation pipeline, and Ahk2Exe icon integration.
 - Added the initial v0.6.0 measurement foundation: structured SUVMax states, strict parsing, an independent sentinel/sequence-based clipboard capture transaction, and a no-focus-switch context-menu provider that remains disconnected from production hotstrings pending Windows validation.
+- Added non-focus-stealing visual feedback to the Windows measurement field harness for workstations without audio devices.
 
 ### Documentation
 
@@ -28,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Recorded the deferred first-run color-menu limitation: black may be selected while the popup remains open once after recompilation; subsequent attempts are normally unaffected.
 
 ### Fixed
+
+- Resolved SUVMax viewer ambiguity by using the validated image screen point to identify its owning `MedExNMFusion.exe` window, while retaining fail-closed unique-window resolution when no point is available.
 
 - Wait for the GUI-based Ahk2Exe process to exit before checking its output, capture compiler diagnostics, retry temporary-file cleanup, and verify every overlaid static publish asset.
 - Restored the field-validated CF_HTML clipboard timing (`200 ms` paste settle, `100 ms` before restore, `100 ms` after restore) after Windows testing exposed a 50 ms race that could insert the user's restored clipboard content.

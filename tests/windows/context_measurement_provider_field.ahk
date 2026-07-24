@@ -7,6 +7,8 @@
 #Include ..\..\src\measurement_clipboard.ahk
 #Include ..\..\src\context_measurement_provider.ahk
 
+CoordMode "Mouse", "Screen"
+
 global ContextMeasurementFieldPoint := 0
 
 ^!F8::CaptureContextMeasurementFieldPoint()
@@ -19,13 +21,19 @@ CaptureContextMeasurementFieldPoint() {
         x: screenX,
         y: screenY
     }
-    SoundBeep 800, 100
+    ShowContextMeasurementFieldFeedback(
+        "测量点已记录`n返回报告编辑器后按 Ctrl+Alt+F9",
+        1800
+    )
 }
 
 RunContextMeasurementProviderFieldRead() {
     global ContextMeasurementFieldPoint
     if !IsObject(ContextMeasurementFieldPoint) {
-        SoundBeep 500, 180
+        ShowContextMeasurementFieldFeedback(
+            "尚未记录测量点`n请在 viewer 图像内按 Ctrl+Alt+F8",
+            2200
+        )
         return false
     }
 
@@ -56,9 +64,29 @@ RunContextMeasurementProviderFieldRead() {
         outputPath,
         "UTF-8"
     )
-    feedbackFrequency := result.state = MeasurementState.AUTOMATION_FAILED ? 500 : 900
-    SoundBeep feedbackFrequency, 120
+    if result.state = MeasurementState.AUTOMATION_FAILED {
+        ShowContextMeasurementFieldFeedback(
+            "SUVMax 读取失败`n" result.failureReason
+            "`n结果已写入：" outputPath,
+            3500
+        )
+    } else {
+        ShowContextMeasurementFieldFeedback(
+            "SUVMax provider 测试完成`nState=" result.state
+            "`n结果已写入：" outputPath,
+            3000
+        )
+    }
     return result.state != MeasurementState.AUTOMATION_FAILED
+}
+
+ShowContextMeasurementFieldFeedback(message, durationMs := 2000) {
+    ToolTip message
+    SetTimer HideContextMeasurementFieldFeedback, -Max(250, durationMs)
+}
+
+HideContextMeasurementFieldFeedback() {
+    ToolTip
 }
 
 BuildContextMeasurementProviderFieldOutput(result, foregroundBefore,

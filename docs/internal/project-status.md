@@ -35,6 +35,7 @@
 - `;fzg` no-reset caret workflow、clipboard restoration 和 immediate black typing。
 - MedEx-only hotstring scope、foreground change fail-closed、version diagnostics-only behavior。
 - 当前 supported profile 上的 red marker 与 black reset 主路径。
+- v0.6.0 SUVMax provider 的 `FOUND`、`NOT_ANNOTATED` 和 `VIEWER_NOT_FOUND` 路径；background popup/command、clipboard freshness/restoration、foreground/mouse invariants 和无音频视觉反馈均通过现场验证。
 
 ### 自动测试覆盖
 
@@ -77,7 +78,7 @@ exact UIA Name="检查所见"
 - 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 MedEx layout 尚未正式支持。
 - Compatibility layer 的 Alt+Shift+S 只保证单次触发；持续按住修饰键连续按 S 延后到 compatibility 重构。
 - updater、installer、self-update、rollback、shortcut 和 registry installation state 均不在范围内。
-- Measurement provider foundation 已实现但尚未 Windows field-validated；`;fzg` 自动插入、long-axis/short-axis 和 `size` placeholder 仍未接入 production。
+- Measurement provider foundation 已通过首轮 Windows field validation；`;fzg` 自动插入、long-axis/short-axis、完整异常矩阵和 `size` placeholder 仍未接入 production。
 - Settings 的“快捷键”“其他”标签页仍是占位页。
 
 ## v0.5.0 发布前剩余验收

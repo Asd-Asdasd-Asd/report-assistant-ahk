@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0
-; Source revision: 7178c29467265e7171f092e447b453c359003652-dirty
-; Generated at: 2026-07-24 05:20:56 UTC
+; Source revision: afdb20674f37e85b6a9f562224dd33bc6c24766d-dirty
+; Generated at: 2026-07-24 06:02:11 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0"
     static Channel := "internal-test"
-    static SourceRevision := "7178c29467265e7171f092e447b453c359003652-dirty"
+    static SourceRevision := "afdb20674f37e85b6a9f562224dd33bc6c24766d-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -8882,7 +8882,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
         "clipboardOwnerHwnd", 0
     )
 
-    viewer := ResolveContextMeasurementViewer(context["viewerExe"])
+    viewer := ResolveContextMeasurementViewer(context["viewerExe"], options)
     if !viewer.ok {
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
@@ -8975,7 +8975,18 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
     return result
 }
 
-ResolveContextMeasurementViewer(viewerExe) {
+ResolveContextMeasurementViewer(viewerExe, options := 0) {
+    screenPoint := GetContextMeasurementConfiguredScreenPoint(options)
+    if IsContextMeasurementPoint(screenPoint)
+        && ContextMeasurementPointInsideVirtualScreen(screenPoint) {
+        pointViewer := ResolveContextMeasurementViewerFromPoint(
+            viewerExe,
+            screenPoint
+        )
+        if pointViewer.ok
+            return pointViewer
+    }
+
     try windows := WinGetList("ahk_exe " viewerExe)
     catch {
         windows := []
@@ -9018,6 +9029,84 @@ ResolveContextMeasurementViewer(viewerExe) {
     }
 }
 
+ResolveContextMeasurementViewerFromPoint(viewerExe, screenPoint) {
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try pointHwnd := DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch {
+        pointHwnd := 0
+    }
+    if !pointHwnd {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_NOT_FOUND
+        }
+    }
+
+    try rootHwnd := DllCall(
+        "User32\GetAncestor",
+        "Ptr", pointHwnd,
+        "UInt", 2,
+        "Ptr"
+    )
+    catch {
+        rootHwnd := 0
+    }
+    if !rootHwnd
+        rootHwnd := pointHwnd
+
+    try processName := WinGetProcessName("ahk_id " rootHwnd)
+    catch {
+        processName := ""
+    }
+    if StrLower(processName) != StrLower(viewerExe) {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_NOT_FOUND
+        }
+    }
+
+    try pid := WinGetPID("ahk_id " rootHwnd)
+    catch {
+        pid := 0
+    }
+    if !pid {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_NOT_FOUND
+        }
+    }
+    return {
+        ok: true,
+        hwnd: rootHwnd,
+        pid: pid,
+        failureReason: MeasurementFailureReason.NONE
+    }
+}
+
+GetContextMeasurementConfiguredScreenPoint(options := 0) {
+    point := MeasurementOption(options, "imageScreenPoint", 0)
+    if IsContextMeasurementPoint(point)
+        return point
+
+    global COORDINATES
+    if IsSet(COORDINATES) && Type(COORDINATES) = "Map"
+        && COORDINATES.Has(ContextMeasurementDefaults.ImagePointKey) {
+        return COORDINATES[ContextMeasurementDefaults.ImagePointKey]
+    }
+    return 0
+}
+
 ResolveContextMeasurementImagePoint(viewerHwnd, options := 0) {
     resolver := MeasurementOption(options, "imagePointResolver", 0)
     if IsObject(resolver) && HasMethod(resolver, "Call") {
@@ -9026,14 +9115,7 @@ ResolveContextMeasurementImagePoint(viewerHwnd, options := 0) {
             point := 0
         }
     } else {
-        point := MeasurementOption(options, "imageScreenPoint", 0)
-        if !IsContextMeasurementPoint(point) {
-            global COORDINATES
-            if IsSet(COORDINATES) && Type(COORDINATES) = "Map"
-                && COORDINATES.Has(ContextMeasurementDefaults.ImagePointKey) {
-                point := COORDINATES[ContextMeasurementDefaults.ImagePointKey]
-            }
-        }
+        point := GetContextMeasurementConfiguredScreenPoint(options)
     }
 
     if !IsContextMeasurementPoint(point) {
