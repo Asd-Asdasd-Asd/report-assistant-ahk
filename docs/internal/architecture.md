@@ -1,6 +1,6 @@
 # 架构说明
 
-本文档记录 v0.5.0 当前架构和安全边界。项目仍为小范围内部测试工具，目标是保持可维护、可验证并逐步迁移 legacy 行为。
+本文档记录 v0.6.0 当前架构和安全边界。项目仍为小范围内部测试工具，目标是保持可维护、可验证并逐步迁移 legacy 行为。
 
 ## 为什么选择 AHK v2
 
@@ -48,11 +48,13 @@ Report hotstrings 已由 Step 2 使用 shared `#HotIf`/foreground predicate 限�
 
 ## Measurement architecture
 
-MxNMSoft 测量值读取计划通过未来的 `ContextMeasurementProvider` adapter/provider layer 实现。line measurement 和 SUVMax 使用相同的 context-menu transport：在当前图像区域打开右键菜单，按 visible command text 找到复制命令，读取并校验剪贴板结果。
+MxNMSoft 测量值由 `MxNMMeasurementProvider` 解析自动目标，再通过通用 `ContextMeasurementProvider` command spec 执行。line measurement 和 SUVMax 使用相同的 context-menu transport：在当前图像区域打开右键菜单，按 visible command text 找到复制命令，读取并校验剪贴板结果。
 
-`ContextMeasurementProvider` 返回 structured measurement data，例如 measurement type、raw value、formatted value、source、timestamp、study identity 和 failure reason。hotstrings 或上层报告逻辑只负责决定最终插入的报告文本，不直接承担窗口消息、控件查找和解析细节。
+`ContextMeasurementProvider` 返回 structured measurement data，包括 measurement type、raw value、formatted value、source、failure reason、context 和 components。hotstrings 或上层报告逻辑只负责决定最终插入的报告文本，不直接承担窗口消息、控件查找和解析细节。
 
-当前图像读取失败时，manual fallback 仍是上层 workflow。系统应优先 false negative，不能复用旧剪贴板值，也不能把最后一条 SUV log 自动当作当前图像测量值。
+自动 target 由 vendor config、runtime frame、UIA image-region geometry 和跨 layout maximin point 共同解析，并在 cache reuse 前复核 HWND、PID、进程名和 client rect。当前图像读取失败时，manual fallback 仍是上层 workflow。系统优先 false negative，不复用旧剪贴板值，也不把最后一条 SUV log 自动当作当前图像测量值。
+
+`{{suvmax}}` 和 `{{size}}` 分别触发 SUVMax 与 1–3 轴读取。只有 `FOUND` 插入数值；`NOT_ANNOTATED`/`AUTOMATION_FAILED` 留下人工输入锚点。报告事务成功后才调用 `删除全部标注`，清除失败不回滚报告。line command 只有在 command 后 clipboard sequence 确实更新为空时才判定 `NOT_ANNOTATED`。
 
 ## 阅片界面的自动化策略
 
@@ -89,7 +91,7 @@ MxNMSoft 测量值读取计划通过未来的 `ContextMeasurementProvider` adapt
 
 ## Template execution boundary
 
-Schema 2 支持 `{{cursor}}`、`{{date}}` 和唯一精确红色尾标记 `{{red:（见图）}}`。普通字面量 `（见图）` 是黑色正文。
+Schema 2 支持 `{{cursor}}`、`{{date}}`、`{{suvmax}}`、`{{size}}` 和唯一精确红色尾标记 `{{red:（见图）}}`。普通字面量 `（见图）` 是黑色正文；同一模板不得同时包含两种 measurement token。
 
 ```text
 configured Hotstring()
@@ -109,7 +111,7 @@ configured Hotstring()
 
 `release/` 保存生成后的单文件脚本，便于复制到 Windows 工作站进行测试。生成文件来自 `scripts/build_release.py`，维护者应优先修改 `src/`，不要手工修改 release 文件。
 
-v0.5.0 增加 portable internal-test executable。Executable、单文件 `.ahk` 和模块化 source 都不能包含真实 user config。用户配置保存在 `%LocalAppData%\MedExReportAssistant\config.ini`，替换应用 artifact 时必须保留。
+portable internal-test executable、单文件 `.ahk` 和模块化 source 都不能包含真实 user config。用户配置保存在 `%LocalAppData%\MedExReportAssistant\config.ini`，替换应用 artifact 时必须保留。
 
 Executable 不绑定安装位置。固定 `Local\MedExReportAssistant.Singleton` mutex 在 config bootstrap 和功能注册前建立，确保采用该策略的不同版本、文件名和目录不能并行运行。mutex 检测不读取或创建配置；成功创建的 handle 保持到退出并用 `CloseHandle` 释放。应用不取得 mutex ownership，因此不调用 `ReleaseMutex`。
 

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-24
+
+### Release summary
+
+- Added production SUVMax acquisition through `{{suvmax}}`, including strict parsing, automatic target resolution, manual-input fallback, visual failure feedback, and post-write annotation cleanup.
+- Added production 1–3 axis acquisition through `{{size}}`, including fresh-empty detection, descending numeric formatting with `×`, manual `;cmx` fallback, and cleanup verification.
+- Reused one config/UIA target resolver, context-menu transport, clipboard transaction, report transaction, and cleanup boundary for both measurement types.
+- Preserved fail-closed behavior: stale clipboard content is never reused, automation failure is distinct from no annotation, and cleanup failure never rolls back written report content.
+- Added non-technical Chinese v0.6.0 first-use, configuration, and update guidance.
+
 ### Added
 
 - Added a stable `Local\MedExReportAssistant.Singleton` mutex before configuration initialization. Conflicting policy-aware versions now show a Chinese message and exit without terminating or reloading the existing process.

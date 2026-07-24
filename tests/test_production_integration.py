@@ -536,7 +536,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         main = source("src/main.ahk")
         build = source("scripts/build_release.py")
         field_debug = source("debug/medex_color_reset_field_debug.ahk")
-        self.assertIn('static Version := "0.5.0"', metadata)
+        self.assertIn('static Version := "0.6.0"', metadata)
         self.assertIn('static Channel := "internal-test"', metadata)
         self.assertIn("#Include app_metadata.ahk", main)
         self.assertIn("#Include <UIA>", main)
@@ -581,7 +581,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_generated_release_is_self_contained_after_build(self) -> None:
         release = source("release/report_assistant.ahk")
         self.assertIn("class AppMetadata", release)
-        self.assertIn('static Version := "0.5.0"', release)
+        self.assertIn('static Version := "0.6.0"', release)
         self.assertIn('static Channel := "internal-test"', release)
         self.assertIn('static Version => "1.1.3"', release)
         self.assertIn("class MedExColorResetLayoutProfile", release)

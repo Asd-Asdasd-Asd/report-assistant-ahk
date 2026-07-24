@@ -1,8 +1,8 @@
-# v0.5.0 Internal Release 检查清单
+# v0.6.0 Internal Release 检查清单
 
 ## Source 与版本
 
-- [ ] 从 clean commit 构建，`src/app_metadata.ahk` 中版本为 `0.5.0`。
+- [ ] 从 clean commit 构建，`src/app_metadata.ahk` 中版本为 `0.6.0`。
 - [ ] `src/app_metadata.ahk` 是 application version 的唯一人工维护来源。
 - [ ] source 变化后运行完整 Python suite 和 `python scripts/build_release.py`。
 - [ ] `release/report_assistant.ahk` 与 source modules 一致，UTF-8 without BOM，U+FEFF count 为 0。
@@ -12,7 +12,8 @@
 ## Schema 2 与设置
 
 - [ ] 新配置 section 只有 `Enabled`、`Name`、`Trigger`、`Text`。
-- [ ] `{{cursor}}`、`{{date}}`、`{{red:（见图）}}` 均通过 parser、renderer 和 Settings validation。
+- [ ] `{{cursor}}`、`{{date}}`、`{{suvmax}}`、`{{size}}`、`{{red:（见图）}}` 均通过 parser、renderer 和 Settings validation。
+- [ ] 同一模板拒绝多个 measurement token，并拒绝混用 `{{suvmax}}` 与 `{{size}}`。
 - [ ] 普通字面量 `（见图）` 保持黑色，不触发 Candidate G。
 - [ ] `{{red:（见图）}}` 最多一次且只能位于模板末尾。
 - [ ] `ReportTemplatePlan` 根据 rendered result 推导 caret relocation 和 Candidate G；内部 cursor 优先于颜色恢复。
@@ -27,6 +28,7 @@
 - [ ] 运行 `git diff --check`。
 - [ ] 运行 Windows AHK regression harnesses，包含 migration、Settings、template renderer、`cmx` 和 startup。
 - [ ] 核对 diagnostics 不包含患者资料、报告正文或 clipboard content。
+- [ ] SUVMax 和尺寸严格区分 `FOUND`、`NOT_ANNOTATED` 与 `AUTOMATION_FAILED`，不复用旧 clipboard 内容。
 
 ## Windows 一键构建
 
@@ -53,6 +55,8 @@ publish\麦旋风.exe
 - [ ] builtin 与多个 custom templates 的新增、编辑、启停、排序、删除和重启持久化正确。
 - [ ] 单行、多行、空行、末尾换行、反斜杠及字面量 `\n` round-trip 正确。
 - [ ] `;red`、`;fzg`、`;fwj`、`;fjd`、`;cmx` 的文字、红色范围、caret 和后续输入颜色正确。
+- [ ] `;fzg` 正数、无标注和失败路径正确；custom `{{size}}` 模板可插入 1–3 个降序尺寸或留下人工输入锚点。
+- [ ] 报告写入成功后才尝试清除 viewer 标注；清除失败不回滚，清除成功以对应 measurement 再读为 `NOT_ANNOTATED`。
 - [ ] hotstrings 只在 MedEx report process 生效；`Ctrl+Alt+Esc` 和 `Ctrl+Alt+Q` 保持全局。
 - [ ] wrong process、missing anchor、invalid geometry、menu timeout 和 black-item failure 均 fail closed。
 - [ ] 重新编译后的第一次颜色下拉操作若已选中黑色但菜单未关闭，记录一次现场结果；不得用 blind retry 掩盖，后续操作应恢复正常。
@@ -62,7 +66,7 @@ publish\麦旋风.exe
 
 - [ ] ZIP 只包含 `publish/` 中需要分发的内容，不包含 build scripts、source、user config、logs 或 Git metadata。
 - [ ] ZIP 先复制到本机并完整解压，不从共享盘或压缩包内直接运行。
-- [ ] 用户说明统一使用“麦旋风”，版本统一为 `v0.5.0`。
+- [ ] 用户说明统一使用“麦旋风”，版本统一为 `v0.6.0`。
 - [ ] `更新说明.md` 写明完整文件夹替换、自动配置升级和问题留存方法。
 - [ ] 不包含 installer、shortcut、registry state、self-update、EXE backup、rollback 或历史 EXE cleanup。
 - [ ] 创建 tag 和上传 artifact 仅在 Windows/MedEx 验收完成后进行。

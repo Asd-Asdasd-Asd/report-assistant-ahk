@@ -43,7 +43,7 @@ publish\麦旋风.exe
 
 静态资源使用 overlay 同步：构建只复制 `assets/publish/` 中当前存在的文件，不审核或删除 `publish/` 中的其他文档、图标。若静态资源被删除或重命名，正式发布前应手工清空 `publish/`，再从 clean commit 重新构建。
 
-v0.5.0 release 还必须：
+每个 v0.5+ internal release 还必须：
 
 - 从 source truth 生成 internal-test executable，不手改 generated artifact；
 - 只从 clean Git commit 构建正式 EXE，确认 startup metadata 中 `SourceRevision` 是该 source commit；
@@ -51,6 +51,8 @@ v0.5.0 release 还必须：
 - 核对 `%LocalAppData%\MedExReportAssistant\config.ini` 的 Schema 1 → 2 备份、迁移和验证流程；失败不得产生半迁移文件；
 - 核对 compatibility script 与新 build 没有重复 hotkeys/hotstrings；
 - 记录本 release 从 compatibility 移除了哪些 capability，以及出现问题时如何停止测试和恢复人工工作流。
+
+v0.6.0 还必须核对 SUVMax/尺寸的 strict parser、fresh clipboard、人工输入锚点、报告成功后清除及清除后 `NOT_ANNOTATED` 复验。
 
 初始内测使用 portable single-EXE：不提供 installer、固定安装路径、shortcut、自动更新、旧 EXE backup 或 rollback system。ZIP 必须先复制到本机并完整解压，不能直接从共享盘运行。
 

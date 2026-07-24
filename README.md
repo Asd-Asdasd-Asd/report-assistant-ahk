@@ -1,6 +1,6 @@
 # 麦旋风（MedEx Report Assistant）
 
-麦旋风是一个基于 AutoHotkey v2 的 Windows 报告书写辅助工具。当前版本为 **v0.5.0 内部测试版**，用于少量工作站验证，不替代人工审核，也不会自动提交报告。
+麦旋风是一个基于 AutoHotkey v2 的 Windows 报告书写辅助工具。当前版本为 **v0.6.0 内部测试版**，用于少量工作站验证，不替代人工审核，也不会自动提交报告。
 
 ## 当前能力
 
@@ -10,6 +10,8 @@
 - 设置窗口支持新增、修改、启用、停用和按列查看快捷语；builtin 可编辑但不能删除，custom template 可删除。
 - 保存设置后执行完整 `Reload()`，不使用进程内热更新。
 - portable EXE 不绑定安装目录；跨版本单实例由固定 `Local\MedExReportAssistant.Singleton` mutex 保护。
+- `{{suvmax}}` 和 `{{size}}` 可从 MxNM 当前标注读取 SUVMax 或 1–3 个直线测量值；两者不能用于同一模板。
+- 自动测量只有在取得严格合法的新结果时才写入报告；无标注或失败时保留人工输入位置，报告写入成功后再尝试清除 viewer 标注。
 
 当前颜色恢复只在 MedEx `0.0.1.0`、1920×1080、100% scaling、DPI 96 的既有 profile 上完成现场验证。其他布局继续 fail closed，不能因为版本检测放宽而视为已支持。
 
@@ -27,9 +29,11 @@ EXE 的位置不参与配置路径计算。普通用户应通过设置窗口修�
 
 - `{{cursor}}`：最终 caret 位置；最多一个。
 - `{{date}}`：触发时展开为本机日期 `yyyy-MM-dd`；可重复。
+- `{{suvmax}}`：自动读取 SUVMax；最多一个。
+- `{{size}}`：自动读取并按数值降序格式化 1–3 个直线测量值；最多一个。
 - `{{red:（见图）}}`：唯一合法的红色元素；最多一个且必须位于模板末尾。
 
-普通字面量 `（见图）` 始终按黑字处理。`template_renderer.ahk` 将模板转换为 `ReportTemplatePlan`，由 plan 的最终 caret 位置推导移动距离，并且仅在 caret 位于红色尾标记之后时请求 Candidate G。纯黑模板和 caret 位于正文内部的模板不会调用 Candidate G。
+`{{suvmax}}` 与 `{{size}}` 不能出现在同一模板中。普通字面量 `（见图）` 始终按黑字处理。`template_renderer.ahk` 将模板转换为 `ReportTemplatePlan`，由 plan 的最终 caret 位置推导移动距离，并且仅在 caret 位于红色尾标记之后时请求 Candidate G。纯黑模板和 caret 位于正文内部的模板不会调用 Candidate G。
 
 Schema 1 首次启动时执行一次性迁移：先审计旧 `Mode`，再备份、写入临时文件、验证并替换。不能无歧义保留的配置会阻止迁移并保留原文件。Schema 2 配置不能再交给旧版 EXE 使用。
 
@@ -44,6 +48,8 @@ Schema 1 首次启动时执行一次性迁移：先审计旧 `Mode`，再备份�
 
 - 光标位置
 - 当前日期
+- 自动获取 SUVMax
+- 自动获取尺寸
 - 红色“（见图）”
 
 保存前会检查空值、重复 trigger、模板语法和外部文件变化。写入使用备份、临时文件和最终复读验证；成功后执行全脚本 `Reload()`。

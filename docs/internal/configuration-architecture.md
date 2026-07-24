@@ -1,4 +1,4 @@
-# v0.5.0 配置与模板架构
+# v0.6.0 配置与模板架构
 
 ## 持久化边界
 
@@ -74,9 +74,11 @@ Text codec 将真实换行保存为 `\n`，普通反斜杠保存为 `\\`；Windo
 
 - `{{cursor}}`：最终 caret 位置；最多一个。不出现时默认为渲染文本末尾。
 - `{{date}}`：执行时读取本机日期并展开为 `yyyy-MM-dd`；可重复。
+- `{{suvmax}}`：运行时自动读取 SUVMax；最多一个。
+- `{{size}}`：运行时自动读取并降序格式化 1–3 个直线测量值；最多一个。
 - `{{red:（见图）}}`：渲染为红色 `（见图）`；最多一个且必须是模板最后一个元素。
 
-未知、拼错、未闭合、嵌套、位置错误或多个 cursor/red element 均拒绝。普通单花括号不作为模板语法。普通字面量 `（见图）` 始终是黑色正文，不产生红色语义。
+`{{suvmax}}` 与 `{{size}}` 不能在同一模板中使用。未知、拼错、未闭合、嵌套、位置错误或多个 cursor/measurement/red element 均拒绝。普通单花括号不作为模板语法。普通字面量 `（见图）` 始终是黑色正文，不产生红色语义。
 
 Parser 返回已展开文本、caret index 和红色尾段位置。`BuildReportTemplatePlan()` 生成：
 
@@ -105,7 +107,7 @@ caret 在文本末尾 + 纯黑正文
 → 不运行 Candidate G
 ```
 
-当前 `;fzg` 会派生 `CaretLeftCount=4`，但这是 `{{cursor}}{{red:（见图）}}` 渲染后的结果，不是配置字段。
+measurement 为 `FOUND` 时展开合法格式化值；`NOT_ANNOTATED` 或 `AUTOMATION_FAILED` 时展开为空，并由对应 measurement token 强制成为人工输入 caret anchor。首版不支持两个 measurement token 共存，以避免多个自动读取和人工锚点产生歧义。
 
 ## 启动与 Schema 1 → 2 migration
 
