@@ -368,6 +368,20 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 
 ## v0.6.0 measurement provider staged tests
 
+### Report editor text/caret read-only exploration
+
+- [ ] 只使用非临床测试文字；退出 production release 和其他 AHK harness。
+- [ ] 启动 `tests\windows\report_editor_text_snapshot_field.ahk`，在“检查所见”正文框中输入固定测试文本 `甲乙丙`。
+- [ ] 光标依次放在文本开头、`甲|乙`、文本末尾，每次按 `Ctrl+Alt+F7`。
+- [ ] 再输入两行文字，分别在第一行末尾和第二行开头按 `Ctrl+Alt+F7`。
+- [ ] 选中单个字符和跨行文字，各按一次 `Ctrl+Alt+F7`。
+- [ ] 检查 `%TEMP%\MedExAHK\report_editor_text_snapshot_field.txt`；每个 run 都应找到同一 focused `Document`，并记录 text length、selection range/offset、caret offset/source。
+- [ ] `CaretActive=false` 时不得把 `CaretCandidateOffset` 当成可信 caret；结果必须为 `TEXT_READY_CARET_UNRESOLVED`。
+- [ ] 比较 `TextLength`、`ValueLength` 和 `TextValueEqual`，判断 `DocumentRange` 与 `ValuePattern` 是否暴露同一文本范围。
+- [ ] 确认结果文件不包含测试正文、选中文字、clipboard 内容、患者信息或报告正文。
+- [ ] 确认 `ForegroundUnchanged=true`、`MouseUnchanged=true`，执行前后正文、选区和光标位置均未改变。
+- [ ] 回传完整结果文件，并说明每个 run 对应“开头/中间/末尾/多行/选区”中的哪一种。
+
 ### Generic acquisition core revalidation
 
 - [x] 重新运行 `tests\windows\measurement_capture_regression.ahk`；确认 spec validation、components copy、原 positive/zero/malformed/no-update/nested-busy 和 clipboard restoration 全部通过。
