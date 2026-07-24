@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added a native Settings UI for creating, editing, enabling, disabling, sorting, and deleting custom report templates, including a compact template-element insertion control.
 - Added tray “设置…” and “重新加载配置” actions; double-clicking the tray icon opens the single Settings window.
 - Added the original SVG, deterministic multi-size PNG/ICO generation pipeline, and Ahk2Exe icon integration.
+- Added the initial v0.6.0 measurement foundation: structured SUVMax states, strict parsing, an independent sentinel/sequence-based clipboard capture transaction, and a no-focus-switch context-menu provider that remains disconnected from production hotstrings pending Windows validation.
 
 ### Documentation
 

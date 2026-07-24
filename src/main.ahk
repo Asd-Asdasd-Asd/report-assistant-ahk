@@ -10,6 +10,10 @@
 #Include window_guard.ahk
 #Include utils.ahk
 #Include clipboard_html.ahk
+#Include measurement_model.ahk
+#Include measurement_parser.ahk
+#Include measurement_clipboard.ahk
+#Include context_measurement_provider.ahk
 #Include <UIA>
 #Include medex_color_reset_logic.ahk
 #Include medex_candidate_g_logic.ahk

@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0
-; Source revision: 16bc5f2bc6abce56f1b129847d4222d058163a1e-dirty
-; Generated at: 2026-07-23 15:27:01 UTC
+; Source revision: 7178c29467265e7171f092e447b453c359003652-dirty
+; Generated at: 2026-07-24 05:20:56 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0"
     static Channel := "internal-test"
-    static SourceRevision := "16bc5f2bc6abce56f1b129847d4222d058163a1e-dirty"
+    static SourceRevision := "7178c29467265e7171f092e447b453c359003652-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -8543,6 +8543,807 @@ FormatCfHtmlOffset(offset) {
 }
 
 ; --- END clipboard_html.ahk ---
+
+; --- BEGIN measurement_model.ahk ---
+class MeasurementState {
+    static FOUND := "FOUND"
+    static NOT_ANNOTATED := "NOT_ANNOTATED"
+    static AUTOMATION_FAILED := "AUTOMATION_FAILED"
+}
+
+class MeasurementType {
+    static SUVMAX := "suvmax"
+}
+
+class MeasurementSource {
+    static MXNM_CONTEXT_COMMAND := "mxnm_context_command"
+}
+
+class MeasurementFailureReason {
+    static NONE := ""
+    static PROVIDER_BUSY := "PROVIDER_BUSY"
+    static VIEWER_NOT_FOUND := "VIEWER_NOT_FOUND"
+    static VIEWER_AMBIGUOUS := "VIEWER_AMBIGUOUS"
+    static IMAGE_POINT_UNAVAILABLE := "IMAGE_POINT_UNAVAILABLE"
+    static IMAGE_POINT_OUT_OF_BOUNDS := "IMAGE_POINT_OUT_OF_BOUNDS"
+    static POPUP_NOT_CREATED := "POPUP_NOT_CREATED"
+    static COMMAND_NOT_FOUND := "COMMAND_NOT_FOUND"
+    static COMMAND_ID_INVALID := "COMMAND_ID_INVALID"
+    static COMMAND_INVOKE_FAILED := "COMMAND_INVOKE_FAILED"
+    static CLIPBOARD_SAVE_FAILED := "CLIPBOARD_SAVE_FAILED"
+    static CLIPBOARD_SENTINEL_FAILED := "CLIPBOARD_SENTINEL_FAILED"
+    static CLIPBOARD_ACTION_FAILED := "CLIPBOARD_ACTION_FAILED"
+    static CLIPBOARD_NOT_UPDATED := "CLIPBOARD_NOT_UPDATED"
+    static CLIPBOARD_RESTORE_FAILED := "CLIPBOARD_RESTORE_FAILED"
+    static UNEXPECTED_FORMAT := "UNEXPECTED_FORMAT"
+    static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
+}
+
+class MeasurementResult {
+    __New(state, measurementType, rawValue := "", formattedValue := "",
+        source := MeasurementSource.MXNM_CONTEXT_COMMAND,
+        failureReason := MeasurementFailureReason.NONE, context := 0) {
+        this.state := String(state)
+        this.success := this.state = MeasurementState.FOUND
+        this.measurementType := String(measurementType)
+        this.rawValue := String(rawValue)
+        this.formattedValue := String(formattedValue)
+        this.source := String(source)
+        this.failureReason := String(failureReason)
+        this.context := Type(context) = "Map" ? context : Map()
+    }
+}
+
+MakeMeasurementResult(state, measurementType := MeasurementType.SUVMAX,
+    rawValue := "", formattedValue := "",
+    source := MeasurementSource.MXNM_CONTEXT_COMMAND,
+    failureReason := MeasurementFailureReason.NONE, context := 0) {
+    return MeasurementResult(
+        state,
+        measurementType,
+        rawValue,
+        formattedValue,
+        source,
+        failureReason,
+        context
+    )
+}
+
+MeasurementOption(options, key, defaultValue := 0) {
+    if Type(options) = "Map" && options.Has(key)
+        return options[key]
+    if IsObject(options) && options.HasOwnProp(key)
+        return options.%key%
+    return defaultValue
+}
+
+; --- END measurement_model.ahk ---
+
+; --- BEGIN measurement_parser.ahk ---
+ParseSuvMaxMeasurement(rawText) {
+    rawValue := String(rawText)
+    if !RegExMatch(
+        rawValue,
+        "^\s*SUVMax\s*:\s*(\d+(?:\.\d+)?)\s*$",
+        &match
+    ) {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            MeasurementType.SUVMAX,
+            rawValue,
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.UNEXPECTED_FORMAT
+        )
+    }
+
+    numericValue := match[1] + 0
+    if numericValue = 0 {
+        return MakeMeasurementResult(
+            MeasurementState.NOT_ANNOTATED,
+            MeasurementType.SUVMAX,
+            rawValue
+        )
+    }
+
+    return MakeMeasurementResult(
+        MeasurementState.FOUND,
+        MeasurementType.SUVMAX,
+        rawValue,
+        Format("{:.1f}", numericValue)
+    )
+}
+
+; --- END measurement_parser.ahk ---
+
+; --- BEGIN measurement_clipboard.ahk ---
+class MeasurementClipboardDefaults {
+    static UpdateTimeoutMs := 1000
+    static PollIntervalMs := 20
+    static SentinelTimeoutSeconds := 0.5
+    static RestoreSettleMs := 100
+}
+
+CaptureMeasurementClipboardText(actionCallback, options := 0,
+    prepareCallback := 0) {
+    static busy := false
+    result := {
+        ok: false,
+        captureSucceeded: false,
+        restoreAttempted: false,
+        restoreSucceeded: false,
+        rawText: "",
+        failureReason: MeasurementFailureReason.NONE,
+        requestId: "",
+        sequenceBeforeCommand: 0,
+        sequenceAfterCommand: 0,
+        clipboardOwnerHwnd: 0,
+        prepareError: "",
+        actionError: "",
+        restoreError: ""
+    }
+
+    if busy {
+        result.failureReason := MeasurementFailureReason.PROVIDER_BUSY
+        return result
+    }
+    if !HasMethod(actionCallback, "Call") {
+        result.failureReason := MeasurementFailureReason.CLIPBOARD_ACTION_FAILED
+        return result
+    }
+
+    busy := true
+    clipboardSaved := false
+    try {
+        try {
+            savedClipboard := ClipboardAll()
+            clipboardSaved := true
+        } catch as err {
+            result.failureReason := MeasurementFailureReason.CLIPBOARD_SAVE_FAILED
+            result.actionError := err.Message
+            return result
+        }
+
+        result.requestId := BuildMeasurementClipboardRequestId()
+        sentinel := "__MEDEX_MEASUREMENT_" result.requestId "__"
+        try {
+            A_Clipboard := sentinel
+            sentinelTimeout := MeasurementOption(
+                options,
+                "sentinelTimeoutSeconds",
+                MeasurementClipboardDefaults.SentinelTimeoutSeconds
+            )
+            if !ClipWait(sentinelTimeout)
+                result.failureReason := MeasurementFailureReason.CLIPBOARD_SENTINEL_FAILED
+            else if A_Clipboard != sentinel
+                result.failureReason := MeasurementFailureReason.CLIPBOARD_SENTINEL_FAILED
+        } catch as err {
+            result.failureReason := MeasurementFailureReason.CLIPBOARD_SENTINEL_FAILED
+            result.actionError := err.Message
+        }
+        if result.failureReason != MeasurementFailureReason.NONE
+            return result
+
+        if IsObject(prepareCallback) && HasMethod(prepareCallback, "Call") {
+            try {
+                if prepareCallback.Call() != true {
+                    result.failureReason :=
+                        MeasurementFailureReason.CLIPBOARD_ACTION_FAILED
+                    return result
+                }
+            } catch as err {
+                result.failureReason :=
+                    MeasurementFailureReason.CLIPBOARD_ACTION_FAILED
+                result.prepareError := err.Message
+                return result
+            }
+        }
+
+        ; Record freshness only after popup/command preparation. This prevents a
+        ; clipboard change during popup discovery from being attributed to the
+        ; command that has not yet been sent.
+        result.sequenceBeforeCommand := GetMeasurementClipboardSequenceNumber()
+        try {
+            if actionCallback.Call() != true {
+                result.failureReason := MeasurementFailureReason.CLIPBOARD_ACTION_FAILED
+                return result
+            }
+        } catch as err {
+            result.failureReason := MeasurementFailureReason.CLIPBOARD_ACTION_FAILED
+            result.actionError := err.Message
+            return result
+        }
+
+        update := WaitForMeasurementClipboardUpdate(
+            result.sequenceBeforeCommand,
+            sentinel,
+            options
+        )
+        result.sequenceAfterCommand := update.sequence
+        result.clipboardOwnerHwnd := update.ownerHwnd
+        if !update.ok {
+            result.failureReason := MeasurementFailureReason.CLIPBOARD_NOT_UPDATED
+            return result
+        }
+
+        result.rawText := update.rawText
+        result.captureSucceeded := true
+    } finally {
+        if clipboardSaved {
+            result.restoreAttempted := true
+            try {
+                A_Clipboard := savedClipboard
+                Sleep MeasurementOption(
+                    options,
+                    "restoreSettleMs",
+                    MeasurementClipboardDefaults.RestoreSettleMs
+                )
+                result.restoreSucceeded := true
+            } catch as err {
+                result.restoreError := err.Message
+                result.failureReason := MeasurementFailureReason.CLIPBOARD_RESTORE_FAILED
+            }
+        }
+        busy := false
+    }
+
+    if result.captureSucceeded && result.restoreSucceeded
+        result.ok := true
+    else if result.failureReason = MeasurementFailureReason.NONE
+        result.failureReason := MeasurementFailureReason.CLIPBOARD_RESTORE_FAILED
+    return result
+}
+
+BuildMeasurementClipboardRequestId() {
+    static requestCounter := 0
+    requestCounter += 1
+    return Format("{:X}_{:X}_{}", A_TickCount, A_ScriptHwnd, requestCounter)
+}
+
+GetMeasurementClipboardSequenceNumber() {
+    return DllCall("User32\GetClipboardSequenceNumber", "UInt")
+}
+
+WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0) {
+    timeoutMs := MeasurementOption(
+        options,
+        "clipboardTimeoutMs",
+        MeasurementClipboardDefaults.UpdateTimeoutMs
+    )
+    pollIntervalMs := MeasurementOption(
+        options,
+        "clipboardPollIntervalMs",
+        MeasurementClipboardDefaults.PollIntervalMs
+    )
+    deadline := A_TickCount + Max(0, Integer(timeoutMs))
+    lastSequence := sequenceBeforeCommand
+    loop {
+        sequence := GetMeasurementClipboardSequenceNumber()
+        if sequence != sequenceBeforeCommand {
+            lastSequence := sequence
+            try rawText := A_Clipboard
+            catch {
+                rawText := ""
+            }
+            if rawText != "" && rawText != sentinel {
+                ownerHwnd := DllCall("User32\GetClipboardOwner", "Ptr")
+                return {
+                    ok: true,
+                    rawText: rawText,
+                    sequence: sequence,
+                    ownerHwnd: ownerHwnd
+                }
+            }
+        }
+        if A_TickCount >= deadline
+            break
+        Sleep Max(1, Integer(pollIntervalMs))
+    }
+    return {
+        ok: false,
+        rawText: "",
+        sequence: lastSequence,
+        ownerHwnd: 0
+    }
+}
+
+; --- END measurement_clipboard.ahk ---
+
+; --- BEGIN context_measurement_provider.ahk ---
+class ContextMeasurementDefaults {
+    static ViewerExe := "MedExNMFusion.exe"
+    static SuvMaxCommandText := "复制SUVMax值"
+    static PopupClass := "#32770"
+    static PopupTimeoutMs := 1000
+    static PopupPollIntervalMs := 20
+    static ImagePointKey := "measurement_image_point"
+}
+
+class ContextMeasurementProvider {
+    static ReadSuvMax(options := 0) {
+        return ReadCurrentSuvMaxWithoutFocusSwitch(options)
+    }
+}
+
+ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
+    context := Map(
+        "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+        "viewerExe", MeasurementOption(
+            options,
+            "viewerExe",
+            ContextMeasurementDefaults.ViewerExe
+        ),
+        "commandText", ContextMeasurementDefaults.SuvMaxCommandText,
+        "focusSwitchAttempted", false,
+        "mouseMoveAttempted", false,
+        "popupHwnd", 0,
+        "commandControlHwnd", 0,
+        "commandRuntimeId", 0,
+        "clipboardOwnerHwnd", 0
+    )
+
+    viewer := ResolveContextMeasurementViewer(context["viewerExe"])
+    if !viewer.ok {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            MeasurementType.SUVMAX,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            viewer.failureReason,
+            context
+        )
+    }
+    context["viewerHwnd"] := viewer.hwnd
+    context["viewerPid"] := viewer.pid
+
+    pointResult := ResolveContextMeasurementImagePoint(
+        viewer.hwnd,
+        options
+    )
+    if !pointResult.ok {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            MeasurementType.SUVMAX,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            pointResult.failureReason,
+            context
+        )
+    }
+    context["imageScreenX"] := pointResult.screenPoint.x
+    context["imageScreenY"] := pointResult.screenPoint.y
+    context["imageClientX"] := pointResult.clientPoint.x
+    context["imageClientY"] := pointResult.clientPoint.y
+
+    actionContext := Map(
+        "failureReason", MeasurementFailureReason.NONE,
+        "popupHwnd", 0,
+        "commandControlHwnd", 0,
+        "commandRuntimeId", 0
+    )
+    try {
+        capture := CaptureMeasurementClipboardText(
+            () => InvokePreparedContextMeasurementCommand(actionContext),
+            options,
+            () => PrepareContextMeasurementCopyCommand(
+                viewer,
+                pointResult.clientPoint,
+                context["commandText"],
+                actionContext,
+                options
+            )
+        )
+    } catch as err {
+        context["exceptionType"] := Type(err)
+        context["exceptionMessage"] := err.Message
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            MeasurementType.SUVMAX,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.UNEXPECTED_ERROR,
+            context
+        )
+    } finally {
+        if actionContext["popupHwnd"]
+            CloseContextMeasurementPopup(actionContext["popupHwnd"])
+    }
+
+    MergeContextMeasurementMetadata(context, actionContext, capture)
+    if !capture.ok {
+        failureReason := capture.failureReason
+        if failureReason = MeasurementFailureReason.CLIPBOARD_ACTION_FAILED
+            && actionContext["failureReason"] != MeasurementFailureReason.NONE {
+            failureReason := actionContext["failureReason"]
+        }
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            MeasurementType.SUVMAX,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            failureReason,
+            context
+        )
+    }
+
+    result := ParseSuvMaxMeasurement(capture.rawText)
+    result.context := context
+    return result
+}
+
+ResolveContextMeasurementViewer(viewerExe) {
+    try windows := WinGetList("ahk_exe " viewerExe)
+    catch {
+        windows := []
+    }
+    if windows.Length = 0 {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_NOT_FOUND
+        }
+    }
+    if windows.Length != 1 {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_AMBIGUOUS
+        }
+    }
+
+    hwnd := windows[1]
+    try pid := WinGetPID("ahk_id " hwnd)
+    catch {
+        pid := 0
+    }
+    if !pid {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_NOT_FOUND
+        }
+    }
+    return {
+        ok: true,
+        hwnd: hwnd,
+        pid: pid,
+        failureReason: MeasurementFailureReason.NONE
+    }
+}
+
+ResolveContextMeasurementImagePoint(viewerHwnd, options := 0) {
+    resolver := MeasurementOption(options, "imagePointResolver", 0)
+    if IsObject(resolver) && HasMethod(resolver, "Call") {
+        try point := resolver.Call(viewerHwnd)
+        catch {
+            point := 0
+        }
+    } else {
+        point := MeasurementOption(options, "imageScreenPoint", 0)
+        if !IsContextMeasurementPoint(point) {
+            global COORDINATES
+            if IsSet(COORDINATES) && Type(COORDINATES) = "Map"
+                && COORDINATES.Has(ContextMeasurementDefaults.ImagePointKey) {
+                point := COORDINATES[ContextMeasurementDefaults.ImagePointKey]
+            }
+        }
+    }
+
+    if !IsContextMeasurementPoint(point) {
+        return {
+            ok: false,
+            screenPoint: 0,
+            clientPoint: 0,
+            failureReason: MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
+        }
+    }
+
+    screenPoint := {
+        x: Round(point.x),
+        y: Round(point.y)
+    }
+    if !ContextMeasurementPointInsideVirtualScreen(screenPoint) {
+        return {
+            ok: false,
+            screenPoint: screenPoint,
+            clientPoint: 0,
+            failureReason: MeasurementFailureReason.IMAGE_POINT_OUT_OF_BOUNDS
+        }
+    }
+
+    clientRectScreen := GetContextMeasurementClientRectScreen(viewerHwnd)
+    if !clientRectScreen
+        || screenPoint.x < clientRectScreen.l
+        || screenPoint.x >= clientRectScreen.r
+        || screenPoint.y < clientRectScreen.t
+        || screenPoint.y >= clientRectScreen.b {
+        return {
+            ok: false,
+            screenPoint: screenPoint,
+            clientPoint: 0,
+            failureReason: MeasurementFailureReason.IMAGE_POINT_OUT_OF_BOUNDS
+        }
+    }
+
+    clientPoint := ContextMeasurementScreenToClient(viewerHwnd, screenPoint)
+    if !clientPoint {
+        return {
+            ok: false,
+            screenPoint: screenPoint,
+            clientPoint: 0,
+            failureReason: MeasurementFailureReason.IMAGE_POINT_OUT_OF_BOUNDS
+        }
+    }
+    return {
+        ok: true,
+        screenPoint: screenPoint,
+        clientPoint: clientPoint,
+        clientRectScreen: clientRectScreen,
+        failureReason: MeasurementFailureReason.NONE
+    }
+}
+
+IsContextMeasurementPoint(point) {
+    return IsObject(point)
+        && point.HasOwnProp("x")
+        && point.HasOwnProp("y")
+        && IsNumber(point.x)
+        && IsNumber(point.y)
+}
+
+ContextMeasurementPointInsideVirtualScreen(point) {
+    left := SysGet(76)
+    top := SysGet(77)
+    width := SysGet(78)
+    height := SysGet(79)
+    return width > 0
+        && height > 0
+        && point.x >= left
+        && point.x < left + width
+        && point.y >= top
+        && point.y < top + height
+}
+
+GetContextMeasurementClientRectScreen(hwnd) {
+    rectBuffer := Buffer(16, 0)
+    if !DllCall("User32\GetClientRect", "Ptr", hwnd, "Ptr", rectBuffer.Ptr, "Int")
+        return 0
+
+    topLeft := Buffer(8, 0)
+    bottomRight := Buffer(8, 0)
+    NumPut("Int", NumGet(rectBuffer, 0, "Int"), topLeft, 0)
+    NumPut("Int", NumGet(rectBuffer, 4, "Int"), topLeft, 4)
+    NumPut("Int", NumGet(rectBuffer, 8, "Int"), bottomRight, 0)
+    NumPut("Int", NumGet(rectBuffer, 12, "Int"), bottomRight, 4)
+    if !DllCall("User32\ClientToScreen", "Ptr", hwnd, "Ptr", topLeft.Ptr, "Int")
+        return 0
+    if !DllCall("User32\ClientToScreen", "Ptr", hwnd, "Ptr", bottomRight.Ptr, "Int")
+        return 0
+    return {
+        l: NumGet(topLeft, 0, "Int"),
+        t: NumGet(topLeft, 4, "Int"),
+        r: NumGet(bottomRight, 0, "Int"),
+        b: NumGet(bottomRight, 4, "Int")
+    }
+}
+
+ContextMeasurementScreenToClient(hwnd, screenPoint) {
+    pointBuffer := Buffer(8, 0)
+    NumPut("Int", screenPoint.x, pointBuffer, 0)
+    NumPut("Int", screenPoint.y, pointBuffer, 4)
+    if !DllCall("User32\ScreenToClient", "Ptr", hwnd, "Ptr", pointBuffer.Ptr, "Int")
+        return 0
+    return {
+        x: NumGet(pointBuffer, 0, "Int"),
+        y: NumGet(pointBuffer, 4, "Int")
+    }
+}
+
+PrepareContextMeasurementCopyCommand(viewer, clientPoint, commandText,
+    actionContext, options := 0) {
+    existingPopups := SnapshotContextMeasurementPopups()
+    lParam := PackContextMeasurementClientPoint(clientPoint)
+    rightDownSent := DllCall(
+        "User32\PostMessageW",
+        "Ptr", viewer.hwnd,
+        "UInt", 0x0204,
+        "UPtr", 0x0002,
+        "Ptr", lParam,
+        "Int"
+    )
+    rightUpSent := DllCall(
+        "User32\PostMessageW",
+        "Ptr", viewer.hwnd,
+        "UInt", 0x0205,
+        "UPtr", 0,
+        "Ptr", lParam,
+        "Int"
+    )
+    if !rightDownSent || !rightUpSent {
+        actionContext["failureReason"] :=
+            MeasurementFailureReason.COMMAND_INVOKE_FAILED
+        return false
+    }
+
+    popupResult := WaitForContextMeasurementPopup(
+        viewer.pid,
+        existingPopups,
+        commandText,
+        options
+    )
+    if !popupResult.ok {
+        actionContext["failureReason"] := popupResult.failureReason
+        actionContext["popupHwnd"] := popupResult.popupHwnd
+        return false
+    }
+
+    actionContext["popupHwnd"] := popupResult.popupHwnd
+    actionContext["commandControlHwnd"] := popupResult.controlHwnd
+    runtimeId := DllCall(
+        "User32\GetDlgCtrlID",
+        "Ptr", popupResult.controlHwnd,
+        "Int"
+    )
+    actionContext["commandRuntimeId"] := runtimeId
+    if runtimeId <= 0 {
+        actionContext["failureReason"] := MeasurementFailureReason.COMMAND_ID_INVALID
+        return false
+    }
+    return true
+}
+
+InvokePreparedContextMeasurementCommand(actionContext) {
+    popupHwnd := actionContext["popupHwnd"]
+    controlHwnd := actionContext["commandControlHwnd"]
+    runtimeId := actionContext["commandRuntimeId"]
+    if !popupHwnd || !controlHwnd || runtimeId <= 0 {
+        actionContext["failureReason"] := MeasurementFailureReason.COMMAND_ID_INVALID
+        return false
+    }
+    try {
+        DllCall(
+            "User32\SendMessageW",
+            "Ptr", popupHwnd,
+            "UInt", 0x0111,
+            "UPtr", runtimeId,
+            "Ptr", controlHwnd,
+            "Ptr"
+        )
+    } catch {
+        actionContext["failureReason"] :=
+            MeasurementFailureReason.COMMAND_INVOKE_FAILED
+        return false
+    }
+    return true
+}
+
+PackContextMeasurementClientPoint(clientPoint) {
+    return ((clientPoint.y & 0xFFFF) << 16) | (clientPoint.x & 0xFFFF)
+}
+
+SnapshotContextMeasurementPopups() {
+    snapshot := Map()
+    try popupWindows := WinGetList(
+        "ahk_class " ContextMeasurementDefaults.PopupClass
+    )
+    catch {
+        popupWindows := []
+    }
+    for hwnd in popupWindows
+        snapshot[hwnd] := true
+    return snapshot
+}
+
+WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
+    options := 0) {
+    timeoutMs := MeasurementOption(
+        options,
+        "popupTimeoutMs",
+        ContextMeasurementDefaults.PopupTimeoutMs
+    )
+    pollIntervalMs := MeasurementOption(
+        options,
+        "popupPollIntervalMs",
+        ContextMeasurementDefaults.PopupPollIntervalMs
+    )
+    deadline := A_TickCount + Max(0, Integer(timeoutMs))
+    newPopupHwnd := 0
+    loop {
+        try popupWindows := WinGetList(
+            "ahk_class " ContextMeasurementDefaults.PopupClass
+        )
+        catch {
+            popupWindows := []
+        }
+        for popupHwnd in popupWindows {
+            if existingPopups.Has(popupHwnd)
+                continue
+            try popupPid := WinGetPID("ahk_id " popupHwnd)
+            catch {
+                popupPid := 0
+            }
+            if popupPid != viewerPid
+                continue
+            newPopupHwnd := popupHwnd
+            controlHwnd := FindContextMeasurementCommandControl(
+                popupHwnd,
+                commandText
+            )
+            if controlHwnd {
+                return {
+                    ok: true,
+                    popupHwnd: popupHwnd,
+                    controlHwnd: controlHwnd,
+                    failureReason: MeasurementFailureReason.NONE
+                }
+            }
+        }
+        if A_TickCount >= deadline
+            break
+        Sleep Max(1, Integer(pollIntervalMs))
+    }
+    return {
+        ok: false,
+        popupHwnd: newPopupHwnd,
+        controlHwnd: 0,
+        failureReason: newPopupHwnd
+            ? MeasurementFailureReason.COMMAND_NOT_FOUND
+            : MeasurementFailureReason.POPUP_NOT_CREATED
+    }
+}
+
+FindContextMeasurementCommandControl(popupHwnd, commandText) {
+    try controls := WinGetControlsHwnd("ahk_id " popupHwnd)
+    catch {
+        controls := []
+    }
+    for controlHwnd in controls {
+        if !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
+            continue
+        try controlText := ControlGetText(controlHwnd)
+        catch {
+            controlText := ""
+        }
+        if controlText = commandText
+            return controlHwnd
+    }
+    return 0
+}
+
+CloseContextMeasurementPopup(popupHwnd) {
+    if !popupHwnd || !WinExist("ahk_id " popupHwnd)
+        return false
+    return DllCall(
+        "User32\PostMessageW",
+        "Ptr", popupHwnd,
+        "UInt", 0x0010,
+        "UPtr", 0,
+        "Ptr", 0,
+        "Int"
+    ) = true
+}
+
+MergeContextMeasurementMetadata(context, actionContext, capture) {
+    context["popupHwnd"] := actionContext["popupHwnd"]
+    context["commandControlHwnd"] := actionContext["commandControlHwnd"]
+    context["commandRuntimeId"] := actionContext["commandRuntimeId"]
+    context["requestId"] := capture.requestId
+    context["clipboardSequenceBeforeCommand"] := capture.sequenceBeforeCommand
+    context["clipboardSequenceAfterCommand"] := capture.sequenceAfterCommand
+    context["clipboardOwnerHwnd"] := capture.clipboardOwnerHwnd
+    context["clipboardCaptureSucceeded"] := capture.captureSucceeded
+    context["clipboardRestoreAttempted"] := capture.restoreAttempted
+    context["clipboardRestoreSucceeded"] := capture.restoreSucceeded
+}
+
+; --- END context_measurement_provider.ahk ---
 
 ; --- BEGIN medex_color_reset_logic.ahk ---
 class ColorResetCode {

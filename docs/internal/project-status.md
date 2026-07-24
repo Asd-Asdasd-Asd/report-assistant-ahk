@@ -25,6 +25,7 @@
 - CF_HTML、clipboard `finally` restoration、Candidate G popup signature 和 at-most-once clicks 保持 fail closed。
 - 正式图标以 `assets/icon/source/medex-icon.svg` 为 source，由 `scripts/generate-icon.sh` 生成多尺寸 PNG/ICO。
 - Windows 一键构建自动生成 release source、以 `/icon` 嵌入 ICO、编译 temporary EXE、同步静态发布资源并事务提升 final。
+- v0.6.0 measurement foundation 已加入 `FOUND` / `NOT_ANNOTATED` / `AUTOMATION_FAILED` result、strict SUVMax parser、独立 measurement clipboard transaction 和无焦点 context-menu provider；当前未接入任何 production hotstring。
 
 ## 验证状态
 
@@ -41,8 +42,9 @@
 - Settings Section identity、排序后选择/编辑/删除、Text codec 和事务保存。
 - CF_HTML offsets、Candidate G pure rules、dispatcher safety、single-instance/build integration。
 - icon generation inputs与 Windows Ahk2Exe `/icon` wiring。
+- measurement result/parser、sentinel + clipboard sequence freshness、single restore owner、provider dynamic popup/command identity 和 privacy-safe field harness。
 
-当前完整 Python suite 为 189 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
+当前完整 Python suite 为 202 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
 
 ## 当前 production flow
 
@@ -75,7 +77,7 @@ exact UIA Name="检查所见"
 - 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 MedEx layout 尚未正式支持。
 - Compatibility layer 的 Alt+Shift+S 只保证单次触发；持续按住修饰键连续按 S 延后到 compatibility 重构。
 - updater、installer、self-update、rollback、shortcut 和 registry installation state 均不在范围内。
-- Measurement capture、SUVMax/长短轴读取和 `size` placeholder 延后到 v0.6.0。
+- Measurement provider foundation 已实现但尚未 Windows field-validated；`;fzg` 自动插入、long-axis/short-axis 和 `size` placeholder 仍未接入 production。
 - Settings 的“快捷键”“其他”标签页仍是占位页。
 
 ## v0.5.0 发布前剩余验收

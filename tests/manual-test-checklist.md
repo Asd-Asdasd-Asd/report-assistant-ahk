@@ -366,6 +366,17 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] User replacement 只作为 text data，不执行 AHK code。
 - [ ] 更新 executable 后 `%LocalAppData%\MedExReportAssistant\config.ini` 保持不变。
 
+## v0.6.0 measurement provider staged tests
+
+- [ ] 运行 `tests\windows\measurement_capture_regression.ahk`；确认 positive、zero、malformed、no-update、nested-busy 和 clipboard restoration 全部通过。
+- [ ] 只运行 `tests\windows\context_measurement_provider_field.ahk`，退出 production release，避免两个脚本同时操作 clipboard。
+- [ ] 在 viewer 图像内部将鼠标放到无害测试点并按 `Ctrl+Alt+F8`；随后将焦点返回报告编辑器，设置无害 clipboard sentinel，再按 `Ctrl+Alt+F9`。
+- [ ] 检查 `%TEMP%\MedExAHK\context_measurement_provider_field.txt`：`ForegroundUnchanged=true`、`MouseUnchanged=true`、`ClipboardCaptureSucceeded=true`、`ClipboardRestoreSucceeded=true`、`PopupCreated=true`、`CommandRuntimeIdResolved=true`。
+- [ ] 确认结果文件不包含 raw/formatted SUVMax、clipboard payload、患者信息、检查信息或报告正文。
+- [ ] 分别验证 positive SUVMax → `FOUND`、numeric zero → `NOT_ANNOTATED`、无 popup/command/clipboard update → `AUTOMATION_FAILED`；每次操作后原 clipboard 均完整恢复。
+- [ ] 制造多个 viewer window、越界 image point 和错误进程环境；确认 provider fail closed，不激活 viewer、不移动鼠标、不调用第二 transport。
+- [ ] 本阶段 provider 未接入 `;fzg`；任何 field result 都不得导致报告插入、caret movement 或 Color Reset。
+
 ## Portable release 与 singleton
 
 - [ ] 将 ZIP 复制到本机并完整解压，不直接从共享盘或压缩包内运行。
