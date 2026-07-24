@@ -11,6 +11,51 @@ global NestedMeasurementCaptureResult := 0
 RunMeasurementCaptureRegression()
 
 RunMeasurementCaptureRegression() {
+    validSpec := MeasurementCommandSpec(
+        MeasurementType.SUVMAX,
+        "复制SUVMax值",
+        ParseSuvMaxMeasurement
+    )
+    AssertMeasurement(
+        IsValidMeasurementCommandSpec(validSpec),
+        "valid measurement spec"
+    )
+    AssertMeasurement(
+        !IsValidMeasurementCommandSpec(
+            MeasurementCommandSpec("", "复制SUVMax值", ParseSuvMaxMeasurement)
+        ),
+        "empty measurement type spec"
+    )
+    AssertMeasurement(
+        !IsValidMeasurementCommandSpec(
+            MeasurementCommandSpec(MeasurementType.SUVMAX, "", ParseSuvMaxMeasurement)
+        ),
+        "empty command text spec"
+    )
+
+    lineComponents := [
+        { role: "line_1", value: 2.6, unit: "cm" }
+    ]
+    lineResult := MakeMeasurementResult(
+        MeasurementState.FOUND,
+        MeasurementType.LINE_AXES,
+        "2.6cm",
+        "2.6cm",
+        MeasurementSource.MXNM_CONTEXT_COMMAND,
+        MeasurementFailureReason.NONE,
+        Map(),
+        lineComponents
+    )
+    lineComponents.Push({ role: "line_2", value: 1.2, unit: "cm" })
+    AssertMeasurement(
+        lineResult.components.Length = 1,
+        "measurement components must be copied"
+    )
+    AssertMeasurement(
+        lineResult.components[1].role = "line_1",
+        "measurement component role"
+    )
+
     AssertSuvMaxResult(
         ParseSuvMaxMeasurement("SUVMax: 3.599"),
         MeasurementState.FOUND,

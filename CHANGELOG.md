@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added the original SVG, deterministic multi-size PNG/ICO generation pipeline, and Ahk2Exe icon integration.
 - Added the initial v0.6.0 measurement foundation: structured SUVMax states, strict parsing, an independent sentinel/sequence-based clipboard capture transaction, and a no-focus-switch context-menu provider that remains disconnected from production hotstrings pending Windows validation.
 - Added non-focus-stealing visual feedback to the Windows measurement field harness for workstations without audio devices.
+- Added a spec-driven measurement acquisition core with an unchanged SUVMax wrapper, reserved `line_axes` type, and optional structured components for later line-measurement support.
 
 ### Documentation
 

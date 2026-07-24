@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0
-; Source revision: afdb20674f37e85b6a9f562224dd33bc6c24766d-dirty
-; Generated at: 2026-07-24 06:02:11 UTC
+; Source revision: ba4438479b8424d9c44ff84448b13d0ec5878374-dirty
+; Generated at: 2026-07-24 06:44:58 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0"
     static Channel := "internal-test"
-    static SourceRevision := "afdb20674f37e85b6a9f562224dd33bc6c24766d-dirty"
+    static SourceRevision := "ba4438479b8424d9c44ff84448b13d0ec5878374-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -8553,6 +8553,7 @@ class MeasurementState {
 
 class MeasurementType {
     static SUVMAX := "suvmax"
+    static LINE_AXES := "line_axes"
 }
 
 class MeasurementSource {
@@ -8561,6 +8562,7 @@ class MeasurementSource {
 
 class MeasurementFailureReason {
     static NONE := ""
+    static INVALID_MEASUREMENT_SPEC := "INVALID_MEASUREMENT_SPEC"
     static PROVIDER_BUSY := "PROVIDER_BUSY"
     static VIEWER_NOT_FOUND := "VIEWER_NOT_FOUND"
     static VIEWER_AMBIGUOUS := "VIEWER_AMBIGUOUS"
@@ -8579,10 +8581,27 @@ class MeasurementFailureReason {
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
 
+class MeasurementCommandSpec {
+    __New(measurementType, commandText, parserCallback) {
+        this.measurementType := String(measurementType)
+        this.commandText := String(commandText)
+        this.parserCallback := parserCallback
+    }
+}
+
+IsValidMeasurementCommandSpec(spec) {
+    return spec is MeasurementCommandSpec
+        && spec.measurementType != ""
+        && spec.commandText != ""
+        && IsObject(spec.parserCallback)
+        && HasMethod(spec.parserCallback, "Call")
+}
+
 class MeasurementResult {
     __New(state, measurementType, rawValue := "", formattedValue := "",
         source := MeasurementSource.MXNM_CONTEXT_COMMAND,
-        failureReason := MeasurementFailureReason.NONE, context := 0) {
+        failureReason := MeasurementFailureReason.NONE, context := 0,
+        components := 0) {
         this.state := String(state)
         this.success := this.state = MeasurementState.FOUND
         this.measurementType := String(measurementType)
@@ -8591,13 +8610,17 @@ class MeasurementResult {
         this.source := String(source)
         this.failureReason := String(failureReason)
         this.context := Type(context) = "Map" ? context : Map()
+        this.components := Type(components) = "Array"
+            ? components.Clone()
+            : []
     }
 }
 
 MakeMeasurementResult(state, measurementType := MeasurementType.SUVMAX,
     rawValue := "", formattedValue := "",
     source := MeasurementSource.MXNM_CONTEXT_COMMAND,
-    failureReason := MeasurementFailureReason.NONE, context := 0) {
+    failureReason := MeasurementFailureReason.NONE, context := 0,
+    components := 0) {
     return MeasurementResult(
         state,
         measurementType,
@@ -8605,7 +8628,8 @@ MakeMeasurementResult(state, measurementType := MeasurementType.SUVMAX,
         formattedValue,
         source,
         failureReason,
-        context
+        context,
+        components
     )
 }
 
@@ -8860,12 +8884,44 @@ class ContextMeasurementDefaults {
 }
 
 class ContextMeasurementProvider {
+    static ReadMeasurement(spec, options := 0) {
+        return ReadCurrentMeasurementWithoutFocusSwitch(spec, options)
+    }
+
     static ReadSuvMax(options := 0) {
-        return ReadCurrentSuvMaxWithoutFocusSwitch(options)
+        return this.ReadMeasurement(BuildSuvMaxMeasurementCommandSpec(), options)
     }
 }
 
 ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
+    return ContextMeasurementProvider.ReadSuvMax(options)
+}
+
+BuildSuvMaxMeasurementCommandSpec() {
+    return MeasurementCommandSpec(
+        MeasurementType.SUVMAX,
+        ContextMeasurementDefaults.SuvMaxCommandText,
+        ParseSuvMaxMeasurement
+    )
+}
+
+ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
+    if !IsValidMeasurementCommandSpec(spec) {
+        requestedMeasurementType := IsObject(spec)
+            && spec.HasOwnProp("measurementType")
+                ? String(spec.measurementType)
+                : ""
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.INVALID_MEASUREMENT_SPEC
+        )
+    }
+
+    requestedMeasurementType := spec.measurementType
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "viewerExe", MeasurementOption(
@@ -8873,7 +8929,8 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
             "viewerExe",
             ContextMeasurementDefaults.ViewerExe
         ),
-        "commandText", ContextMeasurementDefaults.SuvMaxCommandText,
+        "commandText", spec.commandText,
+        "measurementType", requestedMeasurementType,
         "focusSwitchAttempted", false,
         "mouseMoveAttempted", false,
         "popupHwnd", 0,
@@ -8886,7 +8943,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
     if !viewer.ok {
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -8904,7 +8961,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
     if !pointResult.ok {
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -8940,7 +8997,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
         context["exceptionMessage"] := err.Message
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -8961,7 +9018,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
         }
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -8970,7 +9027,33 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
         )
     }
 
-    result := ParseSuvMaxMeasurement(capture.rawText)
+    try result := spec.parserCallback.Call(capture.rawText)
+    catch as err {
+        context["parserExceptionType"] := Type(err)
+        context["parserExceptionMessage"] := err.Message
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.UNEXPECTED_ERROR,
+            context
+        )
+    }
+    if !(result is MeasurementResult)
+        || result.measurementType != requestedMeasurementType {
+        context["parserResultType"] := Type(result)
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.UNEXPECTED_ERROR,
+            context
+        )
+    }
     result.context := context
     return result
 }

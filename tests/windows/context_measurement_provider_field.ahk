@@ -11,8 +11,22 @@ CoordMode "Mouse", "Screen"
 
 global ContextMeasurementFieldPoint := 0
 
+ValidateContextMeasurementProviderSpecContract()
+
 ^!F8::CaptureContextMeasurementFieldPoint()
 ^!F9::RunContextMeasurementProviderFieldRead()
+
+ValidateContextMeasurementProviderSpecContract() {
+    invalidResult := ContextMeasurementProvider.ReadMeasurement(0)
+    if invalidResult.state != MeasurementState.AUTOMATION_FAILED
+        || invalidResult.failureReason
+            != MeasurementFailureReason.INVALID_MEASUREMENT_SPEC {
+        throw Error("Invalid measurement spec did not fail before acquisition")
+    }
+    suvSpec := BuildSuvMaxMeasurementCommandSpec()
+    if !IsValidMeasurementCommandSpec(suvSpec)
+        throw Error("SUVMax measurement spec is invalid")
+}
 
 CaptureContextMeasurementFieldPoint() {
     global ContextMeasurementFieldPoint

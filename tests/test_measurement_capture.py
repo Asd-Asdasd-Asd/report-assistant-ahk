@@ -39,10 +39,37 @@ class MeasurementCaptureTests(unittest.TestCase):
             "source",
             "failureReason",
             "context",
+            "components",
         ):
             self.assertIn(f"this.{field} :=", model)
         self.assertIn(
             "this.success := this.state = MeasurementState.FOUND", model
+        )
+        self.assertIn('static LINE_AXES := "line_axes"', model)
+        self.assertIn("components.Clone()", model)
+
+    def test_command_spec_defines_the_generic_provider_boundary(self) -> None:
+        model = source("src/measurement_model.ahk")
+        provider = source("src/context_measurement_provider.ahk")
+        for required in (
+            "class MeasurementCommandSpec",
+            "this.measurementType := String(measurementType)",
+            "this.commandText := String(commandText)",
+            "this.parserCallback := parserCallback",
+            "IsValidMeasurementCommandSpec(spec)",
+            'static INVALID_MEASUREMENT_SPEC := "INVALID_MEASUREMENT_SPEC"',
+        ):
+            self.assertIn(required, model)
+        for required in (
+            "static ReadMeasurement(spec, options := 0)",
+            "ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0)",
+            "BuildSuvMaxMeasurementCommandSpec()",
+            "return this.ReadMeasurement(BuildSuvMaxMeasurementCommandSpec(), options)",
+        ):
+            self.assertIn(required, provider)
+        self.assertLess(
+            provider.index("if !IsValidMeasurementCommandSpec(spec)"),
+            provider.index("ResolveContextMeasurementViewer("),
         )
 
     def test_suvmax_parser_is_strict_and_formats_one_decimal(self) -> None:
@@ -136,10 +163,15 @@ class MeasurementCaptureTests(unittest.TestCase):
     def test_provider_parses_only_after_a_fresh_capture(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
         capture_failure = provider.index("if !capture.ok")
-        parser_call = provider.index("ParseSuvMaxMeasurement(capture.rawText)")
+        parser_call = provider.index(
+            "spec.parserCallback.Call(capture.rawText)"
+        )
         self.assertLess(capture_failure, parser_call)
         self.assertIn(
             "failureReason := actionContext[\"failureReason\"]", provider
+        )
+        self.assertIn(
+            "result.measurementType != requestedMeasurementType", provider
         )
         self.assertNotIn('context["rawText"]', provider)
         self.assertNotIn('context["rawValue"]', provider)
@@ -192,6 +224,8 @@ class MeasurementCaptureTests(unittest.TestCase):
             "ParseSuvMaxMeasurement(rawText)",
             "CaptureMeasurementClipboardText(actionCallback",
             "class ContextMeasurementProvider",
+            "class MeasurementCommandSpec",
+            "static ReadMeasurement(spec, options := 0)",
         ):
             self.assertIn(symbol, release)
 

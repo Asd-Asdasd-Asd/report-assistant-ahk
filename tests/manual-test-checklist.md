@@ -368,6 +368,13 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 
 ## v0.6.0 measurement provider staged tests
 
+### Generic acquisition core revalidation
+
+- [x] 重新运行 `tests\windows\measurement_capture_regression.ahk`；确认 spec validation、components copy、原 positive/zero/malformed/no-update/nested-busy 和 clipboard restoration 全部通过。
+- [x] 重新运行 `tests\windows\context_measurement_provider_field.ahk`；脚本启动时 invalid-spec preflight 不报错。
+- [x] 复测 positive SUVMax → `FOUND`、numeric zero → `NOT_ANNOTATED`、关闭 viewer → `VIEWER_NOT_FOUND`；结果、视觉提示、foreground/mouse invariants 和 clipboard restoration 与重构前一致。
+- [x] 本 checkpoint 未读取 vendor INI，未使用 UIA，未接入 `;fzg`，未实现 line parser。
+
 - [x] 运行 `tests\windows\measurement_capture_regression.ahk`；确认 positive、zero、malformed、no-update、nested-busy 和 clipboard restoration 全部通过。
 - [x] 只运行 `tests\windows\context_measurement_provider_field.ahk`，退出 production release，避免两个脚本同时操作 clipboard。
 - [x] 在 viewer 图像内部将鼠标放到无害测试点并按 `Ctrl+Alt+F8`；看到“测量点已记录”视觉提示后，将焦点返回报告编辑器，设置无害 clipboard sentinel，再按 `Ctrl+Alt+F9`。

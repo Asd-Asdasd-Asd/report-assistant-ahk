@@ -8,12 +8,44 @@ class ContextMeasurementDefaults {
 }
 
 class ContextMeasurementProvider {
+    static ReadMeasurement(spec, options := 0) {
+        return ReadCurrentMeasurementWithoutFocusSwitch(spec, options)
+    }
+
     static ReadSuvMax(options := 0) {
-        return ReadCurrentSuvMaxWithoutFocusSwitch(options)
+        return this.ReadMeasurement(BuildSuvMaxMeasurementCommandSpec(), options)
     }
 }
 
 ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
+    return ContextMeasurementProvider.ReadSuvMax(options)
+}
+
+BuildSuvMaxMeasurementCommandSpec() {
+    return MeasurementCommandSpec(
+        MeasurementType.SUVMAX,
+        ContextMeasurementDefaults.SuvMaxCommandText,
+        ParseSuvMaxMeasurement
+    )
+}
+
+ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
+    if !IsValidMeasurementCommandSpec(spec) {
+        requestedMeasurementType := IsObject(spec)
+            && spec.HasOwnProp("measurementType")
+                ? String(spec.measurementType)
+                : ""
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.INVALID_MEASUREMENT_SPEC
+        )
+    }
+
+    requestedMeasurementType := spec.measurementType
     context := Map(
         "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "viewerExe", MeasurementOption(
@@ -21,7 +53,8 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
             "viewerExe",
             ContextMeasurementDefaults.ViewerExe
         ),
-        "commandText", ContextMeasurementDefaults.SuvMaxCommandText,
+        "commandText", spec.commandText,
+        "measurementType", requestedMeasurementType,
         "focusSwitchAttempted", false,
         "mouseMoveAttempted", false,
         "popupHwnd", 0,
@@ -34,7 +67,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
     if !viewer.ok {
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -52,7 +85,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
     if !pointResult.ok {
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -88,7 +121,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
         context["exceptionMessage"] := err.Message
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -109,7 +142,7 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
         }
         return MakeMeasurementResult(
             MeasurementState.AUTOMATION_FAILED,
-            MeasurementType.SUVMAX,
+            requestedMeasurementType,
             "",
             "",
             MeasurementSource.MXNM_CONTEXT_COMMAND,
@@ -118,7 +151,33 @@ ReadCurrentSuvMaxWithoutFocusSwitch(options := 0) {
         )
     }
 
-    result := ParseSuvMaxMeasurement(capture.rawText)
+    try result := spec.parserCallback.Call(capture.rawText)
+    catch as err {
+        context["parserExceptionType"] := Type(err)
+        context["parserExceptionMessage"] := err.Message
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.UNEXPECTED_ERROR,
+            context
+        )
+    }
+    if !(result is MeasurementResult)
+        || result.measurementType != requestedMeasurementType {
+        context["parserResultType"] := Type(result)
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.UNEXPECTED_ERROR,
+            context
+        )
+    }
     result.context := context
     return result
 }

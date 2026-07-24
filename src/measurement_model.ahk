@@ -6,6 +6,7 @@ class MeasurementState {
 
 class MeasurementType {
     static SUVMAX := "suvmax"
+    static LINE_AXES := "line_axes"
 }
 
 class MeasurementSource {
@@ -14,6 +15,7 @@ class MeasurementSource {
 
 class MeasurementFailureReason {
     static NONE := ""
+    static INVALID_MEASUREMENT_SPEC := "INVALID_MEASUREMENT_SPEC"
     static PROVIDER_BUSY := "PROVIDER_BUSY"
     static VIEWER_NOT_FOUND := "VIEWER_NOT_FOUND"
     static VIEWER_AMBIGUOUS := "VIEWER_AMBIGUOUS"
@@ -32,10 +34,27 @@ class MeasurementFailureReason {
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
 
+class MeasurementCommandSpec {
+    __New(measurementType, commandText, parserCallback) {
+        this.measurementType := String(measurementType)
+        this.commandText := String(commandText)
+        this.parserCallback := parserCallback
+    }
+}
+
+IsValidMeasurementCommandSpec(spec) {
+    return spec is MeasurementCommandSpec
+        && spec.measurementType != ""
+        && spec.commandText != ""
+        && IsObject(spec.parserCallback)
+        && HasMethod(spec.parserCallback, "Call")
+}
+
 class MeasurementResult {
     __New(state, measurementType, rawValue := "", formattedValue := "",
         source := MeasurementSource.MXNM_CONTEXT_COMMAND,
-        failureReason := MeasurementFailureReason.NONE, context := 0) {
+        failureReason := MeasurementFailureReason.NONE, context := 0,
+        components := 0) {
         this.state := String(state)
         this.success := this.state = MeasurementState.FOUND
         this.measurementType := String(measurementType)
@@ -44,13 +63,17 @@ class MeasurementResult {
         this.source := String(source)
         this.failureReason := String(failureReason)
         this.context := Type(context) = "Map" ? context : Map()
+        this.components := Type(components) = "Array"
+            ? components.Clone()
+            : []
     }
 }
 
 MakeMeasurementResult(state, measurementType := MeasurementType.SUVMAX,
     rawValue := "", formattedValue := "",
     source := MeasurementSource.MXNM_CONTEXT_COMMAND,
-    failureReason := MeasurementFailureReason.NONE, context := 0) {
+    failureReason := MeasurementFailureReason.NONE, context := 0,
+    components := 0) {
     return MeasurementResult(
         state,
         measurementType,
@@ -58,7 +81,8 @@ MakeMeasurementResult(state, measurementType := MeasurementType.SUVMAX,
         formattedValue,
         source,
         failureReason,
-        context
+        context,
+        components
     )
 }
 

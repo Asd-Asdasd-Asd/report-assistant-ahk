@@ -25,7 +25,7 @@
 - CF_HTML、clipboard `finally` restoration、Candidate G popup signature 和 at-most-once clicks 保持 fail closed。
 - 正式图标以 `assets/icon/source/medex-icon.svg` 为 source，由 `scripts/generate-icon.sh` 生成多尺寸 PNG/ICO。
 - Windows 一键构建自动生成 release source、以 `/icon` 嵌入 ICO、编译 temporary EXE、同步静态发布资源并事务提升 final。
-- v0.6.0 measurement foundation 已加入 `FOUND` / `NOT_ANNOTATED` / `AUTOMATION_FAILED` result、strict SUVMax parser、独立 measurement clipboard transaction 和无焦点 context-menu provider；当前未接入任何 production hotstring。
+- v0.6.0 measurement foundation 已加入 `FOUND` / `NOT_ANNOTATED` / `AUTOMATION_FAILED` result、strict SUVMax parser、独立 measurement clipboard transaction 和无焦点 context-menu provider；acquisition 已抽为 command/type/parser spec-driven core，并为后续 line components 预留结构，当前未接入任何 production hotstring。
 
 ## 验证状态
 
@@ -78,7 +78,7 @@ exact UIA Name="检查所见"
 - 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 MedEx layout 尚未正式支持。
 - Compatibility layer 的 Alt+Shift+S 只保证单次触发；持续按住修饰键连续按 S 延后到 compatibility 重构。
 - updater、installer、self-update、rollback、shortcut 和 registry installation state 均不在范围内。
-- Measurement provider foundation 已通过首轮 Windows field validation；`;fzg` 自动插入、long-axis/short-axis、完整异常矩阵和 `size` placeholder 仍未接入 production。
+- Measurement provider foundation 和通用 acquisition core 已通过 Windows field validation；`;fzg` 自动插入、config-driven target resolver、long-axis/short-axis、完整异常矩阵和 `size` placeholder 仍未接入 production。
 - Settings 的“快捷键”“其他”标签页仍是占位页。
 
 ## v0.5.0 发布前剩余验收
