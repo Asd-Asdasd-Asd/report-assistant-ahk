@@ -33,15 +33,21 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
 
     def test_plain_text_precedes_fixed_red_marker_insertion(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        dispatcher = hotstrings.split("RunConfiguredReportHotstring(entry, *)", 1)[1].split(
-            "\n}\n\nSendConfiguredReportText", 1
+        dispatcher = hotstrings.split(
+            "ExecuteReportTemplatePlan(plan, expectedReportHwnd)", 1
+        )[1].split(
+            "\n}\n\nMakeReportTemplateWriteResult", 1
         )[0]
         self.assertLess(
-            dispatcher.index("SendConfiguredReportText(plan.PlainText)"),
+            dispatcher.index(
+                "SendConfiguredReportText(plan.PlainText, expectedReportHwnd)"
+            ),
             dispatcher.index("RunRedResetInsertion(plan.RedText, resetReadiness.options)"),
         )
         self.assertLess(
-            dispatcher.index("SendConfiguredReportText(plan.PlainText)"),
+            dispatcher.index(
+                "SendConfiguredReportText(plan.PlainText, expectedReportHwnd)"
+            ),
             dispatcher.index("RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)"),
         )
 
@@ -217,7 +223,9 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         transaction_return = orchestration.index(
             "resetResult := pasteResult.beforeRestoreResult"
         )
-        feedback = orchestration.index('SoundBeep(650, 150)')
+        feedback = orchestration.index(
+            'ShowReportAssistantVisualFeedback("报告写入未完成")'
+        )
         self.assertLess(transaction_return, feedback)
 
     def test_step_three_fast_failure_harness_preserves_clipboard(self) -> None:

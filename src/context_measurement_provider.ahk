@@ -77,6 +77,20 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
     }
     context["viewerHwnd"] := viewer.hwnd
     context["viewerPid"] := viewer.pid
+    expectedViewerHwnd := MeasurementOption(options, "expectedViewerHwnd", 0)
+    expectedViewerPid := MeasurementOption(options, "expectedViewerPid", 0)
+    if (expectedViewerHwnd && viewer.hwnd != expectedViewerHwnd)
+        || (expectedViewerPid && viewer.pid != expectedViewerPid) {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.VIEWER_TARGET_CHANGED,
+            context
+        )
+    }
 
     pointResult := ResolveContextMeasurementImagePoint(
         viewer.hwnd,
@@ -106,9 +120,9 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
     )
     try {
         capture := CaptureMeasurementClipboardText(
-            () => InvokePreparedContextMeasurementCommand(actionContext),
+            () => InvokePreparedMxNMContextCommand(actionContext),
             options,
-            () => PrepareContextMeasurementCopyCommand(
+            () => PrepareMxNMContextCommand(
                 viewer,
                 pointResult.clientPoint,
                 context["commandText"],
@@ -437,6 +451,13 @@ ContextMeasurementScreenToClient(hwnd, screenPoint) {
 
 PrepareContextMeasurementCopyCommand(viewer, clientPoint, commandText,
     actionContext, options := 0) {
+    return PrepareMxNMContextCommand(
+        viewer, clientPoint, commandText, actionContext, options
+    )
+}
+
+PrepareMxNMContextCommand(viewer, clientPoint, commandText,
+    actionContext, options := 0) {
     existingPopups := SnapshotContextMeasurementPopups()
     lParam := PackContextMeasurementClientPoint(clientPoint)
     rightDownSent := DllCall(
@@ -489,6 +510,10 @@ PrepareContextMeasurementCopyCommand(viewer, clientPoint, commandText,
 }
 
 InvokePreparedContextMeasurementCommand(actionContext) {
+    return InvokePreparedMxNMContextCommand(actionContext)
+}
+
+InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {
     popupHwnd := actionContext["popupHwnd"]
     controlHwnd := actionContext["commandControlHwnd"]
     runtimeId := actionContext["commandRuntimeId"]
@@ -497,14 +522,27 @@ InvokePreparedContextMeasurementCommand(actionContext) {
         return false
     }
     try {
-        DllCall(
-            "User32\SendMessageW",
-            "Ptr", popupHwnd,
-            "UInt", 0x0111,
-            "UPtr", runtimeId,
-            "Ptr", controlHwnd,
-            "Ptr"
-        )
+        if asynchronous {
+            dispatched := DllCall(
+                "User32\PostMessageW",
+                "Ptr", popupHwnd,
+                "UInt", 0x0111,
+                "UPtr", runtimeId,
+                "Ptr", controlHwnd,
+                "Int"
+            )
+            if !dispatched
+                throw Error("Context command post failed")
+        } else {
+            DllCall(
+                "User32\SendMessageW",
+                "Ptr", popupHwnd,
+                "UInt", 0x0111,
+                "UPtr", runtimeId,
+                "Ptr", controlHwnd,
+                "Ptr"
+            )
+        }
     } catch {
         actionContext["failureReason"] :=
             MeasurementFailureReason.COMMAND_INVOKE_FAILED

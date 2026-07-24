@@ -253,8 +253,11 @@ clipboard、popup 和 command 均不可达，foreground/mouse 保持不变。
 至此 field-only automatic target checkpoint 的成功路径、pane semantics
 和 viewer-missing fail-closed 均通过 Windows 验证。
 
-`MxNMMeasurementTargetResolver` 当前仅由独立 field harness include，
-未接入 `main.ahk`、generated release、provider 默认路径或 hotstrings。
+`MxNMMeasurementTargetResolver` 的 field checkpoint 已完成；v0.6.0
+production candidate 现由独立 `MxNMMeasurementProvider` adapter 接入
+`main.ahk`、generated release 和含 `{{suvmax}}` 的 hotstrings。底层
+`ContextMeasurementProvider` 默认路径保持通用，不直接依赖 config/UIA
+resolver。
 resolver 会用 `WindowFromPoint` 和 process/PID/client bounds 重新验证
 action HWND；field harness 再确认该 HWND 与 provider 实际选择的 viewer
 一致。

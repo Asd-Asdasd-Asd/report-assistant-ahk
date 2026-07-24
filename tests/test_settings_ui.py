@@ -28,6 +28,7 @@ class SettingsUiTests(unittest.TestCase):
             "插入模板元素",
             "光标位置",
             "当前日期",
+            "自动获取 SUVMax",
             "红色“（见图）”",
         ):
             self.assertIn(label, ui)

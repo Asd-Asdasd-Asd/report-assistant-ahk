@@ -40,7 +40,7 @@ class HotstringConfigTests(unittest.TestCase):
             (
                 "fzg",
                 ";fzg",
-                "放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}",
+                "放射性摄取增高，SUVmax约为{{suvmax}}{{red:（见图）}}",
             ),
             ("fwj", ";fwj", "放射性摄取未见明显增高{{red:（见图）}}"),
             ("fjd", ";fjd", "放射性摄取降低{{red:（见图）}}"),
@@ -101,6 +101,7 @@ class HotstringConfigTests(unittest.TestCase):
         self.assertIn('InStr(sourceText, "}}"', renderer)
         self.assertIn('token = "cursor"', renderer)
         self.assertIn('token = "date"', renderer)
+        self.assertIn('token = "suvmax"', renderer)
         self.assertIn('token = "red:（见图）"', renderer)
         self.assertIn("RedFigureStartIndex", renderer)
         self.assertIn("必须是模板最后一个元素", renderer)
@@ -121,17 +122,28 @@ class HotstringConfigTests(unittest.TestCase):
     def test_dispatcher_derives_caret_and_color_from_plan(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
         body = hotstrings.split("RunConfiguredReportHotstring(entry, *)", 1)[1]
-        self.assertIn("plan := BuildReportTemplatePlan(entry.Text)", body)
-        self.assertIn("if plan.RequiresColorReset", body)
-        self.assertIn("SendConfiguredReportText(plan.PlainText)", body)
-        self.assertIn("RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)", body)
-        self.assertIn("RunRedResetInsertion(plan.RedText, resetReadiness.options)", body)
+        self.assertIn(
+            "plan := BuildReportTemplatePlan(entry.Text, runtimeContext)", body
+        )
+        self.assertIn("MxNMMeasurementProvider.ReadSuvMax()", body)
+        self.assertIn("ExecuteReportTemplatePlan(plan, reportHwnd)", body)
+        executor = hotstrings.split("ExecuteReportTemplatePlan(", 1)[1]
+        self.assertIn("if plan.RequiresColorReset", executor)
+        self.assertIn(
+            "SendConfiguredReportText(plan.PlainText, expectedReportHwnd)",
+            executor,
+        )
+        self.assertIn("RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)", executor)
+        self.assertIn("RunRedResetInsertion(plan.RedText, resetReadiness.options)", executor)
         self.assertNotIn("entry.Mode", body)
         self.assertNotIn("ReportHotstringMode", body)
 
     def test_black_templates_keep_existing_sendtext_backend(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        self.assertIn("SendConfiguredReportText(plan.PlainText)", hotstrings)
+        self.assertIn(
+            "SendConfiguredReportText(plan.PlainText, expectedReportHwnd)",
+            hotstrings,
+        )
         self.assertIn("SendText(line)", hotstrings)
         self.assertIn('Send("{Enter}")', hotstrings)
         self.assertNotIn("PastePlainText(plan.PlainText)", hotstrings)
@@ -139,7 +151,9 @@ class HotstringConfigTests(unittest.TestCase):
     def test_red_suffix_and_caret_share_generic_safe_path(self) -> None:
         renderer = source("src/template_renderer.ahk")
         report_editor = source("src/report_editor.ahk")
-        plan = renderer.split("BuildReportTemplatePlan(templateText)", 1)[1]
+        plan = renderer.split(
+            "BuildReportTemplatePlan(templateText, runtimeContext := 0)", 1
+        )[1]
         self.assertIn("rendered.RedFigureCount = 1", plan)
         self.assertIn("rendered.RedFigureStartIndex", plan)
         self.assertNotIn("TextEndsWith(", plan)

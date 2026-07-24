@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.5.0
-; Source revision: ba1a250f374d628decccef67ff7a4cb0626848ed-dirty
-; Generated at: 2026-07-24 08:01:17 UTC
+; Source revision: 82c3869f541dae8d9838d67e8851a1c588d1a5be-dirty
+; Generated at: 2026-07-24 11:53:49 UTC
 ;@Ahk2Exe-SetFileVersion 0.5.0.0
 ;@Ahk2Exe-SetProductVersion 0.5.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.5.0"
     static Channel := "internal-test"
-    static SourceRevision := "ba1a250f374d628decccef67ff7a4cb0626848ed-dirty"
+    static SourceRevision := "82c3869f541dae8d9838d67e8851a1c588d1a5be-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -8204,6 +8204,68 @@ ClickPoint(name, clicks := 1) {
 
 ; --- END utils.ahk ---
 
+; --- BEGIN visual_feedback.ahk ---
+class ReportAssistantVisualFeedback {
+    static CurrentWindow := 0
+    static CurrentToken := 0
+
+    static Show(message, durationMs := 1500) {
+        this.Hide()
+        token := A_TickCount
+        this.CurrentToken := token
+        try {
+            window := Gui(
+                "+AlwaysOnTop -Caption +ToolWindow +E0x20 +E0x08000000"
+            )
+            window.BackColor := "202124"
+            window.SetFont("s10 cFFFFFF", "Segoe UI")
+            window.MarginX := 16
+            window.MarginY := 10
+            window.Add("Text",, String(message))
+            window.Show("NoActivate AutoSize Hide")
+            window.GetPos(, , &width, &height)
+            MonitorGetWorkArea(
+                MonitorGetPrimary(),
+                &workLeft,
+                &workTop,
+                &workRight,
+                &workBottom
+            )
+            x := workRight - width - 24
+            y := workBottom - height - 24
+            window.Show("NoActivate x" x " y" y)
+            this.CurrentWindow := window
+            SetTimer(
+                () => ReportAssistantVisualFeedback.HideIfCurrent(token),
+                -Max(250, Integer(durationMs))
+            )
+            return true
+        } catch {
+            this.CurrentWindow := 0
+            return false
+        }
+    }
+
+    static HideIfCurrent(token) {
+        if this.CurrentToken = token
+            this.Hide()
+    }
+
+    static Hide() {
+        if IsObject(this.CurrentWindow) {
+            try this.CurrentWindow.Destroy()
+        }
+        this.CurrentWindow := 0
+        this.CurrentToken := 0
+    }
+}
+
+ShowReportAssistantVisualFeedback(message, durationMs := 1500) {
+    return ReportAssistantVisualFeedback.Show(message, durationMs)
+}
+
+; --- END visual_feedback.ahk ---
+
 ; --- BEGIN clipboard_html.ahk ---
 class ClipboardTransactionDefaults {
     ; Continue after Ctrl+V without a fixed paste-dispatch delay. Clipboard restore
@@ -8258,11 +8320,8 @@ PasteHtmlFragmentDetailed(fragment, performanceContext := 0,
     )
     pasteDispatched := transaction.actionSucceeded && transaction.restoreAttempted
 
-    if !transaction.actionSucceeded {
-        SoundBeep(750, 120)
-    } else if !transaction.restoreSucceeded {
-        SoundBeep(750, 120)
-    }
+    if !transaction.actionSucceeded || !transaction.restoreSucceeded
+        ShowReportAssistantVisualFeedback("报告写入未完成")
 
     ; pasteDispatched does not confirm that the target editor rendered the HTML.
     return {
@@ -8566,12 +8625,15 @@ class MeasurementFailureReason {
     static PROVIDER_BUSY := "PROVIDER_BUSY"
     static VIEWER_NOT_FOUND := "VIEWER_NOT_FOUND"
     static VIEWER_AMBIGUOUS := "VIEWER_AMBIGUOUS"
+    static VIEWER_TARGET_CHANGED := "VIEWER_TARGET_CHANGED"
     static IMAGE_POINT_UNAVAILABLE := "IMAGE_POINT_UNAVAILABLE"
     static IMAGE_POINT_OUT_OF_BOUNDS := "IMAGE_POINT_OUT_OF_BOUNDS"
     static POPUP_NOT_CREATED := "POPUP_NOT_CREATED"
     static COMMAND_NOT_FOUND := "COMMAND_NOT_FOUND"
     static COMMAND_ID_INVALID := "COMMAND_ID_INVALID"
     static COMMAND_INVOKE_FAILED := "COMMAND_INVOKE_FAILED"
+    static CONFIRMATION_REQUIRED := "CONFIRMATION_REQUIRED"
+    static CLEANUP_NOT_VERIFIED := "CLEANUP_NOT_VERIFIED"
     static CLIPBOARD_SAVE_FAILED := "CLIPBOARD_SAVE_FAILED"
     static CLIPBOARD_SENTINEL_FAILED := "CLIPBOARD_SENTINEL_FAILED"
     static CLIPBOARD_ACTION_FAILED := "CLIPBOARD_ACTION_FAILED"
@@ -9673,6 +9735,20 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
     }
     context["viewerHwnd"] := viewer.hwnd
     context["viewerPid"] := viewer.pid
+    expectedViewerHwnd := MeasurementOption(options, "expectedViewerHwnd", 0)
+    expectedViewerPid := MeasurementOption(options, "expectedViewerPid", 0)
+    if (expectedViewerHwnd && viewer.hwnd != expectedViewerHwnd)
+        || (expectedViewerPid && viewer.pid != expectedViewerPid) {
+        return MakeMeasurementResult(
+            MeasurementState.AUTOMATION_FAILED,
+            requestedMeasurementType,
+            "",
+            "",
+            MeasurementSource.MXNM_CONTEXT_COMMAND,
+            MeasurementFailureReason.VIEWER_TARGET_CHANGED,
+            context
+        )
+    }
 
     pointResult := ResolveContextMeasurementImagePoint(
         viewer.hwnd,
@@ -9702,9 +9778,9 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
     )
     try {
         capture := CaptureMeasurementClipboardText(
-            () => InvokePreparedContextMeasurementCommand(actionContext),
+            () => InvokePreparedMxNMContextCommand(actionContext),
             options,
-            () => PrepareContextMeasurementCopyCommand(
+            () => PrepareMxNMContextCommand(
                 viewer,
                 pointResult.clientPoint,
                 context["commandText"],
@@ -10033,6 +10109,13 @@ ContextMeasurementScreenToClient(hwnd, screenPoint) {
 
 PrepareContextMeasurementCopyCommand(viewer, clientPoint, commandText,
     actionContext, options := 0) {
+    return PrepareMxNMContextCommand(
+        viewer, clientPoint, commandText, actionContext, options
+    )
+}
+
+PrepareMxNMContextCommand(viewer, clientPoint, commandText,
+    actionContext, options := 0) {
     existingPopups := SnapshotContextMeasurementPopups()
     lParam := PackContextMeasurementClientPoint(clientPoint)
     rightDownSent := DllCall(
@@ -10085,6 +10168,10 @@ PrepareContextMeasurementCopyCommand(viewer, clientPoint, commandText,
 }
 
 InvokePreparedContextMeasurementCommand(actionContext) {
+    return InvokePreparedMxNMContextCommand(actionContext)
+}
+
+InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {
     popupHwnd := actionContext["popupHwnd"]
     controlHwnd := actionContext["commandControlHwnd"]
     runtimeId := actionContext["commandRuntimeId"]
@@ -10093,14 +10180,27 @@ InvokePreparedContextMeasurementCommand(actionContext) {
         return false
     }
     try {
-        DllCall(
-            "User32\SendMessageW",
-            "Ptr", popupHwnd,
-            "UInt", 0x0111,
-            "UPtr", runtimeId,
-            "Ptr", controlHwnd,
-            "Ptr"
-        )
+        if asynchronous {
+            dispatched := DllCall(
+                "User32\PostMessageW",
+                "Ptr", popupHwnd,
+                "UInt", 0x0111,
+                "UPtr", runtimeId,
+                "Ptr", controlHwnd,
+                "Int"
+            )
+            if !dispatched
+                throw Error("Context command post failed")
+        } else {
+            DllCall(
+                "User32\SendMessageW",
+                "Ptr", popupHwnd,
+                "UInt", 0x0111,
+                "UPtr", runtimeId,
+                "Ptr", controlHwnd,
+                "Ptr"
+            )
+        }
     } catch {
         actionContext["failureReason"] :=
             MeasurementFailureReason.COMMAND_INVOKE_FAILED
@@ -10229,6 +10329,1003 @@ MergeContextMeasurementMetadata(context, actionContext, capture) {
 }
 
 ; --- END context_measurement_provider.ahk ---
+
+; --- BEGIN mxnm_measurement_target_resolver.ahk ---
+class MxNMUiaImageRegionCode {
+    static READY_FOR_FIELD_VALIDATION := "READY_FOR_FIELD_VALIDATION"
+    static CONFIG_GEOMETRY_UNAVAILABLE := "CONFIG_GEOMETRY_UNAVAILABLE"
+    static UIA_UNAVAILABLE := "UIA_UNAVAILABLE"
+    static UIA_IMAGE_REGION_NOT_FOUND := "UIA_IMAGE_REGION_NOT_FOUND"
+    static UIA_IMAGE_REGION_AMBIGUOUS := "UIA_IMAGE_REGION_AMBIGUOUS"
+}
+
+class MxNMMeasurementTargetCode {
+    static READY_FOR_FIELD_VALIDATION := "READY_FOR_FIELD_VALIDATION"
+    static CONFIG_GEOMETRY_UNAVAILABLE := "CONFIG_GEOMETRY_UNAVAILABLE"
+    static LAYOUT_SCHEMA_INVALID := "LAYOUT_SCHEMA_INVALID"
+    static LAYOUT_SAFE_POINT_NOT_FOUND := "LAYOUT_SAFE_POINT_NOT_FOUND"
+    static UIA_UNAVAILABLE := "UIA_UNAVAILABLE"
+    static UIA_IMAGE_REGION_NOT_FOUND := "UIA_IMAGE_REGION_NOT_FOUND"
+    static UIA_IMAGE_REGION_AMBIGUOUS := "UIA_IMAGE_REGION_AMBIGUOUS"
+    static ACTION_WINDOW_INVALID := "ACTION_WINDOW_INVALID"
+    static POINT_OUT_OF_BOUNDS := "POINT_OUT_OF_BOUNDS"
+    static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
+}
+
+class MxNMMeasurementTargetResolver {
+    static Resolve(viewerExe := "") {
+        if viewerExe = ""
+            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+        return ResolveMxNMMeasurementTarget(viewerExe)
+    }
+}
+
+ResolveMxNMMeasurementTarget(viewerExe) {
+    result := MakeMxNMMeasurementTargetResult()
+    try {
+        configResult := MxNMConfigGeometryProvider.AuditCurrentConfig(
+            viewerExe
+        )
+        result.configCode := configResult.code
+        if !configResult.ok
+            return result
+        result.configReady := true
+        result.runtimeFrameResolved :=
+            configResult.runtimeFrameResolved
+        result.mappedImageRectResolved :=
+            configResult.mappedImageRectResolved
+        if !result.runtimeFrameResolved
+            || !result.mappedImageRectResolved {
+            return result
+        }
+
+        layoutResult := ParseMxNMDeclaredLayoutModels(
+            configResult.layoutEntries,
+            configResult.mainGeometry
+        )
+        result.layoutModelCount := layoutResult.modelCount
+        if !layoutResult.ok {
+            result.code := MxNMMeasurementTargetCode.LAYOUT_SCHEMA_INVALID
+            return result
+        }
+        result.layoutReady := true
+
+        safePointResult := FindMxNMCrossLayoutSafePoint(
+            layoutResult.models,
+            configResult.mainGeometry.imageWidth,
+            configResult.mainGeometry.imageHeight
+        )
+        if !safePointResult.ok {
+            result.code :=
+                MxNMMeasurementTargetCode.LAYOUT_SAFE_POINT_NOT_FOUND
+            return result
+        }
+        result.logicalPoint := safePointResult.point
+        result.minimumLogicalClearance :=
+            safePointResult.minimumClearance
+        result.minimumRequiredClearance :=
+            safePointResult.minimumRequiredClearance
+
+        uiaResult := ResolveMxNMUiaImageRegion(configResult)
+        result.uiaPaneCount := uiaResult.paneCount
+        result.uiaGeometryMatchCount := uiaResult.geometryMatchCount
+        if !uiaResult.ok {
+            result.code := MapMxNMUiaCodeToTargetCode(uiaResult.code)
+            return result
+        }
+        result.imageRect := uiaResult.matchedRects[1]
+        result.screenPoint := MapMxNMLogicalPointToUiaRect(
+            result.logicalPoint,
+            configResult.mainGeometry,
+            result.imageRect
+        )
+        if !MxNMPointInsideRect(result.screenPoint, result.imageRect) {
+            result.code := MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
+            return result
+        }
+
+        actionWindowResult := ResolveMxNMActionWindowFromPoint(
+            viewerExe,
+            result.screenPoint,
+            configResult.runtimeFrame.hwnd
+        )
+        if !actionWindowResult.ok {
+            result.code := actionWindowResult.code
+            return result
+        }
+        result.actionHwnd := actionWindowResult.hwnd
+        result.actionPid := actionWindowResult.pid
+        result.ok := true
+        result.code :=
+            MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION
+        return result
+    } catch {
+        result.code := MxNMMeasurementTargetCode.UNEXPECTED_ERROR
+        return result
+    }
+}
+
+MakeMxNMMeasurementTargetResult() {
+    return {
+        ok: false,
+        code: MxNMMeasurementTargetCode.CONFIG_GEOMETRY_UNAVAILABLE,
+        configCode: "",
+        configReady: false,
+        runtimeFrameResolved: false,
+        mappedImageRectResolved: false,
+        layoutReady: false,
+        layoutModelCount: 0,
+        minimumLogicalClearance: 0,
+        minimumRequiredClearance: 0,
+        logicalPoint: 0,
+        imageRect: 0,
+        screenPoint: 0,
+        actionHwnd: 0,
+        actionPid: 0,
+        uiaPaneCount: 0,
+        uiaGeometryMatchCount: 0
+    }
+}
+
+ParseMxNMDeclaredLayoutModels(layoutEntries, mainGeometry) {
+    failure := {
+        ok: false,
+        modelCount: 0,
+        models: []
+    }
+    if !mainGeometry.imageSizeResolved
+        return failure
+
+    declaredCount := FindMxNMGeometryAuditNumber(
+        layoutEntries,
+        "ShowModelGroup",
+        "ShowModelSize"
+    )
+    if !MxNMTargetPositiveInteger(declaredCount)
+        return failure
+    modelCount := Round(declaredCount.value)
+    if modelCount > 100
+        return failure
+
+    clippingTolerance := Max(
+        1,
+        Ceil(
+            Max(mainGeometry.imageWidth, mainGeometry.imageHeight)
+            * 0.01
+        )
+    )
+    models := []
+    loop modelCount {
+        modelIndex := A_Index
+        section := "ShowModel" modelIndex
+        paneCountResult := FindMxNMGeometryAuditNumber(
+            layoutEntries,
+            section,
+            "LowWndSize"
+        )
+        if !MxNMTargetPositiveInteger(paneCountResult)
+            return failure
+        paneCount := Round(paneCountResult.value)
+        if paneCount > 100
+            return failure
+
+        panes := []
+        loop paneCount {
+            paneIndex := A_Index
+            leftResult := FindMxNMGeometryAuditNumber(
+                layoutEntries,
+                section,
+                "LowWndLeft_" paneIndex
+            )
+            topResult := FindMxNMGeometryAuditNumber(
+                layoutEntries,
+                section,
+                "LowWndTop_" paneIndex
+            )
+            widthResult := FindMxNMGeometryAuditNumber(
+                layoutEntries,
+                section,
+                "LowWndWidth_" paneIndex
+            )
+            heightResult := FindMxNMGeometryAuditNumber(
+                layoutEntries,
+                section,
+                "LowWndHeight_" paneIndex
+            )
+            if !MxNMTargetInteger(leftResult)
+                || !MxNMTargetInteger(topResult)
+                || !MxNMTargetPositiveInteger(widthResult)
+                || !MxNMTargetPositiveInteger(heightResult) {
+                return failure
+            }
+            rawLeft := Round(leftResult.value)
+            rawTop := Round(topResult.value)
+            rawRight := rawLeft + Round(widthResult.value)
+            rawBottom := rawTop + Round(heightResult.value)
+            if rawLeft < -clippingTolerance
+                || rawTop < -clippingTolerance
+                || rawRight
+                    > mainGeometry.imageWidth + clippingTolerance
+                || rawBottom
+                    > mainGeometry.imageHeight + clippingTolerance {
+                return failure
+            }
+            pane := {
+                left: Max(0, rawLeft),
+                top: Max(0, rawTop),
+                right: Min(mainGeometry.imageWidth, rawRight),
+                bottom: Min(mainGeometry.imageHeight, rawBottom)
+            }
+            if pane.right <= pane.left || pane.bottom <= pane.top
+                return failure
+            panes.Push(pane)
+        }
+        models.Push({
+            index: modelIndex,
+            panes: panes
+        })
+    }
+    return {
+        ok: models.Length = modelCount,
+        modelCount: modelCount,
+        models: models
+    }
+}
+
+MxNMTargetInteger(numberResult) {
+    return numberResult.found
+        && numberResult.value = Round(numberResult.value)
+}
+
+MxNMTargetPositiveInteger(numberResult) {
+    return MxNMTargetInteger(numberResult)
+        && numberResult.value > 0
+}
+
+FindMxNMCrossLayoutSafePoint(models, imageWidth, imageHeight) {
+    minimumRequiredClearance :=
+        Min(imageWidth, imageHeight) * 0.05
+    candidateMap := Map()
+    candidates := []
+    for model in models {
+        for pane in model.panes {
+            candidate := {
+                x: Round((pane.left + pane.right) / 2),
+                y: Round((pane.top + pane.bottom) / 2)
+            }
+            key := candidate.x "," candidate.y
+            if !candidateMap.Has(key) {
+                candidateMap[key] := true
+                candidates.Push(candidate)
+            }
+        }
+    }
+
+    bestPoint := 0
+    bestClearance := -1
+    for candidate in candidates {
+        candidateClearance := MxNMPointClearanceAcrossLayouts(
+            candidate,
+            models
+        )
+        if candidateClearance < 0
+            continue
+        if candidateClearance > bestClearance
+            || (candidateClearance = bestClearance
+                && MxNMPointComesBefore(candidate, bestPoint)) {
+            bestPoint := candidate
+            bestClearance := candidateClearance
+        }
+    }
+    if !IsObject(bestPoint)
+        || bestClearance < minimumRequiredClearance {
+        return {
+            ok: false,
+            point: 0,
+            minimumClearance: Max(0, bestClearance),
+            minimumRequiredClearance: minimumRequiredClearance
+        }
+    }
+    return {
+        ok: true,
+        point: bestPoint,
+        minimumClearance: bestClearance,
+        minimumRequiredClearance: minimumRequiredClearance
+    }
+}
+
+MxNMPointClearanceAcrossLayouts(point, models) {
+    minimumClearance := 0x7FFFFFFF
+    for model in models {
+        bestModelClearance := -1
+        for pane in model.panes {
+            if !MxNMPointStrictlyInsideRect(point, pane)
+                continue
+            clearance := Min(
+                point.x - pane.left,
+                pane.right - point.x,
+                point.y - pane.top,
+                pane.bottom - point.y
+            )
+            bestModelClearance := Max(
+                bestModelClearance,
+                clearance
+            )
+        }
+        if bestModelClearance < 0
+            return -1
+        minimumClearance := Min(
+            minimumClearance,
+            bestModelClearance
+        )
+    }
+    return minimumClearance
+}
+
+MxNMPointComesBefore(candidate, currentPoint) {
+    if !IsObject(currentPoint)
+        return true
+    return candidate.y < currentPoint.y
+        || (candidate.y = currentPoint.y
+            && candidate.x < currentPoint.x)
+}
+
+MxNMPointStrictlyInsideRect(point, rect) {
+    return point.x > rect.left
+        && point.x < rect.right
+        && point.y > rect.top
+        && point.y < rect.bottom
+}
+
+ResolveMxNMUiaImageRegion(configResult) {
+    result := {
+        ok: false,
+        code: MxNMUiaImageRegionCode.CONFIG_GEOMETRY_UNAVAILABLE,
+        configReady: false,
+        runtimeFrameResolved: false,
+        mappedImageRectResolved: false,
+        paneCount: 0,
+        geometryMatchCount: 0,
+        mappedRect: 0,
+        matchedRects: []
+    }
+    if !configResult.ok
+        return result
+    result.configReady := true
+    result.runtimeFrameResolved := configResult.runtimeFrameResolved
+    result.mappedImageRectResolved :=
+        configResult.mappedImageRectResolved
+    if !result.runtimeFrameResolved
+        || !result.mappedImageRectResolved {
+        return result
+    }
+    result.mappedRect := configResult.mappedImageRect
+
+    global UIA
+    if !IsSet(UIA) {
+        result.code := MxNMUiaImageRegionCode.UIA_UNAVAILABLE
+        return result
+    }
+
+    horizontalTolerance := Max(
+        12,
+        Round(configResult.runtimeFrame.windowWidth * 0.01)
+    )
+    verticalTolerance := Max(
+        12,
+        Round(configResult.runtimeFrame.windowHeight * 0.01)
+    )
+    seenRects := Map()
+    try {
+        for viewerWindow in configResult.viewerWindows {
+            try rootElement := UIA.ElementFromHandle(
+                viewerWindow.hwnd,
+                ,
+                false
+            )
+            catch {
+                continue
+            }
+            elements := [rootElement]
+            try paneElements := rootElement.FindElements({Type: "Pane"})
+            catch {
+                paneElements := []
+            }
+            for paneElement in paneElements
+                elements.Push(paneElement)
+
+            for element in elements {
+                try elementType := element.Type
+                catch {
+                    continue
+                }
+                if elementType != UIA.ControlType.Pane
+                    continue
+                try rectangle := element.BoundingRectangle
+                catch {
+                    continue
+                }
+                rect := {
+                    left: Round(rectangle.l),
+                    top: Round(rectangle.t),
+                    right: Round(rectangle.r),
+                    bottom: Round(rectangle.b)
+                }
+                if rect.right <= rect.left || rect.bottom <= rect.top
+                    continue
+                rectKey := rect.left "," rect.top ","
+                    . rect.right "," rect.bottom
+                if seenRects.Has(rectKey)
+                    continue
+                seenRects[rectKey] := true
+                result.paneCount += 1
+
+                try isOffscreen := element.IsOffscreen
+                catch {
+                    isOffscreen := true
+                }
+                if isOffscreen
+                    continue
+                if MxNMUiaRectMatchesMappedGeometry(
+                    rect,
+                    result.mappedRect,
+                    horizontalTolerance,
+                    verticalTolerance
+                ) {
+                    result.matchedRects.Push(rect)
+                }
+            }
+        }
+    } catch {
+        result.code := MxNMUiaImageRegionCode.UIA_UNAVAILABLE
+        return result
+    }
+
+    result.geometryMatchCount := result.matchedRects.Length
+    if result.geometryMatchCount = 0 {
+        result.code :=
+            MxNMUiaImageRegionCode.UIA_IMAGE_REGION_NOT_FOUND
+        return result
+    }
+    if result.geometryMatchCount != 1 {
+        result.code :=
+            MxNMUiaImageRegionCode.UIA_IMAGE_REGION_AMBIGUOUS
+        return result
+    }
+    result.ok := true
+    result.code :=
+        MxNMUiaImageRegionCode.READY_FOR_FIELD_VALIDATION
+    return result
+}
+
+MxNMUiaRectMatchesMappedGeometry(
+    actualRect,
+    mappedRect,
+    horizontalTolerance,
+    verticalTolerance
+) {
+    return Abs(actualRect.left - mappedRect.left)
+            <= horizontalTolerance
+        && Abs(actualRect.right - mappedRect.right)
+            <= horizontalTolerance
+        && Abs(actualRect.top - mappedRect.top)
+            <= verticalTolerance
+        && Abs(actualRect.bottom - mappedRect.bottom)
+            <= verticalTolerance
+}
+
+MapMxNMLogicalPointToUiaRect(point, mainGeometry, uiaRect) {
+    return {
+        x: uiaRect.left + Round(
+            point.x
+            * (uiaRect.right - uiaRect.left)
+            / mainGeometry.imageWidth
+        ),
+        y: uiaRect.top + Round(
+            point.y
+            * (uiaRect.bottom - uiaRect.top)
+            / mainGeometry.imageHeight
+        )
+    }
+}
+
+MxNMPointInsideRect(point, rect) {
+    return IsObject(point)
+        && IsObject(rect)
+        && point.x >= rect.left
+        && point.x < rect.right
+        && point.y >= rect.top
+        && point.y < rect.bottom
+}
+
+MapMxNMUiaCodeToTargetCode(uiaCode) {
+    if uiaCode = MxNMUiaImageRegionCode.UIA_UNAVAILABLE
+        return MxNMMeasurementTargetCode.UIA_UNAVAILABLE
+    if uiaCode = MxNMUiaImageRegionCode.UIA_IMAGE_REGION_NOT_FOUND
+        return MxNMMeasurementTargetCode.UIA_IMAGE_REGION_NOT_FOUND
+    if uiaCode = MxNMUiaImageRegionCode.UIA_IMAGE_REGION_AMBIGUOUS
+        return MxNMMeasurementTargetCode.UIA_IMAGE_REGION_AMBIGUOUS
+    return MxNMMeasurementTargetCode.CONFIG_GEOMETRY_UNAVAILABLE
+}
+
+ResolveMxNMActionWindowFromPoint(
+    viewerExe,
+    screenPoint,
+    runtimeFrameHwnd
+) {
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try pointHwnd := DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch {
+        pointHwnd := 0
+    }
+    if !pointHwnd {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
+        }
+    }
+    try rootHwnd := DllCall(
+        "User32\GetAncestor",
+        "Ptr", pointHwnd,
+        "UInt", 2,
+        "Ptr"
+    )
+    catch {
+        rootHwnd := 0
+    }
+    if !rootHwnd
+        rootHwnd := pointHwnd
+
+    try processName := WinGetProcessName("ahk_id " rootHwnd)
+    catch {
+        processName := ""
+    }
+    try actionPid := WinGetPID("ahk_id " rootHwnd)
+    catch {
+        actionPid := 0
+    }
+    try runtimePid := WinGetPID("ahk_id " runtimeFrameHwnd)
+    catch {
+        runtimePid := 0
+    }
+    if StrLower(processName) != StrLower(viewerExe)
+        || !actionPid || actionPid != runtimePid {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
+        }
+    }
+    clientRect := MxNMTargetClientRectScreen(rootHwnd)
+    if !IsObject(clientRect)
+        || !MxNMPointInsideRect(screenPoint, clientRect) {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
+        }
+    }
+    return {
+        ok: true,
+        code: MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION,
+        hwnd: rootHwnd,
+        pid: actionPid
+    }
+}
+
+MxNMTargetClientRectScreen(hwnd) {
+    rectBuffer := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetClientRect",
+        "Ptr", hwnd,
+        "Ptr", rectBuffer.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    topLeft := Buffer(8, 0)
+    bottomRight := Buffer(8, 0)
+    NumPut("Int", NumGet(rectBuffer, 0, "Int"), topLeft, 0)
+    NumPut("Int", NumGet(rectBuffer, 4, "Int"), topLeft, 4)
+    NumPut("Int", NumGet(rectBuffer, 8, "Int"), bottomRight, 0)
+    NumPut("Int", NumGet(rectBuffer, 12, "Int"), bottomRight, 4)
+    if !DllCall(
+        "User32\ClientToScreen",
+        "Ptr", hwnd,
+        "Ptr", topLeft.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    if !DllCall(
+        "User32\ClientToScreen",
+        "Ptr", hwnd,
+        "Ptr", bottomRight.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    return {
+        left: NumGet(topLeft, 0, "Int"),
+        top: NumGet(topLeft, 4, "Int"),
+        right: NumGet(bottomRight, 0, "Int"),
+        bottom: NumGet(bottomRight, 4, "Int")
+    }
+}
+
+; --- END mxnm_measurement_target_resolver.ahk ---
+
+; --- BEGIN mxnm_measurement_provider.ahk ---
+class MxNMMeasurementProvider {
+    static CachedTarget := 0
+
+    static ReadSuvMax(options := 0) {
+        startedAt := A_TickCount
+        targetStartedAt := A_TickCount
+        target := this.ResolveTarget(options)
+        targetResolutionMs := A_TickCount - targetStartedAt
+        if !target.ok
+            return MakeMxNMTargetFailureMeasurement(
+                target,
+                targetResolutionMs,
+                A_TickCount - startedAt
+            )
+
+        providerOptions := CloneMeasurementOptions(options)
+        expectedViewerHwnd := MeasurementOption(
+            options, "expectedViewerHwnd", 0
+        )
+        expectedViewerPid := MeasurementOption(
+            options, "expectedViewerPid", 0
+        )
+        if (expectedViewerHwnd && target.actionHwnd != expectedViewerHwnd)
+            || (expectedViewerPid && target.actionPid != expectedViewerPid) {
+            return MakeMeasurementResult(
+                MeasurementState.AUTOMATION_FAILED,
+                MeasurementType.SUVMAX,
+                "",
+                "",
+                MeasurementSource.MXNM_CONTEXT_COMMAND,
+                MeasurementFailureReason.VIEWER_TARGET_CHANGED,
+                Map(
+                    "targetCode", target.code,
+                    "targetActionHwnd", target.actionHwnd,
+                    "targetActionPid", target.actionPid,
+                    "targetResolutionMs", targetResolutionMs,
+                    "totalReadMs", A_TickCount - startedAt
+                )
+            )
+        }
+        providerOptions["imageScreenPoint"] := target.screenPoint
+        providerOptions["expectedViewerHwnd"] := target.actionHwnd
+        providerOptions["expectedViewerPid"] := target.actionPid
+        result := ContextMeasurementProvider.ReadSuvMax(providerOptions)
+        result.context["targetCode"] := target.code
+        result.context["targetActionHwnd"] := target.actionHwnd
+        result.context["targetActionPid"] := target.actionPid
+        result.context["targetScreenX"] := target.screenPoint.x
+        result.context["targetScreenY"] := target.screenPoint.y
+        result.context["targetResolutionMs"] := targetResolutionMs
+        result.context["totalReadMs"] := A_TickCount - startedAt
+        return result
+    }
+
+    static ResolveTarget(options := 0) {
+        forceRefresh := MeasurementOption(
+            options, "forceTargetRefresh", false
+        )
+        if !forceRefresh && IsReusableMxNMMeasurementTarget(this.CachedTarget)
+            return this.CachedTarget
+
+        this.CachedTarget := 0
+        target := MxNMMeasurementTargetResolver.Resolve(
+            MeasurementOption(
+                options,
+                "viewerExe",
+                MxNMConfigGeometryDefaults.ViewerExe
+            )
+        )
+        if target.ok {
+            target.cacheClientRect := MxNMTargetClientRectScreen(
+                target.actionHwnd
+            )
+            if IsObject(target.cacheClientRect)
+                this.CachedTarget := target
+        }
+        return target
+    }
+
+    static HasReusableTarget() {
+        return IsReusableMxNMMeasurementTarget(this.CachedTarget)
+    }
+
+    static WarmTarget() {
+        return this.ResolveTarget().ok
+    }
+}
+
+CloneMeasurementOptions(options := 0) {
+    clone := Map()
+    if Type(options) = "Map" {
+        for key, value in options
+            clone[key] := value
+    }
+    return clone
+}
+
+IsReusableMxNMMeasurementTarget(target) {
+    if !IsObject(target) || !target.ok
+        || !target.actionHwnd || !target.actionPid
+        || !target.HasOwnProp("cacheClientRect")
+        || !IsObject(target.cacheClientRect)
+        return false
+    if !WinExist("ahk_id " target.actionHwnd)
+        return false
+    try currentPid := WinGetPID("ahk_id " target.actionHwnd)
+    catch {
+        return false
+    }
+    try processName := WinGetProcessName("ahk_id " target.actionHwnd)
+    catch {
+        return false
+    }
+    if currentPid != target.actionPid
+        || StrLower(processName) != StrLower(MxNMConfigGeometryDefaults.ViewerExe)
+        return false
+    currentRect := MxNMTargetClientRectScreen(target.actionHwnd)
+    return IsObject(currentRect)
+        && MxNMMeasurementRectsEqual(currentRect, target.cacheClientRect)
+        && MxNMPointInsideRect(target.screenPoint, currentRect)
+}
+
+MxNMMeasurementRectsEqual(leftRect, rightRect) {
+    return leftRect.left = rightRect.left
+        && leftRect.top = rightRect.top
+        && leftRect.right = rightRect.right
+        && leftRect.bottom = rightRect.bottom
+}
+
+MakeMxNMTargetFailureMeasurement(
+    target,
+    targetResolutionMs := 0,
+    totalReadMs := 0
+) {
+    failureReason := target.configCode = MxNMConfigGeometryCode.VIEWER_NOT_FOUND
+        ? MeasurementFailureReason.VIEWER_NOT_FOUND
+        : MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
+    context := Map(
+        "targetCode", target.code,
+        "targetConfigCode", target.configCode,
+        "targetActionHwnd", 0,
+        "targetActionPid", 0,
+        "targetResolutionMs", targetResolutionMs,
+        "totalReadMs", totalReadMs
+    )
+    return MakeMeasurementResult(
+        MeasurementState.AUTOMATION_FAILED,
+        MeasurementType.SUVMAX,
+        "",
+        "",
+        MeasurementSource.MXNM_CONTEXT_COMMAND,
+        failureReason,
+        context
+    )
+}
+
+; --- END mxnm_measurement_provider.ahk ---
+
+; --- BEGIN mxnm_annotation_cleaner.ahk ---
+class MxNMAnnotationCleanupDefaults {
+    static DeleteAllCommandText := "删除全部标注"
+    static ConfirmationProbeMs := 500
+    static ConfirmationPollIntervalMs := 20
+    static ProductionEnabled := true
+}
+
+class MxNMAnnotationCleanupCode {
+    static OK := "OK"
+    static TARGET_UNAVAILABLE := "TARGET_UNAVAILABLE"
+    static TARGET_CHANGED := "TARGET_CHANGED"
+    static COMMAND_FAILED := "COMMAND_FAILED"
+    static CONFIRMATION_REQUIRED := "CONFIRMATION_REQUIRED"
+    static CLEANUP_NOT_VERIFIED := "CLEANUP_NOT_VERIFIED"
+    static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
+}
+
+class MxNMAnnotationCleaner {
+    static DeleteAll(expectedViewerHwnd := 0, expectedViewerPid := 0,
+        options := 0) {
+        return DeleteAllMxNMAnnotations(
+            expectedViewerHwnd,
+            expectedViewerPid,
+            options
+        )
+    }
+}
+
+DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
+    options := 0) {
+    result := {
+        ok: false,
+        code: MxNMAnnotationCleanupCode.UNEXPECTED_ERROR,
+        failureReason: MeasurementFailureReason.UNEXPECTED_ERROR,
+        commandInvoked: false,
+        confirmationDetected: false,
+        verificationState: "",
+        context: Map()
+    }
+    actionContext := Map(
+        "failureReason", MeasurementFailureReason.NONE,
+        "popupHwnd", 0,
+        "commandControlHwnd", 0,
+        "commandRuntimeId", 0
+    )
+    try {
+        target := MxNMMeasurementProvider.ResolveTarget(options)
+        result.context["targetCode"] := target.code
+        if !target.ok {
+            result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
+            result.failureReason :=
+                MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
+            return result
+        }
+        if (expectedViewerHwnd && target.actionHwnd != expectedViewerHwnd)
+            || (expectedViewerPid && target.actionPid != expectedViewerPid) {
+            result.code := MxNMAnnotationCleanupCode.TARGET_CHANGED
+            result.failureReason :=
+                MeasurementFailureReason.VIEWER_TARGET_CHANGED
+            return result
+        }
+
+        clientPoint := ContextMeasurementScreenToClient(
+            target.actionHwnd,
+            target.screenPoint
+        )
+        if !IsContextMeasurementPoint(clientPoint) {
+            result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
+            result.failureReason :=
+                MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
+            return result
+        }
+        viewer := {
+            hwnd: target.actionHwnd,
+            pid: target.actionPid
+        }
+        dialogSnapshot := SnapshotMxNMViewerDialogs(target.actionPid)
+        if !PrepareMxNMContextCommand(
+            viewer,
+            clientPoint,
+            MxNMAnnotationCleanupDefaults.DeleteAllCommandText,
+            actionContext,
+            options
+        ) {
+            result.code := MxNMAnnotationCleanupCode.COMMAND_FAILED
+            result.failureReason := actionContext["failureReason"]
+            return result
+        }
+        ; Delete may open a modal confirmation. Post the command so this
+        ; process remains able to detect and close that owned dialog.
+        if !InvokePreparedMxNMContextCommand(actionContext, true) {
+            result.code := MxNMAnnotationCleanupCode.COMMAND_FAILED
+            result.failureReason := actionContext["failureReason"]
+            return result
+        }
+        result.commandInvoked := true
+        confirmationHwnd := WaitForNewMxNMViewerDialog(
+            target.actionPid,
+            dialogSnapshot,
+            actionContext["popupHwnd"],
+            MxNMAnnotationCleanupDefaults.ConfirmationProbeMs
+        )
+        if confirmationHwnd {
+            result.confirmationDetected := true
+            CloseOwnedMxNMViewerDialog(confirmationHwnd)
+            result.code :=
+                MxNMAnnotationCleanupCode.CONFIRMATION_REQUIRED
+            result.failureReason :=
+                MeasurementFailureReason.CONFIRMATION_REQUIRED
+            return result
+        }
+    } catch as err {
+        result.context["exceptionType"] := Type(err)
+        result.code := MxNMAnnotationCleanupCode.UNEXPECTED_ERROR
+        result.failureReason := MeasurementFailureReason.UNEXPECTED_ERROR
+        return result
+    } finally {
+        if actionContext["popupHwnd"]
+            CloseContextMeasurementPopup(actionContext["popupHwnd"])
+    }
+
+    verificationOptions := CloneMeasurementOptions(options)
+    verificationOptions["expectedViewerHwnd"] := expectedViewerHwnd
+    verificationOptions["expectedViewerPid"] := expectedViewerPid
+    verification := MxNMMeasurementProvider.ReadSuvMax(verificationOptions)
+    result.verificationState := verification.state
+    if verification.state != MeasurementState.NOT_ANNOTATED {
+        result.code := MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED
+        result.failureReason :=
+            MeasurementFailureReason.CLEANUP_NOT_VERIFIED
+        return result
+    }
+    result.ok := true
+    result.code := MxNMAnnotationCleanupCode.OK
+    result.failureReason := MeasurementFailureReason.NONE
+    return result
+}
+
+SnapshotMxNMViewerDialogs(viewerPid) {
+    snapshot := Map()
+    try dialogs := WinGetList("ahk_class #32770")
+    catch {
+        dialogs := []
+    }
+    for hwnd in dialogs {
+        try dialogPid := WinGetPID("ahk_id " hwnd)
+        catch {
+            dialogPid := 0
+        }
+        if dialogPid = viewerPid
+            snapshot[hwnd] := true
+    }
+    return snapshot
+}
+
+FindNewMxNMViewerDialog(viewerPid, snapshot, ownedPopupHwnd := 0) {
+    try dialogs := WinGetList("ahk_class #32770")
+    catch {
+        dialogs := []
+    }
+    for hwnd in dialogs {
+        if hwnd = ownedPopupHwnd || snapshot.Has(hwnd)
+            continue
+        try dialogPid := WinGetPID("ahk_id " hwnd)
+        catch {
+            dialogPid := 0
+        }
+        if dialogPid = viewerPid
+            return hwnd
+    }
+    return 0
+}
+
+WaitForNewMxNMViewerDialog(
+    viewerPid,
+    snapshot,
+    ownedPopupHwnd,
+    timeoutMs
+) {
+    deadline := A_TickCount + Max(0, Integer(timeoutMs))
+    loop {
+        dialogHwnd := FindNewMxNMViewerDialog(
+            viewerPid,
+            snapshot,
+            ownedPopupHwnd
+        )
+        if dialogHwnd
+            return dialogHwnd
+        if A_TickCount >= deadline
+            return 0
+        Sleep MxNMAnnotationCleanupDefaults.ConfirmationPollIntervalMs
+    }
+}
+
+CloseOwnedMxNMViewerDialog(hwnd) {
+    if !hwnd || !WinExist("ahk_id " hwnd)
+        return false
+    return DllCall(
+        "User32\PostMessageW",
+        "Ptr", hwnd,
+        "UInt", 0x0010,
+        "UPtr", 0,
+        "Ptr", 0,
+        "Int"
+    ) = true
+}
+
+; --- END mxnm_annotation_cleaner.ahk ---
 
 ; --- BEGIN medex_color_reset_logic.ahk ---
 class ColorResetCode {
@@ -13626,7 +14723,7 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
     ; remains after the clipboard transaction has completed.
     if !resetResult.ok {
         RecordOptionalPerformanceTimestamp(performanceContext, "FailureFeedbackStartedMs")
-        SoundBeep(650, 150)
+        ShowReportAssistantVisualFeedback("报告写入未完成")
         RecordOptionalPerformanceTimestamp(performanceContext, "FailureFeedbackCompletedMs")
         return {
             ok: false,
@@ -13740,6 +14837,7 @@ class ReportHotstringDefaults {
     static RedFigureMarker := "（见图）"
     static CursorPlaceholder := "{{cursor}}"
     static DatePlaceholder := "{{date}}"
+    static SuvMaxPlaceholder := "{{suvmax}}"
     static RedFigureReferencePlaceholder := "{{red:（见图）}}"
 
     static BuiltinDefinitions() {
@@ -13750,7 +14848,7 @@ class ReportHotstringDefaults {
             ),
             RawHotstringEntry(
                 "Hotstring.builtin-fzg", "true", "放射性摄取增高", ";fzg",
-                "放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}"
+                "放射性摄取增高，SUVmax约为{{suvmax}}{{red:（见图）}}"
             ),
             RawHotstringEntry(
                 "Hotstring.builtin-fwj", "true", "放射性摄取未见明显增高", ";fwj",
@@ -13771,21 +14869,25 @@ class ReportHotstringDefaults {
         currentBySection := Map()
         for entry in this.BuiltinDefinitions()
             currentBySection[StrLower(entry.Section)] := entry.Text
-        legacyTexts := Map(
-            "Hotstring.builtin-red", "（见图）",
-            "Hotstring.builtin-fzg",
-            "放射性摄取增高，SUVmax约为{{cursor}}（见图）",
-            "Hotstring.builtin-fwj", "放射性摄取未见明显增高（见图）",
-            "Hotstring.builtin-fjd", "放射性摄取降低（见图）"
-        )
         upgrades := []
-        for section, legacyText in legacyTexts {
+        legacyTexts := Map(
+            "Hotstring.builtin-red", ["（见图）"],
+            "Hotstring.builtin-fzg", [
+                "放射性摄取增高，SUVmax约为{{cursor}}（见图）",
+                "放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}"
+            ],
+            "Hotstring.builtin-fwj", ["放射性摄取未见明显增高（见图）"],
+            "Hotstring.builtin-fjd", ["放射性摄取降低（见图）"]
+        )
+        for section, sectionLegacyTexts in legacyTexts {
             sectionKey := StrLower(section)
-            upgrades.Push({
-                Section: section,
-                FromText: legacyText,
-                ToText: currentBySection[sectionKey]
-            })
+            for legacyText in sectionLegacyTexts {
+                upgrades.Push({
+                    Section: section,
+                    FromText: legacyText,
+                    ToText: currentBySection[sectionKey]
+                })
+            }
         }
         return upgrades
     }
@@ -13864,6 +14966,7 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         "; MedEx Report Assistant 配置",
         "; 请保持 UTF-16 LE 编码；Text 中的 \n 表示换行。",
         "; Text 可使用 {{cursor}} 标记光标位置，使用 {{date}} 插入当天日期。",
+        "; 使用 {{suvmax}} 自动获取 SUVMax；失败时该位置作为人工输入光标。",
         "; 只有 {{red:（见图）}} 会插入红色（见图），且必须放在模板最后。",
         "[Config]",
         "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
@@ -13888,7 +14991,7 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
     lines.Push("; 这里只使用小写英文字母、数字和减号，例如 lung-note。")
     lines.Push("; 不要使用中文、空格，也不要继续使用 example。")
     lines.Push("; Name 和 Text 可以正常填写中文。")
-    lines.Push("; 可在 Text 中使用 {{cursor}}、{{date}} 和 {{red:（见图）}}。")
+    lines.Push("; 可在 Text 中使用 {{cursor}}、{{date}}、{{suvmax}} 和 {{red:（见图）}}。")
     lines.Push("; 最后把 Enabled 改成 true。")
     lines.Push("; ============================================================")
     lines.Push("")
@@ -13977,7 +15080,9 @@ ReportHotstringTextFromMultilineEdit(value) {
 ; --- BEGIN template_renderer.ahk ---
 class ReportTemplateParseResult {
     __New(ok, renderedText := "", caretIndex := 0, cursorCount := 0,
-        redFigureStartIndex := -1, redFigureCount := 0, message := "") {
+        redFigureStartIndex := -1, redFigureCount := 0, message := "",
+        suvMaxIndex := -1, suvMaxCount := 0,
+        suvMaxCaretForced := false) {
         this.Ok := ok = true
         this.RenderedText := String(renderedText)
         this.CaretIndex := caretIndex
@@ -13985,6 +15090,9 @@ class ReportTemplateParseResult {
         this.RedFigureStartIndex := redFigureStartIndex
         this.RedFigureCount := redFigureCount
         this.Message := String(message)
+        this.SuvMaxIndex := suvMaxIndex
+        this.SuvMaxCount := suvMaxCount
+        this.SuvMaxCaretForced := suvMaxCaretForced = true
     }
 }
 
@@ -14005,17 +15113,20 @@ ValidateReportTemplate(templateText) {
     return ParseReportTemplate(templateText, false)
 }
 
-RenderReportTemplate(templateText) {
-    return ParseReportTemplate(templateText, true)
+RenderReportTemplate(templateText, runtimeContext := 0) {
+    return ParseReportTemplate(templateText, true, runtimeContext)
 }
 
-ParseReportTemplate(templateText, expandDate) {
+ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
     sourceText := String(templateText)
     output := ""
     cursorCount := 0
     caretIndex := -1
     redFigureStartIndex := -1
     redFigureCount := 0
+    suvMaxIndex := -1
+    suvMaxCount := 0
+    suvMaxCaretForced := false
     position := 1
 
     while position <= StrLen(sourceText) {
@@ -14058,6 +15169,46 @@ ParseReportTemplate(templateText, expandDate) {
         } else if token = "date" {
             output .= expandDate ? FormatTime(, "yyyy-MM-dd")
                 : ReportHotstringDefaults.DatePlaceholder
+        } else if token = "suvmax" {
+            suvMaxCount += 1
+            if suvMaxCount > 1 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "每个模板最多只能使用一个 {{suvmax}}。",
+                    suvMaxIndex, suvMaxCount
+                )
+            }
+            suvMaxIndex := StrLen(output)
+            if expandDate {
+                runtimeState := ReportTemplateRuntimeValue(
+                    runtimeContext, "suvmaxState", ""
+                )
+                runtimeText := String(ReportTemplateRuntimeValue(
+                    runtimeContext, "suvmaxText", ""
+                ))
+                if runtimeState = "FOUND" {
+                    if !RegExMatch(
+                        runtimeText,
+                        "^(?:0|[1-9]\d*)\.\d$"
+                    ) || Number(runtimeText) <= 0 {
+                        return ReportTemplateParseResult(
+                            false, , , cursorCount, , redFigureCount,
+                            "SUVMax 运行时结果缺少合法数值。",
+                            suvMaxIndex, suvMaxCount
+                        )
+                    }
+                    output .= runtimeText
+                } else if runtimeState = "NOT_ANNOTATED"
+                    || runtimeState = "AUTOMATION_FAILED" {
+                    suvMaxCaretForced := true
+                } else {
+                    return ReportTemplateParseResult(
+                        false, , , cursorCount, , redFigureCount,
+                        "模板缺少 SUVMax 运行时结果。",
+                        suvMaxIndex, suvMaxCount
+                    )
+                }
+            }
         } else if token = "red:（见图）" {
             redFigureCount += 1
             if redFigureCount > 1 {
@@ -14087,16 +15238,27 @@ ParseReportTemplate(templateText, expandDate) {
         position := closer + 2
     }
 
-    if caretIndex < 0
+    if suvMaxCaretForced
+        caretIndex := suvMaxIndex
+    else if caretIndex < 0
         caretIndex := StrLen(output)
     return ReportTemplateParseResult(
         true, output, caretIndex, cursorCount,
-        redFigureStartIndex, redFigureCount
+        redFigureStartIndex, redFigureCount, "",
+        suvMaxIndex, suvMaxCount, suvMaxCaretForced
     )
 }
 
-BuildReportTemplatePlan(templateText) {
-    rendered := RenderReportTemplate(templateText)
+ReportTemplateRuntimeValue(runtimeContext, key, defaultValue := "") {
+    if Type(runtimeContext) = "Map" && runtimeContext.Has(key)
+        return runtimeContext[key]
+    if IsObject(runtimeContext) && runtimeContext.HasOwnProp(key)
+        return runtimeContext.%key%
+    return defaultValue
+}
+
+BuildReportTemplatePlan(templateText, runtimeContext := 0) {
+    rendered := RenderReportTemplate(templateText, runtimeContext)
     if !rendered.Ok
         return ReportTemplatePlan(false, , , , , , rendered.Message)
 
@@ -14291,8 +15453,10 @@ ValidateSchema2BuiltinTemplateUpdates(configPath, updates) {
             return false
         if encodedText != update.NewEncodedText
             return false
-        plan := BuildReportTemplatePlan(DecodeReportHotstringText(encodedText))
-        if !plan.Ok
+        validation := ValidateReportTemplate(
+            DecodeReportHotstringText(encodedText)
+        )
+        if !validation.Ok
             return false
     }
     return true
@@ -15455,39 +16619,198 @@ RegisterReportHotstrings(
     RunConfiguredReportHotstring
 )
 
+class ReportTemplateWriteCode {
+    static OK := "OK"
+    static INVALID_TEMPLATE := "INVALID_TEMPLATE"
+    static TARGET_CHANGED := "TARGET_CHANGED"
+    static TEXT_DISPATCH_FAILED := "TEXT_DISPATCH_FAILED"
+    static RED_INSERTION_FAILED := "RED_INSERTION_FAILED"
+    static CARET_RELOCATION_FAILED := "CARET_RELOCATION_FAILED"
+}
+
 RunConfiguredReportHotstring(entry, *) {
-    plan := BuildReportTemplatePlan(entry.Text)
-    if !plan.Ok {
+    templateInfo := ValidateReportTemplate(entry.Text)
+    if !templateInfo.Ok {
         OutputDebug "Report template render failed: INVALID_TEMPLATE"
         return false
     }
 
+    reportHwnd := WinExist("A")
+    runtimeContext := 0
+    measurement := 0
+    if templateInfo.SuvMaxCount = 1 {
+        measurement := MxNMMeasurementProvider.ReadSuvMax()
+        runtimeContext := Map(
+            "suvmaxState", measurement.state,
+            "suvmaxText", measurement.formattedValue
+        )
+    }
+
+    plan := BuildReportTemplatePlan(entry.Text, runtimeContext)
+    if !plan.Ok {
+        OutputDebug "Report template render failed: INVALID_RUNTIME_TEMPLATE"
+        ShowReportAssistantVisualFeedback("报告写入未完成")
+        return false
+    }
+
+    writeResult := ExecuteReportTemplatePlan(plan, reportHwnd)
+    if !writeResult.ok {
+        OutputDebug "Report template write failed: " writeResult.code
+        ShowReportAssistantVisualFeedback("报告写入未完成")
+        return false
+    }
+
+    if !IsObject(measurement)
+        return true
+    if measurement.state = MeasurementState.AUTOMATION_FAILED {
+        ShowReportAssistantVisualFeedback("SUVMax 获取失败，请手动输入")
+        return true
+    }
+    if measurement.state = MeasurementState.NOT_ANNOTATED
+        return true
+
+    if MxNMAnnotationCleanupDefaults.ProductionEnabled {
+        cleanup := MxNMAnnotationCleaner.DeleteAll(
+            ReportMeasurementContextValue(
+                measurement.context, "targetActionHwnd", 0
+            ),
+            ReportMeasurementContextValue(
+                measurement.context, "targetActionPid", 0
+            )
+        )
+        if !cleanup.ok {
+            OutputDebug "MxNM annotation cleanup failed: " cleanup.code
+            ShowReportAssistantVisualFeedback(
+                "报告已写入，标注未清除"
+            )
+        }
+    }
+    return true
+}
+
+ExecuteReportTemplatePlan(plan, expectedReportHwnd) {
+    if !ReportHotstringTargetMatches(expectedReportHwnd)
+        return MakeReportTemplateWriteResult(
+            false, ReportTemplateWriteCode.TARGET_CHANGED
+        )
+
     resetReadiness := 0
     if plan.RequiresColorReset {
         resetReadiness := PrepareMedExRedReset()
-        if !resetReadiness.ok
-            return false
+        if !resetReadiness.ok {
+            return MakeReportTemplateWriteResult(
+                false, ReportTemplateWriteCode.RED_INSERTION_FAILED
+            )
+        }
     }
 
-    SendConfiguredReportText(plan.PlainText)
-    if plan.RedText = "" {
-        if plan.CaretLeftCount > 0
-            Send("{Left " plan.CaretLeftCount "}")
-        return true
+    if !SendConfiguredReportText(plan.PlainText, expectedReportHwnd) {
+        return MakeReportTemplateWriteResult(
+            false, ReportTemplateWriteCode.TEXT_DISPATCH_FAILED
+        )
     }
-    if plan.CaretLeftCount > 0
-        return RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)
-    return RunRedResetInsertion(plan.RedText, resetReadiness.options)
+    if plan.RedText = "" {
+        if plan.CaretLeftCount > 0 {
+            if !ReportHotstringTargetMatches(expectedReportHwnd)
+                return MakeReportTemplateWriteResult(
+                    false, ReportTemplateWriteCode.TARGET_CHANGED
+                )
+            try Send("{Left " plan.CaretLeftCount "}")
+            catch {
+                return MakeReportTemplateWriteResult(
+                    false,
+                    ReportTemplateWriteCode.CARET_RELOCATION_FAILED
+                )
+            }
+        }
+        return MakeReportTemplateWriteResult(
+            ReportHotstringTargetMatches(expectedReportHwnd),
+            ReportHotstringTargetMatches(expectedReportHwnd)
+                ? ReportTemplateWriteCode.OK
+                : ReportTemplateWriteCode.TARGET_CHANGED
+        )
+    }
+
+    if !ReportHotstringTargetMatches(expectedReportHwnd)
+        return MakeReportTemplateWriteResult(
+            false, ReportTemplateWriteCode.TARGET_CHANGED
+        )
+    operation := plan.CaretLeftCount > 0
+        ? RunRedCaretInsertion(plan.RedText, plan.CaretLeftCount)
+        : RunRedResetInsertion(plan.RedText, resetReadiness.options)
+    if !IsObject(operation) || !operation.ok {
+        return MakeReportTemplateWriteResult(
+            false, ReportTemplateWriteCode.RED_INSERTION_FAILED
+        )
+    }
+    if !ReportHotstringTargetMatches(expectedReportHwnd) {
+        return MakeReportTemplateWriteResult(
+            false, ReportTemplateWriteCode.TARGET_CHANGED
+        )
+    }
+    return MakeReportTemplateWriteResult(
+        true, ReportTemplateWriteCode.OK
+    )
 }
 
-SendConfiguredReportText(text) {
-    lines := StrSplit(text, "`n", "`r")
-    for index, line in lines {
-        if index > 1
-            Send("{Enter}")
-        if line != ""
-            SendText(line)
+MakeReportTemplateWriteResult(ok, code) {
+    return {
+        ok: ok = true,
+        code: String(code)
     }
+}
+
+SendConfiguredReportText(text, expectedReportHwnd := 0) {
+    lines := StrSplit(text, "`n", "`r")
+    try {
+        for index, line in lines {
+            if expectedReportHwnd
+                && !ReportHotstringTargetMatches(expectedReportHwnd)
+                return false
+            if index > 1
+                Send("{Enter}")
+            if line != ""
+                SendText(line)
+        }
+        return !expectedReportHwnd
+            || ReportHotstringTargetMatches(expectedReportHwnd)
+    } catch {
+        return false
+    }
+}
+
+ReportHotstringTargetMatches(expectedHwnd) {
+    if !MedExForegroundWindowMatches(expectedHwnd)
+        return false
+    try processName := WinGetProcessName("ahk_id " expectedHwnd)
+    catch {
+        return false
+    }
+    return MedExProcessNameIsApproved(
+        processName,
+        MedExColorResetDefaults.ProvisionalProcessNames
+    )
+}
+
+ReportMeasurementContextValue(context, key, defaultValue := 0) {
+    if Type(context) = "Map" && context.Has(key)
+        return context[key]
+    return defaultValue
+}
+
+WarmMxNMMeasurementTarget(*) {
+    if MxNMMeasurementProvider.HasReusableTarget() {
+        SetTimer WarmMxNMMeasurementTarget, 0
+        return
+    }
+    if !WinExist(
+        "ahk_exe " MxNMConfigGeometryDefaults.ViewerExe
+    )
+        return
+    if MedExReportHotstringsEnabled()
+        return
+    if MxNMMeasurementProvider.WarmTarget()
+        SetTimer WarmMxNMMeasurementTarget, 0
 }
 
 ; --- END hotstrings.ahk ---
@@ -15634,6 +16957,10 @@ class ReportAssistantSettingsDefaults {
             {
                 Label: "当前日期",
                 Token: ReportHotstringDefaults.DatePlaceholder
+            },
+            {
+                Label: "自动获取 SUVMax",
+                Token: ReportHotstringDefaults.SuvMaxPlaceholder
             },
             {
                 Label: "红色“（见图）”",
@@ -16146,6 +17473,7 @@ ReloadReportAssistantFromTray(*) {
 
 
 ConfigureReportAssistantTrayMenu()
+SetTimer WarmMxNMMeasurementTarget, 1000
 
 #SuspendExempt
 

@@ -403,6 +403,21 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [x] Field-only automatic target checkpoint 通过 Windows 验证；下一 checkpoint 才允许设计 provider 默认集成。
 - [x] 本 checkpoint 未修改 `main.ahk`、generated release、provider 默认行为、hotstrings 或 `;fzg`。
 
+### SUVMax production candidate
+
+- [ ] 启动 generated release，无 `#Warn`、解析错误或启动错误；全程没有提示音。
+- [ ] 配置中的精确历史 `;fzg` 默认值升级为 `放射性摄取增高，SUVmax约为{{suvmax}}{{red:（见图）}}`；用户修改过的 builtin/custom 文本不变。
+- [x] 有正数 SUVMax 时运行 `;fzg`：自动插入结果正确；target cache 优化后现场确认延迟可接受。
+- [ ] 无标注时运行 `;fzg`：不插入数值、无即时提示，caret 位于 `{{suvmax}}` 空位。
+- [ ] 关闭 viewer 或制造 command failure：报告其余部分仍写入，caret 位于空位，右下角短暂显示无焦点视觉提示。
+- [ ] 人为改变前台报告 HWND 或制造 red/clipboard failure：报告事务返回失败且不执行清除。
+- [x] 单独启动 `tests\windows\mxnm_annotation_cleanup_field.ahk`，只使用非临床测试标注，按 `Ctrl+Alt+F12`。
+- [x] 检查 `%TEMP%\MedExAHK\mxnm_annotation_cleanup_field.txt`：`CleanupState=OK`、`CommandInvoked=true`、`ConfirmationDetected=false`、`VerificationState=NOT_ANNOTATED`、foreground/mouse 均不变。
+- [ ] 若出现二次确认：`CleanupState=CONFIRMATION_REQUIRED`，未自动确认；报告内容不回滚。
+- [ ] production 清除失败时只显示“报告已写入，标注未清除”，不撤销正文、不切换焦点、不移动鼠标。
+- [x] 重启 release 后完成 target 预热，再切回报告运行 `;fzg`；现场确认不再出现不可接受的 config/UIA 重算停顿。
+- [ ] 清除 field 输出中的 `InitialTargetResolutionMs` 在 cache 命中时接近 0；记录 `InitialMeasurementTotalMs` 供后续 clipboard latency 优化。
+
 - [x] 运行 `tests\windows\measurement_capture_regression.ahk`；确认 positive、zero、malformed、no-update、nested-busy 和 clipboard restoration 全部通过。
 - [x] 只运行 `tests\windows\context_measurement_provider_field.ahk`，退出 production release，避免两个脚本同时操作 clipboard。
 - [x] 在 viewer 图像内部将鼠标放到无害测试点并按 `Ctrl+Alt+F8`；看到“测量点已记录”视觉提示后，将焦点返回报告编辑器，设置无害 clipboard sentinel，再按 `Ctrl+Alt+F9`。

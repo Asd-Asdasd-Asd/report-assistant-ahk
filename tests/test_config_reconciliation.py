@@ -53,10 +53,11 @@ class ConfigReconciliationTests(unittest.TestCase):
         reconciliation = source("src/config_reconciliation.ahk")
         bootstrap = source("src/config_bootstrap.ahk")
         for legacy_text in (
-            '"Hotstring.builtin-red", "（见图）"',
+            '"Hotstring.builtin-red", ["（见图）"]',
             '"放射性摄取增高，SUVmax约为{{cursor}}（见图）"',
-            '"Hotstring.builtin-fwj", "放射性摄取未见明显增高（见图）"',
-            '"Hotstring.builtin-fjd", "放射性摄取降低（见图）"',
+            '"放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}"',
+            '"Hotstring.builtin-fwj", ["放射性摄取未见明显增高（见图）"]',
+            '"Hotstring.builtin-fjd", ["放射性摄取降低（见图）"]',
         ):
             self.assertIn(legacy_text, model)
         self.assertIn("LegacySchema2BuiltinTextUpgrades()", model)

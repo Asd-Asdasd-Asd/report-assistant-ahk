@@ -39,7 +39,7 @@ TestInterimSchema2BuiltinDefaultUpgrade() {
         AssertTemplateTest(
             DecodeReportHotstringText(
                 IniRead(configPath, "Hotstring.builtin-fzg", "Text", "")
-            ) = "放射性摄取增高，SUVmax约为{{cursor}}"
+            ) = "放射性摄取增高，SUVmax约为{{suvmax}}"
                 . "{{red:（见图）}}",
             "fzg builtin was not upgraded"
         )
@@ -61,6 +61,33 @@ TestInterimSchema2BuiltinDefaultUpgrade() {
 }
 
 TestTemplatePlans() {
+    suvFound := BuildReportTemplatePlan(
+        "SUVmax{{suvmax}}{{red:（见图）}}",
+        Map("suvmaxState", "FOUND", "suvmaxText", "3.2")
+    )
+    AssertTemplateTest(
+        suvFound.Ok
+            && suvFound.RenderedText = "SUVmax3.2（见图）"
+            && suvFound.CaretLeftCount = 0
+            && suvFound.RequiresColorReset,
+        "FOUND SUVMax did not use the default end caret"
+    )
+    suvMissing := BuildReportTemplatePlan(
+        "{{cursor}}SUVmax{{suvmax}}{{red:（见图）}}",
+        Map("suvmaxState", "NOT_ANNOTATED", "suvmaxText", "")
+    )
+    AssertTemplateTest(
+        suvMissing.Ok
+            && suvMissing.RenderedText = "SUVmax（见图）"
+            && suvMissing.CaretLeftCount = 4
+            && !suvMissing.RequiresColorReset,
+        "missing SUVMax did not force the manual-input anchor"
+    )
+    AssertTemplateTest(
+        !BuildReportTemplatePlan("{{suvmax}}").Ok,
+        "SUVMax template accepted a missing runtime result"
+    )
+
     internal := BuildReportTemplatePlan(
         "检查日期：{{date}}，SUVmax约为{{cursor}}{{red:（见图）}}"
     )

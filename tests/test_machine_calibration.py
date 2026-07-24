@@ -71,11 +71,11 @@ class MachineCalibrationTests(unittest.TestCase):
 
     def test_red_reset_preflight_runs_before_any_text(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
-        body = hotstrings.split("RunConfiguredReportHotstring(entry, *)", 1)[1].split(
-            "\n}\n\nSendConfiguredReportText", 1
-        )[0]
+        body = hotstrings.split(
+            "ExecuteReportTemplatePlan(plan, expectedReportHwnd)", 1
+        )[1].split("\n}\n\nMakeReportTemplateWriteResult", 1)[0]
         self.assertLess(body.index("PrepareMedExRedReset()"), body.index("SendConfiguredReportText"))
-        self.assertIn("if !resetReadiness.ok\n            return false", body)
+        self.assertIn("if !resetReadiness.ok", body)
         self.assertIn(
             "RunRedResetInsertion(plan.RedText, resetReadiness.options)", body
         )

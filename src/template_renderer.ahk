@@ -1,6 +1,8 @@
 class ReportTemplateParseResult {
     __New(ok, renderedText := "", caretIndex := 0, cursorCount := 0,
-        redFigureStartIndex := -1, redFigureCount := 0, message := "") {
+        redFigureStartIndex := -1, redFigureCount := 0, message := "",
+        suvMaxIndex := -1, suvMaxCount := 0,
+        suvMaxCaretForced := false) {
         this.Ok := ok = true
         this.RenderedText := String(renderedText)
         this.CaretIndex := caretIndex
@@ -8,6 +10,9 @@ class ReportTemplateParseResult {
         this.RedFigureStartIndex := redFigureStartIndex
         this.RedFigureCount := redFigureCount
         this.Message := String(message)
+        this.SuvMaxIndex := suvMaxIndex
+        this.SuvMaxCount := suvMaxCount
+        this.SuvMaxCaretForced := suvMaxCaretForced = true
     }
 }
 
@@ -28,17 +33,20 @@ ValidateReportTemplate(templateText) {
     return ParseReportTemplate(templateText, false)
 }
 
-RenderReportTemplate(templateText) {
-    return ParseReportTemplate(templateText, true)
+RenderReportTemplate(templateText, runtimeContext := 0) {
+    return ParseReportTemplate(templateText, true, runtimeContext)
 }
 
-ParseReportTemplate(templateText, expandDate) {
+ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
     sourceText := String(templateText)
     output := ""
     cursorCount := 0
     caretIndex := -1
     redFigureStartIndex := -1
     redFigureCount := 0
+    suvMaxIndex := -1
+    suvMaxCount := 0
+    suvMaxCaretForced := false
     position := 1
 
     while position <= StrLen(sourceText) {
@@ -81,6 +89,46 @@ ParseReportTemplate(templateText, expandDate) {
         } else if token = "date" {
             output .= expandDate ? FormatTime(, "yyyy-MM-dd")
                 : ReportHotstringDefaults.DatePlaceholder
+        } else if token = "suvmax" {
+            suvMaxCount += 1
+            if suvMaxCount > 1 {
+                return ReportTemplateParseResult(
+                    false, , , cursorCount, , redFigureCount,
+                    "每个模板最多只能使用一个 {{suvmax}}。",
+                    suvMaxIndex, suvMaxCount
+                )
+            }
+            suvMaxIndex := StrLen(output)
+            if expandDate {
+                runtimeState := ReportTemplateRuntimeValue(
+                    runtimeContext, "suvmaxState", ""
+                )
+                runtimeText := String(ReportTemplateRuntimeValue(
+                    runtimeContext, "suvmaxText", ""
+                ))
+                if runtimeState = "FOUND" {
+                    if !RegExMatch(
+                        runtimeText,
+                        "^(?:0|[1-9]\d*)\.\d$"
+                    ) || Number(runtimeText) <= 0 {
+                        return ReportTemplateParseResult(
+                            false, , , cursorCount, , redFigureCount,
+                            "SUVMax 运行时结果缺少合法数值。",
+                            suvMaxIndex, suvMaxCount
+                        )
+                    }
+                    output .= runtimeText
+                } else if runtimeState = "NOT_ANNOTATED"
+                    || runtimeState = "AUTOMATION_FAILED" {
+                    suvMaxCaretForced := true
+                } else {
+                    return ReportTemplateParseResult(
+                        false, , , cursorCount, , redFigureCount,
+                        "模板缺少 SUVMax 运行时结果。",
+                        suvMaxIndex, suvMaxCount
+                    )
+                }
+            }
         } else if token = "red:（见图）" {
             redFigureCount += 1
             if redFigureCount > 1 {
@@ -110,16 +158,27 @@ ParseReportTemplate(templateText, expandDate) {
         position := closer + 2
     }
 
-    if caretIndex < 0
+    if suvMaxCaretForced
+        caretIndex := suvMaxIndex
+    else if caretIndex < 0
         caretIndex := StrLen(output)
     return ReportTemplateParseResult(
         true, output, caretIndex, cursorCount,
-        redFigureStartIndex, redFigureCount
+        redFigureStartIndex, redFigureCount, "",
+        suvMaxIndex, suvMaxCount, suvMaxCaretForced
     )
 }
 
-BuildReportTemplatePlan(templateText) {
-    rendered := RenderReportTemplate(templateText)
+ReportTemplateRuntimeValue(runtimeContext, key, defaultValue := "") {
+    if Type(runtimeContext) = "Map" && runtimeContext.Has(key)
+        return runtimeContext[key]
+    if IsObject(runtimeContext) && runtimeContext.HasOwnProp(key)
+        return runtimeContext.%key%
+    return defaultValue
+}
+
+BuildReportTemplatePlan(templateText, runtimeContext := 0) {
+    rendered := RenderReportTemplate(templateText, runtimeContext)
     if !rendered.Ok
         return ReportTemplatePlan(false, , , , , , rendered.Message)
 

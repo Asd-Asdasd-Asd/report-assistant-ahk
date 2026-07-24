@@ -201,9 +201,9 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 
 技术自动化失败不等同于“无标注”。`AUTOMATION_FAILED` 不得触发静默的空值或旧值 fallback。
 
-Implementation status（2026-07-24）：首个 foundation checkpoint 已实现 structured SUVMax result、strict parser、独立 measurement clipboard transaction、dynamic popup/command provider 和 privacy-safe Windows harness。Windows 已验证 `FOUND`、`NOT_ANNOTATED`、`VIEWER_NOT_FOUND`、background popup/command、clipboard freshness/restoration 以及 no-focus/no-mouse invariants；现场发现的同进程多窗口歧义已改为由已校验 image point 唯一定位 viewer。Acquisition 已进一步抽为 command/type/parser spec-driven core，并预留 `line_axes` components；该重构已通过 Windows 等价复验。Config-first target resolver 和 `;fzg` report orchestration 分属后续独立 checkpoint；在对应验收通过前不得自动插入测量值或移除 legacy measurement capability。
+Implementation status（2026-07-24）：foundation、config/UIA automatic target、production `FOUND` insertion、context-menu `删除全部标注` + `NOT_ANNOTATED` postcondition 和 target-cache latency 已通过 Windows checkpoint。通用 `{{suvmax}}`、报告事务及无焦点视觉提示已接入；`NOT_ANNOTATED`/automation failure 的 production 组合验收仍需完成，未完成前不标记 v0.6.0 release-ready。
 
-Config-first target resolver foundation 和 field-only automatic target checkpoint 均已通过 Windows 验证。resolver 从声明的 `ShowModel1..N` 计算跨布局 maximin point，再以 UIA geometry 和 action HWND ownership 校验；当前配置由 AHK 实测 logical `(63,95)` / screen `(2686,217)`。自动 transport 已从非目标活动 pane 返回 `FOUND`，foreground、mouse、clipboard、popup 和 runtime ID invariants 全部通过；viewer missing 时在 provider/clipboard 前 fail closed。总 UIA Pane 数可在 9/10 间变化，仅唯一 geometry match 是硬门槛。未改变 provider 默认路径，未接入 `;fzg`。
+Config-first target resolver foundation 和 field-only automatic target checkpoint 均已通过 Windows 验证。resolver 从声明的 `ShowModel1..N` 计算跨布局 maximin point，再以 UIA geometry 和 action HWND ownership 校验；当前配置由 AHK 实测 logical `(63,95)` / screen `(2686,217)`。自动 transport 已从非目标活动 pane 返回 `FOUND`，foreground、mouse、clipboard、popup 和 runtime ID invariants 全部通过；viewer missing 时在 provider/clipboard 前 fail closed。总 UIA Pane 数可在 9/10 间变化，仅唯一 geometry match 是硬门槛。该 field 结论现已用于 production adapter；底层 command/type/parser provider 仍保持通用边界。
 
 ## Later versions
 

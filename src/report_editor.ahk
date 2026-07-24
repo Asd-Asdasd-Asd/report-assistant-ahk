@@ -182,7 +182,7 @@ InsertRedFigureTextAndRestoreState(text := "（见图）", resetOptions := 0) {
     ; remains after the clipboard transaction has completed.
     if !resetResult.ok {
         RecordOptionalPerformanceTimestamp(performanceContext, "FailureFeedbackStartedMs")
-        SoundBeep(650, 150)
+        ShowReportAssistantVisualFeedback("报告写入未完成")
         RecordOptionalPerformanceTimestamp(performanceContext, "FailureFeedbackCompletedMs")
         return {
             ok: false,

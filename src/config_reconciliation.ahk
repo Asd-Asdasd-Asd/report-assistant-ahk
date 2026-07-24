@@ -101,8 +101,10 @@ ValidateSchema2BuiltinTemplateUpdates(configPath, updates) {
             return false
         if encodedText != update.NewEncodedText
             return false
-        plan := BuildReportTemplatePlan(DecodeReportHotstringText(encodedText))
-        if !plan.Ok
+        validation := ValidateReportTemplate(
+            DecodeReportHotstringText(encodedText)
+        )
+        if !validation.Ok
             return false
     }
     return true

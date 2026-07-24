@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 import unittest
 
 
@@ -19,10 +20,18 @@ class Plan:
     reset: bool
 
 
-def render(template: str, date: str = "2001-03-13") -> Plan:
+def render(
+    template: str,
+    date: str = "2001-03-13",
+    suv_state: str | None = None,
+    suv_text: str = "",
+) -> Plan:
     output: list[str] = []
     cursor: int | None = None
     red_text = ""
+    suv_anchor: int | None = None
+    suv_count = 0
+    force_suv_anchor = False
     position = 0
     while position < len(template):
         opener = template.find("{{", position)
@@ -45,6 +54,21 @@ def render(template: str, date: str = "2001-03-13") -> Plan:
             cursor = len("".join(output))
         elif token == "date":
             output.append(date)
+        elif token == "suvmax":
+            suv_count += 1
+            if suv_count > 1:
+                raise ValueError("multiple suvmax")
+            suv_anchor = len("".join(output))
+            if (
+                suv_state == "FOUND"
+                and re.fullmatch(r"(?:0|[1-9]\d*)\.\d", suv_text)
+                and float(suv_text) > 0
+            ):
+                output.append(suv_text)
+            elif suv_state in ("NOT_ANNOTATED", "AUTOMATION_FAILED"):
+                force_suv_anchor = True
+            else:
+                raise ValueError("missing suvmax runtime")
         elif token == "red:（见图）":
             if red_text:
                 raise ValueError("multiple red token")
@@ -56,7 +80,9 @@ def render(template: str, date: str = "2001-03-13") -> Plan:
             raise ValueError("unknown")
         position = closer + 2
     text = "".join(output)
-    if cursor is None:
+    if force_suv_anchor:
+        cursor = suv_anchor
+    elif cursor is None:
         cursor = len(text)
     left = len(text) - cursor
     return Plan(
@@ -68,6 +94,45 @@ def render(template: str, date: str = "2001-03-13") -> Plan:
 
 
 class TemplateEngineBehaviorTests(unittest.TestCase):
+    def test_suvmax_found_uses_cursor_or_default_end(self) -> None:
+        default_end = render(
+            "SUVmax{{suvmax}}{{red:（见图）}}",
+            suv_state="FOUND",
+            suv_text="3.2",
+        )
+        self.assertEqual(default_end.text, "SUVmax3.2（见图）")
+        self.assertEqual(default_end.left, 0)
+        self.assertTrue(default_end.reset)
+
+        explicit = render(
+            "{{cursor}}SUVmax{{suvmax}}",
+            suv_state="FOUND",
+            suv_text="3.2",
+        )
+        self.assertEqual(explicit.left, len("SUVmax3.2"))
+
+    def test_suvmax_failure_forces_manual_anchor_over_cursor(self) -> None:
+        for state in ("NOT_ANNOTATED", "AUTOMATION_FAILED"):
+            plan = render(
+                "{{cursor}}SUVmax{{suvmax}}{{red:（见图）}}",
+                suv_state=state,
+            )
+            self.assertEqual(plan.text, "SUVmax（见图）")
+            self.assertEqual(plan.left, len(MARKER))
+            self.assertFalse(plan.reset)
+
+    def test_suvmax_runtime_and_count_are_strict(self) -> None:
+        with self.assertRaises(ValueError):
+            render("{{suvmax}}")
+        with self.assertRaises(ValueError):
+            render("{{suvmax}}", suv_state="FOUND", suv_text="old")
+        with self.assertRaises(ValueError):
+            render(
+                "{{suvmax}}{{suvmax}}",
+                suv_state="FOUND",
+                suv_text="3.2",
+            )
+
     def test_internal_cursor_skips_reset(self) -> None:
         plan = render(
             "放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}"

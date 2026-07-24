@@ -2,6 +2,7 @@ class ReportHotstringDefaults {
     static RedFigureMarker := "（见图）"
     static CursorPlaceholder := "{{cursor}}"
     static DatePlaceholder := "{{date}}"
+    static SuvMaxPlaceholder := "{{suvmax}}"
     static RedFigureReferencePlaceholder := "{{red:（见图）}}"
 
     static BuiltinDefinitions() {
@@ -12,7 +13,7 @@ class ReportHotstringDefaults {
             ),
             RawHotstringEntry(
                 "Hotstring.builtin-fzg", "true", "放射性摄取增高", ";fzg",
-                "放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}"
+                "放射性摄取增高，SUVmax约为{{suvmax}}{{red:（见图）}}"
             ),
             RawHotstringEntry(
                 "Hotstring.builtin-fwj", "true", "放射性摄取未见明显增高", ";fwj",
@@ -33,21 +34,25 @@ class ReportHotstringDefaults {
         currentBySection := Map()
         for entry in this.BuiltinDefinitions()
             currentBySection[StrLower(entry.Section)] := entry.Text
-        legacyTexts := Map(
-            "Hotstring.builtin-red", "（见图）",
-            "Hotstring.builtin-fzg",
-            "放射性摄取增高，SUVmax约为{{cursor}}（见图）",
-            "Hotstring.builtin-fwj", "放射性摄取未见明显增高（见图）",
-            "Hotstring.builtin-fjd", "放射性摄取降低（见图）"
-        )
         upgrades := []
-        for section, legacyText in legacyTexts {
+        legacyTexts := Map(
+            "Hotstring.builtin-red", ["（见图）"],
+            "Hotstring.builtin-fzg", [
+                "放射性摄取增高，SUVmax约为{{cursor}}（见图）",
+                "放射性摄取增高，SUVmax约为{{cursor}}{{red:（见图）}}"
+            ],
+            "Hotstring.builtin-fwj", ["放射性摄取未见明显增高（见图）"],
+            "Hotstring.builtin-fjd", ["放射性摄取降低（见图）"]
+        )
+        for section, sectionLegacyTexts in legacyTexts {
             sectionKey := StrLower(section)
-            upgrades.Push({
-                Section: section,
-                FromText: legacyText,
-                ToText: currentBySection[sectionKey]
-            })
+            for legacyText in sectionLegacyTexts {
+                upgrades.Push({
+                    Section: section,
+                    FromText: legacyText,
+                    ToText: currentBySection[sectionKey]
+                })
+            }
         }
         return upgrades
     }

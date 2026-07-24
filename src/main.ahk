@@ -9,6 +9,7 @@
 #Include *i config.local.ahk
 #Include window_guard.ahk
 #Include utils.ahk
+#Include visual_feedback.ahk
 #Include clipboard_html.ahk
 #Include measurement_model.ahk
 #Include measurement_parser.ahk
@@ -16,6 +17,9 @@
 #Include mxnm_config_geometry_provider.ahk
 #Include context_measurement_provider.ahk
 #Include <UIA>
+#Include mxnm_measurement_target_resolver.ahk
+#Include mxnm_measurement_provider.ahk
+#Include mxnm_annotation_cleaner.ahk
 #Include medex_color_reset_logic.ahk
 #Include medex_candidate_g_logic.ahk
 #Include machine_profile.ahk
@@ -44,6 +48,7 @@
 #Include tray_menu.ahk
 
 ConfigureReportAssistantTrayMenu()
+SetTimer WarmMxNMMeasurementTarget, 1000
 
 #SuspendExempt
 

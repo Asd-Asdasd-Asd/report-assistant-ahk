@@ -122,11 +122,11 @@ ContextMeasurementProvider
 - 同一 `MedExNMFusion.exe` 进程可能暴露多个可见顶层窗口。已有 screen point 时，通过 `WindowFromPoint` 定位该点所属窗口并校验进程名；没有可用 point 时才要求进程窗口唯一。不得从多个候选中任取第一个窗口。
 - profile 至少校验 screen bounds 和目标 viewer window/client bounds。Windows 现场验收后，可在不改变调用方接口的前提下增加 config-derived resolver、UIA-relative resolver 或用户校验步骤。
 
-当前 field-only 自动目标 checkpoint 通过 config + UIA 得到完整主图区，
-再从所有声明 `ShowModel1..N` 中计算跨 layout maximin point。它通过
-`imageScreenPoint` option 调用现有 provider，因此不改变 provider 默认
-行为。该点是否能读取“当前活动 pane”的 SUVMax 仍是独立 Windows A/B
-门槛；验证前不得接入 production。
+自动目标 checkpoint 已通过 config + UIA 得到完整主图区，再从所有声明
+`ShowModel1..N` 中计算跨 layout maximin point。Windows A/B 已证明该点能在
+非目标活动 pane 存在标注时读取当前活动/全局 SUVMax，因此现由
+`MxNMMeasurementProvider` 作为 production adapter 接入；底层
+`ContextMeasurementProvider` 仍只负责通用 command transport。
 
 ### Preferred no-focus-switch transport
 
@@ -150,7 +150,7 @@ ContextMeasurementProvider
 -> close only the popup created by this operation if cleanup is required
 -> restore the original ClipboardAll in finally
 -> run zero-wait report-target guards
--> render and execute the current builtin ;fzg ReportTemplatePlan
+-> render and execute the current ReportTemplatePlan containing {{suvmax}}
 -> insert the formatted value only when the measurement state is FOUND
 ```
 
@@ -168,26 +168,30 @@ Capture the original report HWND before measurement acquisition. Immediately bef
 
 If any guard fails, do not send text, caret movement, paste commands, or measurement content. Return a structured failure and use only non-focus-stealing feedback. These guards protect against an unexpected foreground change during the short script-owned operation; they do not perform patient or study matching.
 
-### `;fzg` orchestration
+### `{{suvmax}}` orchestration
 
 Measurement acquisition happens before the existing report insertion. The measurement text must be copied into a local value before the acquisition transaction restores the user's clipboard. The existing CF_HTML transaction then owns the report insertion independently.
 
 ```text
-ReadCurrentSuvMaxWithoutFocusSwitch()
+MxNMMeasurementProvider.ReadSuvMax()
 -> verify original report target
--> render the builtin template containing {{cursor}}{{red:（见图）}}
--> insert “放射性摄取增高，SUVmax约为（见图）” through the existing workflow
+-> render any validated template containing {{suvmax}}
+-> FOUND: expand {{suvmax}} to the formatted numeric value
+-> NOT_ANNOTATED/AUTOMATION_FAILED: expand it to empty and force its position
+   to become the manual-input caret anchor, overriding {{cursor}}
 -> restore the user's clipboard
--> apply the caret relocation derived by ReportTemplatePlan
--> FOUND: insert the formatted numeric value at the current caret
--> NOT_ANNOTATED: insert nothing and leave the caret for manual input
--> AUTOMATION_FAILED: insert nothing, leave the caret for manual input,
-   and emit explicit non-focus-stealing failure feedback
+-> execute black/red/caret operations as one report transaction
+-> FOUND + report transaction success: attempt “删除全部标注”
 ```
 
-The current builtin template derives a caret relocation equivalent to the previously validated `Left 4`. Do not replace it with `Left 5`, hard-code another offset, or run Color Reset when the plan places the caret before the red suffix.
+On `FOUND`, an explicit `{{cursor}}` remains authoritative; without one the
+caret defaults to the template end. On `NOT_ANNOTATED` or
+`AUTOMATION_FAILED`, the SUVMax anchor is authoritative. Do not replace derived
+movement with hard-coded `Left 4`/`Left 5`.
 
-This automatic behavior belongs to the builtin `;fzg` workflow. Measurement acquisition must not be attached to every configurable template that happens to contain `{{cursor}}` or `{{red:（见图）}}`.
+Automation is opt-in by token: built-in and custom templates containing
+`{{suvmax}}` trigger acquisition; templates containing only `{{cursor}}` or
+`{{red:（见图）}}` retain their previous behavior.
 
 ### SUVMax state mapping
 
@@ -198,6 +202,15 @@ For the first implementation:
 - popup not created, command not found, invocation failed, clipboard did not produce a new result, or returned text did not match the expected format -> `AUTOMATION_FAILED`。
 
 Only `FOUND` may insert a numeric value. `NOT_ANNOTATED` and `AUTOMATION_FAILED` both preserve the manual-input caret position, but `AUTOMATION_FAILED` must remain visibly or diagnostically distinguishable from a normal no-annotation result.
+
+### Annotation cleanup
+
+Cleanup runs only after a `FOUND` result and a successful operational report
+transaction. It re-resolves the automatic target, requires the same viewer
+HWND/PID, invokes the exact context command `删除全部标注`, then re-reads SUVMax;
+only `NOT_ANNOTATED` verifies success. A newly created same-process confirmation
+dialog is closed without confirmation and reported as failure. Cleanup failure
+never rolls back report content.
 
 ### Explicit exclusions
 

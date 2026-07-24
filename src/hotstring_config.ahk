@@ -48,6 +48,7 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         "; MedEx Report Assistant 配置",
         "; 请保持 UTF-16 LE 编码；Text 中的 \n 表示换行。",
         "; Text 可使用 {{cursor}} 标记光标位置，使用 {{date}} 插入当天日期。",
+        "; 使用 {{suvmax}} 自动获取 SUVMax；失败时该位置作为人工输入光标。",
         "; 只有 {{red:（见图）}} 会插入红色（见图），且必须放在模板最后。",
         "[Config]",
         "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
@@ -72,7 +73,7 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
     lines.Push("; 这里只使用小写英文字母、数字和减号，例如 lung-note。")
     lines.Push("; 不要使用中文、空格，也不要继续使用 example。")
     lines.Push("; Name 和 Text 可以正常填写中文。")
-    lines.Push("; 可在 Text 中使用 {{cursor}}、{{date}} 和 {{red:（见图）}}。")
+    lines.Push("; 可在 Text 中使用 {{cursor}}、{{date}}、{{suvmax}} 和 {{red:（见图）}}。")
     lines.Push("; 最后把 Enabled 改成 true。")
     lines.Push("; ============================================================")
     lines.Push("")

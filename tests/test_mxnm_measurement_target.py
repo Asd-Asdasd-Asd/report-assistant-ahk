@@ -114,16 +114,16 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("MouseUnchanged=", harness)
         self.assertIn("TargetActionMatchesProviderViewer=", harness)
 
-    def test_checkpoint_does_not_change_production_wiring(self) -> None:
+    def test_validated_checkpoint_is_connected_to_production_wiring(self) -> None:
         resolver_name = "mxnm_measurement_target_resolver.ahk"
-        self.assertNotIn(resolver_name, source("src/main.ahk"))
-        self.assertNotIn(resolver_name, source("scripts/build_release.py"))
+        self.assertIn(resolver_name, source("src/main.ahk"))
+        self.assertIn(resolver_name, source("scripts/build_release.py"))
         self.assertNotIn(
             "MxNMMeasurementTargetResolver",
             source("src/context_measurement_provider.ahk"),
         )
-        self.assertNotIn(
-            "MxNMMeasurementTargetResolver",
+        self.assertIn(
+            "MxNMMeasurementProvider.ReadSuvMax()",
             source("src/hotstrings.ahk"),
         )
 

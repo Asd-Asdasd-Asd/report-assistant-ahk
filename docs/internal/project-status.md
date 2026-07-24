@@ -16,7 +16,7 @@
 ## 当前已实现
 
 - 固定 `Local\MedExReportAssistant.Singleton` 在 config bootstrap 前保护不同版本、文件名和目录。
-- Schema 2 template engine 支持 `{{cursor}}`、`{{date}}`、`{{red:（见图）}}`。
+- Schema 2 template engine 支持 `{{cursor}}`、`{{date}}`、`{{suvmax}}`、`{{red:（见图）}}`。
 - 普通字面量 `（见图）` 保持黑色；caret movement 和 Candidate G 均由 `ReportTemplatePlan` 派生。
 - Schema 1 配置可经只读审计、backup、临时写入和最终验证一次性升级；legacy Mode 只存在于 migration module。
 - 原生 Settings UI 支持稳定 Section identity、ListView sorting、custom add/delete、builtin edit/disable、template-element insertion、严格校验和事务保存。
@@ -25,8 +25,8 @@
 - CF_HTML、clipboard `finally` restoration、Candidate G popup signature 和 at-most-once clicks 保持 fail closed。
 - 正式图标以 `assets/icon/source/medex-icon.svg` 为 source，由 `scripts/generate-icon.sh` 生成多尺寸 PNG/ICO。
 - Windows 一键构建自动生成 release source、以 `/icon` 嵌入 ICO、编译 temporary EXE、同步静态发布资源并事务提升 final。
-- v0.6.0 measurement foundation 已加入 `FOUND` / `NOT_ANNOTATED` / `AUTOMATION_FAILED` result、strict SUVMax parser、独立 measurement clipboard transaction 和无焦点 context-menu provider；acquisition 已抽为 command/type/parser spec-driven core，并为后续 line components 预留结构，当前未接入任何 production hotstring。
-- Config-first measurement target foundation 和 field-only automatic target checkpoint 已通过 Windows 验证。自动 target 已从非目标活动 pane 成功读取 SUVMax，success-path invariants 全部通过；viewer missing 时 provider、clipboard、popup 和 command 均不可达。总 UIA Pane 数是诊断字段，唯一 geometry match 才是硬门槛。未改变 provider 默认路径。
+- v0.6.0 SUVMax production candidate 已接入通用 `{{suvmax}}` 模板：自动 target、strict parser、报告事务和右键清除 provider 均已实现；`NOT_ANNOTATED`/失败会留下人工输入锚点，失败提示为无焦点视觉浮层。首次 production 复测发现同步重算 config/UIA target 导致 trigger-to-text 超过 1 秒；增加 viewer-session target 预热/cache，并在复用前核对 HWND、PID、进程名和 client rect 后，现场确认延迟可接受。
+- Config-first measurement target foundation 和 field-only automatic target checkpoint 已通过 Windows 验证。自动 target 已从非目标活动 pane 成功读取 SUVMax，success-path invariants 全部通过；viewer missing 时 provider、clipboard、popup 和 command 均不可达。总 UIA Pane 数是诊断字段，唯一 geometry match 才是硬门槛。本轮已在其外增加 production adapter，底层 provider 默认边界不变。
 
 ## 验证状态
 
@@ -39,6 +39,8 @@
 - v0.6.0 SUVMax provider 的 `FOUND`、`NOT_ANNOTATED` 和 `VIEWER_NOT_FOUND` 路径；background popup/command、clipboard freshness/restoration、foreground/mouse invariants 和无音频视觉反馈均通过现场验证。
 - Config + UIA 主图区 resolver foundation：唯一 runtime frame、logical-to-runtime mapping、9→1 UIA Pane geometry match，以及相同布局三次稳定复验。
 - Field-only automatic target：21 个声明布局的 maximin point、非目标活动 pane `FOUND`、完整 no-focus/no-mouse/clipboard invariants，以及 viewer-missing early fail-closed。
+- Production `;fzg` FOUND path：自动插入结果正确，target cache 后延迟可接受。
+- `删除全部标注` field path：`CleanupState=OK`、command invoked、无 confirmation、复查 `NOT_ANNOTATED`，foreground/mouse 均保持不变。
 
 ### 自动测试覆盖
 
@@ -48,13 +50,14 @@
 - icon generation inputs与 Windows Ahk2Exe `/icon` wiring。
 - measurement result/parser、sentinel + clipboard sequence freshness、single restore owner、provider dynamic popup/command identity 和 privacy-safe field harness。
 
-当前完整 Python suite 为 218 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
+当前完整 Python suite 为 223 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
 
 ## 当前 production flow
 
 ```text
 configured report hotstring
-→ BuildReportTemplatePlan()
+→ optional MxNMMeasurementProvider.ReadSuvMax()
+→ BuildReportTemplatePlan(runtimeContext)
 → send PlainText
 → optional red CF_HTML transaction
 → caret internal: derived Left count, no Candidate G
@@ -62,6 +65,7 @@ configured report hotstring
 → minimum paste-to-restore interval if required
 → ClipboardAll restoration in finally
 → structured result
+→ FOUND + report transaction success: DeleteAll + NOT_ANNOTATED verification
 ```
 
 Candidate G：
@@ -81,7 +85,7 @@ exact UIA Name="检查所见"
 - 其他 resolution/DPI/scaling、multi-monitor/per-monitor DPI 和 MedEx layout 尚未正式支持。
 - Compatibility layer 的 Alt+Shift+S 只保证单次触发；持续按住修饰键连续按 S 延后到 compatibility 重构。
 - updater、installer、self-update、rollback、shortcut 和 registry installation state 均不在范围内。
-- Measurement provider foundation 和通用 acquisition core 已通过 Windows field validation；field-only config/UIA automatic target 尚待 pane-semantics A/B。`;fzg` 自动插入、production target integration、long-axis/short-axis、完整异常矩阵和 `size` placeholder 仍未接入 production。
+- SUVMax acquisition、automatic target、production FOUND orchestration、`删除全部标注` 清除链及 cache latency 已通过 Windows checkpoint；`NOT_ANNOTATED`/automation failure 的 production 组合验收仍保留在 checklist。long-axis/short-axis 和 `size` placeholder 尚未实现。
 - Config logical-to-runtime mapping 和 privacy-safe UIA geometry-only 唯一重找已通过当前工作站相同布局三次复验；其他布局/profile 尚未正式验证，active `ShowModelN` 识别仍不属于当前 checkpoint。
 - Settings 的“快捷键”“其他”标签页仍是占位页。
 

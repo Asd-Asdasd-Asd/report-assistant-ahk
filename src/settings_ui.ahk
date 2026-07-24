@@ -12,6 +12,10 @@ class ReportAssistantSettingsDefaults {
                 Token: ReportHotstringDefaults.DatePlaceholder
             },
             {
+                Label: "自动获取 SUVMax",
+                Token: ReportHotstringDefaults.SuvMaxPlaceholder
+            },
+            {
                 Label: "红色“（见图）”",
                 Token: ReportHotstringDefaults.RedFigureReferencePlaceholder
             }

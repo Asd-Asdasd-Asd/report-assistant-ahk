@@ -51,11 +51,8 @@ PasteHtmlFragmentDetailed(fragment, performanceContext := 0,
     )
     pasteDispatched := transaction.actionSucceeded && transaction.restoreAttempted
 
-    if !transaction.actionSucceeded {
-        SoundBeep(750, 120)
-    } else if !transaction.restoreSucceeded {
-        SoundBeep(750, 120)
-    }
+    if !transaction.actionSucceeded || !transaction.restoreSucceeded
+        ShowReportAssistantVisualFeedback("报告写入未完成")
 
     ; pasteDispatched does not confirm that the target editor rendered the HTML.
     return {

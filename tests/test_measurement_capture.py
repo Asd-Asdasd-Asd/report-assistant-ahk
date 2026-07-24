@@ -176,10 +176,46 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertNotIn('context["rawText"]', provider)
         self.assertNotIn('context["rawValue"]', provider)
 
-    def test_provider_is_not_connected_to_production_hotstrings(self) -> None:
+    def test_provider_is_connected_through_the_production_adapter(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
         self.assertNotIn("ContextMeasurementProvider", hotstrings)
-        self.assertNotIn("ReadCurrentSuvMaxWithoutFocusSwitch", hotstrings)
+        self.assertIn("MxNMMeasurementProvider.ReadSuvMax()", hotstrings)
+        self.assertIn("MxNMAnnotationCleaner.DeleteAll(", hotstrings)
+
+    def test_cleanup_reuses_context_transport_and_verifies_postcondition(
+        self,
+    ) -> None:
+        cleaner = source("src/mxnm_annotation_cleaner.ahk")
+        self.assertIn('"删除全部标注"', cleaner)
+        self.assertIn("PrepareMxNMContextCommand(", cleaner)
+        self.assertIn("InvokePreparedMxNMContextCommand(actionContext, true)", cleaner)
+        self.assertIn("CONFIRMATION_REQUIRED", cleaner)
+        self.assertIn("verification.state != MeasurementState.NOT_ANNOTATED", cleaner)
+        for forbidden in ("MouseMove", "WinActivate", "SoundBeep"):
+            self.assertNotIn(forbidden, cleaner)
+
+    def test_production_target_is_warmed_and_revalidated_before_cache_reuse(
+        self,
+    ) -> None:
+        provider = source("src/mxnm_measurement_provider.ahk")
+        main = source("src/main.ahk")
+        for required in (
+            "static CachedTarget := 0",
+            "IsReusableMxNMMeasurementTarget(this.CachedTarget)",
+            'WinExist("ahk_id " target.actionHwnd)',
+            "WinGetPID",
+            "WinGetProcessName",
+            "MxNMMeasurementRectsEqual",
+            "MxNMPointInsideRect",
+            '"targetResolutionMs"',
+            '"totalReadMs"',
+        ):
+            self.assertIn(required, provider)
+        self.assertIn("SetTimer WarmMxNMMeasurementTarget, 1000", main)
+        self.assertIn(
+            "if MedExReportHotstringsEnabled()",
+            source("src/hotstrings.ahk"),
+        )
 
     def test_geometry_is_owned_by_one_resolver_and_fails_closed(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
