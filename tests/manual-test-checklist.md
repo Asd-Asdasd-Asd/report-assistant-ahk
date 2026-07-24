@@ -390,6 +390,19 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [x] 相同布局连续运行三次；`UiaCandidateRect=2566,80,3991,1440` 保持不变，使用视觉反馈且无声音。
 - [x] Config + UIA 主图区矩形 checkpoint 通过；本 checkpoint 未生成 production image point，未接入 provider 或 `;fzg`。
 
+### Field-only automatic measurement target
+
+- [ ] 先运行 `tests\windows\mxnm_measurement_target_regression.ahk`；看到纯逻辑回归通过的视觉提示，无 warning/error。
+- [ ] 单独启动 `tests\windows\mxnm_measurement_target_field.ahk`，保持报告编辑器为前台，按 `Ctrl+Alt+F10`；确认视觉标记落入图像 pane 内且远离分隔线。
+- [x] 检查 `%TEMP%\MedExAHK\mxnm_measurement_target_field.txt`：`TargetState=READY_FOR_FIELD_VALIDATION`、`LayoutModelCount=21`、`LogicalPoint=63,95`、`MinimumLogicalClearance=62`、`UiaGeometryMatchCount=1`、`ActionWindowResolved=true`。
+- [x] 在一个不同于自动目标点的 pane 保持活动状态，并只让该活动 pane 存在 SUVMax 标注；自动读取返回 `FOUND`，确认 command 可读取当前活动/全局测量。
+- [x] 以静止鼠标复跑 F11 完整 transport；`TargetActionMatchesProviderViewer`、foreground/mouse、clipboard、popup 和 runtime ID 字段均为 `true`。F10/F11 各自独立比较调用前后位置，不要求两次测试之间持续静止。
+- [x] 记录 `UiaPaneCount` 可从 9 变为 10；它只用于诊断，`UiaGeometryMatchCount=1` 才是硬门槛。
+- [ ] 若自动点为 `NOT_ANNOTATED` 而手动活动 pane point 为 `FOUND`，记录 command 为 point-local 并停止；不得尝试第二自动 transport，下一步改为 active-pane resolver。
+- [x] 关闭 viewer 后复跑：`TargetState=CONFIG_GEOMETRY_UNAVAILABLE`、`ConfigState=VIEWER_NOT_FOUND`、`MeasurementInvoked=false`；foreground/mouse 不变，clipboard/popup/command 均不可达。
+- [x] Field-only automatic target checkpoint 通过 Windows 验证；下一 checkpoint 才允许设计 provider 默认集成。
+- [x] 本 checkpoint 未修改 `main.ahk`、generated release、provider 默认行为、hotstrings 或 `;fzg`。
+
 - [x] 运行 `tests\windows\measurement_capture_regression.ahk`；确认 positive、zero、malformed、no-update、nested-busy 和 clipboard restoration 全部通过。
 - [x] 只运行 `tests\windows\context_measurement_provider_field.ahk`，退出 production release，避免两个脚本同时操作 clipboard。
 - [x] 在 viewer 图像内部将鼠标放到无害测试点并按 `Ctrl+Alt+F8`；看到“测量点已记录”视觉提示后，将焦点返回报告编辑器，设置无害 clipboard sentinel，再按 `Ctrl+Alt+F9`。

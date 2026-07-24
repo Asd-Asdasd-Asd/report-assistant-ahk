@@ -223,11 +223,47 @@ config complete logical image rectangle
 这只授权下一阶段生成安全 image point；尚未证明 context-menu transport
 使用新 resolver 后仍保持 foreground、mouse、clipboard 和 popup invariants。
 
+自动目标 field checkpoint 已实现但尚待 Windows 验证。它只使用
+`ShowModelGroup.ShowModelSize` 声明的 `ShowModel1..N`，不会把额外 section
+猜成当前 layout，也不会识别 active model。每个声明 model 的 pane geometry
+先裁剪到主图区；只有不超过主图区 1% 的 vendor 边缘溢出可以被裁剪。
+
+安全点从所有 pane 中心候选里选择：候选必须严格落在每一个声明 layout
+的某个 pane 内，并最大化跨 layout 的最小边缘距离；平局选择更小 Y，
+再选择更小 X。最小距离必须达到主图区短边的 5%，否则 fail closed。
+当前现场配置声明 21 个 model、产生 185 个去重候选，预期 logical point
+为 `(63,95)`，最小距离 `62`，高于要求的 `37.5`；映射到已验证 UIA
+rectangle 后预期 screen point 为 `(2686,217)`。这些值是算法结果，
+不得作为 profile 常量写死。
+
+首次 Windows automatic-target transport 返回 `FOUND`，证明在非目标 pane
+保持活动且只有该 pane 存在标注时，复制命令仍能取得当前活动/全局 SUVMax；
+首次结果中的 `MouseUnchanged=false` 经静止鼠标复跑后变为 `true`；
+`TargetActionMatchesProviderViewer`、foreground、mouse、clipboard、popup
+和 runtime ID 因此全部通过。F10/F11 分别只比较各自调用开始与结束的鼠标
+位置，不要求操作者在两次测试之间持续保持鼠标静止。
+
+复跑时 `UiaPaneCount` 从 9 变为 10，但 `UiaGeometryMatchCount` 始终为 1。
+总 Pane 数受运行时 UIA tree 变化影响，只能作为诊断字段；唯一 geometry
+match 才是执行门槛。
+
+关闭 `MedExNMFusion.exe` 后，field harness 返回
+`CONFIG_GEOMETRY_UNAVAILABLE / VIEWER_NOT_FOUND`，`MeasurementInvoked=false`；
+clipboard、popup 和 command 均不可达，foreground/mouse 保持不变。
+至此 field-only automatic target checkpoint 的成功路径、pane semantics
+和 viewer-missing fail-closed 均通过 Windows 验证。
+
+`MxNMMeasurementTargetResolver` 当前仅由独立 field harness include，
+未接入 `main.ahk`、generated release、provider 默认路径或 hotstrings。
+resolver 会用 `WindowFromPoint` 和 process/PID/client bounds 重新验证
+action HWND；field harness 再确认该 HWND 与 provider 实际选择的 viewer
+一致。
+
 ## 下一步最小验证清单
 
-1. 从已验证 UIA rectangle 生成远离四边的命名安全点，不读取活动子窗格或当前 `ShowModelN`。
-2. 让 `ContextMeasurementProvider` 通过现有 `imagePointResolver` 接口使用该点；不得在 provider 内复制 config/UIA 逻辑。
-3. 复跑 SUVMax 的 `FOUND`、`NOT_ANNOTATED`、`VIEWER_NOT_FOUND` 和 induced failure，确认 foreground、mouse、clipboard 及 popup invariants 不变。
+1. 运行纯逻辑 Windows regression，确认 layout schema、clipping、maximin、tie-break 和 5% clearance gate。
+2. 用 field harness 的 `Ctrl+Alt+F10` 预览自动点，再用 `Ctrl+Alt+F11` 执行一次自动 SUVMax。
+3. 在非自动目标 pane 保持活动状态且只让该 pane 有标注：若自动点仍返回 `FOUND`，进入下一 provider-integration checkpoint；若返回 `NOT_ANNOTATED` 而手动活动点为 `FOUND`，判定 command 为 point-local，先实现 active-pane resolver。
 3. 切换两个显示布局，观察 MedEx 读取或写入了什么状态，并确认如何得到当前活动 `ShowModelN`。
 4. 在至少两个工作站 profile 上验证同一命名锚点是否落入预期控件或图像区。
 5. 对一个按钮和一个图像内部点分别验证后台窗口消息，确认几何正确不等于动作一定可用。

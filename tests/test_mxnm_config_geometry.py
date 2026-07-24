@@ -186,11 +186,14 @@ class MxNMConfigGeometryTests(unittest.TestCase):
 
     def test_uia_audit_is_geometry_only_and_privacy_safe(self) -> None:
         harness = source("tests/windows/mxnm_uia_image_region_audit.ahk")
-        self.assertIn("UIA.ElementFromHandle", harness)
-        self.assertIn('FindElements({Type: "Pane"})', harness)
-        self.assertIn("BoundingRectangle", harness)
+        resolver = source("src/mxnm_measurement_target_resolver.ahk")
+        self.assertIn("mxnm_measurement_target_resolver.ahk", harness)
+        self.assertIn("ResolveMxNMUiaImageRegion", harness)
+        self.assertIn("UIA.ElementFromHandle", resolver)
+        self.assertIn('FindElements({Type: "Pane"})', resolver)
+        self.assertIn("BoundingRectangle", resolver)
         self.assertIn("UiaGeometryMatchCount=", harness)
-        self.assertIn("UIA_IMAGE_REGION_AMBIGUOUS", harness)
+        self.assertIn("UIA_IMAGE_REGION_AMBIGUOUS", resolver)
         for forbidden in (
             ".Name",
             "CachedName",
@@ -200,7 +203,7 @@ class MxNMConfigGeometryTests(unittest.TestCase):
             "SoundBeep",
             "WinActivate",
         ):
-            self.assertNotIn(forbidden, harness)
+            self.assertNotIn(forbidden, harness + resolver)
 
 
 if __name__ == "__main__":

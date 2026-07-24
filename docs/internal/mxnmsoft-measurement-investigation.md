@@ -122,6 +122,12 @@ ContextMeasurementProvider
 - 同一 `MedExNMFusion.exe` 进程可能暴露多个可见顶层窗口。已有 screen point 时，通过 `WindowFromPoint` 定位该点所属窗口并校验进程名；没有可用 point 时才要求进程窗口唯一。不得从多个候选中任取第一个窗口。
 - profile 至少校验 screen bounds 和目标 viewer window/client bounds。Windows 现场验收后，可在不改变调用方接口的前提下增加 config-derived resolver、UIA-relative resolver 或用户校验步骤。
 
+当前 field-only 自动目标 checkpoint 通过 config + UIA 得到完整主图区，
+再从所有声明 `ShowModel1..N` 中计算跨 layout maximin point。它通过
+`imageScreenPoint` option 调用现有 provider，因此不改变 provider 默认
+行为。该点是否能读取“当前活动 pane”的 SUVMax 仍是独立 Windows A/B
+门槛；验证前不得接入 production。
+
 ### Preferred no-focus-switch transport
 
 首版不得主动激活 `MedExNMFusion.exe`，不得移动鼠标，也不得为读取测量值切换报告编辑器焦点。优先直接向 viewer HWND 发送后台窗口消息：

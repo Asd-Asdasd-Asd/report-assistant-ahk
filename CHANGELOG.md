@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added a spec-driven measurement acquisition core with an unchanged SUVMax wrapper, reserved `line_axes` type, and optional structured components for later line-measurement support.
 - Added a read-only MxNM config geometry schema audit that derives the two vendor INI paths from the running viewer executable, hashes both files, and exports only whitelisted numeric geometry entries.
 - Added a privacy-safe MxNM UIA image-region audit that cross-checks unnamed Pane rectangles against the config-derived runtime image rectangle without reading UIA text.
+- Added a field-only automatic MxNM measurement target resolver that selects a maximin point inside every declared layout and validates its UIA/action-window ownership before SUVMax testing.
 
 ### Documentation
 
