@@ -1,6 +1,6 @@
 # MxNMSoft 测量值读取调查记录
 
-本文档记录 Windows 工作站上对 MxNMSoft / `MedExNMFusion.exe` 阅片窗口测量值读取的现场调查。当前只记录发现和计划，不实现自动化功能。
+本文档记录 Windows 工作站上对 MxNMSoft / `MedExNMFusion.exe` 阅片窗口测量值读取的现场调查、已验证 foundation 和后续实现契约。
 
 ## Line measurement
 
@@ -10,11 +10,17 @@
 - Observed ClassNN: `Button10`
 - Observed Control ID: `21877`
 
-剪贴板输出示例：
+通过右键菜单“复制直线测量值”得到的现场 clipboard 输出：
 
 ```text
-2.1cm×2.9cm (长径×短径)
+1 条：2.6cm
+2 条：3.1cm×2.8cm (长径×短径)
+3 条：3.1cm×2.8cm×3.2cm (长径×短径×上下径)
 ```
+
+第三条现场样本在首个数字前曾携带一个不可见的 `U+200B ZERO
+WIDTH SPACE`。parser 应只在整个 payload 的首尾兼容并移除普通空白、
+`U+200B` 和 `U+FEFF`；不得在数值、单位、乘号或轴向标签内部静默删除未知字符。
 
 已验证调用链：
 
@@ -224,6 +230,7 @@ success
 measurement_type
 raw_value
 formatted_value
+components
 source
 timestamp
 study_identity
@@ -235,8 +242,13 @@ failure_reason
 ```text
 success = true
 measurement_type = line_axes
-raw_value = 2.1cm×2.9cm (长径×短径)
-formatted_value = 2.1cm×2.9cm
+raw_value = 3.1cm×2.8cm×3.2cm (长径×短径×上下径)
+formatted_value = 3.1cm×2.8cm×3.2cm
+components = [
+  { role = long_axis, value = 3.1, unit = cm },
+  { role = short_axis, value = 2.8, unit = cm },
+  { role = vertical_axis, value = 3.2, unit = cm }
+]
 source = mxnm_context_command
 ```
 
@@ -270,36 +282,45 @@ failure_reason = no_valid_current_measurement
 
 ## Line measurement parser
 
-期望输入：
+Windows 现场确认的严格输入族：
 
 ```text
-2.1cm×2.9cm (长径×短径)
+2.6cm
+3.1cm×2.8cm (长径×短径)
+3.1cm×2.8cm×3.2cm (长径×短径×上下径)
 ```
 
-建议 parser compatibility：
+首版 parser contract：
 
-- `cm` or `mm`；
-- `×`, `x`, `X`, `*`, or `＊`；
-- integer or decimal values；
-- optional spaces。
+- 只接受 1、2 或 3 个非负 integer/decimal measurement；
+- 现场已验证单位为 `cm`，输出统一为 `cm`；
+- 2 个值时轴向标签必须精确对应 `长径×短径`；
+- 3 个值时轴向标签必须精确对应 `长径×短径×上下径`；
+- 1 个值没有轴向标签，结构化 role 使用 `line_1`，不得推断为长径；
+- 只在整个 payload 首尾兼容普通空白、`U+200B` 和 `U+FEFF`；
+- 格式化输出统一使用 `×`，不保留轴向说明；
+- payload 自身若出现 4 个及以上值、数量与标签不一致、未知单位或未知内部字符，返回 `AUTOMATION_FAILED / UNEXPECTED_FORMAT`，不得截断或猜测。
 
-概念 regex：
+标准化输出：
 
-```regex
-^\s*\d+(?:\.\d+)?\s*(?:mm|cm)\s*[×xX＊*]\s*\d+(?:\.\d+)?\s*(?:mm|cm)
+```text
+1 个值 → 2.6cm
+2 个值 → 3.1cm×2.8cm
+3 个值 → 3.1cm×2.8cm×3.2cm
 ```
 
 建议结构化结果：
 
 ```text
-long_axis
-short_axis
-long_unit
-short_unit
+components = [
+  { role, value, unit }
+]
 raw_text
+formatted_value
 ```
 
-如果单位不同，应先 normalize 再格式化。
+未来若现场确认 `mm` 或其他 separator 变体，应增加明确 fixture 后再扩展 parser，
+不得仅依据旧的 compatibility 假设放宽 production grammar。
 
 ## MFCGridCtrl1
 
