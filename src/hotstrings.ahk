@@ -122,9 +122,10 @@ ExecuteReportTemplatePlan(plan, expectedReportHwnd) {
                 )
             }
         }
+        targetMatches := ReportHotstringTargetMatches(expectedReportHwnd)
         return MakeReportTemplateWriteResult(
-            ReportHotstringTargetMatches(expectedReportHwnd),
-            ReportHotstringTargetMatches(expectedReportHwnd)
+            targetMatches,
+            targetMatches
                 ? ReportTemplateWriteCode.OK
                 : ReportTemplateWriteCode.TARGET_CHANGED
         )

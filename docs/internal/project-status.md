@@ -28,6 +28,7 @@
 - v0.6.0 SUVMax workflow 已接入通用 `{{suvmax}}` 模板：自动 target、strict parser、报告事务和右键清除 provider 均已实现；`NOT_ANNOTATED`/失败会留下人工输入锚点，失败提示为无焦点视觉浮层。首次 production 复测发现同步重算 config/UIA target 导致 trigger-to-text 超过 1 秒；增加 viewer-session target 预热/cache，并在复用前核对 HWND、PID、进程名和 client rect 后，现场确认延迟可接受。
 - v0.6.x 将 measurement target 预热改为 viewer-session 事件驱动：启动时只做廉价存在性探测，viewer 顶层窗口出现并稳定后再读取 config/UIA；等待 target 时以 15 秒低频轮询兜底，cache ready 后只保留 60 秒 session health check。预热不再因报告编辑器位于前台而跳过，且不触碰焦点、鼠标、剪贴板或 context menu。
 - v0.6.0 长短轴 workflow 已接入通用 `{{size}}` 模板，共用自动 target、context popup transport、clipboard restore、报告事务和标注清除。`复制直线测量值` 的新鲜空剪贴板映射为 `NOT_ANNOTATED`；1-3 个正数严格解析后按数值降序输出，使用 `×` 和逐项 `cm`。未标注或失败时留下人工输入锚点，可继续使用 `;cmx`。
+- v0.6.x 增加 builtin `;cma -> {{size}}`。现有配置通过 additive reconciliation 获取该入口：默认 trigger 空闲时直接启用；已有等价 custom `;cma` 时不重复添加；已有不同用途的 `;cma` 时保留用户条目，并以禁用的 `;cma-size` 添加 builtin。配置 normalization 失败或 trigger 重复时继续整体 fail-closed，同时显示无焦点视觉提示。
 - Config-first measurement target foundation 和 field-only automatic target checkpoint 已通过 Windows 验证。自动 target 已从非目标活动 pane 成功读取 SUVMax，success-path invariants 全部通过；viewer missing 时 provider、clipboard、popup 和 command 均不可达。总 UIA Pane 数是诊断字段，唯一 geometry match 才是硬门槛。本轮已在其外增加 production adapter，底层 provider 默认边界不变。
 
 ## 验证状态

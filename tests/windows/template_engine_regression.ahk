@@ -4,6 +4,7 @@
 
 #Include ..\..\src\app_config.ahk
 #Include ..\..\src\feature_model.ahk
+#Include ..\..\src\visual_feedback.ahk
 #Include ..\..\src\hotstring_model.ahk
 #Include ..\..\src\hotstring_config.ahk
 #Include ..\..\src\template_renderer.ahk
@@ -16,10 +17,148 @@ RunTemplateEngineRegression()
 RunTemplateEngineRegression() {
     TestTemplatePlans()
     TestSchema1Migration()
+    TestAdditiveCmaBuiltinReconciliation()
     TestInterimSchema2BuiltinDefaultUpgrade()
     TestUnsafeMigrationLeavesOriginalUntouched()
     MsgBox "Template engine regression passed.", "MedEx test", "Iconi"
     ExitApp 0
+}
+
+TestAdditiveCmaBuiltinReconciliation() {
+    TestMissingCmaBuiltinIsAdded()
+    TestEquivalentCustomCmaIsPreserved()
+    TestConflictingCustomCmaGetsDisabledFallback()
+}
+
+TestMissingCmaBuiltinIsAdded() {
+    TestCmaReconciliationFixture(
+        "",
+        (configPath) => (
+            AssertTemplateTest(
+                IniRead(
+                    configPath,
+                    "Hotstring.builtin-cma",
+                    "Enabled",
+                    ""
+                ) = "true",
+                "missing cma builtin was not enabled"
+            ),
+            AssertTemplateTest(
+                IniRead(
+                    configPath,
+                    "Hotstring.builtin-cma",
+                    "Trigger",
+                    ""
+                ) = ";cma",
+                "missing cma builtin did not use default trigger"
+            )
+        )
+    )
+}
+
+TestEquivalentCustomCmaIsPreserved() {
+    customSection := JoinConfigLines([
+        "",
+        "[Hotstring.custom-cma]",
+        "Enabled=true",
+        "Name=Custom CMA",
+        "Trigger=;cma",
+        "Text={{size}}"
+    ])
+    TestCmaReconciliationFixture(
+        customSection,
+        (configPath) => (
+            AssertTemplateTest(
+                IniRead(
+                    configPath,
+                    "Hotstring.builtin-cma",
+                    "Trigger",
+                    "MISSING"
+                ) = "MISSING",
+                "equivalent custom cma created a duplicate builtin"
+            ),
+            AssertTemplateTest(
+                IniRead(
+                    configPath,
+                    "Hotstring.custom-cma",
+                    "Text",
+                    ""
+                ) = "{{size}}",
+                "equivalent custom cma was modified"
+            )
+        )
+    )
+}
+
+TestConflictingCustomCmaGetsDisabledFallback() {
+    customSection := JoinConfigLines([
+        "",
+        "[Hotstring.custom-cma]",
+        "Enabled=true",
+        "Name=Custom CMA",
+        "Trigger=;cma",
+        "Text=用户内容"
+    ])
+    TestCmaReconciliationFixture(
+        customSection,
+        (configPath) => (
+            AssertTemplateTest(
+                IniRead(
+                    configPath,
+                    "Hotstring.builtin-cma",
+                    "Enabled",
+                    ""
+                ) = "false",
+                "conflicting cma builtin was not disabled"
+            ),
+            AssertTemplateTest(
+                IniRead(
+                    configPath,
+                    "Hotstring.builtin-cma",
+                    "Trigger",
+                    ""
+                ) = ";cma-size",
+                "conflicting cma builtin did not use fallback trigger"
+            ),
+            AssertTemplateTest(
+                NormalizeReportHotstringEntriesResult(
+                    LoadRawReportHotstringConfig(configPath)
+                ).Ok,
+                "conflicting cma reconciliation invalidated all templates"
+            )
+        )
+    )
+}
+
+TestCmaReconciliationFixture(customText, assertionCallback) {
+    testDirectory := A_Temp "\MedExCmaBuiltin-" A_TickCount
+        . "-" Random(1000, 9999)
+    DirCreate testDirectory
+    configPath := testDirectory "\config.ini"
+    try {
+        baseText := JoinConfigLines([
+            "[Config]",
+            "SchemaVersion=2",
+            "",
+            "[Hotstring.custom-base]",
+            "Enabled=true",
+            "Name=Base",
+            "Trigger=;base",
+            "Text=基础"
+        ])
+        FileAppend(
+            baseText (customText = "" ? "" : "`r`n" customText) "`r`n",
+            configPath,
+            "UTF-16"
+        )
+        AssertTemplateTest(
+            ReconcileAdditiveReportHotstringBuiltins(configPath),
+            "cma builtin reconciliation failed"
+        )
+        assertionCallback.Call(configPath)
+    } finally {
+        try DirDelete testDirectory, true
+    }
 }
 
 TestInterimSchema2BuiltinDefaultUpgrade() {

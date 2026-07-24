@@ -54,7 +54,7 @@ publish\麦旋风.exe
 - [ ] 双击托盘图标与右键“设置…”打开同一窗口；保存后 full-script Reload。
 - [ ] builtin 与多个 custom templates 的新增、编辑、启停、排序、删除和重启持久化正确。
 - [ ] 单行、多行、空行、末尾换行、反斜杠及字面量 `\n` round-trip 正确。
-- [ ] `;red`、`;fzg`、`;fwj`、`;fjd`、`;cmx` 的文字、红色范围、caret 和后续输入颜色正确。
+- [ ] `;red`、`;fzg`、`;fwj`、`;fjd`、`;cma`、`;cmx` 的文字、红色范围、caret 和后续输入颜色正确。
 - [ ] `;fzg` 正数、无标注和失败路径正确；custom `{{size}}` 模板可插入 1–3 个降序尺寸或留下人工输入锚点。
 - [ ] 报告写入成功后才尝试清除 viewer 标注；清除失败不回滚，清除成功以对应 measurement 再读为 `NOT_ANNOTATED`。
 - [ ] hotstrings 只在 MedEx report process 生效；`Ctrl+Alt+Esc` 和 `Ctrl+Alt+Q` 保持全局。

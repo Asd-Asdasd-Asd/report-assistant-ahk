@@ -7,7 +7,7 @@ class ReportHotstringDefaults {
     static RedFigureReferencePlaceholder := "{{red:（见图）}}"
 
     static BuiltinDefinitions() {
-        return [
+        definitions := [
             RawHotstringEntry(
                 "Hotstring.builtin-red", "true", "红字插入", ";red",
                 "{{red:（见图）}}"
@@ -27,6 +27,18 @@ class ReportHotstringDefaults {
             RawHotstringEntry(
                 "Hotstring.builtin-cmx", "true", "厘米尺寸模板", ";cmx",
                 "cm×{{cursor}}cm"
+            )
+        ]
+        for definition in this.AdditiveBuiltinDefinitions()
+            definitions.Push(definition)
+        return definitions
+    }
+
+    static AdditiveBuiltinDefinitions() {
+        return [
+            RawHotstringEntry(
+                "Hotstring.builtin-cma", "true", "自动读取尺寸", ";cma",
+                "{{size}}"
             )
         ]
     }

@@ -45,7 +45,8 @@ PrepareReportAssistantConfig(managedDefaults, configPath := "") {
     }
 
     try {
-        reconciled := ReconcileSchema2BuiltinTemplateDefaults(configPath)
+        reconciled := ReconcileAdditiveReportHotstringBuiltins(configPath)
+            && ReconcileSchema2BuiltinTemplateDefaults(configPath)
             && ReconcileManagedConfigDefaults(configPath, managedDefaults)
     } catch {
         reconciled := false

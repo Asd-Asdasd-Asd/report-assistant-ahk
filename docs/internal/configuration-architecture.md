@@ -25,7 +25,7 @@
 - `template_renderer.ahk`：严格模板校验、执行时展开和 `ReportTemplatePlan`。
 - `hotstring_normalization.ahk`：字段、trigger collision 和模板校验；任一报告模板不安全时整体 fail closed。
 - `hotstring_config_migration.ahk`：唯一允许读取 Schema 1 `Mode` 的模块；负责审计、迁移、备份和复验。
-- `config_reconciliation.ahk`：补充缺失 managed defaults，并只把仍等于开发期旧默认值的 builtin 升级为显式红色 token。
+- `config_reconciliation.ahk`：补充缺失 managed defaults 和 additive builtin，并只把仍等于开发期旧默认值的 builtin 升级为显式红色 token。additive builtin 不覆盖用户已有 trigger；冲突时使用禁用的确定性备用 trigger。
 - `config_bootstrap.ahk`：启动顺序协调；在任何 hotstring 注册前完成创建、迁移和 reconciliation。
 - `hotstring_config_editor.ahk`：设置窗口的严格读取、校验和事务保存。
 - `settings_ui.ahk`：GUI state 与事件；不直接实现运行时 hotstring。

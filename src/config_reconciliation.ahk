@@ -19,6 +19,173 @@ ReconcileManagedConfigDefaults(configPath, managedDefaults) {
     return ApplyMissingManagedConfigDefaults(configPath, missingDefaults)
 }
 
+ReconcileAdditiveReportHotstringBuiltins(configPath) {
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+
+    rawEntries := LoadRawReportHotstringConfig(configPath)
+    additions := []
+    for definition in ReportHotstringDefaults.AdditiveBuiltinDefinitions() {
+        decision := ResolveAdditiveReportHotstringBuiltin(
+            rawEntries,
+            definition
+        )
+        if !decision.Ok
+            return false
+        if decision.ShouldAdd
+            additions.Push(decision.Entry)
+    }
+    if additions.Length = 0
+        return true
+    return ApplyAdditiveReportHotstringBuiltins(configPath, additions)
+}
+
+ResolveAdditiveReportHotstringBuiltin(rawEntries, definition) {
+    sectionKey := StrLower(definition.Section)
+    defaultTriggerKey := StrLower(definition.Trigger)
+    seenTriggers := Map()
+    defaultTriggerEntries := []
+    for raw in rawEntries {
+        if StrLower(raw.Section) = sectionKey {
+            return {
+                Ok: true,
+                ShouldAdd: false,
+                Entry: 0,
+                Code: "SECTION_EXISTS"
+            }
+        }
+        triggerKey := StrLower(Trim(raw.Trigger, " `t`r`n"))
+        if triggerKey = ""
+            continue
+        seenTriggers[triggerKey] := true
+        if triggerKey = defaultTriggerKey
+            defaultTriggerEntries.Push(raw)
+    }
+
+    for existing in defaultTriggerEntries {
+        if existing.Text = definition.Text {
+            return {
+                Ok: true,
+                ShouldAdd: false,
+                Entry: 0,
+                Code: "EQUIVALENT_TRIGGER_EXISTS"
+            }
+        }
+    }
+
+    if defaultTriggerEntries.Length = 0 {
+        entry := RawHotstringEntry(
+            definition.Section,
+            definition.Enabled,
+            definition.Name,
+            definition.Trigger,
+            definition.Text
+        )
+        return {
+            Ok: true,
+            ShouldAdd: true,
+            Entry: entry,
+            Code: "ADD_DEFAULT"
+        }
+    }
+
+    fallbackTrigger := FindAvailableAdditiveReportHotstringTrigger(
+        definition.Trigger "-size",
+        seenTriggers
+    )
+    if fallbackTrigger = "" {
+        return {
+            Ok: false,
+            ShouldAdd: false,
+            Entry: 0,
+            Code: "FALLBACK_TRIGGER_UNAVAILABLE"
+        }
+    }
+    return {
+        Ok: true,
+        ShouldAdd: true,
+        Entry: RawHotstringEntry(
+            definition.Section,
+            "false",
+            definition.Name,
+            fallbackTrigger,
+            definition.Text
+        ),
+        Code: "ADD_DISABLED_WITH_FALLBACK"
+    }
+}
+
+FindAvailableAdditiveReportHotstringTrigger(baseTrigger, seenTriggers) {
+    Loop 100 {
+        candidate := A_Index = 1
+            ? baseTrigger
+            : baseTrigger A_Index
+        if !seenTriggers.Has(StrLower(candidate))
+            return candidate
+    }
+    return ""
+}
+
+ApplyAdditiveReportHotstringBuiltins(configPath, additions) {
+    tempPath := configPath ".builtin-addition.tmp.ini"
+    backupPath := ""
+    promoted := false
+    try {
+        try FileDelete tempPath
+        backupPath := CreateReportAssistantConfigBackup(configPath)
+        FileCopy configPath, tempPath, true
+        for entry in additions {
+            IniWrite(entry.Enabled, tempPath, entry.Section, "Enabled")
+            IniWrite(entry.Name, tempPath, entry.Section, "Name")
+            IniWrite(entry.Trigger, tempPath, entry.Section, "Trigger")
+            IniWrite(
+                EncodeReportHotstringText(entry.Text),
+                tempPath,
+                entry.Section,
+                "Text"
+            )
+        }
+        if !ValidateAdditiveReportHotstringBuiltins(tempPath, additions)
+            throw Error("Additive builtin validation failed")
+        FileMove tempPath, configPath, true
+        promoted := true
+        if !ValidateAdditiveReportHotstringBuiltins(configPath, additions)
+            throw Error("Final additive builtin validation failed")
+        return true
+    } catch {
+        try FileDelete tempPath
+        if promoted && backupPath != "" && FileExist(backupPath) {
+            try FileCopy backupPath, configPath, true
+            catch
+                return false
+        }
+        return false
+    }
+}
+
+ValidateAdditiveReportHotstringBuiltins(configPath, additions) {
+    rawEntries := LoadRawReportHotstringConfig(configPath)
+    bySection := Map()
+    for raw in rawEntries
+        bySection[StrLower(raw.Section)] := raw
+    for expected in additions {
+        sectionKey := StrLower(expected.Section)
+        if !bySection.Has(sectionKey)
+            return false
+        actual := bySection[sectionKey]
+        if actual.Enabled != expected.Enabled
+            || actual.Name != expected.Name
+            || actual.Trigger != expected.Trigger
+            || actual.Text != expected.Text {
+            return false
+        }
+    }
+    return NormalizeReportHotstringEntriesResult(rawEntries).Ok
+}
+
 ReconcileSchema2BuiltinTemplateDefaults(configPath) {
     static MissingValue := "{A3FE0E44-FC11-4A12-83C4-ED719CA613A8}"
     try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")

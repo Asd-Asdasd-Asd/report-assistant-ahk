@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.0
-; Source revision: 833d0b245b4ee4970ee9ee584b4da7669fa51198-dirty
-; Generated at: 2026-07-24 19:14:02 UTC
+; Source revision: 865ea8681ab78e5f5a8095dcc2ce29e374e6e176-dirty
+; Generated at: 2026-07-24 19:41:49 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.0.0
 ;@Ahk2Exe-SetProductVersion 0.6.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.6.0"
     static Channel := "internal-test"
-    static SourceRevision := "833d0b245b4ee4970ee9ee584b4da7669fa51198-dirty"
+    static SourceRevision := "865ea8681ab78e5f5a8095dcc2ce29e374e6e176-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -15159,7 +15159,7 @@ class ReportHotstringDefaults {
     static RedFigureReferencePlaceholder := "{{red:（见图）}}"
 
     static BuiltinDefinitions() {
-        return [
+        definitions := [
             RawHotstringEntry(
                 "Hotstring.builtin-red", "true", "红字插入", ";red",
                 "{{red:（见图）}}"
@@ -15179,6 +15179,18 @@ class ReportHotstringDefaults {
             RawHotstringEntry(
                 "Hotstring.builtin-cmx", "true", "厘米尺寸模板", ";cmx",
                 "cm×{{cursor}}cm"
+            )
+        ]
+        for definition in this.AdditiveBuiltinDefinitions()
+            definitions.Push(definition)
+        return definitions
+    }
+
+    static AdditiveBuiltinDefinitions() {
+        return [
+            RawHotstringEntry(
+                "Hotstring.builtin-cma", "true", "自动读取尺寸", ";cma",
+                "{{size}}"
             )
         ]
     }
@@ -15441,7 +15453,7 @@ RenderReportTemplate(templateText, runtimeContext := 0) {
     return ParseReportTemplate(templateText, true, runtimeContext)
 }
 
-ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
+ParseReportTemplate(templateText, isRuntimeRender, runtimeContext := 0) {
     sourceText := String(templateText)
     output := ""
     cursorCount := 0
@@ -15494,7 +15506,7 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
             }
             caretIndex := StrLen(output)
         } else if token = "date" {
-            output .= expandDate ? FormatTime(, "yyyy-MM-dd")
+            output .= isRuntimeRender ? FormatTime(, "yyyy-MM-dd")
                 : ReportHotstringDefaults.DatePlaceholder
         } else if token = "suvmax" {
             if sizeCount > 0 {
@@ -15512,7 +15524,7 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
                 )
             }
             suvMaxIndex := StrLen(output)
-            if expandDate {
+            if isRuntimeRender {
                 runtimeState := ReportTemplateRuntimeValue(
                     runtimeContext, "suvmaxState", ""
                 )
@@ -15559,7 +15571,7 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
                 )
             }
             sizeIndex := StrLen(output)
-            if expandDate {
+            if isRuntimeRender {
                 runtimeState := ReportTemplateRuntimeValue(
                     runtimeContext, "sizeState", ""
                 )
@@ -15687,35 +15699,61 @@ BuildReportTemplatePlan(templateText, runtimeContext := 0) {
 
 ; --- BEGIN hotstring_normalization.ahk ---
 LoadReportHotstringConfig(configPath := "") {
-    return NormalizeReportHotstringEntries(
+    result := NormalizeReportHotstringEntriesResult(
         LoadRawReportHotstringConfig(configPath)
     )
+    if result.Ok
+        return result.Entries
+
+    OutputDebug(
+        "Report hotstring config rejected: " result.Code
+            . " Section=" result.Section
+    )
+    ShowReportAssistantVisualFeedback(
+        "模板配置存在错误，本次未加载任何模板",
+        4000
+    )
+    return []
 }
 
 NormalizeReportHotstringEntries(rawEntries) {
+    return NormalizeReportHotstringEntriesResult(rawEntries).Entries
+}
+
+NormalizeReportHotstringEntriesResult(rawEntries) {
     entries := []
     seenTriggers := Map()
     for raw in rawEntries {
         entry := NormalizeReportHotstringEntry(raw)
         if !entry {
-            OutputDebug(
-                "Report hotstring config rejected: INVALID_ENTRY Section=" .
-                raw.Section
+            return ReportHotstringNormalizationResult(
+                false, "INVALID_ENTRY", raw.Section
             )
-            return []
         }
         triggerKey := StrLower(entry.Trigger)
         if seenTriggers.Has(triggerKey) {
-            OutputDebug(
-                "Report hotstring config rejected: DUPLICATE_TRIGGER Section=" .
-                raw.Section
+            return ReportHotstringNormalizationResult(
+                false, "DUPLICATE_TRIGGER", raw.Section
             )
-            return []
         }
         seenTriggers[triggerKey] := true
         entries.Push(entry)
     }
-    return entries
+    return ReportHotstringNormalizationResult(true, "OK", "", entries)
+}
+
+ReportHotstringNormalizationResult(
+    ok,
+    code,
+    section := "",
+    entries := 0
+) {
+    return {
+        Ok: ok = true,
+        Code: String(code),
+        Section: String(section),
+        Entries: Type(entries) = "Array" ? entries : []
+    }
 }
 
 NormalizeReportHotstringEntry(raw) {
@@ -15773,6 +15811,173 @@ ReconcileManagedConfigDefaults(configPath, managedDefaults) {
     if missingDefaults.Length = 0
         return true
     return ApplyMissingManagedConfigDefaults(configPath, missingDefaults)
+}
+
+ReconcileAdditiveReportHotstringBuiltins(configPath) {
+    try schemaValue := IniRead(configPath, "Config", "SchemaVersion", "")
+    catch
+        return false
+    if schemaValue != String(ReportAssistantConfigDefaults.SchemaVersion)
+        return false
+
+    rawEntries := LoadRawReportHotstringConfig(configPath)
+    additions := []
+    for definition in ReportHotstringDefaults.AdditiveBuiltinDefinitions() {
+        decision := ResolveAdditiveReportHotstringBuiltin(
+            rawEntries,
+            definition
+        )
+        if !decision.Ok
+            return false
+        if decision.ShouldAdd
+            additions.Push(decision.Entry)
+    }
+    if additions.Length = 0
+        return true
+    return ApplyAdditiveReportHotstringBuiltins(configPath, additions)
+}
+
+ResolveAdditiveReportHotstringBuiltin(rawEntries, definition) {
+    sectionKey := StrLower(definition.Section)
+    defaultTriggerKey := StrLower(definition.Trigger)
+    seenTriggers := Map()
+    defaultTriggerEntries := []
+    for raw in rawEntries {
+        if StrLower(raw.Section) = sectionKey {
+            return {
+                Ok: true,
+                ShouldAdd: false,
+                Entry: 0,
+                Code: "SECTION_EXISTS"
+            }
+        }
+        triggerKey := StrLower(Trim(raw.Trigger, " `t`r`n"))
+        if triggerKey = ""
+            continue
+        seenTriggers[triggerKey] := true
+        if triggerKey = defaultTriggerKey
+            defaultTriggerEntries.Push(raw)
+    }
+
+    for existing in defaultTriggerEntries {
+        if existing.Text = definition.Text {
+            return {
+                Ok: true,
+                ShouldAdd: false,
+                Entry: 0,
+                Code: "EQUIVALENT_TRIGGER_EXISTS"
+            }
+        }
+    }
+
+    if defaultTriggerEntries.Length = 0 {
+        entry := RawHotstringEntry(
+            definition.Section,
+            definition.Enabled,
+            definition.Name,
+            definition.Trigger,
+            definition.Text
+        )
+        return {
+            Ok: true,
+            ShouldAdd: true,
+            Entry: entry,
+            Code: "ADD_DEFAULT"
+        }
+    }
+
+    fallbackTrigger := FindAvailableAdditiveReportHotstringTrigger(
+        definition.Trigger "-size",
+        seenTriggers
+    )
+    if fallbackTrigger = "" {
+        return {
+            Ok: false,
+            ShouldAdd: false,
+            Entry: 0,
+            Code: "FALLBACK_TRIGGER_UNAVAILABLE"
+        }
+    }
+    return {
+        Ok: true,
+        ShouldAdd: true,
+        Entry: RawHotstringEntry(
+            definition.Section,
+            "false",
+            definition.Name,
+            fallbackTrigger,
+            definition.Text
+        ),
+        Code: "ADD_DISABLED_WITH_FALLBACK"
+    }
+}
+
+FindAvailableAdditiveReportHotstringTrigger(baseTrigger, seenTriggers) {
+    Loop 100 {
+        candidate := A_Index = 1
+            ? baseTrigger
+            : baseTrigger A_Index
+        if !seenTriggers.Has(StrLower(candidate))
+            return candidate
+    }
+    return ""
+}
+
+ApplyAdditiveReportHotstringBuiltins(configPath, additions) {
+    tempPath := configPath ".builtin-addition.tmp.ini"
+    backupPath := ""
+    promoted := false
+    try {
+        try FileDelete tempPath
+        backupPath := CreateReportAssistantConfigBackup(configPath)
+        FileCopy configPath, tempPath, true
+        for entry in additions {
+            IniWrite(entry.Enabled, tempPath, entry.Section, "Enabled")
+            IniWrite(entry.Name, tempPath, entry.Section, "Name")
+            IniWrite(entry.Trigger, tempPath, entry.Section, "Trigger")
+            IniWrite(
+                EncodeReportHotstringText(entry.Text),
+                tempPath,
+                entry.Section,
+                "Text"
+            )
+        }
+        if !ValidateAdditiveReportHotstringBuiltins(tempPath, additions)
+            throw Error("Additive builtin validation failed")
+        FileMove tempPath, configPath, true
+        promoted := true
+        if !ValidateAdditiveReportHotstringBuiltins(configPath, additions)
+            throw Error("Final additive builtin validation failed")
+        return true
+    } catch {
+        try FileDelete tempPath
+        if promoted && backupPath != "" && FileExist(backupPath) {
+            try FileCopy backupPath, configPath, true
+            catch
+                return false
+        }
+        return false
+    }
+}
+
+ValidateAdditiveReportHotstringBuiltins(configPath, additions) {
+    rawEntries := LoadRawReportHotstringConfig(configPath)
+    bySection := Map()
+    for raw in rawEntries
+        bySection[StrLower(raw.Section)] := raw
+    for expected in additions {
+        sectionKey := StrLower(expected.Section)
+        if !bySection.Has(sectionKey)
+            return false
+        actual := bySection[sectionKey]
+        if actual.Enabled != expected.Enabled
+            || actual.Name != expected.Name
+            || actual.Trigger != expected.Trigger
+            || actual.Text != expected.Text {
+            return false
+        }
+    }
+    return NormalizeReportHotstringEntriesResult(rawEntries).Ok
 }
 
 ReconcileSchema2BuiltinTemplateDefaults(configPath) {
@@ -16962,7 +17167,8 @@ PrepareReportAssistantConfig(managedDefaults, configPath := "") {
     }
 
     try {
-        reconciled := ReconcileSchema2BuiltinTemplateDefaults(configPath)
+        reconciled := ReconcileAdditiveReportHotstringBuiltins(configPath)
+            && ReconcileSchema2BuiltinTemplateDefaults(configPath)
             && ReconcileManagedConfigDefaults(configPath, managedDefaults)
     } catch {
         reconciled := false
@@ -17142,9 +17348,10 @@ ExecuteReportTemplatePlan(plan, expectedReportHwnd) {
                 )
             }
         }
+        targetMatches := ReportHotstringTargetMatches(expectedReportHwnd)
         return MakeReportTemplateWriteResult(
-            ReportHotstringTargetMatches(expectedReportHwnd),
-            ReportHotstringTargetMatches(expectedReportHwnd)
+            targetMatches,
+            targetMatches
                 ? ReportTemplateWriteCode.OK
                 : ReportTemplateWriteCode.TARGET_CHANGED
         )

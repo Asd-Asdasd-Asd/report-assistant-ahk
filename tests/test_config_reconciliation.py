@@ -73,6 +73,32 @@ class ConfigReconciliationTests(unittest.TestCase):
             "ReconcileSchema2BuiltinTemplateDefaults(configPath)", bootstrap
         )
 
+    def test_cma_builtin_is_additive_and_preserves_existing_trigger_owner(
+        self,
+    ) -> None:
+        model = source("src/hotstring_model.ahk")
+        reconciliation = source("src/config_reconciliation.ahk")
+        bootstrap = source("src/config_bootstrap.ahk")
+        for required in (
+            "AdditiveBuiltinDefinitions()",
+            '"Hotstring.builtin-cma"',
+            '";cma"',
+            '"{{size}}"',
+        ):
+            self.assertIn(required, model)
+        for required in (
+            "ReconcileAdditiveReportHotstringBuiltins(configPath)",
+            '"EQUIVALENT_TRIGGER_EXISTS"',
+            'definition.Trigger "-size"',
+            '"false"',
+            "ValidateAdditiveReportHotstringBuiltins(tempPath, additions)",
+            "CreateReportAssistantConfigBackup(configPath)",
+        ):
+            self.assertIn(required, reconciliation)
+        self.assertIn(
+            "ReconcileAdditiveReportHotstringBuiltins(configPath)", bootstrap
+        )
+
     def test_builtin_upgrade_is_exact_transactional_and_preserves_custom_text(
         self,
     ) -> None:

@@ -25,6 +25,7 @@ Optional global navigation, enabled with `GlobalHjklArrows=true` in the
 | `;fzg` | Read SUVMax from MxNM, insert it before the red `（见图）`, then attempt to clear viewer annotations; on no annotation/failure, leave the caret at the value position |
 | `;fwj` | Insert `放射性摄取未见明显增高（见图）` with an explicit red suffix |
 | `;fjd` | Insert `放射性摄取降低（见图）` with an explicit red suffix |
+| `;cma` | Read 1–3 line measurements from MxNM; on no annotation/failure, leave the caret at the value position |
 | `;cmx` | Insert `cm×cm` and place the caret between the two units |
 
 The active Schema 2 model derives caret movement and color restoration from

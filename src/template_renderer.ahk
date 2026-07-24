@@ -41,7 +41,7 @@ RenderReportTemplate(templateText, runtimeContext := 0) {
     return ParseReportTemplate(templateText, true, runtimeContext)
 }
 
-ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
+ParseReportTemplate(templateText, isRuntimeRender, runtimeContext := 0) {
     sourceText := String(templateText)
     output := ""
     cursorCount := 0
@@ -94,7 +94,7 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
             }
             caretIndex := StrLen(output)
         } else if token = "date" {
-            output .= expandDate ? FormatTime(, "yyyy-MM-dd")
+            output .= isRuntimeRender ? FormatTime(, "yyyy-MM-dd")
                 : ReportHotstringDefaults.DatePlaceholder
         } else if token = "suvmax" {
             if sizeCount > 0 {
@@ -112,7 +112,7 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
                 )
             }
             suvMaxIndex := StrLen(output)
-            if expandDate {
+            if isRuntimeRender {
                 runtimeState := ReportTemplateRuntimeValue(
                     runtimeContext, "suvmaxState", ""
                 )
@@ -159,7 +159,7 @@ ParseReportTemplate(templateText, expandDate, runtimeContext := 0) {
                 )
             }
             sizeIndex := StrLen(output)
-            if expandDate {
+            if isRuntimeRender {
                 runtimeState := ReportTemplateRuntimeValue(
                     runtimeContext, "sizeState", ""
                 )

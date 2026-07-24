@@ -82,6 +82,6 @@ Legacy 中的 XButton1 notification 是历史测试项，不属于正式功能�
 
 ## 当前迁移结论
 
-新项目已覆盖 5 个报告文本入口；`;red`、`;fwj`、`;fjd` 使用已提升为 mainline 的 Candidate G，`;fzg` 使用已现场验证的 phrase-specific no-reset path，`;cmx` 保持简单 caret relocation。报告入口不能与 legacy duplicate 同时启用。RAlt+H/J/K/L 已由 `GlobalHjklArrows` 接管并从 compatibility 移除；其他 active `legacy/karabiner.ahk` 阅片/键盘行为仍未迁移。
+新项目已覆盖 6 个报告文本入口；`;red`、`;fwj`、`;fjd` 使用已提升为 mainline 的 Candidate G，`;fzg` 使用已现场验证的 phrase-specific no-reset path，`;cma` 自动读取直线测量值，`;cmx` 保持简单 caret relocation。报告入口不能与 legacy duplicate 同时启用。RAlt+H/J/K/L 已由 `GlobalHjklArrows` 接管并从 compatibility 移除；其他 active `legacy/karabiner.ahk` 阅片/键盘行为仍未迁移。
 
-在用户确认各 legacy 功能的真实日常依赖之前，兼容脚本应保守保留尚未迁移的 viewer actions；当前移除项为已由新项目接管的 5 个 hotstrings、RAlt+H/J/K/L，以及仅服务于已弃用 clipboard snapshot 路径的 Shift+Alt+R。
+在用户确认各 legacy 功能的真实日常依赖之前，兼容脚本应保守保留尚未迁移的 viewer actions；当前移除项为已由新项目接管的既有 hotstrings、RAlt+H/J/K/L，以及仅服务于已弃用 clipboard snapshot 路径的 Shift+Alt+R。

@@ -1,33 +1,59 @@
 LoadReportHotstringConfig(configPath := "") {
-    return NormalizeReportHotstringEntries(
+    result := NormalizeReportHotstringEntriesResult(
         LoadRawReportHotstringConfig(configPath)
     )
+    if result.Ok
+        return result.Entries
+
+    OutputDebug(
+        "Report hotstring config rejected: " result.Code
+            . " Section=" result.Section
+    )
+    ShowReportAssistantVisualFeedback(
+        "模板配置存在错误，本次未加载任何模板",
+        4000
+    )
+    return []
 }
 
 NormalizeReportHotstringEntries(rawEntries) {
+    return NormalizeReportHotstringEntriesResult(rawEntries).Entries
+}
+
+NormalizeReportHotstringEntriesResult(rawEntries) {
     entries := []
     seenTriggers := Map()
     for raw in rawEntries {
         entry := NormalizeReportHotstringEntry(raw)
         if !entry {
-            OutputDebug(
-                "Report hotstring config rejected: INVALID_ENTRY Section=" .
-                raw.Section
+            return ReportHotstringNormalizationResult(
+                false, "INVALID_ENTRY", raw.Section
             )
-            return []
         }
         triggerKey := StrLower(entry.Trigger)
         if seenTriggers.Has(triggerKey) {
-            OutputDebug(
-                "Report hotstring config rejected: DUPLICATE_TRIGGER Section=" .
-                raw.Section
+            return ReportHotstringNormalizationResult(
+                false, "DUPLICATE_TRIGGER", raw.Section
             )
-            return []
         }
         seenTriggers[triggerKey] := true
         entries.Push(entry)
     }
-    return entries
+    return ReportHotstringNormalizationResult(true, "OK", "", entries)
+}
+
+ReportHotstringNormalizationResult(
+    ok,
+    code,
+    section := "",
+    entries := 0
+) {
+    return {
+        Ok: ok = true,
+        Code: String(code),
+        Section: String(section),
+        Entries: Type(entries) = "Array" ? entries : []
+    }
 }
 
 NormalizeReportHotstringEntry(raw) {

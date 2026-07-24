@@ -45,6 +45,7 @@ class HotstringConfigTests(unittest.TestCase):
             ("fwj", ";fwj", "放射性摄取未见明显增高{{red:（见图）}}"),
             ("fjd", ";fjd", "放射性摄取降低{{red:（见图）}}"),
             ("cmx", ";cmx", "cm×{{cursor}}cm"),
+            ("cma", ";cma", "{{size}}"),
         )
         for stable_id, trigger, text in expected:
             self.assertIn(f'"Hotstring.builtin-{stable_id}"', model)
@@ -94,6 +95,9 @@ class HotstringConfigTests(unittest.TestCase):
         self.assertIn("ValidateReportTemplate(raw.Text)", normalization)
         self.assertIn("return []", normalization)
         self.assertIn("DUPLICATE_TRIGGER", normalization)
+        self.assertIn("NormalizeReportHotstringEntriesResult(", normalization)
+        self.assertIn("ShowReportAssistantVisualFeedback(", normalization)
+        self.assertIn("本次未加载任何模板", normalization)
 
     def test_double_brace_parser_is_strict_but_single_braces_are_not_reserved(self) -> None:
         renderer = source("src/template_renderer.ahk")
@@ -113,6 +117,11 @@ class HotstringConfigTests(unittest.TestCase):
     def test_date_is_evaluated_at_render_time_before_caret_distance(self) -> None:
         renderer = source("src/template_renderer.ahk")
         self.assertIn('FormatTime(, "yyyy-MM-dd")', renderer)
+        self.assertIn(
+            "ParseReportTemplate(templateText, isRuntimeRender, runtimeContext := 0)",
+            renderer,
+        )
+        self.assertNotIn("expandDate", renderer)
         self.assertLess(
             renderer.index('FormatTime(, "yyyy-MM-dd")'),
             renderer.index(
@@ -139,6 +148,19 @@ class HotstringConfigTests(unittest.TestCase):
         self.assertIn("RunRedResetInsertion(plan.RedText, resetReadiness.options)", executor)
         self.assertNotIn("entry.Mode", body)
         self.assertNotIn("ReportHotstringMode", body)
+        no_red_result = executor.split("if plan.RedText = \"\" {", 1)[1].split(
+            "\n    }\n\n    if !ReportHotstringTargetMatches", 1
+        )[0]
+        self.assertIn(
+            "targetMatches := ReportHotstringTargetMatches(expectedReportHwnd)",
+            no_red_result,
+        )
+        self.assertEqual(
+            no_red_result.count(
+                "ReportHotstringTargetMatches(expectedReportHwnd)"
+            ),
+            2,
+        )
 
     def test_black_templates_keep_existing_sendtext_backend(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
