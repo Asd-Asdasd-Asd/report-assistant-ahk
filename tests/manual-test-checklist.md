@@ -375,6 +375,21 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [x] 复测 positive SUVMax → `FOUND`、numeric zero → `NOT_ANNOTATED`、关闭 viewer → `VIEWER_NOT_FOUND`；结果、视觉提示、foreground/mouse invariants 和 clipboard restoration 与重构前一致。
 - [x] 本 checkpoint 未读取 vendor INI，未使用 UIA，未接入 `;fzg`，未实现 line parser。
 
+### Config-first geometry schema audit
+
+- [x] 首轮 Windows audit：从运行中 `MedExNMFusion.exe` 唯一解析两个固定相对 INI；两个 Exists、root safety 和 SHA-256 均通过。
+- [x] 首轮 exact keys 返回 `FramePosX/Y`、`ShowImagePosX/Y`；随后确认 whitelist 错误漏掉 `ShowImageWidth=750` / `ShowImageHeight=940`，layout 配置有 30 个 `ShowModelN` 候选但没有可靠 active model。
+- [x] screen/window/client 候选标签在多次执行时位置不稳定；该验证方案作废，不得用 `Wn/Cn` 编号形成坐标结论。
+- [x] UIA Viewer 现场可选中主图区 `Pane(50033)` 并读取准确 `BoundingRectangle`；该元素没有可用 Name/AccessKey，尚未证明程序化唯一重找。
+- [ ] 保持 `MedExNMFusion.exe` 运行，重新启动修正版 `tests\windows\mxnm_config_geometry_audit.ahk`。
+- [x] 修正版 audit：`FrameSize=1348,1000`、`ShowImageSize=750,940`、10 个 viewer windows 均已回传；旧 `FrameMatchedWindowCount=0` 证明 physical exact-position 判据无效并已移除。
+- [x] 修正版 config audit：`RuntimeFrameCandidateCount=1`、`RuntimeFrameResolved=true`、`MappedImageRectResolved=true`、`MappedImageRect=2566,81,3991,1434`。
+- [x] 确认结果不包含 absolute path、raw vendor config、患者信息、检查信息或报告内容。
+- [x] 本阶段未调用 context menu/provider，未读写 clipboard，未移动鼠标或切换焦点。
+- [x] 单独运行 `tests\windows\mxnm_uia_image_region_audit.ahk`；`State=READY_FOR_FIELD_VALIDATION`、两个 resolved 字段和 `ConfigReady` 均为 `true`，`UiaPaneCount=9`、`UiaGeometryMatchCount=1`。
+- [x] 相同布局连续运行三次；`UiaCandidateRect=2566,80,3991,1440` 保持不变，使用视觉反馈且无声音。
+- [x] Config + UIA 主图区矩形 checkpoint 通过；本 checkpoint 未生成 production image point，未接入 provider 或 `;fzg`。
+
 - [x] 运行 `tests\windows\measurement_capture_regression.ahk`；确认 positive、zero、malformed、no-update、nested-busy 和 clipboard restoration 全部通过。
 - [x] 只运行 `tests\windows\context_measurement_provider_field.ahk`，退出 production release，避免两个脚本同时操作 clipboard。
 - [x] 在 viewer 图像内部将鼠标放到无害测试点并按 `Ctrl+Alt+F8`；看到“测量点已记录”视觉提示后，将焦点返回报告编辑器，设置无害 clipboard sentinel，再按 `Ctrl+Alt+F9`。

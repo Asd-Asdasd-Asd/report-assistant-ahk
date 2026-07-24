@@ -161,10 +161,73 @@ v0.6.0 的 `ContextMeasurementProvider` 可以继续只依赖一个 image-point 
 
 这不会改变测量链路的其他安全要求：后台窗口消息、动态 popup 识别、精确菜单文字、runtime control ID、剪贴板事务、报告 HWND 检查和 false-negative 策略仍然必须保留。
 
+当前工作站确认的首版路径关系以运行中的 `MedExNMFusion.exe` 所在目录为根：
+
+```text
+<viewerDir>\MultNMSoftInfo\1\MxNMSoft.ini
+<viewerDir>\MultNMSoftInfo\1\MxPetCtTemp.ini
+```
+
+实现不得写死 `C:\MedEx`，不得递归扫描并猜测多个 profile。首个 config-first checkpoint 先进行只读 schema audit，只输出 `[ShowSetting]` 中 `FramePos*` / `ShowImagePos*` 和 `MxPetCtTemp.ini` 中 `ShowModel*` / `LowWnd*` 的 numeric entries。UIA 不参与该 checkpoint；`MxPetCtTemp.ini` 只形成候选 `ShowModelN` 快照，不推断当前活动布局。
+
+2026-07-24 首轮 Windows audit 已确认：
+
+- 运行时进程目录能够唯一解析上述两个配置文件，root relation、文件存在性和 SHA-256 均通过；
+- 首轮 audit 只返回 `FramePosX=1000`、`FramePosY=0`、`ShowImagePosX=340`、`ShowImagePosY=56`；随后现场检查发现这是 audit whitelist 漏掉了独立的 `ShowImageWidth` / `ShowImageHeight`，不是 vendor 配置缺少宽高；
+- 当前现场确认的完整逻辑主图区为 `ShowImagePosX=340`、`ShowImagePosY=56`、`ShowImageWidth=750`、`ShowImageHeight=940`，这四个字段共同控制主图区位置和大小；
+- 当前 `MxPetCtTemp.ini` 包含 30 个 `ShowModelN` section；其中 `ShowModelGroup` 声明 `ShowModelSize=21`、`ShowModelPageSize=2`，但没有足以证明当前 active model 的状态字段；
+- 候选布局原点均为 `(0,0)`，总体 extents 包含约 `750×945`、`800×600`、`1000×996` 等多组值，因此不得把任一候选直接当作当前运行时图像矩形；
+- 首轮结果证明了 config discovery 和部分 schema shape，但没有证明逻辑主图区如何映射到 runtime screen coordinates。
+
+原计划通过 `WinGetList()` 顺序编号显示 screen/window/client 候选标签；Windows 发现多次执行时标签位置不稳定，因此该方案已撤销，编号和视觉位置不得作为证据。
+
+同一工作站上的 UIA Viewer 能把主图区呈现为 `Pane(50033)`，现场选中元素的 `BoundingRectangle=[l=2566,t=80,r=3991,b=1440]`，`Name`、`AccessKey` 等语义属性不存在。这个结果证明 UIA 可以读取准确的 runtime rectangle，但仅凭 `ControlType=Pane` 尚不能证明程序能够从多个 pane 中唯一重找同一元素。后续应采用双证据：
+
+```text
+config complete logical image rectangle
+-> UIA Pane candidates under the validated viewer
+-> require one geometry-valid runtime rectangle
+-> validate containment, visibility and minimum size
+-> choose an inset image point
+```
+
+配置是稳定的逻辑布局来源；UIA 是实际屏幕矩形来源。两者不一致或 UIA 候选不唯一时必须 fail closed。
+
+修正版 Windows audit 进一步确认当前 logical frame 为
+`FramePos=(1000,0)`、`FrameSize=1348×1000`，同进程暴露 10 个可见 window；唯一包含其余 window 的 runtime frame 为
+`(1920,0,2561,1440)`。`FramePos` 因此不是可与 physical screen origin
+直接比较的坐标，旧的 exact-position match 返回 0 属于错误判据，现已移除。
+
+在 runtime frame 内分别按 X/Y 比例映射逻辑主图区，得到约
+`[2566,81,3991,1434]`。它与人工选中的 UIA Pane
+`[2566,80,3991,1440]` 左、上、右边界基本重合，底边相差约 6 px。
+这支持独立 X/Y mapping，但差值只能作为 clipping/rounding tolerance，
+不得写成固定 `+6` 补偿。
+
+独立 field harness `tests/windows/mxnm_uia_image_region_audit.ahk`
+会在所有同进程 window 的 UIA root/descendants 中只读取
+`ControlType`、`BoundingRectangle` 和 `IsOffscreen`，不读取 Name/Text。
+它以 config-derived rectangle 的 1% bounded tolerance 过滤 `Pane`，
+且只在候选数恰好为 1 时返回 `READY_FOR_FIELD_VALIDATION`。
+
+2026-07-24 Windows field validation 已通过：
+
+- config audit 连续得到唯一 runtime frame 和
+  `MappedImageRect=[2566,81,3991,1434]`；
+- UIA audit 在 9 个去重后的 `Pane` 中恰好得到 1 个 geometry match；
+- 相同布局连续三次均返回
+  `UiaCandidateRect=[2566,80,3991,1440]`；
+- 三次均为 `READY_FOR_FIELD_VALIDATION`，未读取 UIA Name/Text。
+
+因此 config + UIA 双证据的“主图区矩形解析”checkpoint 已完成。
+这只授权下一阶段生成安全 image point；尚未证明 context-menu transport
+使用新 resolver 后仍保持 foreground、mouse、clipboard 和 popup invariants。
+
 ## 下一步最小验证清单
 
-1. 用 Windows 文件读取监控确认当前运行版本实际读取的 `MxNMSoft*.ini` 和 `MxPetCtTemp.ini` 路径。
-2. 在 viewer 上绘制或记录计算矩形，验证 `FramePos*`、`ShowImagePos*` 的坐标原点、DPI 和多显示器映射。
+1. 从已验证 UIA rectangle 生成远离四边的命名安全点，不读取活动子窗格或当前 `ShowModelN`。
+2. 让 `ContextMeasurementProvider` 通过现有 `imagePointResolver` 接口使用该点；不得在 provider 内复制 config/UIA 逻辑。
+3. 复跑 SUVMax 的 `FOUND`、`NOT_ANNOTATED`、`VIEWER_NOT_FOUND` 和 induced failure，确认 foreground、mouse、clipboard 及 popup invariants 不变。
 3. 切换两个显示布局，观察 MedEx 读取或写入了什么状态，并确认如何得到当前活动 `ShowModelN`。
 4. 在至少两个工作站 profile 上验证同一命名锚点是否落入预期控件或图像区。
 5. 对一个按钮和一个图像内部点分别验证后台窗口消息，确认几何正确不等于动作一定可用。

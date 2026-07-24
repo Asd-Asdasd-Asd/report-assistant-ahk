@@ -23,6 +23,7 @@ ORDER = [
     "measurement_model.ahk",
     "measurement_parser.ahk",
     "measurement_clipboard.ahk",
+    "mxnm_config_geometry_provider.ahk",
     "context_measurement_provider.ahk",
     "medex_color_reset_logic.ahk",
     "medex_candidate_g_logic.ahk",

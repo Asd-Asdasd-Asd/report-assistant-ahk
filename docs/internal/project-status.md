@@ -26,6 +26,7 @@
 - 正式图标以 `assets/icon/source/medex-icon.svg` 为 source，由 `scripts/generate-icon.sh` 生成多尺寸 PNG/ICO。
 - Windows 一键构建自动生成 release source、以 `/icon` 嵌入 ICO、编译 temporary EXE、同步静态发布资源并事务提升 final。
 - v0.6.0 measurement foundation 已加入 `FOUND` / `NOT_ANNOTATED` / `AUTOMATION_FAILED` result、strict SUVMax parser、独立 measurement clipboard transaction 和无焦点 context-menu provider；acquisition 已抽为 command/type/parser spec-driven core，并为后续 line components 预留结构，当前未接入任何 production hotstring。
+- Config-first measurement target checkpoint 已通过 Windows 验证：完整 logical frame/image rectangle 可映射到唯一 runtime frame，privacy-safe UIA audit 连续三次从 9 个 Pane 中唯一重找同一主图区矩形。尚未生成 production image point 或接入 provider。
 
 ## 验证状态
 
@@ -36,6 +37,7 @@
 - MedEx-only hotstring scope、foreground change fail-closed、version diagnostics-only behavior。
 - 当前 supported profile 上的 red marker 与 black reset 主路径。
 - v0.6.0 SUVMax provider 的 `FOUND`、`NOT_ANNOTATED` 和 `VIEWER_NOT_FOUND` 路径；background popup/command、clipboard freshness/restoration、foreground/mouse invariants 和无音频视觉反馈均通过现场验证。
+- Config + UIA 主图区 resolver foundation：唯一 runtime frame、logical-to-runtime mapping、9→1 UIA Pane geometry match，以及相同布局三次稳定复验。
 
 ### 自动测试覆盖
 
@@ -45,7 +47,7 @@
 - icon generation inputs与 Windows Ahk2Exe `/icon` wiring。
 - measurement result/parser、sentinel + clipboard sequence freshness、single restore owner、provider dynamic popup/command identity 和 privacy-safe field harness。
 
-当前完整 Python suite 为 202 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
+当前完整 Python suite 为 212 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
 
 ## 当前 production flow
 
@@ -79,6 +81,7 @@ exact UIA Name="检查所见"
 - Compatibility layer 的 Alt+Shift+S 只保证单次触发；持续按住修饰键连续按 S 延后到 compatibility 重构。
 - updater、installer、self-update、rollback、shortcut 和 registry installation state 均不在范围内。
 - Measurement provider foundation 和通用 acquisition core 已通过 Windows field validation；`;fzg` 自动插入、config-driven target resolver、long-axis/short-axis、完整异常矩阵和 `size` placeholder 仍未接入 production。
+- Config logical-to-runtime mapping 和 privacy-safe UIA geometry-only 唯一重找已通过当前工作站相同布局三次复验；其他布局/profile 尚未正式验证，active `ShowModelN` 识别仍不属于当前 checkpoint。
 - Settings 的“快捷键”“其他”标签页仍是占位页。
 
 ## v0.5.0 发布前剩余验收

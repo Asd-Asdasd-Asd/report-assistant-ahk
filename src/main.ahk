@@ -13,6 +13,7 @@
 #Include measurement_model.ahk
 #Include measurement_parser.ahk
 #Include measurement_clipboard.ahk
+#Include mxnm_config_geometry_provider.ahk
 #Include context_measurement_provider.ahk
 #Include <UIA>
 #Include medex_color_reset_logic.ahk

@@ -204,6 +204,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"measurement_model.ahk"',
             '"measurement_parser.ahk"',
             '"measurement_clipboard.ahk"',
+            '"mxnm_config_geometry_provider.ahk"',
             '"context_measurement_provider.ahk"',
             '"hotstrings.ahk"',
         )
@@ -216,6 +217,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             "measurement_model.ahk",
             "measurement_parser.ahk",
             "measurement_clipboard.ahk",
+            "mxnm_config_geometry_provider.ahk",
             "context_measurement_provider.ahk",
         ):
             self.assertIn(f"; --- BEGIN {component} ---", release)
