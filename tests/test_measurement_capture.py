@@ -270,6 +270,7 @@ class MeasurementCaptureTests(unittest.TestCase):
     ) -> None:
         provider = source("src/mxnm_measurement_provider.ahk")
         main = source("src/main.ahk")
+        warmup = source("src/mxnm_measurement_warmup.ahk")
         for required in (
             "static CachedTarget := 0",
             "IsReusableMxNMMeasurementTarget(this.CachedTarget)",
@@ -282,11 +283,32 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"totalReadMs"',
         ):
             self.assertIn(required, provider)
-        self.assertIn("SetTimer WarmMxNMMeasurementTarget, 1000", main)
-        self.assertIn(
-            "if MedExReportHotstringsEnabled()",
-            source("src/hotstrings.ahk"),
-        )
+        self.assertIn("StartMxNMMeasurementTargetWarmup()", main)
+        for required in (
+            "RegisterShellHookWindow",
+            "RegisterWindowMessageW",
+            "OnMessage(shellMessageId, HandleMxNMShellHookMessage)",
+            "ProbeMxNMMeasurementWarmup()",
+            "MxNMMeasurementProvider.WarmTarget()",
+            "FallbackPollIntervalMs := 15000",
+            "ReadyHealthCheckIntervalMs := 60000",
+            "ViewerSettleMs := 1500",
+        ):
+            self.assertIn(required, warmup)
+        self.assertNotIn("MedExReportHotstringsEnabled()", warmup)
+        for forbidden in (
+            "WinActivate",
+            "MouseMove",
+            "A_Clipboard",
+            "PrepareMxNMContextCommand",
+        ):
+            self.assertNotIn(forbidden, warmup)
+        shell_callback = warmup[
+            warmup.index("HandleMxNMShellHookMessage(") :
+            warmup.index("ProbeMxNMMeasurementWarmup(*)")
+        ]
+        self.assertNotIn("WarmTarget()", shell_callback)
+        self.assertNotIn("UIA.", shell_callback)
 
     def test_geometry_is_owned_by_one_resolver_and_fails_closed(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
@@ -313,6 +335,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"measurement_clipboard.ahk"',
             '"mxnm_config_geometry_provider.ahk"',
             '"context_measurement_provider.ahk"',
+            '"mxnm_measurement_warmup.ahk"',
             '"hotstrings.ahk"',
         )
         positions = [build.index(component) for component in ordered_components]
@@ -326,6 +349,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             "measurement_clipboard.ahk",
             "mxnm_config_geometry_provider.ahk",
             "context_measurement_provider.ahk",
+            "mxnm_measurement_warmup.ahk",
         ):
             self.assertIn(f"; --- BEGIN {component} ---", release)
         for symbol in (

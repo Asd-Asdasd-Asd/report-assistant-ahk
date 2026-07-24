@@ -28,6 +28,7 @@ ORDER = [
     "context_measurement_provider.ahk",
     "mxnm_measurement_target_resolver.ahk",
     "mxnm_measurement_provider.ahk",
+    "mxnm_measurement_warmup.ahk",
     "mxnm_annotation_cleaner.ahk",
     "medex_color_reset_logic.ahk",
     "medex_candidate_g_logic.ahk",

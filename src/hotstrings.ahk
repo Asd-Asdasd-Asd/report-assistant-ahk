@@ -196,18 +196,3 @@ ReportMeasurementContextValue(context, key, defaultValue := 0) {
         return context[key]
     return defaultValue
 }
-
-WarmMxNMMeasurementTarget(*) {
-    if MxNMMeasurementProvider.HasReusableTarget() {
-        SetTimer WarmMxNMMeasurementTarget, 0
-        return
-    }
-    if !WinExist(
-        "ahk_exe " MxNMConfigGeometryDefaults.ViewerExe
-    )
-        return
-    if MedExReportHotstringsEnabled()
-        return
-    if MxNMMeasurementProvider.WarmTarget()
-        SetTimer WarmMxNMMeasurementTarget, 0
-}

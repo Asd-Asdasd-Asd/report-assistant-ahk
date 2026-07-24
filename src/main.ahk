@@ -19,6 +19,7 @@
 #Include <UIA>
 #Include mxnm_measurement_target_resolver.ahk
 #Include mxnm_measurement_provider.ahk
+#Include mxnm_measurement_warmup.ahk
 #Include mxnm_annotation_cleaner.ahk
 #Include medex_color_reset_logic.ahk
 #Include medex_candidate_g_logic.ahk
@@ -48,7 +49,7 @@
 #Include tray_menu.ahk
 
 ConfigureReportAssistantTrayMenu()
-SetTimer WarmMxNMMeasurementTarget, 1000
+StartMxNMMeasurementTargetWarmup()
 
 #SuspendExempt
 

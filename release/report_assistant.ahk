@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.0
-; Source revision: 7ca910c92f5d26e35393d6557a1699bca8c9a637
-; Generated at: 2026-07-24 15:44:13 UTC
+; Source revision: 833d0b245b4ee4970ee9ee584b4da7669fa51198-dirty
+; Generated at: 2026-07-24 19:14:02 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.0.0
 ;@Ahk2Exe-SetProductVersion 0.6.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,7 @@
 class AppMetadata {
     static Version := "0.6.0"
     static Channel := "internal-test"
-    static SourceRevision := "7ca910c92f5d26e35393d6557a1699bca8c9a637"
+    static SourceRevision := "833d0b245b4ee4970ee9ee584b4da7669fa51198-dirty"
 }
 
 ; --- END app_metadata.ahk ---
@@ -11295,6 +11295,140 @@ MakeMxNMTargetFailureMeasurement(
 
 ; --- END mxnm_measurement_provider.ahk ---
 
+; --- BEGIN mxnm_measurement_warmup.ahk ---
+class MxNMMeasurementWarmupDefaults {
+    static ViewerSettleMs := 1500
+    static RetryIntervalMs := 5000
+    static FallbackPollIntervalMs := 15000
+    static ReadyHealthCheckIntervalMs := 60000
+    static ShellEventDebounceMs := 250
+    static ShellMessageName := "SHELLHOOK"
+    static ShellWindowCreated := 1
+    static ShellWindowDestroyed := 2
+}
+
+MxNMMeasurementWarmupRuntime := Map(
+    "started", false,
+    "shellMessageId", 0,
+    "shellHookRegistered", false
+)
+
+StartMxNMMeasurementTargetWarmup() {
+    global MxNMMeasurementWarmupRuntime
+    if MxNMMeasurementWarmupRuntime["started"]
+        return
+
+    MxNMMeasurementWarmupRuntime["started"] := true
+    shellMessageId := 0
+    shellHookRegistered := false
+    try shellMessageId := DllCall(
+        "User32\RegisterWindowMessageW",
+        "Str", MxNMMeasurementWarmupDefaults.ShellMessageName,
+        "UInt"
+    )
+    catch {
+        shellMessageId := 0
+    }
+    if shellMessageId {
+        try shellHookRegistered := DllCall(
+            "User32\RegisterShellHookWindow",
+            "Ptr", A_ScriptHwnd,
+            "Int"
+        ) != 0
+        catch {
+            shellHookRegistered := false
+        }
+    }
+    if shellHookRegistered {
+        try {
+            OnMessage(shellMessageId, HandleMxNMShellHookMessage)
+            MxNMMeasurementWarmupRuntime["shellMessageId"] := shellMessageId
+            MxNMMeasurementWarmupRuntime["shellHookRegistered"] := true
+        } catch {
+            try DllCall(
+                "User32\DeregisterShellHookWindow",
+                "Ptr", A_ScriptHwnd,
+                "Int"
+            )
+        }
+    }
+
+    ; Startup-folder launches normally precede the viewer. Probe once without
+    ; touching config/UIA, then rely on shell events or the low-frequency
+    ; fallback until a viewer session exists.
+    ProbeMxNMMeasurementWarmup()
+}
+
+HandleMxNMShellHookMessage(wParam, lParam, msg, hwnd) {
+    if wParam != MxNMMeasurementWarmupDefaults.ShellWindowCreated
+        && wParam != MxNMMeasurementWarmupDefaults.ShellWindowDestroyed {
+        return
+    }
+    ; Shell callbacks must remain cheap. Defer process discovery, cache
+    ; validation and all UIA work to an ordinary timer callback.
+    SetTimer(
+        ProbeMxNMMeasurementWarmup,
+        -MxNMMeasurementWarmupDefaults.ShellEventDebounceMs
+    )
+}
+
+ProbeMxNMMeasurementWarmup(*) {
+    if MxNMMeasurementProvider.HasReusableTarget() {
+        SetTimer WarmMxNMMeasurementTarget, 0
+        EnsureMxNMMeasurementWarmupPoll(true)
+        return
+    }
+
+    if WinExist("ahk_exe " MxNMConfigGeometryDefaults.ViewerExe) {
+        SetTimer(
+            WarmMxNMMeasurementTarget,
+            -MxNMMeasurementWarmupDefaults.ViewerSettleMs
+        )
+    }
+    EnsureMxNMMeasurementWarmupPoll()
+}
+
+WarmMxNMMeasurementTarget(*) {
+    if MxNMMeasurementProvider.HasReusableTarget() {
+        EnsureMxNMMeasurementWarmupPoll(true)
+        return
+    }
+    if !WinExist("ahk_exe " MxNMConfigGeometryDefaults.ViewerExe) {
+        EnsureMxNMMeasurementWarmupPoll()
+        return
+    }
+    if MxNMMeasurementProvider.WarmTarget() {
+        EnsureMxNMMeasurementWarmupPoll(true)
+        return
+    }
+
+    ; The first top-level viewer window can appear before its final geometry
+    ; and UIA panes. Retry once the session has had more time to settle.
+    SetTimer(
+        WarmMxNMMeasurementTarget,
+        -MxNMMeasurementWarmupDefaults.RetryIntervalMs
+    )
+    EnsureMxNMMeasurementWarmupPoll()
+}
+
+PollMxNMMeasurementWarmup(*) {
+    ProbeMxNMMeasurementWarmup()
+}
+
+EnsureMxNMMeasurementWarmupPoll(targetReady := false) {
+    global MxNMMeasurementWarmupRuntime
+    intervalMs := targetReady
+        && MxNMMeasurementWarmupRuntime["shellHookRegistered"]
+            ? MxNMMeasurementWarmupDefaults.ReadyHealthCheckIntervalMs
+            : MxNMMeasurementWarmupDefaults.FallbackPollIntervalMs
+    SetTimer(
+        PollMxNMMeasurementWarmup,
+        intervalMs
+    )
+}
+
+; --- END mxnm_measurement_warmup.ahk ---
+
 ; --- BEGIN mxnm_annotation_cleaner.ahk ---
 class MxNMAnnotationCleanupDefaults {
     static DeleteAllCommandText := "删除全部标注"
@@ -17083,21 +17217,6 @@ ReportMeasurementContextValue(context, key, defaultValue := 0) {
     return defaultValue
 }
 
-WarmMxNMMeasurementTarget(*) {
-    if MxNMMeasurementProvider.HasReusableTarget() {
-        SetTimer WarmMxNMMeasurementTarget, 0
-        return
-    }
-    if !WinExist(
-        "ahk_exe " MxNMConfigGeometryDefaults.ViewerExe
-    )
-        return
-    if MedExReportHotstringsEnabled()
-        return
-    if MxNMMeasurementProvider.WarmTarget()
-        SetTimer WarmMxNMMeasurementTarget, 0
-}
-
 ; --- END hotstrings.ahk ---
 
 ; --- BEGIN feature_config.ahk ---
@@ -17762,7 +17881,7 @@ ReloadReportAssistantFromTray(*) {
 
 
 ConfigureReportAssistantTrayMenu()
-SetTimer WarmMxNMMeasurementTarget, 1000
+StartMxNMMeasurementTargetWarmup()
 
 #SuspendExempt
 
