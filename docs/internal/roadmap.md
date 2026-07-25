@@ -205,11 +205,19 @@ Release status（2026-07-26）：v0.6.0 measurement baseline 已完成。SUVMax 
 
 历史 Config + UIA target resolver foundation 和 field-only automatic target checkpoint 均已通过 Windows 验证。当前 resolver 继续从声明的 `ShowModel1..N` 计算跨布局 maximin point，但直接映射到 config-derived runtime image rectangle，再以 action HWND ownership、PID、进程名和 client rect 校验；不再枚举 UIA Pane。底层 command/type/parser provider 边界不变。
 
+## v0.6.1 — Viewer Tool Hotkeys
+
+目标：用可配置快捷键选择高频 Viewer 工具，同时保持报告前台、鼠标位置和 fail-closed 边界。
+
+Release status（2026-07-26）：当前工作站 Windows 验证通过。设置页提供默认关闭的箭头、长度测量和 3D SUV 快捷键；Vendor command ID 分别为 `21043`、`21048`、`21193`。运行路径从 Vendor 配置建立静态 button plan，每次按当前 frame rect 映射坐标，以 native HWND、PID、client rect 和 control ID 核验，再向直接父窗口发送 bounded synchronous `WM_COMMAND / BN_CLICKED`。不使用 UIA、hover、鼠标移动、焦点切换、后台 warmup 或周期轮询。
+
+本轮确认了 floating root 不能与 main frame HWND 强制相等、panel origin 与固定按钮偏移需要分别处理、非活动父窗口上的 `BM_CLICK` 会丢失首次动作，以及嵌套 `A_Index` 会把所有 Vendor rows 错记为 1。详细记录见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
+
 ## Later versions
 
 计划范围：
 
-- Settings 中“快捷键”和“其他”页的后续功能；
+- Settings 中“其他”页及“快捷键”页的后续功能；
 - import/export of user configuration；
 - automatic update support；
 - possible replacement of coordinate interaction with a direct Electron/editor command；

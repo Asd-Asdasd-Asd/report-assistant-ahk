@@ -464,6 +464,15 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [ ] 特意让 vendor 返回值不按大小排列；确认视觉提示已按数值从大到小排列，而不是沿用 vendor 创建顺序。
 - [ ] 有测量时按 `Ctrl+Alt+F12`；确认 `CleanupState=OK`、`VerificationState=NOT_ANNOTATED`，报告前台、鼠标和原 clipboard 保持不变。
 - [ ] 检查 `%TEMP%\MedExAHK\mxnm_line_axes_field.txt` 不包含 raw/formatted measurement、clipboard payload、患者信息、检查信息或报告正文。
+
+### Viewer 工具快捷键（config + native HWND/WM_COMMAND，当前工作站已通过）
+
+- [ ] 退出 production release，先运行 `tests\windows\mxnm_viewer_tool_command_regression.ahk`；确认纯配置解析回归通过。
+- [x] 单独运行 `tests\windows\mxnm_viewer_tool_command_field.ahk`，仅使用非临床 Viewer；在 Viewer 前台依次按 `Ctrl+Alt+F9/F10/F11`。
+- [x] 确认三个命令分别等价于点击第 4 个箭头、第 6 个长度测量和第 9 个 3D SUV 按钮；不需要预先 hover。
+- [x] 将报告编辑器置于前台后重复，确认 Viewer 工具仍正确切换，前台窗口和鼠标位置保持不变。
+- [x] 检查 `%TEMP%\MedExAHK\mxnm_viewer_tool_command_field.txt`：`State=READY`、对应 `CommandId` 与 `RuntimeControlId` 均为 `21043/21048/21193`、`CommandRow=1/3/6`、`TargetScreenPoint` 分别落在目标按钮、`ForegroundUnchanged=true`、`MouseUnchanged=true`。
+- [ ] 启动 regenerated release，在设置页逐项启用 `Ctrl+Alt+1/2/3`；确认仅在报告程序或 Viewer 前台生效，在其他应用中不触发也不吞键。
 - [ ] 在 custom template 中配置 `大小{{size}}{{red:（见图）}}`，重新加载 release，无 `#Warn`、解析错误或提示音。
 - [ ] 1/2/3 轴分别触发 custom hotstring；确认报告插入 `1.2cm`、`2.2cm×1.2cm` 或三轴降序格式，并在写入成功后清除 viewer 标注。
 - [ ] 无标注时触发：不插入尺寸、不提示，caret 留在 `{{size}}`；键入第一个数值后运行 `;cmx`，确认继续得到手动 `cm×cm` 流程。

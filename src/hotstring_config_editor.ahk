@@ -244,11 +244,23 @@ SaveEditableReportHotstringConfig(
     deletedSections,
     originalText,
     modifiedSectionKeys,
-    configPath := ""
+    configPath := "",
+    featureSettings := 0
 ) {
     validation := ValidateEditableReportHotstringEntries(entries)
     if !validation.Ok
         return ReportHotstringEditorSaveResult(false, validation.Message)
+    if IsObject(featureSettings) {
+        featureValidation := ValidateViewerToolHotkeySettings(
+            featureSettings
+        )
+        if !featureValidation.Ok {
+            return ReportHotstringEditorSaveResult(
+                false,
+                featureValidation.Message
+            )
+        }
+    }
 
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
@@ -323,6 +335,19 @@ SaveEditableReportHotstringConfig(
             )
         }
 
+        if IsObject(featureSettings) {
+            WriteViewerToolHotkeySettings(tempPath, featureSettings)
+            savedFeatures := LoadFeatureSettings(tempPath)
+            if !ViewerToolHotkeySettingsMatch(
+                featureSettings,
+                savedFeatures
+            ) {
+                throw Error(
+                    "Saved viewer tool hotkeys did not match settings"
+                )
+            }
+        }
+
         savedLoad := LoadEditableReportHotstringConfig(tempPath)
         if !savedLoad.Ok
             throw Error("Saved configuration could not be read: " savedLoad.Message)
@@ -345,6 +370,17 @@ SaveEditableReportHotstringConfig(
             throw Error("Final configuration validation failed")
         if !EditableReportHotstringEntriesMatch(entries, finalLoad.Entries)
             throw Error("Final configuration did not match the edited templates")
+        if IsObject(featureSettings) {
+            finalFeatures := LoadFeatureSettings(configPath)
+            if !ViewerToolHotkeySettingsMatch(
+                featureSettings,
+                finalFeatures
+            ) {
+                throw Error(
+                    "Final viewer tool hotkeys did not match settings"
+                )
+            }
+        }
         if !ValidateEditableReportHotstringSaveResult(
             originalLoad.Entries,
             entries,
@@ -374,6 +410,46 @@ SaveEditableReportHotstringConfig(
             false, "无法保存配置，原配置未被本次操作覆盖。"
         )
     }
+}
+
+WriteViewerToolHotkeySettings(configPath, settings) {
+    section := FeatureDefaults.ViewerToolSection
+    IniWrite(
+        settings.ViewerArrowEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerArrowEnabledKey
+    )
+    IniWrite(
+        settings.ViewerArrowChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerArrowChordKey
+    )
+    IniWrite(
+        settings.ViewerLengthEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerLengthEnabledKey
+    )
+    IniWrite(
+        settings.ViewerLengthChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerLengthChordKey
+    )
+    IniWrite(
+        settings.ViewerSuv3DEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerSuv3DEnabledKey
+    )
+    IniWrite(
+        settings.ViewerSuv3DChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerSuv3DChordKey
+    )
 }
 
 EditableReportHotstringEntriesMatch(expected, actual) {

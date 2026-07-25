@@ -12,6 +12,10 @@
 #Include ..\..\src\config_reconciliation.ahk
 #Include ..\..\src\hotstring_config_migration.ahk
 #Include ..\..\src\hotstring_config_editor.ahk
+#Include ..\..\src\feature_config.ahk
+#Include ..\..\src\hotkey_registration.ahk
+#Include ..\..\src\global_hjkl_arrows.ahk
+#Include ..\..\src\feature_normalization.ahk
 #Include ..\..\src\settings_ui.ahk
 
 RunSettingsUiRegression()

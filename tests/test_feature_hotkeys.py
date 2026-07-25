@@ -105,9 +105,10 @@ class FeatureHotkeyTests(unittest.TestCase):
             "return registeredIds", 1
         )[0]
         self.assertIn("seenChords.Has(chordKey)", loop)
-        self.assertIn("try {\n            Hotkey(", loop)
+        self.assertIn("try {\n                Hotkey(", loop)
         self.assertLess(loop.index("Hotkey("), loop.index("seenChords[chordKey] := true"))
-        self.assertIn('return ["^!Esc", "^!q"]', registration)
+        self.assertIn('return ["^!Esc", "^!q", "^!F8"]', registration)
+        self.assertIn('for modifier in ["^", "!", "+", "#"]', registration)
 
     def test_release_order_keeps_optional_hotkeys_before_suspend_exempt_controls(self) -> None:
         build = source("scripts/build_release.py")

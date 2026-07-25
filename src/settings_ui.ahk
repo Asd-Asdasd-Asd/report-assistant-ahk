@@ -67,6 +67,7 @@ class ReportAssistantSettingsWindow {
         this.ConfigPath := loadResult.ConfigPath
         this.OriginalText := loadResult.OriginalText
         this.Entries := loadResult.Entries
+        this.FeatureSettings := LoadFeatureSettings(this.ConfigPath)
         this.OriginalSections := Map()
         for entry in this.Entries
             this.OriginalSections[StrLower(entry.Section)] := true
@@ -154,8 +155,51 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs.UseTab(2)
         this.Window.Add(
-            "Text", "x40 y70 w820 h30 Center", "快捷键设置将在后续版本开放。"
+            "Text", "x40 y64 w820 h38",
+            "仅在 MedEx 报告程序或 Viewer 位于前台时生效；保存后程序会重新加载。"
         )
+        this.Window.Add("Text", "x72 y126 w170", "功能")
+        this.Window.Add("Text", "x276 y126 w90", "状态")
+        this.Window.Add("Text", "x402 y126 w220", "快捷键")
+
+        this.Window.Add("Text", "x72 y174 w170", "箭头")
+        this.ViewerArrowEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y166 w90 h26", "启用"
+        )
+        this.ViewerArrowChordInput := this.Window.Add(
+            "Hotkey", "x402 y166 w220 h26 Limit15"
+        )
+
+        this.Window.Add("Text", "x72 y222 w170", "长度测量")
+        this.ViewerLengthEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y214 w90 h26", "启用"
+        )
+        this.ViewerLengthChordInput := this.Window.Add(
+            "Hotkey", "x402 y214 w220 h26 Limit15"
+        )
+
+        this.Window.Add("Text", "x72 y270 w170", "3D SUV测量")
+        this.ViewerSuv3DEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y262 w90 h26", "启用"
+        )
+        this.ViewerSuv3DChordInput := this.Window.Add(
+            "Hotkey", "x402 y262 w220 h26 Limit15"
+        )
+        for control in [
+            this.ViewerArrowEnabledInput,
+            this.ViewerLengthEnabledInput,
+            this.ViewerSuv3DEnabledInput
+        ] {
+            control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
+        }
+        for control in [
+            this.ViewerArrowChordInput,
+            this.ViewerLengthChordInput,
+            this.ViewerSuv3DChordInput
+        ] {
+            control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
+        }
+        this.LoadViewerToolHotkeyControls()
 
         this.Tabs.UseTab(3)
         this.Window.Add(
@@ -271,6 +315,45 @@ class ReportAssistantSettingsWindow {
         this.Dirty := true
     }
 
+    LoadViewerToolHotkeyControls() {
+        this.LoadingControls := true
+        try {
+            this.ViewerArrowEnabledInput.Value :=
+                this.FeatureSettings.ViewerArrowEnabled ? 1 : 0
+            this.ViewerArrowChordInput.Value :=
+                this.FeatureSettings.ViewerArrowChord
+            this.ViewerLengthEnabledInput.Value :=
+                this.FeatureSettings.ViewerLengthEnabled ? 1 : 0
+            this.ViewerLengthChordInput.Value :=
+                this.FeatureSettings.ViewerLengthChord
+            this.ViewerSuv3DEnabledInput.Value :=
+                this.FeatureSettings.ViewerSuv3DEnabled ? 1 : 0
+            this.ViewerSuv3DChordInput.Value :=
+                this.FeatureSettings.ViewerSuv3DChord
+        } finally {
+            this.LoadingControls := false
+        }
+    }
+
+    StoreViewerToolHotkeyControls() {
+        this.FeatureSettings := FeatureSettings(
+            this.FeatureSettings.GlobalHjklArrows,
+            this.ViewerArrowEnabledInput.Value = 1,
+            this.ViewerArrowChordInput.Value,
+            this.ViewerLengthEnabledInput.Value = 1,
+            this.ViewerLengthChordInput.Value,
+            this.ViewerSuv3DEnabledInput.Value = 1,
+            this.ViewerSuv3DChordInput.Value
+        )
+    }
+
+    OnViewerHotkeyChanged(*) {
+        if this.LoadingControls
+            return
+        this.StoreViewerToolHotkeyControls()
+        this.Dirty := true
+    }
+
     OnInsertTemplateElement(*) {
         entryIndex := this.FindEntryIndexBySection(this.SelectedSection)
         definitionIndex := this.TemplateElementInput.Value
@@ -364,12 +447,28 @@ class ReportAssistantSettingsWindow {
 
     OnSave(*) {
         this.StoreEditorToEntry()
+        this.StoreViewerToolHotkeyControls()
         validation := ValidateEditableReportHotstringEntries(this.Entries)
         if !validation.Ok {
             if validation.Row > 0
                 this.FocusValidationError(validation)
             MsgBox(
                 validation.Message,
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Icon!"
+            )
+            return
+        }
+        featureValidation := ValidateViewerToolHotkeySettings(
+            this.FeatureSettings
+        )
+        if !featureValidation.Ok {
+            this.Tabs.Choose(2)
+            this.FocusViewerToolHotkeyValidationError(
+                featureValidation.Field
+            )
+            MsgBox(
+                featureValidation.Message,
                 ReportAssistantSettingsDefaults.WindowTitle,
                 "Icon!"
             )
@@ -386,7 +485,8 @@ class ReportAssistantSettingsWindow {
             this.DeletedSections,
             this.OriginalText,
             this.ModifiedSectionKeys,
-            this.ConfigPath
+            this.ConfigPath,
+            this.FeatureSettings
         )
         if !saveResult.Ok {
             MsgBox(
@@ -409,6 +509,15 @@ class ReportAssistantSettingsWindow {
                 "Icon!"
             )
         }
+    }
+
+    FocusViewerToolHotkeyValidationError(field) {
+        if field = "ViewerArrowChord"
+            this.ViewerArrowChordInput.Focus()
+        else if field = "ViewerLengthChord"
+            this.ViewerLengthChordInput.Focus()
+        else if field = "ViewerSuv3DChord"
+            this.ViewerSuv3DChordInput.Focus()
     }
 
     FocusValidationError(validation) {

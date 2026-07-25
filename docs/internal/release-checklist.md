@@ -1,4 +1,4 @@
-# v0.6.0 Internal Release 检查清单
+# v0.6.1 Internal Release 检查清单
 
 ## Source 与版本
 
@@ -53,6 +53,7 @@ publish\麦旋风.exe
 - [ ] 从普通本地目录、Desktop 和 Windows Startup folder 启动，不要求管理员权限。
 - [ ] 同名、改名、不同目录和不同版本 EXE 均由 `Local\MedExReportAssistant.Singleton` 阻止并行运行。
 - [ ] startup log 包含 `AppVersion`、`SourceRevision`、`ExecutablePath`、`ConfigPath`。
+- [ ] 在当前工作站逐项启用 Viewer 箭头、长度测量和 3D SUV 快捷键；确认从 Viewer/报告窗口前台单次触发成功，其他程序不吞键，foreground 与鼠标不变。
 - [ ] 双击托盘图标与右键“设置…”打开同一窗口；保存后 full-script Reload。
 - [ ] 托盘“关于麦旋风…”显示正确版本、构建日期和 7 位 source revision；clean build 无 dirty 警告。
 - [ ] builtin 与多个 custom templates 的新增、编辑、启停、排序、删除和重启持久化正确。

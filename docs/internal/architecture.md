@@ -66,6 +66,8 @@ MxNMSoft 测量值由 `MxNMMeasurementProvider` 解析自动目标，再通过�
 
 因此阅片动作应逐个迁移，不能一次性照搬 legacy 点击序列。每个动作必须验证 process/window、fail closed、避免 modal feedback，并在需要移动鼠标时恢复原位置。
 
+v0.6.1 的箭头、长度测量和 3D SUV 快捷键使用一个更窄的 config + native HWND 策略。`mxnm_viewer_tool_commands.ahk` 从 Vendor 配置解析 button-pad 原点和 command rows，按当前 frame rect 映射目标中心，再用 `WindowFromPoint`、PID、client rect 和 `GetDlgCtrlID` 校验。验证通过后，向按钮直接父窗口发送有超时上限的同步 `WM_COMMAND / BN_CLICKED`。该路径不使用 UIA、不移动鼠标、不切换焦点，也没有后台 warmup 或轮询。完整坐标模型与现场纠错见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
+
 ## `src/` 模块职责
 
 - `main.ahk`：include/registration 顺序与全局 suspend-exempt safety hotkeys。
@@ -82,6 +84,8 @@ MxNMSoft 测量值由 `MxNMMeasurementProvider` 解析自动目标，再通过�
 - `report_editor.ahk`：editor-level orchestration，例如插入格式化报告文字、调用目标 editor adapter 恢复 insertion state、处理 workflow result；不得包含 generic clipboard wire-format implementation。
 - `medex_calibration.ahk` / `machine_profile.ahk`：supported profile、UIA readiness、calibration state 和 fail-closed preflight。
 - `mxnm_config_path_cache.ahk`：一次发现后持久化 viewer executable identity；每次加载重新派生并验证固定 vendor config 路径，不保存原始配置内容。
+- `mxnm_viewer_tool_commands.ahk`：缓存 Vendor Viewer 工具静态 plan，执行 runtime frame mapping、native HWND/control-ID 校验和直接父窗口 command dispatch。
+- `viewer_tool_hotkeys.ahk`：根据已归一化设置声明三项 Viewer 工具快捷键，并把结构化失败转换为无焦点视觉提示。
 - `medex_color_reset_logic.ahk`：layout profile、pure anchor selection、rectangle/geometry、local-offset calculation、screen/client conversion 和 structured result definitions。
 - `adapters/medex_report_editor.ahk`：MedEx-specific strategy dispatch、target validation 和 interaction。`relativeMousePixelValidated` 是 production mainline；`uiaInvoke` 暂存于同一 adapter 作为显式 comparison/rollback。后续如按真实复杂度拆分文件，不得复制 clipboard/report orchestration。
 - `diagnostics.ahk`：区分 production failure-only lightweight log 与 explicit field schema；不得记录报告内容、replacement text 或 clipboard payload。

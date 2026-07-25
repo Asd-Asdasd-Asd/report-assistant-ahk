@@ -1,4 +1,4 @@
-# v0.6.0 配置与模板架构
+# v0.6.x 配置、模板与快捷键架构
 
 ## 持久化边界
 
@@ -31,6 +31,8 @@
 - `settings_ui.ahk`：GUI state 与事件；不直接实现运行时 hotstring。
 - `hotstring_registration.ahk`：基于 normalized entries 调用 `Hotstring()`。
 - `hotstrings.ahk`：执行 `ReportTemplatePlan`，不读取 INI。
+- `feature_model.ahk` / `feature_config.ahk` / `feature_normalization.ahk`：managed feature defaults、Viewer 工具 enabled/chord 读取、归一化和冲突校验。
+- `hotkey_registration.ahk` / `viewer_tool_hotkeys.ahk`：按 normalized settings 动态注册 Viewer 工具快捷键；不直接读取 INI。
 
 Feature 和 MedEx adapter 不得自行读取或重写 template config。
 
@@ -42,6 +44,14 @@ SchemaVersion=2
 
 [Features]
 GlobalHjklArrows=false
+
+[ViewerToolHotkeys]
+ArrowEnabled=false
+ArrowChord=^!1
+LengthEnabled=false
+LengthChord=^!2
+Suv3DEnabled=false
+Suv3DChord=^!3
 
 [Hotstring.builtin-red]
 Enabled=true
@@ -145,7 +155,7 @@ Schema 1 migration 是唯一保留 legacy `text`、`red-reset` 和 `red-left4` �
 
 设置窗口使用与运行时相同的 template validator 和 Text codec。GUI 隐藏 section、builtin/custom 分类和内部 identity，只显示用户概念。
 
-“插入模板元素”下拉数据定义集中在 `TemplateElementDefinitions()`；当前可插入 cursor、date 和 red element。插入使用原生 Edit selection：有选区时替换，否则在 caret 处插入，随后 caret 位于 token 后并恢复编辑框焦点。
+“插入模板元素”下拉数据定义集中在 `TemplateElementDefinitions()`；当前可插入 cursor、date、SUVMax、size 和 red element。插入使用原生 Edit selection：有选区时替换，否则在 caret 处插入，随后 caret 位于 token 后并恢复编辑框焦点。
 
 保存前检查：
 
@@ -155,7 +165,7 @@ Schema 1 migration 是唯一保留 legacy `text`、`red-reset` 和 `red-left4` �
 - 原文件内容仍与窗口打开时一致；
 - builtin 不能删除，custom 只能按 stable Section 明确删除。
 
-保存使用 backup + 同目录临时文件。未修改的 hotstring section、`[Features]`、未知 sections/keys 和注释通过复制原文件保留；只重写 UI 明确修改的 section。临时与 final 均重新读取并比较目标/非目标 sections。成功后调用完整 `Reload()`。
+保存使用 backup + 同目录临时文件。未修改的 hotstring section、`[Features]`、未知 sections/keys 和注释通过复制原文件保留；只重写 UI 明确修改的 section。Viewer 工具快捷键由设置页事务更新 `[ViewerToolHotkeys]`，要求至少两个修饰键，并拒绝 duplicate/reserved chords。临时与 final 均重新读取并比较目标/非目标 sections。成功后调用完整 `Reload()`。
 
 ## Update preservation
 

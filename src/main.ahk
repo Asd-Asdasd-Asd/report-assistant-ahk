@@ -21,6 +21,7 @@
 #Include mxnm_measurement_target_resolver.ahk
 #Include mxnm_measurement_provider.ahk
 #Include mxnm_annotation_cleaner.ahk
+#Include mxnm_viewer_tool_commands.ahk
 #Include medex_color_reset_logic.ahk
 #Include medex_candidate_g_logic.ahk
 #Include machine_profile.ahk
@@ -44,12 +45,14 @@
 #Include feature_normalization.ahk
 #Include hotkey_registration.ahk
 #Include global_hjkl_arrows.ahk
+#Include viewer_tool_hotkeys.ahk
 #Include features.ahk
 #Include settings_ui.ahk
 #Include tray_menu.ahk
 
 ConfigureReportAssistantTrayMenu()
 MxNMMeasurementProvider.PrepareTargetPlanFromPathCache()
+MxNMViewerToolCommandProvider.PrepareAtStartup()
 
 #SuspendExempt
 

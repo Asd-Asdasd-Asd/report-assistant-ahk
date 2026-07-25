@@ -7,4 +7,9 @@ RegisterConfiguredFeatures(settings) {
             ReservedApplicationHotkeyChords()
         )
     }
+    RegisterHotkeyDefinitions(
+        ViewerToolHotkeyDefinitions(settings),
+        ReservedApplicationHotkeyChords(),
+        MedExViewerToolForegroundActive
+    )
 }

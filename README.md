@@ -9,6 +9,7 @@
 - 双击托盘图标或右键选择“设置…”可打开原生设置窗口。
 - 托盘“关于麦旋风…”显示版本、构建日期和源代码版本。
 - 设置窗口支持新增、修改、启用、停用和按列查看快捷语；builtin 可编辑但不能删除，custom template 可删除。
+- 设置窗口可配置箭头、长度测量和 3D SUV 工具快捷键；三项默认关闭，只在 MedEx 报告程序或 Viewer 位于前台时生效。
 - 保存设置后执行完整 `Reload()`，不使用进程内热更新。
 - portable EXE 不绑定安装目录；跨版本单实例由固定 `Local\MedExReportAssistant.Singleton` mutex 保护。
 - `{{suvmax}}` 和 `{{size}}` 可从 MxNM 当前标注读取 SUVMax 或 1–3 个直线测量值；两者不能用于同一模板。
@@ -56,6 +57,8 @@ Schema 1 首次启动时执行一次性迁移：先审计旧 `Mode`，再备份�
 - 红色“（见图）”
 
 保存前会检查空值、重复 trigger、模板语法和外部文件变化。写入使用备份、临时文件和最终复读验证；成功后执行全脚本 `Reload()`。
+
+快捷键页提供箭头、长度测量和 3D SUV 三项 Viewer 工具。默认组合为 `Ctrl+Alt+1/2/3`，首次升级保持停用；当前工作站已完成 Windows 非临床验证，可按工作站逐项启用。触发时不移动鼠标或切换前台窗口；程序从 Vendor 配置计算按钮位置，并在点击前核对真实控件 ID，配置缺失、布局不符或 ID 冲突时拒绝执行。实现与现场发现见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
 
 ## Portable build
 

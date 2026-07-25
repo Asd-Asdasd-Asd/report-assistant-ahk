@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-26
+
+### Added
+
+- Added configurable, default-disabled hotkeys for the MxNM Viewer arrow, length-measurement, and 3D SUV tools.
+- Added config-derived Vendor command discovery and Windows field harnesses for all three Viewer tools.
+
+### Changed
+
+- Viewer tool invocation now maps the Vendor button-pad origin into the current runtime frame, validates the native control and process boundary, and sends a bounded synchronous `WM_COMMAND / BN_CLICKED` to the button's direct parent.
+- Removed UIA, mouse movement, focus switching, background polling, and hover dependencies from the Viewer tool hotkey path.
+
+### Fixed
+
+- Fixed inactive-parent `BM_CLICK` behavior that could discard the first tool selection after focus changed.
+- Fixed overly strict root-HWND validation for same-process MxNM floating windows.
+- Fixed logical/runtime coordinate mapping by scaling the configured panel origin while retaining fixed native button offsets.
+- Fixed nested AHK `A_Index` reuse that incorrectly mapped every configured command to the arrow row.
+
+### Documentation
+
+- Documented the validated command IDs, coordinate model, native-window dispatch boundary, fail-closed checks, and Windows findings.
+- Updated physician-facing hotkey and release guidance for the three optional Viewer tools.
+
 ## [0.6.0] - 2026-07-24
 
 ### Release summary

@@ -1,6 +1,6 @@
 # 项目状态与交接
 
-更新时间：2026-07-24
+更新时间：2026-07-26
 当前版本以 `src/app_metadata.ahk` 为唯一真源，并显示在 EXE“关于麦旋风…”和发布目录 `版本信息.md`。
 
 ## 当前 mainline
@@ -12,6 +12,7 @@
 - Explicit comparison/rollback：`uiaInvoke`。
 - Automatic cross-strategy fallback：无。
 - 当前验证 profile：MedEx `0.0.1.0`、1920×1080、100% scaling、DPI 96。
+- 当前 application version：`0.6.1`。
 
 ## 当前已实现
 
@@ -26,10 +27,11 @@
 - 正式图标以 `assets/icon/source/medex-icon.svg` 为 source，由 `scripts/generate-icon.sh` 生成多尺寸 PNG/ICO。
 - Windows 一键构建自动生成 release source、以 `/icon` 嵌入 ICO、编译 temporary EXE、同步静态发布资源并事务提升 final。
 - v0.6.0 SUVMax workflow 已接入通用 `{{suvmax}}` 模板：自动 target、strict parser、报告事务和右键清除 provider 均已实现；`NOT_ANNOTATED`/失败会留下人工输入锚点，失败提示为无焦点视觉浮层。
-- v0.6.x measurement target 已改为 config-only on-demand resolution：首次成功发现 viewer 后持久化经验证的 process path，后续应用启动直接从固定相对路径读取 vendor config 并建立静态 plan，不需要 viewer 窗口存在；进程生命周期只缓存 `mainGeometry`、跨布局 `logicalPoint`、配置 hash 和 viewer process path。每次读取重新查找唯一 runtime frame、读取当前 rect、映射 `screenPoint`，并执行 `WindowFromPoint`、PID、进程路径、进程名和 client-rect 校验。measurement target 不再使用 UIA、shell hook、后台 warmup、重试或 15/60 秒轮询；该变更静态验证通过，Windows latency/transport 复验待完成。
+- v0.6.x measurement target 已改为 config-only on-demand resolution：首次成功发现 viewer 后持久化经验证的 process path，后续应用启动直接从固定相对路径读取 vendor config 并建立静态 plan，不需要 viewer 窗口存在；进程生命周期只缓存 `mainGeometry`、跨布局 `logicalPoint`、配置 hash 和 viewer process path。每次读取重新查找唯一 runtime frame、读取当前 rect、映射 `screenPoint`，并执行 `WindowFromPoint`、PID、进程路径、进程名和 client-rect 校验。measurement target 不再使用 UIA、shell hook、后台 warmup、重试或 15/60 秒轮询；Windows 现场已确认启动约 4 秒后配置 plan 可用，后续 `;fzg` 延迟稳定。
 - v0.6.0 长短轴 workflow 已接入通用 `{{size}}` 模板，共用自动 target、context popup transport、clipboard restore、报告事务和标注清除。`复制直线测量值` 的新鲜空剪贴板映射为 `NOT_ANNOTATED`；1-3 个正数严格解析后按数值降序输出，使用 `×` 和逐项 `cm`。未标注或失败时留下人工输入锚点，可继续使用 `;cmx`。
 - v0.6.x 增加 builtin `;cma -> {{size}}`。现有配置通过 additive reconciliation 获取该入口：默认 trigger 空闲时直接启用；已有等价 custom `;cma` 时不重复添加；已有不同用途的 `;cma` 时保留用户条目，并以禁用的 `;cma-size` 添加 builtin。配置 normalization 失败或 trigger 重复时继续整体 fail-closed，同时显示无焦点视觉提示。
-- 历史 Config + UIA measurement target checkpoint 已通过 Windows 验证；当前 config-only production resolver 保留相同跨布局安全点、runtime frame mapping、action HWND ownership 和 transport invariants，但移除了 UIA geometry gate，仍待 Windows 现场重新验收。
+- v0.6.1 增加默认关闭的箭头、长度测量和 3D SUV Viewer 工具快捷键。三项共用 config-derived button plan、runtime frame mapping、native HWND/control-ID 校验和直接父窗口 `WM_COMMAND / BN_CLICKED`；不依赖 UIA、hover、鼠标移动、焦点切换或后台轮询。
+- 历史 Config + UIA measurement target checkpoint 已通过 Windows 验证；当前 config-only production resolver 保留相同跨布局安全点、runtime frame mapping、action HWND ownership 和 transport invariants，并已完成当前工作站 Windows 延迟与 transport 复验。
 
 ## 验证状态
 
@@ -45,10 +47,8 @@
 - Production `;fzg` FOUND path：自动插入结果正确，target cache 后延迟可接受。
 - `删除全部标注` field path：`CleanupState=OK`、command invoked、无 confirmation、复查 `NOT_ANNOTATED`，foreground/mouse 均保持不变。
 - 长短轴 workflow 已在 Windows 完成端到端验证并由用户确认通过。
-
-以上 measurement target 现场结果属于 config + UIA 历史基线。当前
-config-only resolver 的坐标、延迟和完整 transport 仍需单独复验，不能由静态测试
-替代。
+- Config-only measurement target：无 UIA、无 warmup timer、无周期轮询的启动缓存和按次 runtime mapping 已通过当前工作站复验。
+- v0.6.1 Viewer 工具快捷键：箭头 `21043`、长度 `21048`、3D SUV `21193` 均已验证；从 Viewer/报告窗口切换焦点后单次触发成功，foreground 与鼠标保持不变。
 
 ### 自动测试覆盖
 
@@ -57,8 +57,9 @@ config-only resolver 的坐标、延迟和完整 transport 仍需单独复验，
 - CF_HTML offsets、Candidate G pure rules、dispatcher safety、single-instance/build integration。
 - icon generation inputs与 Windows Ahk2Exe `/icon` wiring。
 - measurement result/parser、sentinel + clipboard sequence freshness、single restore owner、provider dynamic popup/command identity 和 privacy-safe field harness。
+- Viewer command schema、三按钮坐标映射、设置读写、hotkey registration 和 generated-release integration。
 
-当前完整 Python suite 为 228 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
+当前完整 Python suite 为 247 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
 
 ## 当前 production flow
 
@@ -95,7 +96,7 @@ exact UIA Name="检查所见"
 - updater、installer、self-update、rollback、shortcut 和 registry installation state 均不在范围内。
 - SUVMax、long-axis/short-axis、automatic target、production orchestration、`删除全部标注` 清除链及 cache latency 已进入 v0.6.0 baseline。更细的 failure injection 和多模板 measurement/caret 组合属于 v0.6.x 后续验证，不扩大 v0.6.0 release scope。
 - Config logical-to-runtime mapping 和 privacy-safe UIA geometry-only 唯一重找已通过当前工作站相同布局三次复验；其他布局/profile 尚未正式验证，active `ShowModelN` 识别仍不属于当前 checkpoint。
-- Settings 的“快捷键”“其他”标签页仍是占位页。
+- Settings 的“其他”标签页仍是占位页；“快捷键”页已用于三项 Viewer 工具。
 
 ## v0.6.x 后续验证
 
@@ -108,4 +109,5 @@ exact UIA Name="检查所见"
 
 - `docs/internal/mxnmsoft-measurement-investigation.md`
 - `docs/internal/mxnmsoft-config-driven-automation.md`
+- `docs/internal/mxnm-viewer-tool-hotkeys.md`
 - `docs/internal/passive-zmq-exploration.md`

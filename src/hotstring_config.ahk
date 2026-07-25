@@ -56,7 +56,15 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
         "",
         "[" FeatureDefaults.Section "]",
-        FeatureDefaults.GlobalHjklArrowsKey "=" FeatureDefaults.GlobalHjklArrowsDefault
+        FeatureDefaults.GlobalHjklArrowsKey "=" FeatureDefaults.GlobalHjklArrowsDefault,
+        "",
+        "[" FeatureDefaults.ViewerToolSection "]",
+        FeatureDefaults.ViewerArrowEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerArrowChordKey "=" FeatureDefaults.ViewerArrowChordDefault,
+        FeatureDefaults.ViewerLengthEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerLengthChordKey "=" FeatureDefaults.ViewerLengthChordDefault,
+        FeatureDefaults.ViewerSuv3DEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerSuv3DChordKey "=" FeatureDefaults.ViewerSuv3DChordDefault
     ]
     for entry in defaults {
         lines.Push("")
