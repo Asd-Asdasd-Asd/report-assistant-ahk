@@ -81,6 +81,7 @@ class AppStartupPolicyTests(unittest.TestCase):
         self.assertIn("请先通过系统托盘退出当前版本，再启动此版本。", startup)
         for field in (
             "AppVersion=",
+            "BuildDate=",
             "SourceRevision=",
             "ExecutablePath=",
             "ConfigPath=",

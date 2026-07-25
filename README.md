@@ -1,12 +1,13 @@
 # 麦旋风（MedEx Report Assistant）
 
-麦旋风是一个基于 AutoHotkey v2 的 Windows 报告书写辅助工具。当前版本为 **v0.6.0 内部测试版**，用于少量工作站验证，不替代人工审核，也不会自动提交报告。
+麦旋风是一个基于 AutoHotkey v2 的 Windows 报告书写辅助工具，目前用于少量工作站内部验证，不替代人工审核，也不会自动提交报告。当前版本可在托盘“关于麦旋风…”或发布文件夹的 `版本信息.md` 中查看。
 
 ## 当前能力
 
 - 报告快捷语只在允许的 MedEx 报告窗口中生效。
 - `Ctrl+Alt+Esc` 暂停或恢复，`Ctrl+Alt+Q` 退出；两者保持全局可用。
 - 双击托盘图标或右键选择“设置…”可打开原生设置窗口。
+- 托盘“关于麦旋风…”显示版本、构建日期和源代码版本。
 - 设置窗口支持新增、修改、启用、停用和按列查看快捷语；builtin 可编辑但不能删除，custom template 可删除。
 - 保存设置后执行完整 `Reload()`，不使用进程内热更新。
 - portable EXE 不绑定安装目录；跨版本单实例由固定 `Local\MedExReportAssistant.Singleton` mutex 保护。
@@ -58,7 +59,7 @@ Schema 1 首次启动时执行一次性迁移：先审计旧 `Mode`，再备份�
 
 ## Portable build
 
-Windows 构建机安装 AutoHotkey v2 与 Ahk2Exe 后，双击根目录 `Build EXE.cmd`：
+Windows 构建机安装 Git、Python 3、AutoHotkey v2 与 Ahk2Exe 后，双击根目录 `Build EXE.cmd`：
 
 ```text
 existing source
@@ -75,6 +76,7 @@ existing source
 需要提交到 Git 的生成文件：
 
 - `release/report_assistant.ahk`（源码变化后生成）
+- `assets/publish/版本信息.md`（与 release 同一次生成）
 - `assets/icon/generated/medex-icon-*.png`
 - `assets/icon/generated/medex-icon.ico`
 

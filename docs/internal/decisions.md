@@ -158,4 +158,4 @@
 
 采用固定 `Local\MedExReportAssistant.Singleton` named mutex。singleton 检测先于配置初始化，以 object existence 判断冲突；不取得 ownership，不调用 `ReleaseMutex`。成功创建的 handle 保持到退出并调用 `CloseHandle`。
 
-应用版本唯一人工来源是 `AppMetadata.Version`；正式构建写入 source commit，并记录 executable/config paths。用户配置继续独立保存在 `%LocalAppData%\MedExReportAssistant\config.ini`。
+应用版本唯一人工来源是 `AppMetadata.Version`；正式构建从 Git checkout 自动写入上海时区构建日期和 source commit，并用同一 metadata 生成 EXE、关于窗口及发布目录 `版本信息.md`。Git 不可用时构建失败；dirty checkout 只能生成带明确警告的测试构建。用户配置继续独立保存在 `%LocalAppData%\MedExReportAssistant\config.ini`。

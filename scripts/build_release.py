@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
 import subprocess
@@ -10,6 +10,12 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 OUTPUT = ROOT / "release" / "report_assistant.ahk"
+VERSION_INFO_OUTPUT = ROOT / "assets" / "publish" / "版本信息.md"
+SHANGHAI_TIMEZONE = timezone(timedelta(hours=8))
+GENERATED_METADATA_PATHS = (
+    "release/report_assistant.ahk",
+    "assets/publish/版本信息.md",
+)
 
 ORDER = [
     "app_metadata.ahk",
@@ -118,6 +124,51 @@ def stamp_source_revision(metadata: str, source_revision: str) -> str:
     )
 
 
+def stamp_build_date(metadata: str, build_date: str) -> str:
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", build_date):
+        raise ValueError(f"Build date is invalid: {build_date}")
+    build_date_pattern = re.compile(r'static BuildDate := "[^"]*"')
+    if not build_date_pattern.search(metadata):
+        raise ValueError("AppMetadata.BuildDate was not found")
+    return build_date_pattern.sub(
+        f'static BuildDate := "{build_date}"', metadata, count=1
+    )
+
+
+def short_source_revision(source_revision: str) -> str:
+    dirty_suffix = "-dirty"
+    is_dirty = source_revision.endswith(dirty_suffix)
+    revision = (
+        source_revision[: -len(dirty_suffix)]
+        if is_dirty
+        else source_revision
+    )
+    short_revision = revision[:7]
+    return f"{short_revision}{dirty_suffix if is_dirty else ''}"
+
+
+def build_version_info_text(
+    version: str,
+    build_date: str,
+    source_revision: str,
+) -> str:
+    lines = [
+        "# 麦旋风版本信息",
+        "",
+        f"- 版本：{version}",
+        f"- 构建日期：{build_date}",
+        f"- 源代码版本：{short_source_revision(source_revision)}",
+    ]
+    if source_revision.endswith("-dirty"):
+        lines.extend(
+            [
+                "",
+                "> ⚠ 此构建包含未提交修改，仅用于测试。",
+            ]
+        )
+    return "\n".join(lines) + "\n"
+
+
 def resolve_source_revision(root: Path = ROOT) -> str:
     try:
         revision = subprocess.run(
@@ -128,7 +179,18 @@ def resolve_source_revision(root: Path = ROOT) -> str:
             text=True,
         ).stdout.strip()
         dirty = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],
+            [
+                "git",
+                "status",
+                "--porcelain",
+                "--untracked-files=no",
+                "--",
+                ".",
+                *(
+                    f":(exclude){path}"
+                    for path in GENERATED_METADATA_PATHS
+                ),
+            ],
             cwd=root,
             check=True,
             capture_output=True,
@@ -139,6 +201,15 @@ def resolve_source_revision(root: Path = ROOT) -> str:
     if not revision:
         return "UNSTAMPED"
     return f"{revision}-dirty" if dirty else revision
+
+
+def require_stamped_source_revision(source_revision: str) -> str:
+    if source_revision == "UNSTAMPED":
+        raise RuntimeError(
+            "Git source revision is unavailable. Install Git, ensure it is on "
+            "PATH, and build from a complete Git checkout."
+        )
+    return source_revision
 
 
 def prepare_source(text: str, relative_name: str) -> str:
@@ -162,6 +233,7 @@ def build_release_text(
     order: list[str] = ORDER,
     timestamp: str | None = None,
     source_revision: str = "UNSTAMPED",
+    build_date: str = "1970-01-01",
 ) -> str:
     if timestamp is None:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -197,6 +269,7 @@ def build_release_text(
         component = read_component(path)
         if name == "app_metadata.ahk":
             component = stamp_source_revision(component, source_revision)
+            component = stamp_build_date(component, build_date)
         parts.append(prepare_source(component, name))
         parts.append(f"; --- END {name} ---")
         parts.append("")
@@ -209,16 +282,39 @@ def build_release_text(
 
 def main() -> int:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    source_revision = resolve_source_revision()
-    release_text = build_release_text(source_revision=source_revision)
+    VERSION_INFO_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    built_at = datetime.now(timezone.utc)
+    timestamp = built_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+    build_date = built_at.astimezone(SHANGHAI_TIMEZONE).strftime("%Y-%m-%d")
+    source_revision = require_stamped_source_revision(
+        resolve_source_revision()
+    )
+    metadata = read_component(SRC / "app_metadata.ahk")
+    version = extract_app_version(metadata)
+    release_text = build_release_text(
+        timestamp=timestamp,
+        source_revision=source_revision,
+        build_date=build_date,
+    )
+    version_info_text = build_version_info_text(
+        version,
+        build_date,
+        source_revision,
+    )
     OUTPUT.write_bytes(release_text.encode("utf-8"))
+    VERSION_INFO_OUTPUT.write_bytes(version_info_text.encode("utf-8"))
 
     written_text = OUTPUT.read_bytes().decode("utf-8")
+    written_version_info = VERSION_INFO_OUTPUT.read_bytes().decode("utf-8")
     bom_count = written_text.count("\ufeff")
     if bom_count != 0:
         raise ValueError(f"Generated release BOM scan failed: count={bom_count}")
+    if "\ufeff" in written_version_info:
+        raise ValueError("Generated version info contains an embedded U+FEFF character")
 
     print(f"Wrote {OUTPUT.relative_to(ROOT)}")
+    print(f"Wrote {VERSION_INFO_OUTPUT.relative_to(ROOT)}")
+    print(f"Build date: {build_date}")
     print(f"Source revision: {source_revision}")
     print(f"Embedded U+FEFF count: {bom_count}")
     return 0

@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.0
-; Source revision: 0b4d9ea297c72321dba84926cde591d90760edec-dirty
-; Generated at: 2026-07-25 19:17:19 UTC
+; Source revision: 43187025a4f4a8eabfa63622059ae0ea7cbd1e1f-dirty
+; Generated at: 2026-07-25 20:19:29 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.0.0
 ;@Ahk2Exe-SetProductVersion 0.6.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,7 +14,60 @@
 class AppMetadata {
     static Version := "0.6.0"
     static Channel := "internal-test"
-    static SourceRevision := "0b4d9ea297c72321dba84926cde591d90760edec-dirty"
+    static BuildDate := "2026-07-26"
+    static SourceRevision := "43187025a4f4a8eabfa63622059ae0ea7cbd1e1f-dirty"
+}
+
+AppMetadataChannelDisplayName(channel := "") {
+    if channel = ""
+        channel := AppMetadata.Channel
+    if channel = "internal-test"
+        return "内部测试"
+    return channel
+}
+
+AppMetadataShortSourceRevision(sourceRevision := "") {
+    if sourceRevision = ""
+        sourceRevision := AppMetadata.SourceRevision
+    if sourceRevision = "UNSTAMPED"
+        return "未标记"
+    dirtySuffix := "-dirty"
+    suffixStart := StrLen(sourceRevision) - StrLen(dirtySuffix) + 1
+    isDirty := suffixStart > 0
+        && SubStr(sourceRevision, suffixStart) = dirtySuffix
+    revision := isDirty
+        ? SubStr(sourceRevision, 1, StrLen(sourceRevision) - StrLen(dirtySuffix))
+        : sourceRevision
+    shortRevision := SubStr(revision, 1, 7)
+    return shortRevision . (isDirty ? dirtySuffix : "")
+}
+
+AppMetadataBuildDateDisplay(buildDate := "") {
+    if buildDate = ""
+        buildDate := AppMetadata.BuildDate
+    return buildDate = "UNSTAMPED" ? "开发版本" : buildDate
+}
+
+AppMetadataIsDirtyBuild(sourceRevision := "") {
+    if sourceRevision = ""
+        sourceRevision := AppMetadata.SourceRevision
+    dirtySuffix := "-dirty"
+    suffixStart := StrLen(sourceRevision) - StrLen(dirtySuffix) + 1
+    return suffixStart > 0
+        && SubStr(sourceRevision, suffixStart) = dirtySuffix
+}
+
+FormatAppVersionInfoText() {
+    output := "麦旋风`n`n"
+    output .= "版本：" . AppMetadata.Version
+        . "（" . AppMetadataChannelDisplayName() . "）`n"
+    output .= "构建日期：" . AppMetadataBuildDateDisplay() . "`n"
+    output .= "源代码版本：" . AppMetadataShortSourceRevision()
+    if AppMetadataIsDirtyBuild() {
+        output .= "`n`n"
+        output .= "⚠ 此构建包含未提交修改，仅用于测试。"
+    }
+    return output
 }
 
 ; --- END app_metadata.ahk ---
@@ -139,6 +192,7 @@ FormatReportAssistantStartupDiagnostic(startupResult, configPath) {
         "Timestamp=" FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "StartupResult=" startupResult,
         "AppVersion=" AppMetadata.Version,
+        "BuildDate=" AppMetadata.BuildDate,
         "SourceRevision=" AppMetadata.SourceRevision,
         "ExecutablePath=" A_ScriptFullPath,
         "ConfigPath=" configPath
@@ -18035,6 +18089,7 @@ ReplaceReportTemplateEditSelection(editControl, replacementText) {
 ; --- BEGIN tray_menu.ahk ---
 class ReportAssistantTrayDefaults {
     static SettingsItemName := "设置…"
+    static AboutItemName := "关于麦旋风…"
     static ReloadItemName := "重新加载配置"
     static ExitItemName := "E&xit"
 }
@@ -18047,11 +18102,24 @@ ConfigureReportAssistantTrayMenu() {
     )
     A_TrayMenu.Insert(
         ReportAssistantTrayDefaults.ExitItemName,
+        ReportAssistantTrayDefaults.AboutItemName,
+        ShowReportAssistantAbout
+    )
+    A_TrayMenu.Insert(
+        ReportAssistantTrayDefaults.ExitItemName,
         ReportAssistantTrayDefaults.ReloadItemName,
         ReloadReportAssistantFromTray
     )
     A_TrayMenu.Default := ReportAssistantTrayDefaults.SettingsItemName
     A_TrayMenu.ClickCount := 2
+}
+
+ShowReportAssistantAbout(*) {
+    MsgBox(
+        FormatAppVersionInfoText(),
+        "关于麦旋风",
+        "Iconi"
+    )
 }
 
 ReloadReportAssistantFromTray(*) {

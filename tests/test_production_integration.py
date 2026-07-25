@@ -536,8 +536,18 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         main = source("src/main.ahk")
         build = source("scripts/build_release.py")
         field_debug = source("debug/medex_color_reset_field_debug.ahk")
-        self.assertIn('static Version := "0.6.0"', metadata)
+        version_match = re.search(
+            r'static Version := "([^"]+)"',
+            metadata,
+        )
+        self.assertIsNotNone(version_match)
+        self.assertRegex(
+            version_match.group(1),
+            r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+            r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$",
+        )
         self.assertIn('static Channel := "internal-test"', metadata)
+        self.assertIn('static BuildDate := "UNSTAMPED"', metadata)
         self.assertIn("#Include app_metadata.ahk", main)
         self.assertIn("#Include <UIA>", main)
         self.assertTrue((SRC / "Lib" / "UIA.ahk").is_file())
@@ -579,10 +589,19 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIsNone(re.search(r'(?i)[A-Z]:\\(?:Users|AutoHotKey|Project)\\', combined))
 
     def test_generated_release_is_self_contained_after_build(self) -> None:
+        metadata = source("src/app_metadata.ahk")
         release = source("release/report_assistant.ahk")
+        version = re.search(
+            r'static Version := "([^"]+)"',
+            metadata,
+        ).group(1)
         self.assertIn("class AppMetadata", release)
-        self.assertIn('static Version := "0.6.0"', release)
+        self.assertIn(f'static Version := "{version}"', release)
         self.assertIn('static Channel := "internal-test"', release)
+        self.assertRegex(
+            release,
+            r'static BuildDate := "\d{4}-\d{2}-\d{2}"',
+        )
         self.assertIn('static Version => "1.1.3"', release)
         self.assertIn("class MedExColorResetLayoutProfile", release)
         self.assertIn("ResetMedExInsertionColor(options := 0)", release)

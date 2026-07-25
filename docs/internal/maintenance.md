@@ -17,23 +17,28 @@
 5. 按 `tests/manual-test-checklist.md` 或 `docs/internal/release-checklist.md` 完成测试。
 6. 只在验证完成后提交并推送。
 
+形成新的可交付验证点时，维护者应同步评估并修改
+`AppMetadata.Version`：兼容修复增加 patch，新的能力阶段增加 minor。
+普通开发提交不为追求数字变化而机械升版。
+
 ## Source truth 与 generated files
 
 - `src/app_metadata.ahk` 是 application version 的唯一人工维护来源。
 - `release/report_assistant.ahk` 由 `scripts/build_release.py` 生成；source 变化后必须重新生成并提交，不得手改。
+- `assets/publish/版本信息.md` 与 release 同次生成；不得手改版本、日期或 revision。
 - `assets/icon/source/medex-icon.svg` 是图标唯一可编辑来源。
 - `assets/icon/generated/*.png` 与 `assets/icon/generated/medex-icon.ico` 由 `scripts/generate-icon.sh` 生成，并与 SVG 一起提交。
-- `assets/publish/*.md` 是发布包静态资源的 source truth；Windows 构建时 overlay 到 `publish/`。
+- 除自动生成的 `版本信息.md` 外，`assets/publish/*.md` 是发布包静态资源的 source truth；Windows 构建时 overlay 到 `publish/`。
 - `publish/*.exe` 是本地发布 staging artifact，不提交。
 
 ## Windows 一键构建
 
-Windows 构建机需安装 AutoHotkey v2，并包含 Ahk2Exe compiler。默认使用：
+Windows 构建机需安装 Git、Python 3、AutoHotkey v2，并包含 Ahk2Exe compiler。项目必须是完整 Git checkout，`git` 和 Python 必须在 `PATH` 中。默认使用：
 
 - `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`
 - `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`
 
-双击仓库根目录的 `Build EXE.cmd`。脚本会重新生成 `release/report_assistant.ahk`，使用 `assets/icon/generated/medex-icon.ico` 作为 Ahk2Exe 图标，编译并验证临时 EXE，同步 `assets/publish/` 中的静态发布资源，最后把产物安全提升为：
+双击仓库根目录的 `Build EXE.cmd`。脚本会从当前 checkout 重新生成 `release/report_assistant.ahk` 和 `assets/publish/版本信息.md`，使用 `assets/icon/generated/medex-icon.ico` 作为 Ahk2Exe 图标，编译并验证临时 EXE，同步 `assets/publish/` 中的发布资源，最后把产物安全提升为：
 
 ```text
 publish\麦旋风.exe
@@ -47,6 +52,7 @@ publish\麦旋风.exe
 
 - 从 source truth 生成 internal-test executable，不手改 generated artifact；
 - 只从 clean Git commit 构建正式 EXE，确认 startup metadata 中 `SourceRevision` 是该 source commit；
+- dirty checkout 允许生成现场测试 EXE，但“关于”和 `版本信息.md` 必须显示 `-dirty` 与测试警告；
 - 为每个 internal release 编写中文 maintainer notes，并更新 `assets/publish/更新说明.md`；
 - 核对 `%LocalAppData%\MedExReportAssistant\config.ini` 的 Schema 1 → 2 备份、迁移和验证流程；失败不得产生半迁移文件；
 - 核对 compatibility script 与新 build 没有重复 hotkeys/hotstrings；

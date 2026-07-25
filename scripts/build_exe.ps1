@@ -13,9 +13,13 @@ $releaseScript = Join-Path $repositoryRoot 'release\report_assistant.ahk'
 $iconPath = Join-Path $repositoryRoot 'assets\icon\generated\medex-icon.ico'
 $publishDirectory = Join-Path $repositoryRoot 'publish'
 $publishAssetsDirectory = Join-Path $repositoryRoot 'assets\publish'
+$versionInfoSource = Join-Path $publishAssetsDirectory '版本信息.md'
 $buildingExe = Join-Path $publishDirectory '麦旋风.building.exe'
 $previousExe = Join-Path $publishDirectory '麦旋风.previous.exe'
 $finalExe = Join-Path $publishDirectory '麦旋风.exe'
+$buildingVersionInfo = Join-Path $publishDirectory '版本信息.building.md'
+$previousVersionInfo = Join-Path $publishDirectory '版本信息.previous.md'
+$finalVersionInfo = Join-Path $publishDirectory '版本信息.md'
 $displayArtifactPath = 'publish\麦旋风.exe'
 
 $stage = 'initialization'
@@ -23,6 +27,9 @@ $promotionStarted = $false
 $finalCreatedByCurrentBuild = $false
 $hadExistingFinal = $false
 $originalFinalHash = $null
+$finalVersionInfoCreatedByCurrentBuild = $false
+$hadExistingVersionInfo = $false
+$originalVersionInfoHash = $null
 $compileStartedUtc = $null
 $compilerStdoutLog = $null
 $compilerStderrLog = $null
@@ -145,6 +152,9 @@ function Copy-PublishAssets {
     $copiedCount = 0
     foreach ($item in $files) {
         $relativePath = $item.FullName.Substring($sourceRoot.Length).TrimStart('\')
+        if ($relativePath -eq '版本信息.md') {
+            continue
+        }
         $destinationPath = Join-Path $DestinationDirectory $relativePath
         $destinationParent = Split-Path -Parent $destinationPath
         if (-not (Test-Path -LiteralPath $destinationParent -PathType Container)) {
@@ -166,13 +176,24 @@ function Copy-PublishAssets {
 }
 
 function Restore-InterruptedPromotion {
-    if (-not (Test-Path -LiteralPath $previousExe -PathType Leaf)) {
+    $hasPreviousExe = Test-Path -LiteralPath $previousExe -PathType Leaf
+    $hasPreviousVersionInfo = Test-Path -LiteralPath $previousVersionInfo -PathType Leaf
+    if (-not $hasPreviousExe -and -not $hasPreviousVersionInfo) {
         return
     }
 
-    Write-Host 'Recovering the previous final artifact from an interrupted promotion.' -ForegroundColor Yellow
-    Remove-ManagedFile -Path $finalExe
-    Move-Item -LiteralPath $previousExe -Destination $finalExe
+    Write-Host 'Recovering previous final artifacts from an interrupted promotion.' -ForegroundColor Yellow
+    if ($hasPreviousExe) {
+        Remove-ManagedFile -Path $finalExe
+        Move-Item -LiteralPath $previousExe -Destination $finalExe
+    }
+    if ($hasPreviousVersionInfo) {
+        Remove-ManagedFile -Path $finalVersionInfo
+        Move-Item -LiteralPath $previousVersionInfo -Destination $finalVersionInfo
+    }
+    elseif ($hasPreviousExe) {
+        Remove-ManagedFile -Path $finalVersionInfo
+    }
 }
 
 function Restore-LastKnownGoodFinal {
@@ -199,6 +220,30 @@ function Restore-LastKnownGoodFinal {
     }
 }
 
+function Restore-LastKnownGoodVersionInfo {
+    if (Test-Path -LiteralPath $previousVersionInfo -PathType Leaf) {
+        Remove-ManagedFile -Path $finalVersionInfo
+        Move-Item -LiteralPath $previousVersionInfo -Destination $finalVersionInfo
+        return
+    }
+
+    if ($finalVersionInfoCreatedByCurrentBuild -and -not $hadExistingVersionInfo) {
+        Remove-ManagedFile -Path $finalVersionInfo
+        return
+    }
+
+    if ($hadExistingVersionInfo -and (Test-Path -LiteralPath $finalVersionInfo -PathType Leaf)) {
+        $currentHash = (Get-FileHash -LiteralPath $finalVersionInfo -Algorithm SHA256).Hash
+        if ($currentHash -eq $originalVersionInfoHash) {
+            return
+        }
+    }
+
+    if ($promotionStarted) {
+        throw 'Promotion failed and the last-known-good version information could not be restored automatically.'
+    }
+}
+
 try {
     $stage = 'prepare publish directory'
     if (-not (Test-Path -LiteralPath $publishDirectory -PathType Container)) {
@@ -206,6 +251,7 @@ try {
     }
     Restore-InterruptedPromotion
     Remove-ManagedFile -Path $buildingExe
+    Remove-ManagedFile -Path $buildingVersionInfo
 
     $stage = 'validate build prerequisites'
     if (-not (Test-Path -LiteralPath $buildReleaseScript -PathType Leaf)) {
@@ -234,6 +280,9 @@ try {
         throw "build_release.py failed with exit code $LASTEXITCODE."
     }
     Assert-RecentNonemptyFile -Path $releaseScript -NotBeforeUtc $releaseStartedUtc -Description 'Generated release script' | Out-Null
+    Assert-RecentNonemptyFile -Path $versionInfoSource -NotBeforeUtc $releaseStartedUtc -Description 'Generated version information' | Out-Null
+    Copy-Item -LiteralPath $versionInfoSource -Destination $buildingVersionInfo
+    Assert-RecentNonemptyFile -Path $buildingVersionInfo -NotBeforeUtc $releaseStartedUtc -Description 'Staged version information' | Out-Null
 
     $stage = 'compile temporary executable'
     $compileStartedUtc = [DateTime]::UtcNow
@@ -268,12 +317,17 @@ try {
     $assetCount = Copy-PublishAssets -SourceDirectory $publishAssetsDirectory -DestinationDirectory $publishDirectory
     Write-Host "Synchronized $assetCount static publish asset(s)."
 
-    $stage = 'promote final executable'
+    $stage = 'promote final artifacts'
     $hadExistingFinal = Test-Path -LiteralPath $finalExe -PathType Leaf
     if ($hadExistingFinal) {
         $originalFinalHash = (Get-FileHash -LiteralPath $finalExe -Algorithm SHA256).Hash
     }
+    $hadExistingVersionInfo = Test-Path -LiteralPath $finalVersionInfo -PathType Leaf
+    if ($hadExistingVersionInfo) {
+        $originalVersionInfoHash = (Get-FileHash -LiteralPath $finalVersionInfo -Algorithm SHA256).Hash
+    }
     Remove-ManagedFile -Path $previousExe
+    Remove-ManagedFile -Path $previousVersionInfo
     $promotionStarted = $true
     if ($hadExistingFinal) {
         [System.IO.File]::Replace($buildingExe, $finalExe, $previousExe, $false)
@@ -282,12 +336,21 @@ try {
         Move-Item -LiteralPath $buildingExe -Destination $finalExe
     }
     $finalCreatedByCurrentBuild = $true
+    if ($hadExistingVersionInfo) {
+        [System.IO.File]::Replace($buildingVersionInfo, $finalVersionInfo, $previousVersionInfo, $false)
+    }
+    else {
+        Move-Item -LiteralPath $buildingVersionInfo -Destination $finalVersionInfo
+    }
+    $finalVersionInfoCreatedByCurrentBuild = $true
 
-    $stage = 'validate final executable'
+    $stage = 'validate final artifacts'
     Assert-RecentNonemptyFile -Path $finalExe -NotBeforeUtc $compileStartedUtc -Description 'Final executable' | Out-Null
+    Assert-RecentNonemptyFile -Path $finalVersionInfo -NotBeforeUtc $releaseStartedUtc -Description 'Final version information' | Out-Null
 
     $stage = 'complete promotion'
     Remove-ManagedFile -Path $previousExe
+    Remove-ManagedFile -Path $previousVersionInfo
     $promotionStarted = $false
 
     Write-Host ''
@@ -307,7 +370,23 @@ catch {
 
     try {
         Remove-ManagedFile -Path $buildingExe
-        Restore-LastKnownGoodFinal
+        Remove-ManagedFile -Path $buildingVersionInfo
+        $recoveryErrors = @()
+        try {
+            Restore-LastKnownGoodFinal
+        }
+        catch {
+            $recoveryErrors += $_.Exception.Message
+        }
+        try {
+            Restore-LastKnownGoodVersionInfo
+        }
+        catch {
+            $recoveryErrors += $_.Exception.Message
+        }
+        if ($recoveryErrors.Count -gt 0) {
+            throw ($recoveryErrors -join ' ')
+        }
     }
     catch {
         Write-Host 'RECOVERY FAILED' -ForegroundColor Red
@@ -315,6 +394,9 @@ catch {
         Write-Host "Inspect: $buildingExe" -ForegroundColor Yellow
         Write-Host "Inspect: $previousExe" -ForegroundColor Yellow
         Write-Host "Inspect: $finalExe" -ForegroundColor Yellow
+        Write-Host "Inspect: $buildingVersionInfo" -ForegroundColor Yellow
+        Write-Host "Inspect: $previousVersionInfo" -ForegroundColor Yellow
+        Write-Host "Inspect: $finalVersionInfo" -ForegroundColor Yellow
     }
 
     Write-Host 'The final artifact was not updated by a successful build.' -ForegroundColor Yellow

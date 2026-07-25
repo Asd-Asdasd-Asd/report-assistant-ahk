@@ -2,12 +2,13 @@
 
 ## Source 与版本
 
-- [ ] 从 clean commit 构建，`src/app_metadata.ahk` 中版本为 `0.6.0`。
+- [ ] 从 clean commit 构建，确认 `src/app_metadata.ahk` 中的版本是本次计划发布版本。
 - [ ] `src/app_metadata.ahk` 是 application version 的唯一人工维护来源。
 - [ ] source 变化后运行完整 Python suite 和 `python scripts/build_release.py`。
 - [ ] `release/report_assistant.ahk` 与 source modules 一致，UTF-8 without BOM，U+FEFF count 为 0。
 - [ ] generated release 不依赖 source tree、debug files 或开发机 absolute paths。
 - [ ] `SourceRevision` 与 clean source commit 一致，不是 `UNSTAMPED` 或 `-dirty`。
+- [ ] `release/report_assistant.ahk`、EXE“关于麦旋风…”和 `assets/publish/版本信息.md` 的版本、构建日期与 revision 一致。
 
 ## Schema 2 与设置
 
@@ -32,7 +33,7 @@
 
 ## Windows 一键构建
 
-- [ ] Windows 构建机已安装 AutoHotkey v2 与 Ahk2Exe。
+- [ ] Windows 构建机已安装 Git、Python 3、AutoHotkey v2 与 Ahk2Exe，项目目录为完整 Git checkout。
 - [ ] `assets/icon/generated/medex-icon.ico` 存在、非空且由当前 SVG 生成。
 - [ ] 双击根目录 `Build EXE.cmd`，确认重新生成 release source、嵌入图标、同步静态资源并输出：
 
@@ -40,7 +41,7 @@
 publish\麦旋风.exe
 ```
 
-- [ ] `publish/` 包含本轮需要分发的 `麦旋风.exe`、`首次使用.md`、`配置指南.md` 和 `更新说明.md`。
+- [ ] `publish/` 包含本轮需要分发的 `麦旋风.exe`、`版本信息.md`、`首次使用.md`、`配置指南.md` 和 `更新说明.md`。
 - [ ] 在资源管理器与系统托盘中确认正式图标。
 - [ ] 连续构建两次，final 被安全替换且没有遗留 `.building.exe` 或 `.previous.exe`。
 - [ ] 模拟 compiler path 错误：构建非零退出、清理 `.building.exe`、保留 last-known-good final。
@@ -52,6 +53,7 @@ publish\麦旋风.exe
 - [ ] 同名、改名、不同目录和不同版本 EXE 均由 `Local\MedExReportAssistant.Singleton` 阻止并行运行。
 - [ ] startup log 包含 `AppVersion`、`SourceRevision`、`ExecutablePath`、`ConfigPath`。
 - [ ] 双击托盘图标与右键“设置…”打开同一窗口；保存后 full-script Reload。
+- [ ] 托盘“关于麦旋风…”显示正确版本、构建日期和 7 位 source revision；clean build 无 dirty 警告。
 - [ ] builtin 与多个 custom templates 的新增、编辑、启停、排序、删除和重启持久化正确。
 - [ ] 单行、多行、空行、末尾换行、反斜杠及字面量 `\n` round-trip 正确。
 - [ ] `;red`、`;fzg`、`;fwj`、`;fjd`、`;cma`、`;cmx` 的文字、红色范围、caret 和后续输入颜色正确。
@@ -66,7 +68,7 @@ publish\麦旋风.exe
 
 - [ ] ZIP 只包含 `publish/` 中需要分发的内容，不包含 build scripts、source、user config、logs 或 Git metadata。
 - [ ] ZIP 先复制到本机并完整解压，不从共享盘或压缩包内直接运行。
-- [ ] 用户说明统一使用“麦旋风”，版本统一为 `v0.6.0`。
+- [ ] 用户说明统一使用“麦旋风”；需要展示当前版本时与 `AppMetadata.Version` 一致。
 - [ ] `更新说明.md` 写明完整文件夹替换、自动配置升级和问题留存方法。
 - [ ] 不包含 installer、shortcut、registry state、self-update、EXE backup、rollback 或历史 EXE cleanup。
 - [ ] 创建 tag 和上传 artifact 仅在 Windows/MedEx 验收完成后进行。

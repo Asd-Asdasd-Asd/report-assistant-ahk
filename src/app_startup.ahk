@@ -91,6 +91,7 @@ FormatReportAssistantStartupDiagnostic(startupResult, configPath) {
         "Timestamp=" FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
         "StartupResult=" startupResult,
         "AppVersion=" AppMetadata.Version,
+        "BuildDate=" AppMetadata.BuildDate,
         "SourceRevision=" AppMetadata.SourceRevision,
         "ExecutablePath=" A_ScriptFullPath,
         "ConfigPath=" configPath

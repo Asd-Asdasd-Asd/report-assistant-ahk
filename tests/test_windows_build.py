@@ -92,7 +92,7 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         script = text(POWERSHELL, "utf-8-sig")
         validate = script.index("$stage = 'validate temporary executable'")
         assets = script.index("$stage = 'synchronize static publish assets'")
-        promotion = script.index("$stage = 'promote final executable'")
+        promotion = script.index("$stage = 'promote final artifacts'")
         self.assertLess(validate, assets)
         self.assertLess(assets, promotion)
         self.assertIn("Get-ChildItem -LiteralPath $SourceDirectory -Force -Recurse -File", script)
@@ -114,14 +114,35 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         )
         self.assertLess(
             script.index("[System.IO.File]::Replace"),
-            script.index("$stage = 'validate final executable'"),
+            script.index("$stage = 'validate final artifacts'"),
         )
         prerequisite_stage = script.index("$stage = 'validate build prerequisites'")
-        promotion_stage = script.index("$stage = 'promote final executable'")
+        promotion_stage = script.index("$stage = 'promote final artifacts'")
         self.assertNotIn(
             "Remove-ManagedFile -Path $finalExe",
             script[prerequisite_stage:promotion_stage],
         )
+
+    def test_version_info_is_promoted_and_restored_with_the_executable(
+        self,
+    ) -> None:
+        script = text(POWERSHELL, "utf-8-sig")
+        for required in (
+            "版本信息.building.md",
+            "版本信息.previous.md",
+            "版本信息.md",
+            "Generated version information",
+            "Staged version information",
+            "Final version information",
+            "Restore-LastKnownGoodVersionInfo",
+        ):
+            self.assertIn(required, script)
+        self.assertIn(
+            "[System.IO.File]::Replace($buildingVersionInfo, "
+            "$finalVersionInfo, $previousVersionInfo, $false)",
+            script,
+        )
+        self.assertIn("if ($relativePath -eq '版本信息.md')", script)
 
     def test_success_output_identifies_exact_artifact(self) -> None:
         script = text(POWERSHELL, "utf-8-sig")
@@ -154,6 +175,7 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         self.assertIn("/publish/", gitignore)
         self.assertTrue((ROOT / "assets" / "publish" / "首次使用.md").is_file())
         self.assertTrue((ROOT / "assets" / "publish" / "配置指南.md").is_file())
+        self.assertTrue((ROOT / "assets" / "publish" / "版本信息.md").is_file())
         self.assertTrue(
             (ROOT / "assets" / "icon" / "source" / "medex-icon.svg").is_file()
         )

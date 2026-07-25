@@ -18,10 +18,12 @@ class TrayMenuTests(unittest.TestCase):
     def test_settings_and_reload_items_are_inserted_before_standard_exit(self) -> None:
         tray = source("src/tray_menu.ahk")
         self.assertIn('static SettingsItemName := "设置…"', tray)
+        self.assertIn('static AboutItemName := "关于麦旋风…"', tray)
         self.assertIn('static ReloadItemName := "重新加载配置"', tray)
         self.assertIn('static ExitItemName := "E&xit"', tray)
         self.assertIn("A_TrayMenu.Insert(", tray)
         self.assertIn("ShowReportAssistantSettings", tray)
+        self.assertIn("ShowReportAssistantAbout", tray)
         self.assertIn("ReloadReportAssistantFromTray", tray)
         self.assertNotIn('A_TrayMenu.Add("Exit', tray)
         self.assertNotIn('A_TrayMenu.Add("退出', tray)
@@ -49,6 +51,25 @@ class TrayMenuTests(unittest.TestCase):
         self.assertIn("无法重新加载配置", callback)
         self.assertIn("当前版本将继续运行", callback)
 
+    def test_about_dialog_uses_generated_application_metadata(self) -> None:
+        metadata = source("src/app_metadata.ahk")
+        tray = source("src/tray_menu.ahk")
+        for required in (
+            "static BuildDate := \"UNSTAMPED\"",
+            "AppMetadataShortSourceRevision(",
+            "AppMetadataBuildDateDisplay(",
+            "AppMetadataIsDirtyBuild(",
+            "FormatAppVersionInfoText()",
+            "此构建包含未提交修改，仅用于测试",
+        ):
+            self.assertIn(required, metadata)
+        about = tray.split("ShowReportAssistantAbout(*)", 1)[1].split(
+            "\n}\n\nReloadReportAssistantFromTray", 1
+        )[0]
+        self.assertIn("FormatAppVersionInfoText()", about)
+        self.assertIn('"关于麦旋风"', about)
+        self.assertNotIn("A_Clipboard", about)
+
     def test_tray_setup_runs_after_runtime_modules_are_included(self) -> None:
         main = source("src/main.ahk")
         self.assertIn("#Include settings_ui.ahk", main)
@@ -67,6 +88,7 @@ class TrayMenuTests(unittest.TestCase):
     def test_generated_release_contains_the_same_tray_policy(self) -> None:
         release = source("release/report_assistant.ahk")
         self.assertIn('static SettingsItemName := "设置…"', release)
+        self.assertIn('static AboutItemName := "关于麦旋风…"', release)
         self.assertIn('static ReloadItemName := "重新加载配置"', release)
         self.assertIn(
             "A_TrayMenu.Default := ReportAssistantTrayDefaults.SettingsItemName",

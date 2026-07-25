@@ -1,11 +1,11 @@
 # 项目状态与交接
 
 更新时间：2026-07-24
-当前版本：v0.6.0 internal test
+当前版本以 `src/app_metadata.ahk` 为唯一真源，并显示在 EXE“关于麦旋风…”和发布目录 `版本信息.md`。
 
 ## 当前 mainline
 
-- Application version source：`src/app_metadata.ahk`，值为 `0.6.0`。
+- Application version source：`src/app_metadata.ahk`；版本号只在这里人工修改。
 - Config：Schema 2，路径 `%LocalAppData%\MedExReportAssistant\config.ini`。
 - Portable artifact：`publish\麦旋风.exe`。
 - Production color-reset strategy：`relativeMousePixelValidated`。
