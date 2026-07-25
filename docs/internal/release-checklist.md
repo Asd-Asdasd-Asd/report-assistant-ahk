@@ -34,6 +34,7 @@
 ## Windows 一键构建
 
 - [ ] Windows 构建机已安装 Git、Python 3、AutoHotkey v2 与 Ahk2Exe，项目目录为完整 Git checkout。
+- [ ] 无 Git 元数据的构建仅用于临时测试；“关于”和 `版本信息.md` 必须显示“未标记”警告，不进入正式发布。
 - [ ] `assets/icon/generated/medex-icon.ico` 存在、非空且由当前 SVG 生成。
 - [ ] 双击根目录 `Build EXE.cmd`，确认重新生成 release source、嵌入图标、同步静态资源并输出：
 

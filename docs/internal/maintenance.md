@@ -33,7 +33,7 @@
 
 ## Windows 一键构建
 
-Windows 构建机需安装 Git、Python 3、AutoHotkey v2，并包含 Ahk2Exe compiler。项目必须是完整 Git checkout，`git` 和 Python 必须在 `PATH` 中。默认使用：
+Windows 构建机需安装 Python 3、AutoHotkey v2，并包含 Ahk2Exe compiler。Git checkout 用于注入准确 source revision；无 Git 或无 `.git` 时允许构建，但“关于”和 `版本信息.md` 会显示“未标记”及临时测试警告，不得作为正式发布。默认使用：
 
 - `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`
 - `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`

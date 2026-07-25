@@ -136,6 +136,8 @@ def stamp_build_date(metadata: str, build_date: str) -> str:
 
 
 def short_source_revision(source_revision: str) -> str:
+    if source_revision == "UNSTAMPED":
+        return "未标记"
     dirty_suffix = "-dirty"
     is_dirty = source_revision.endswith(dirty_suffix)
     revision = (
@@ -164,6 +166,13 @@ def build_version_info_text(
             [
                 "",
                 "> ⚠ 此构建包含未提交修改，仅用于测试。",
+            ]
+        )
+    elif source_revision == "UNSTAMPED":
+        lines.extend(
+            [
+                "",
+                "> ⚠ 当前环境没有 Git 元数据，源代码版本未标记，仅用于临时测试。",
             ]
         )
     return "\n".join(lines) + "\n"
@@ -201,15 +210,6 @@ def resolve_source_revision(root: Path = ROOT) -> str:
     if not revision:
         return "UNSTAMPED"
     return f"{revision}-dirty" if dirty else revision
-
-
-def require_stamped_source_revision(source_revision: str) -> str:
-    if source_revision == "UNSTAMPED":
-        raise RuntimeError(
-            "Git source revision is unavailable. Install Git, ensure it is on "
-            "PATH, and build from a complete Git checkout."
-        )
-    return source_revision
 
 
 def prepare_source(text: str, relative_name: str) -> str:
@@ -286,9 +286,7 @@ def main() -> int:
     built_at = datetime.now(timezone.utc)
     timestamp = built_at.strftime("%Y-%m-%d %H:%M:%S UTC")
     build_date = built_at.astimezone(SHANGHAI_TIMEZONE).strftime("%Y-%m-%d")
-    source_revision = require_stamped_source_revision(
-        resolve_source_revision()
-    )
+    source_revision = resolve_source_revision()
     metadata = read_component(SRC / "app_metadata.ahk")
     version = extract_app_version(metadata)
     release_text = build_release_text(
@@ -316,6 +314,11 @@ def main() -> int:
     print(f"Wrote {VERSION_INFO_OUTPUT.relative_to(ROOT)}")
     print(f"Build date: {build_date}")
     print(f"Source revision: {source_revision}")
+    if source_revision == "UNSTAMPED":
+        print(
+            "WARNING: Git metadata is unavailable. "
+            "This build is for temporary testing only."
+        )
     print(f"Embedded U+FEFF count: {bom_count}")
     return 0
 

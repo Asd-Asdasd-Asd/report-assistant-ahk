@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.0
-; Source revision: 43187025a4f4a8eabfa63622059ae0ea7cbd1e1f-dirty
-; Generated at: 2026-07-25 20:19:29 UTC
+; Source revision: c76b1b2357819f2a9c2764ff2f93623ed4be78ab-dirty
+; Generated at: 2026-07-25 20:29:43 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.0.0
 ;@Ahk2Exe-SetProductVersion 0.6.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.0"
     static Channel := "internal-test"
     static BuildDate := "2026-07-26"
-    static SourceRevision := "43187025a4f4a8eabfa63622059ae0ea7cbd1e1f-dirty"
+    static SourceRevision := "c76b1b2357819f2a9c2764ff2f93623ed4be78ab-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -66,6 +66,10 @@ FormatAppVersionInfoText() {
     if AppMetadataIsDirtyBuild() {
         output .= "`n`n"
         output .= "⚠ 此构建包含未提交修改，仅用于测试。"
+    } else if AppMetadata.SourceRevision = "UNSTAMPED" {
+        output .= "`n`n"
+        output .= "⚠ 当前环境没有 Git 元数据，"
+            . "源代码版本未标记，仅用于临时测试。"
     }
     return output
 }

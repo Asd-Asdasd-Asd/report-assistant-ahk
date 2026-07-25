@@ -13,7 +13,6 @@ from scripts.build_release import (
     build_version_info_text,
     build_release_text,
     extract_app_version,
-    require_stamped_source_revision,
     resolve_source_revision,
     short_source_revision,
     stamp_build_date,
@@ -89,13 +88,16 @@ class BuildReleaseEncodingTests(unittest.TestCase):
         self.assertIn("- 源代码版本：81ee813-dirty", version_info)
         self.assertIn("包含未提交修改", version_info)
 
-    def test_formal_generator_requires_git_revision(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "Install Git"):
-            require_stamped_source_revision("UNSTAMPED")
-        self.assertEqual(
-            require_stamped_source_revision("81ee813"),
-            "81ee813",
+    def test_unstamped_version_info_allows_temporary_non_git_build(self) -> None:
+        self.assertEqual(short_source_revision("UNSTAMPED"), "未标记")
+        version_info = build_version_info_text(
+            "0.6.0",
+            "2026-07-26",
+            "UNSTAMPED",
         )
+        self.assertIn("- 源代码版本：未标记", version_info)
+        self.assertIn("没有 Git 元数据", version_info)
+        self.assertIn("仅用于临时测试", version_info)
 
     def test_generated_outputs_do_not_make_the_next_build_dirty(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

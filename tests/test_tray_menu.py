@@ -61,6 +61,8 @@ class TrayMenuTests(unittest.TestCase):
             "AppMetadataIsDirtyBuild(",
             "FormatAppVersionInfoText()",
             "此构建包含未提交修改，仅用于测试",
+            "当前环境没有 Git 元数据",
+            "仅用于临时测试",
         ):
             self.assertIn(required, metadata)
         about = tray.split("ShowReportAssistantAbout(*)", 1)[1].split(

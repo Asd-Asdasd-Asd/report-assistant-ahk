@@ -53,6 +53,10 @@ FormatAppVersionInfoText() {
     if AppMetadataIsDirtyBuild() {
         output .= "`n`n"
         output .= "⚠ 此构建包含未提交修改，仅用于测试。"
+    } else if AppMetadata.SourceRevision = "UNSTAMPED" {
+        output .= "`n`n"
+        output .= "⚠ 当前环境没有 Git 元数据，"
+            . "源代码版本未标记，仅用于临时测试。"
     }
     return output
 }

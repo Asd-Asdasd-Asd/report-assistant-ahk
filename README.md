@@ -59,7 +59,7 @@ Schema 1 首次启动时执行一次性迁移：先审计旧 `Mode`，再备份�
 
 ## Portable build
 
-Windows 构建机安装 Git、Python 3、AutoHotkey v2 与 Ahk2Exe 后，双击根目录 `Build EXE.cmd`：
+Windows 构建机安装 Python 3、AutoHotkey v2 与 Ahk2Exe 后，双击根目录 `Build EXE.cmd`。Git checkout 可提供准确 source revision；没有 Git 元数据时仍可生成带“未标记”警告的临时测试构建：
 
 ```text
 existing source
