@@ -25,8 +25,36 @@ RunSettingsUiRegression() {
     TestSettingsListSectionIdentity()
     TestSettingsTemplateElementInsertion()
     TestSettingsDeletePersistence()
+    TestViewerHotkeyWinModifier()
     MsgBox "Settings UI regression passed.", "MedEx test", "Iconi"
     ExitApp 0
+}
+
+TestViewerHotkeyWinModifier() {
+    AssertSettingsTest(
+        ViewerHotkeyUsesWin("#^!1"),
+        "Win modifier was not detected"
+    )
+    AssertSettingsTest(
+        ViewerHotkeyNativeChord("#^!1") = "^!1",
+        "native Hotkey chord retained Win"
+    )
+    AssertSettingsTest(
+        MergeViewerHotkeyChord("^!1", true) = "^!#1",
+        "Win modifier was not merged canonically"
+    )
+    AssertSettingsTest(
+        ViewerToolHotkeyChordIsSafe("#1"),
+        "Win-only modifier chord was rejected"
+    )
+    AssertSettingsTest(
+        ViewerToolHotkeyChordIsSafe("^!1"),
+        "two standard modifiers were rejected"
+    )
+    AssertSettingsTest(
+        !ViewerToolHotkeyChordIsSafe("^1"),
+        "single standard modifier was accepted"
+    )
 }
 
 TestReportHotstringTextCodec() {

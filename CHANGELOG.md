@@ -11,11 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Added configurable, default-disabled hotkeys for the MxNM Viewer arrow, length-measurement, and 3D SUV tools.
+- Added a configurable, Viewer-only screenshot mapping that sends MedEx F12 and shows a brief non-text dispatch pulse.
+- Added Win-key support through an explicit Settings modifier, bypassing the native Windows Hotkey control limitation.
 - Added config-derived Vendor command discovery and Windows field harnesses for all three Viewer tools.
 
 ### Changed
 
 - Viewer tool invocation now maps the Vendor button-pad origin into the current runtime frame, validates the native control and process boundary, and sends a bounded synchronous `WM_COMMAND / BN_CLICKED` to the button's direct parent.
+- 3D SUV now dispatches once after the complete shortcut chord is released, avoiding Vendor modifier-dependent temporary state; screenshot feedback uses a fast, full-Viewer translucent flash after pure F12 dispatch.
 - Removed UIA, mouse movement, focus switching, background polling, and hover dependencies from the Viewer tool hotkey path.
 
 ### Fixed

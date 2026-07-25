@@ -18,10 +18,127 @@ ViewerToolHotkeyDefinitions(settings) {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-suv3d",
             settings.ViewerSuv3DChord,
-            InvokeMxNMViewerToolHotkey.Bind("suv3d")
+            InvokeMxNMViewerSuv3DHotkey.Bind(
+                settings.ViewerSuv3DChord
+            )
         ))
     }
     return definitions
+}
+
+ViewerCaptureHotkeyDefinitions(settings) {
+    if !settings.ViewerCaptureEnabled
+        || settings.ViewerCaptureChord = "" {
+        return []
+    }
+    return [
+        HotkeyDefinition(
+            "viewer-capture-f12",
+            settings.ViewerCaptureChord,
+            InvokeMxNMViewerCaptureHotkey.Bind(
+                settings.ViewerCaptureChord
+            )
+        )
+    ]
+}
+
+MedExViewerForegroundActive(*) {
+    global VIEWER_EXE
+
+    try foregroundHwnd := WinExist("A")
+    catch
+        return false
+    if !foregroundHwnd
+        return false
+    try processName := WinGetProcessName("ahk_id " foregroundHwnd)
+    catch
+        return false
+    return StrLower(processName) = StrLower(VIEWER_EXE)
+}
+
+InvokeMxNMViewerCaptureHotkey(chord, *) {
+    static active := false
+    if active
+        return
+    if !MedExViewerForegroundActive()
+        return
+    try viewerHwnd := WinExist("A")
+    catch
+        return
+    if !viewerHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != viewerHwnd
+            || !MedExViewerForegroundActive() {
+            return
+        }
+        try Send "{F12}"
+        catch {
+            Flash("Viewer 截图快捷键执行失败", 1200)
+            return
+        }
+        ShowReportAssistantDispatchPulse(viewerHwnd)
+    } finally {
+        active := false
+    }
+}
+
+InvokeMxNMViewerSuv3DHotkey(chord, *) {
+    static active := false
+    if active
+        return
+    try foregroundHwnd := WinExist("A")
+    catch
+        return
+    if !foregroundHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != foregroundHwnd
+            return
+        result := MxNMViewerToolCommandProvider.Invoke("suv3d")
+        if !result.ok {
+            if result.code != MxNMViewerToolCode.WRONG_FOREGROUND
+                Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+            return
+        }
+    } finally {
+        active := false
+    }
+}
+
+ViewerHotkeyChordHasPressedComponent(chord) {
+    normalized := Trim(String(chord), " `t`r`n")
+    if !RegExMatch(normalized, "^([!+^#]*)(.+)$", &match)
+        return false
+    try {
+        if GetKeyState(match[2], "P")
+            return true
+        if InStr(match[1], "^")
+            && GetKeyState("Control", "P")
+            return true
+        if InStr(match[1], "!")
+            && GetKeyState("Alt", "P")
+            return true
+        if InStr(match[1], "+")
+            && GetKeyState("Shift", "P")
+            return true
+        if InStr(match[1], "#")
+            && (
+                GetKeyState("LWin", "P")
+                || GetKeyState("RWin", "P")
+            ) {
+            return true
+        }
+    } catch {
+        return false
+    }
+    return false
 }
 
 InvokeMxNMViewerToolHotkey(commandName, *) {

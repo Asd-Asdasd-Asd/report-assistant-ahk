@@ -14,6 +14,24 @@
 
 默认快捷键为 `Ctrl+Alt+1/2/3`，三项首次升级均保持关闭。快捷键只在配置的 MedEx 报告程序或 Viewer 位于前台时注册为有效动作；其他程序中的相同按键继续交给原程序。
 
+## Win 修饰键
+
+AHK 动态 `Hotkey()` 原生支持 `#` 表示 Win，但 Windows common-control `Hotkey` 输入框没有 Win modifier flag，只能采集 Ctrl、Alt 和 Shift。设置页因此在每一行提供独立的 Win checkbox：加载时从 canonical chord 拆出 `#`，保存时再与 native Hotkey 值合并。
+
+Win 本身可作为安全修饰键；不使用 Win 时仍要求 Ctrl/Alt/Shift 中至少两个，避免覆盖普通单修饰键。归一化继续使用统一顺序 `^!+#`，并与 emergency/reserved 及其他已启用快捷键做不区分大小写的冲突检查。
+
+## F12 截图映射
+
+第四项默认快捷键为 `Ctrl+Alt+4`，保存键位后只在 `MedExNMFusion.exe` Viewer 位于前台时注册。handler 保存 foreground HWND，等待主键及全部声明 modifier 物理释放，再复核仍是同一个 Viewer 后发送纯 F12，避免 MedEx 收到 Ctrl/Alt/Win+F12；报告窗口或其他程序前台时既不触发，也不吞掉相同按键。
+
+F12 派发成功后，以约 23% opacity 的白色 overlay 覆盖 Viewer outer rect 约 90 ms。pulse 使用 `NoActivate`、click-through tool window，不包含文字，不改变焦点；显示前 best-effort 设置 `WDA_EXCLUDEFROMCAPTURE`，降低 overlay 进入截图的风险。它只表示麦旋风在正确 Viewer context 中接受快捷键并执行 F12 send，不验证 MedEx 的截图文件、剪贴板或保存结果。
+
+## 3D SUV release-then-dispatch semantics
+
+现场确认 `21193` 在快捷键 modifier 仍物理按下时投递，会进入由 modifier 维持的临时状态：抬起主键后仍可测量，但释放 modifier 就会自动取消。这不是期望的产品交互，也不表示 Vendor command 必须持续重复。
+
+production 因此在 hotkey key-down 后等待主键及所有声明 modifier 完全物理释放，再复核 foreground HWND 未变化，最后只执行一次完整 config、geometry、HWND、PID、control-ID 校验和 command 投递。静态 `active` guard 屏蔽等待期间的操作系统重复 hotkey thread。这样 Vendor 收到 `21193` 时不再带着 Ctrl、Alt、Shift 或 Win 的物理按下状态，目标交互与箭头、长度一致：按下并松开一次完成选择，选择后无需继续按住快捷键。
+
 ## 配置与运行时模型
 
 `MxNMViewerToolCommandProvider` 在应用启动时尽量复用已经验证的 Viewer process path cache，并从固定相对路径读取 Vendor 配置。静态 plan 缓存：

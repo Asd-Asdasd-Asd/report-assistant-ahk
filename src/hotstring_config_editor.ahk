@@ -450,6 +450,18 @@ WriteViewerToolHotkeySettings(configPath, settings) {
         section,
         FeatureDefaults.ViewerSuv3DChordKey
     )
+    IniWrite(
+        settings.ViewerCaptureEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerCaptureEnabledKey
+    )
+    IniWrite(
+        settings.ViewerCaptureChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerCaptureChordKey
+    )
 }
 
 EditableReportHotstringEntriesMatch(expected, actual) {

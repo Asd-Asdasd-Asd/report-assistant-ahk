@@ -58,7 +58,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         hotkeys = source("src/viewer_tool_hotkeys.ahk")
         features = source("src/features.ahk")
         self.assertIn('static ViewerToolEnabledDefault := "false"', model)
-        for chord in ('"^!1"', '"^!2"', '"^!3"'):
+        for chord in ('"^!1"', '"^!2"', '"^!3"', '"^!4"'):
             self.assertIn(chord, model)
         self.assertIn(
             "MedExViewerToolForegroundActive",
@@ -66,22 +66,76 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         )
         self.assertIn("MedExViewerToolForegroundActive", features)
 
-    def test_settings_ui_exposes_all_three_hotkeys(self) -> None:
+    def test_settings_ui_exposes_all_viewer_hotkeys_and_win_modifier(self) -> None:
         ui = source("src/settings_ui.ahk")
         editor = source("src/hotstring_config_editor.ahk")
-        for label in ("箭头", "长度测量", "3D SUV测量"):
+        for label in ("箭头", "长度测量", "3D SUV测量", "截图（发送 F12）"):
             self.assertIn(label, ui)
-        self.assertEqual(ui.count('"Hotkey"'), 3)
-        self.assertEqual(ui.count('"CheckBox", "x276'), 3)
-        self.assertEqual(ui.count('w90 h26", "启用"'), 3)
-        self.assertEqual(ui.count("Limit15"), 3)
+        self.assertEqual(ui.count('"Hotkey"'), 4)
+        self.assertEqual(ui.count('"CheckBox", "x276'), 4)
+        self.assertEqual(ui.count('"CheckBox", "x648'), 4)
+        self.assertEqual(ui.count('w90 h26", "启用"'), 4)
+        self.assertEqual(ui.count('w70 h26", "使用"'), 4)
+        self.assertNotIn("Limit15", ui)
         self.assertIn("ValidateViewerToolHotkeySettings(", ui)
         self.assertIn(
-            "ViewerToolHotkeyChordHasTwoModifiers",
+            "ViewerToolHotkeyChordIsSafe",
             source("src/feature_normalization.ahk"),
         )
+        self.assertIn("ViewerHotkeyNativeChord(", ui)
+        self.assertIn("ViewerHotkeyUsesWin(", ui)
+        self.assertIn("MergeViewerHotkeyChord(", ui)
         self.assertIn("WriteViewerToolHotkeySettings(", editor)
         self.assertIn("ViewerToolHotkeySettingsMatch(", editor)
+
+    def test_capture_mapping_is_viewer_only_and_feedback_is_non_textual(self) -> None:
+        hotkeys = source("src/viewer_tool_hotkeys.ahk")
+        features = source("src/features.ahk")
+        feedback = source("src/visual_feedback.ahk")
+        self.assertIn("ViewerCaptureHotkeyDefinitions(settings)", hotkeys)
+        self.assertIn("InvokeMxNMViewerCaptureHotkey.Bind(", hotkeys)
+        self.assertIn(
+            "ViewerHotkeyChordHasPressedComponent(chord)",
+            hotkeys,
+        )
+        self.assertIn('if WinExist("A") != viewerHwnd', hotkeys)
+        self.assertIn('Send "{F12}"', hotkeys)
+        self.assertIn("ShowReportAssistantDispatchPulse(viewerHwnd)", hotkeys)
+        self.assertIn("MedExViewerForegroundActive", features)
+        self.assertIn("ReportAssistantDispatchPulse", feedback)
+        pulse = feedback.split(
+            "class ReportAssistantDispatchPulse", 1
+        )[1]
+        self.assertIn("durationMs := 90", pulse)
+        self.assertIn('window.BackColor := "FFFFFF"', pulse)
+        self.assertIn("WinSetTransparent(", pulse)
+        self.assertIn('"User32\\SetWindowDisplayAffinity"', pulse)
+        self.assertNotIn('window.Add("Text"', pulse)
+        self.assertIn("NoActivate", pulse)
+
+    def test_suv3d_dispatches_once_after_the_chord_is_released(self) -> None:
+        hotkeys = source("src/viewer_tool_hotkeys.ahk")
+        commands = source("src/mxnm_viewer_tool_commands.ahk")
+        self.assertIn("InvokeMxNMViewerSuv3DHotkey.Bind(", hotkeys)
+        self.assertIn('Invoke("suv3d")', hotkeys)
+        handler = hotkeys.split(
+            "InvokeMxNMViewerSuv3DHotkey(chord, *)", 1
+        )[1].split(
+            "ViewerHotkeyChordHasPressedComponent(chord) {", 1
+        )[0]
+        release_wait = (
+            "while ViewerHotkeyChordHasPressedComponent(chord)"
+        )
+        self.assertIn(release_wait, handler)
+        self.assertLess(
+            handler.index(release_wait),
+            handler.index('Invoke("suv3d")'),
+        )
+        self.assertIn('if WinExist("A") != foregroundHwnd', handler)
+        self.assertNotIn("RepeatValidatedMxNMViewerToolButton", commands)
+        self.assertNotIn("Sleep 35", hotkeys)
+        self.assertIn('GetKeyState("Control", "P")', hotkeys)
+        self.assertIn('GetKeyState("LWin", "P")', hotkeys)
 
     def test_release_order_contains_command_and_hotkey_modules(self) -> None:
         main = source("src/main.ahk")

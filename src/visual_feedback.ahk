@@ -56,3 +56,77 @@ class ReportAssistantVisualFeedback {
 ShowReportAssistantVisualFeedback(message, durationMs := 1500) {
     return ReportAssistantVisualFeedback.Show(message, durationMs)
 }
+
+class ReportAssistantDispatchPulse {
+    static CurrentWindow := 0
+    static CurrentToken := 0
+
+    static ShowForWindow(targetHwnd, durationMs := 90) {
+        this.Hide()
+        if !targetHwnd
+            return false
+        try WinGetPos(
+            &windowX,
+            &windowY,
+            &windowWidth,
+            &windowHeight,
+            "ahk_id " targetHwnd
+        )
+        catch
+            return false
+        if windowWidth < 32 || windowHeight < 32
+            return false
+
+        this.CurrentToken += 1
+        token := this.CurrentToken
+        try {
+            window := Gui(
+                "+AlwaysOnTop -Caption +ToolWindow +E0x20 +E0x08000000"
+            )
+            window.BackColor := "FFFFFF"
+            window.Show(
+                "Hide x" windowX " y" windowY
+                    . " w" windowWidth " h" windowHeight
+            )
+            try WinSetTransparent(
+                58,
+                "ahk_id " window.Hwnd
+            )
+            try DllCall(
+                "User32\SetWindowDisplayAffinity",
+                "Ptr", window.Hwnd,
+                "UInt", 0x00000011,
+                "Int"
+            )
+            window.Show("NoActivate")
+            this.CurrentWindow := window
+            SetTimer(
+                () => ReportAssistantDispatchPulse.HideIfCurrent(token),
+                -Max(80, Integer(durationMs))
+            )
+            return true
+        } catch {
+            this.CurrentWindow := 0
+            return false
+        }
+    }
+
+    static HideIfCurrent(token) {
+        if this.CurrentToken = token
+            this.Hide()
+    }
+
+    static Hide() {
+        if IsObject(this.CurrentWindow) {
+            try this.CurrentWindow.Destroy()
+        }
+        this.CurrentWindow := 0
+    }
+}
+
+ShowReportAssistantDispatchPulse(targetHwnd, durationMs := 90) {
+    return ReportAssistantDispatchPulse.ShowForWindow(
+        targetHwnd,
+        durationMs
+    )
+}

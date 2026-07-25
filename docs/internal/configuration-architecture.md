@@ -52,6 +52,8 @@ LengthEnabled=false
 LengthChord=^!2
 Suv3DEnabled=false
 Suv3DChord=^!3
+CaptureEnabled=false
+CaptureChord=^!4
 
 [Hotstring.builtin-red]
 Enabled=true

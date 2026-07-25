@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.1
-; Source revision: 383f242f11e60c38807b3845d3ee4c031bbea193
-; Generated at: 2026-07-25 22:08:31 UTC
+; Source revision: 8a3db6f2e37fdddc7c35ec6cef4eab8c0fc22f2d-dirty
+; Generated at: 2026-07-25 22:44:26 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.1.0
 ;@Ahk2Exe-SetProductVersion 0.6.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-26"
-    static SourceRevision := "383f242f11e60c38807b3845d3ee4c031bbea193"
+    static SourceRevision := "8a3db6f2e37fdddc7c35ec6cef4eab8c0fc22f2d-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -8322,6 +8322,80 @@ ShowReportAssistantVisualFeedback(message, durationMs := 1500) {
     return ReportAssistantVisualFeedback.Show(message, durationMs)
 }
 
+class ReportAssistantDispatchPulse {
+    static CurrentWindow := 0
+    static CurrentToken := 0
+
+    static ShowForWindow(targetHwnd, durationMs := 90) {
+        this.Hide()
+        if !targetHwnd
+            return false
+        try WinGetPos(
+            &windowX,
+            &windowY,
+            &windowWidth,
+            &windowHeight,
+            "ahk_id " targetHwnd
+        )
+        catch
+            return false
+        if windowWidth < 32 || windowHeight < 32
+            return false
+
+        this.CurrentToken += 1
+        token := this.CurrentToken
+        try {
+            window := Gui(
+                "+AlwaysOnTop -Caption +ToolWindow +E0x20 +E0x08000000"
+            )
+            window.BackColor := "FFFFFF"
+            window.Show(
+                "Hide x" windowX " y" windowY
+                    . " w" windowWidth " h" windowHeight
+            )
+            try WinSetTransparent(
+                58,
+                "ahk_id " window.Hwnd
+            )
+            try DllCall(
+                "User32\SetWindowDisplayAffinity",
+                "Ptr", window.Hwnd,
+                "UInt", 0x00000011,
+                "Int"
+            )
+            window.Show("NoActivate")
+            this.CurrentWindow := window
+            SetTimer(
+                () => ReportAssistantDispatchPulse.HideIfCurrent(token),
+                -Max(80, Integer(durationMs))
+            )
+            return true
+        } catch {
+            this.CurrentWindow := 0
+            return false
+        }
+    }
+
+    static HideIfCurrent(token) {
+        if this.CurrentToken = token
+            this.Hide()
+    }
+
+    static Hide() {
+        if IsObject(this.CurrentWindow) {
+            try this.CurrentWindow.Destroy()
+        }
+        this.CurrentWindow := 0
+    }
+}
+
+ShowReportAssistantDispatchPulse(targetHwnd, durationMs := 90) {
+    return ReportAssistantDispatchPulse.ShowForWindow(
+        targetHwnd,
+        durationMs
+    )
+}
+
 ; --- END visual_feedback.ahk ---
 
 ; --- BEGIN clipboard_html.ahk ---
@@ -15759,10 +15833,13 @@ class FeatureDefaults {
     static ViewerLengthChordKey := "LengthChord"
     static ViewerSuv3DEnabledKey := "Suv3DEnabled"
     static ViewerSuv3DChordKey := "Suv3DChord"
+    static ViewerCaptureEnabledKey := "CaptureEnabled"
+    static ViewerCaptureChordKey := "CaptureChord"
     static ViewerToolEnabledDefault := "false"
     static ViewerArrowChordDefault := "^!1"
     static ViewerLengthChordDefault := "^!2"
     static ViewerSuv3DChordDefault := "^!3"
+    static ViewerCaptureChordDefault := "^!4"
 
     static ManagedConfigDefaults() {
         return [
@@ -15800,6 +15877,16 @@ class FeatureDefaults {
                 this.ViewerToolSection,
                 this.ViewerSuv3DChordKey,
                 this.ViewerSuv3DChordDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerCaptureEnabledKey,
+                this.ViewerToolEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerCaptureChordKey,
+                this.ViewerCaptureChordDefault
             )
         ]
     }
@@ -15813,7 +15900,9 @@ class RawFeatureSettings {
         viewerLengthEnabled,
         viewerLengthChord,
         viewerSuv3DEnabled,
-        viewerSuv3DChord
+        viewerSuv3DChord,
+        viewerCaptureEnabled,
+        viewerCaptureChord
     ) {
         this.GlobalHjklArrows := String(globalHjklArrows)
         this.ViewerArrowEnabled := String(viewerArrowEnabled)
@@ -15822,6 +15911,8 @@ class RawFeatureSettings {
         this.ViewerLengthChord := String(viewerLengthChord)
         this.ViewerSuv3DEnabled := String(viewerSuv3DEnabled)
         this.ViewerSuv3DChord := String(viewerSuv3DChord)
+        this.ViewerCaptureEnabled := String(viewerCaptureEnabled)
+        this.ViewerCaptureChord := String(viewerCaptureChord)
     }
 }
 
@@ -15833,7 +15924,9 @@ class FeatureSettings {
         viewerLengthEnabled := false,
         viewerLengthChord := "",
         viewerSuv3DEnabled := false,
-        viewerSuv3DChord := ""
+        viewerSuv3DChord := "",
+        viewerCaptureEnabled := false,
+        viewerCaptureChord := ""
     ) {
         this.GlobalHjklArrows := globalHjklArrows = true
         this.ViewerArrowEnabled := viewerArrowEnabled = true
@@ -15842,6 +15935,8 @@ class FeatureSettings {
         this.ViewerLengthChord := String(viewerLengthChord)
         this.ViewerSuv3DEnabled := viewerSuv3DEnabled = true
         this.ViewerSuv3DChord := String(viewerSuv3DChord)
+        this.ViewerCaptureEnabled := viewerCaptureEnabled = true
+        this.ViewerCaptureChord := String(viewerCaptureChord)
     }
 }
 
@@ -16018,7 +16113,9 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         FeatureDefaults.ViewerLengthEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerLengthChordKey "=" FeatureDefaults.ViewerLengthChordDefault,
         FeatureDefaults.ViewerSuv3DEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
-        FeatureDefaults.ViewerSuv3DChordKey "=" FeatureDefaults.ViewerSuv3DChordDefault
+        FeatureDefaults.ViewerSuv3DChordKey "=" FeatureDefaults.ViewerSuv3DChordDefault,
+        FeatureDefaults.ViewerCaptureEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerCaptureChordKey "=" FeatureDefaults.ViewerCaptureChordDefault
     ]
     for entry in defaults {
         lines.Push("")
@@ -17805,6 +17902,18 @@ WriteViewerToolHotkeySettings(configPath, settings) {
         section,
         FeatureDefaults.ViewerSuv3DChordKey
     )
+    IniWrite(
+        settings.ViewerCaptureEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerCaptureEnabledKey
+    )
+    IniWrite(
+        settings.ViewerCaptureChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerCaptureChordKey
+    )
 }
 
 EditableReportHotstringEntriesMatch(expected, actual) {
@@ -18225,7 +18334,9 @@ LoadRawFeatureSettings(configPath := "") {
         FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerLengthChordDefault,
         FeatureDefaults.ViewerToolEnabledDefault,
-        FeatureDefaults.ViewerSuv3DChordDefault
+        FeatureDefaults.ViewerSuv3DChordDefault,
+        FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerCaptureChordDefault
     )
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
@@ -18281,6 +18392,18 @@ LoadRawFeatureSettings(configPath := "") {
                 FeatureDefaults.ViewerToolSection,
                 FeatureDefaults.ViewerSuv3DChordKey,
                 FeatureDefaults.ViewerSuv3DChordDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerCaptureEnabledKey,
+                FeatureDefaults.ViewerToolEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerCaptureChordKey,
+                FeatureDefaults.ViewerCaptureChordDefault
             )
         )
     } catch {
@@ -18303,7 +18426,9 @@ NormalizeFeatureSettings(raw) {
         ParseOptionalFeatureEnabled(raw.ViewerLengthEnabled),
         NormalizeOptionalHotkeyChord(raw.ViewerLengthChord),
         ParseOptionalFeatureEnabled(raw.ViewerSuv3DEnabled),
-        NormalizeOptionalHotkeyChord(raw.ViewerSuv3DChord)
+        NormalizeOptionalHotkeyChord(raw.ViewerSuv3DChord),
+        ParseOptionalFeatureEnabled(raw.ViewerCaptureEnabled),
+        NormalizeOptionalHotkeyChord(raw.ViewerCaptureChord)
     )
 }
 
@@ -18335,6 +18460,12 @@ ValidateViewerToolHotkeySettings(settings) {
             label: "3D SUV测量",
             enabled: settings.ViewerSuv3DEnabled,
             chord: settings.ViewerSuv3DChord
+        },
+        {
+            field: "ViewerCaptureChord",
+            label: "截图",
+            enabled: settings.ViewerCaptureEnabled,
+            chord: settings.ViewerCaptureChord
         }
     ]
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
@@ -18360,11 +18491,12 @@ ValidateViewerToolHotkeySettings(settings) {
                 "启用“" definition.label "”前必须设置快捷键。"
             )
         }
-        if !ViewerToolHotkeyChordHasTwoModifiers(chord) {
+        if !ViewerToolHotkeyChordIsSafe(chord) {
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键至少需要两个修饰键。"
+                "“" definition.label "”快捷键需要 Win，"
+                    . "或至少两个 Ctrl/Alt/Shift 修饰键。"
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -18380,9 +18512,11 @@ ValidateViewerToolHotkeySettings(settings) {
     return MakeViewerToolHotkeyValidation(true)
 }
 
-ViewerToolHotkeyChordHasTwoModifiers(chord) {
-    if !RegExMatch(String(chord), "^([!+^]+)(.+)$", &match)
+ViewerToolHotkeyChordIsSafe(chord) {
+    if !RegExMatch(String(chord), "^([!+^#]+)(.+)$", &match)
         return false
+    if InStr(match[1], "#")
+        return true
     modifierCount := 0
     for modifier in ["^", "!", "+"] {
         if InStr(match[1], modifier)
@@ -18406,6 +18540,33 @@ ViewerToolHotkeySettingsMatch(expected, actual) {
         && expected.ViewerLengthChord = actual.ViewerLengthChord
         && expected.ViewerSuv3DEnabled = actual.ViewerSuv3DEnabled
         && expected.ViewerSuv3DChord = actual.ViewerSuv3DChord
+        && expected.ViewerCaptureEnabled = actual.ViewerCaptureEnabled
+        && expected.ViewerCaptureChord = actual.ViewerCaptureChord
+}
+
+ViewerHotkeyUsesWin(chord) {
+    if !RegExMatch(
+        Trim(String(chord), " `t`r`n"),
+        "^([!+^#]+)",
+        &match
+    ) {
+        return false
+    }
+    return InStr(match[1], "#") > 0
+}
+
+ViewerHotkeyNativeChord(chord) {
+    normalized := Trim(String(chord), " `t`r`n")
+    if !RegExMatch(normalized, "^([!+^#]+)(.+)$", &match)
+        return normalized
+    return StrReplace(match[1], "#") . match[2]
+}
+
+MergeViewerHotkeyChord(nativeChord, usesWin) {
+    normalized := Trim(String(nativeChord), " `t`r`n")
+    if normalized = ""
+        return ""
+    return NormalizeHotkeyChord((usesWin ? "#" : "") . normalized)
 }
 
 ; --- END feature_normalization.ahk ---
@@ -18522,10 +18683,127 @@ ViewerToolHotkeyDefinitions(settings) {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-suv3d",
             settings.ViewerSuv3DChord,
-            InvokeMxNMViewerToolHotkey.Bind("suv3d")
+            InvokeMxNMViewerSuv3DHotkey.Bind(
+                settings.ViewerSuv3DChord
+            )
         ))
     }
     return definitions
+}
+
+ViewerCaptureHotkeyDefinitions(settings) {
+    if !settings.ViewerCaptureEnabled
+        || settings.ViewerCaptureChord = "" {
+        return []
+    }
+    return [
+        HotkeyDefinition(
+            "viewer-capture-f12",
+            settings.ViewerCaptureChord,
+            InvokeMxNMViewerCaptureHotkey.Bind(
+                settings.ViewerCaptureChord
+            )
+        )
+    ]
+}
+
+MedExViewerForegroundActive(*) {
+    global VIEWER_EXE
+
+    try foregroundHwnd := WinExist("A")
+    catch
+        return false
+    if !foregroundHwnd
+        return false
+    try processName := WinGetProcessName("ahk_id " foregroundHwnd)
+    catch
+        return false
+    return StrLower(processName) = StrLower(VIEWER_EXE)
+}
+
+InvokeMxNMViewerCaptureHotkey(chord, *) {
+    static active := false
+    if active
+        return
+    if !MedExViewerForegroundActive()
+        return
+    try viewerHwnd := WinExist("A")
+    catch
+        return
+    if !viewerHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != viewerHwnd
+            || !MedExViewerForegroundActive() {
+            return
+        }
+        try Send "{F12}"
+        catch {
+            Flash("Viewer 截图快捷键执行失败", 1200)
+            return
+        }
+        ShowReportAssistantDispatchPulse(viewerHwnd)
+    } finally {
+        active := false
+    }
+}
+
+InvokeMxNMViewerSuv3DHotkey(chord, *) {
+    static active := false
+    if active
+        return
+    try foregroundHwnd := WinExist("A")
+    catch
+        return
+    if !foregroundHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != foregroundHwnd
+            return
+        result := MxNMViewerToolCommandProvider.Invoke("suv3d")
+        if !result.ok {
+            if result.code != MxNMViewerToolCode.WRONG_FOREGROUND
+                Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+            return
+        }
+    } finally {
+        active := false
+    }
+}
+
+ViewerHotkeyChordHasPressedComponent(chord) {
+    normalized := Trim(String(chord), " `t`r`n")
+    if !RegExMatch(normalized, "^([!+^#]*)(.+)$", &match)
+        return false
+    try {
+        if GetKeyState(match[2], "P")
+            return true
+        if InStr(match[1], "^")
+            && GetKeyState("Control", "P")
+            return true
+        if InStr(match[1], "!")
+            && GetKeyState("Alt", "P")
+            return true
+        if InStr(match[1], "+")
+            && GetKeyState("Shift", "P")
+            return true
+        if InStr(match[1], "#")
+            && (
+                GetKeyState("LWin", "P")
+                || GetKeyState("RWin", "P")
+            ) {
+            return true
+        }
+    } catch {
+        return false
+    }
+    return false
 }
 
 InvokeMxNMViewerToolHotkey(commandName, *) {
@@ -18567,6 +18845,11 @@ RegisterConfiguredFeatures(settings) {
         ViewerToolHotkeyDefinitions(settings),
         ReservedApplicationHotkeyChords(),
         MedExViewerToolForegroundActive
+    )
+    RegisterHotkeyDefinitions(
+        ViewerCaptureHotkeyDefinitions(settings),
+        ReservedApplicationHotkeyChords(),
+        MedExViewerForegroundActive
     )
 }
 
@@ -18731,18 +19014,22 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "仅在 MedEx 报告程序或 Viewer 位于前台时生效；保存后程序会重新加载。"
+            "工具选择可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")
         this.Window.Add("Text", "x402 y126 w220", "快捷键")
+        this.Window.Add("Text", "x648 y126 w70", "Win")
 
         this.Window.Add("Text", "x72 y174 w170", "箭头")
         this.ViewerArrowEnabledInput := this.Window.Add(
             "CheckBox", "x276 y166 w90 h26", "启用"
         )
         this.ViewerArrowChordInput := this.Window.Add(
-            "Hotkey", "x402 y166 w220 h26 Limit15"
+            "Hotkey", "x402 y166 w220 h26"
+        )
+        this.ViewerArrowWinInput := this.Window.Add(
+            "CheckBox", "x648 y166 w70 h26", "使用"
         )
 
         this.Window.Add("Text", "x72 y222 w170", "长度测量")
@@ -18750,7 +19037,10 @@ class ReportAssistantSettingsWindow {
             "CheckBox", "x276 y214 w90 h26", "启用"
         )
         this.ViewerLengthChordInput := this.Window.Add(
-            "Hotkey", "x402 y214 w220 h26 Limit15"
+            "Hotkey", "x402 y214 w220 h26"
+        )
+        this.ViewerLengthWinInput := this.Window.Add(
+            "CheckBox", "x648 y214 w70 h26", "使用"
         )
 
         this.Window.Add("Text", "x72 y270 w170", "3D SUV测量")
@@ -18758,19 +19048,39 @@ class ReportAssistantSettingsWindow {
             "CheckBox", "x276 y262 w90 h26", "启用"
         )
         this.ViewerSuv3DChordInput := this.Window.Add(
-            "Hotkey", "x402 y262 w220 h26 Limit15"
+            "Hotkey", "x402 y262 w220 h26"
+        )
+        this.ViewerSuv3DWinInput := this.Window.Add(
+            "CheckBox", "x648 y262 w70 h26", "使用"
+        )
+
+        this.Window.Add("Text", "x72 y318 w170", "截图（发送 F12）")
+        this.ViewerCaptureEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y310 w90 h26", "启用"
+        )
+        this.ViewerCaptureChordInput := this.Window.Add(
+            "Hotkey", "x402 y310 w220 h26"
+        )
+        this.ViewerCaptureWinInput := this.Window.Add(
+            "CheckBox", "x648 y310 w70 h26", "使用"
         )
         for control in [
             this.ViewerArrowEnabledInput,
             this.ViewerLengthEnabledInput,
-            this.ViewerSuv3DEnabledInput
+            this.ViewerSuv3DEnabledInput,
+            this.ViewerCaptureEnabledInput,
+            this.ViewerArrowWinInput,
+            this.ViewerLengthWinInput,
+            this.ViewerSuv3DWinInput,
+            this.ViewerCaptureWinInput
         ] {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
         for control in [
             this.ViewerArrowChordInput,
             this.ViewerLengthChordInput,
-            this.ViewerSuv3DChordInput
+            this.ViewerSuv3DChordInput,
+            this.ViewerCaptureChordInput
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -18896,15 +19206,43 @@ class ReportAssistantSettingsWindow {
             this.ViewerArrowEnabledInput.Value :=
                 this.FeatureSettings.ViewerArrowEnabled ? 1 : 0
             this.ViewerArrowChordInput.Value :=
-                this.FeatureSettings.ViewerArrowChord
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerArrowChord
+                )
+            this.ViewerArrowWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerArrowChord
+                ) ? 1 : 0
             this.ViewerLengthEnabledInput.Value :=
                 this.FeatureSettings.ViewerLengthEnabled ? 1 : 0
             this.ViewerLengthChordInput.Value :=
-                this.FeatureSettings.ViewerLengthChord
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerLengthChord
+                )
+            this.ViewerLengthWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerLengthChord
+                ) ? 1 : 0
             this.ViewerSuv3DEnabledInput.Value :=
                 this.FeatureSettings.ViewerSuv3DEnabled ? 1 : 0
             this.ViewerSuv3DChordInput.Value :=
-                this.FeatureSettings.ViewerSuv3DChord
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerSuv3DChord
+                )
+            this.ViewerSuv3DWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerSuv3DChord
+                ) ? 1 : 0
+            this.ViewerCaptureEnabledInput.Value :=
+                this.FeatureSettings.ViewerCaptureEnabled ? 1 : 0
+            this.ViewerCaptureChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerCaptureChord
+                )
+            this.ViewerCaptureWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerCaptureChord
+                ) ? 1 : 0
         } finally {
             this.LoadingControls := false
         }
@@ -18914,11 +19252,25 @@ class ReportAssistantSettingsWindow {
         this.FeatureSettings := FeatureSettings(
             this.FeatureSettings.GlobalHjklArrows,
             this.ViewerArrowEnabledInput.Value = 1,
-            this.ViewerArrowChordInput.Value,
+            MergeViewerHotkeyChord(
+                this.ViewerArrowChordInput.Value,
+                this.ViewerArrowWinInput.Value = 1
+            ),
             this.ViewerLengthEnabledInput.Value = 1,
-            this.ViewerLengthChordInput.Value,
+            MergeViewerHotkeyChord(
+                this.ViewerLengthChordInput.Value,
+                this.ViewerLengthWinInput.Value = 1
+            ),
             this.ViewerSuv3DEnabledInput.Value = 1,
-            this.ViewerSuv3DChordInput.Value
+            MergeViewerHotkeyChord(
+                this.ViewerSuv3DChordInput.Value,
+                this.ViewerSuv3DWinInput.Value = 1
+            ),
+            this.ViewerCaptureEnabledInput.Value = 1,
+            MergeViewerHotkeyChord(
+                this.ViewerCaptureChordInput.Value,
+                this.ViewerCaptureWinInput.Value = 1
+            )
         )
     }
 
@@ -19093,6 +19445,8 @@ class ReportAssistantSettingsWindow {
             this.ViewerLengthChordInput.Focus()
         else if field = "ViewerSuv3DChord"
             this.ViewerSuv3DChordInput.Focus()
+        else if field = "ViewerCaptureChord"
+            this.ViewerCaptureChordInput.Focus()
     }
 
     FocusValidationError(validation) {

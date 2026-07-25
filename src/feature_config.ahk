@@ -6,7 +6,9 @@ LoadRawFeatureSettings(configPath := "") {
         FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerLengthChordDefault,
         FeatureDefaults.ViewerToolEnabledDefault,
-        FeatureDefaults.ViewerSuv3DChordDefault
+        FeatureDefaults.ViewerSuv3DChordDefault,
+        FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerCaptureChordDefault
     )
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
@@ -62,6 +64,18 @@ LoadRawFeatureSettings(configPath := "") {
                 FeatureDefaults.ViewerToolSection,
                 FeatureDefaults.ViewerSuv3DChordKey,
                 FeatureDefaults.ViewerSuv3DChordDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerCaptureEnabledKey,
+                FeatureDefaults.ViewerToolEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerCaptureChordKey,
+                FeatureDefaults.ViewerCaptureChordDefault
             )
         )
     } catch {

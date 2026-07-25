@@ -9,10 +9,13 @@ class FeatureDefaults {
     static ViewerLengthChordKey := "LengthChord"
     static ViewerSuv3DEnabledKey := "Suv3DEnabled"
     static ViewerSuv3DChordKey := "Suv3DChord"
+    static ViewerCaptureEnabledKey := "CaptureEnabled"
+    static ViewerCaptureChordKey := "CaptureChord"
     static ViewerToolEnabledDefault := "false"
     static ViewerArrowChordDefault := "^!1"
     static ViewerLengthChordDefault := "^!2"
     static ViewerSuv3DChordDefault := "^!3"
+    static ViewerCaptureChordDefault := "^!4"
 
     static ManagedConfigDefaults() {
         return [
@@ -50,6 +53,16 @@ class FeatureDefaults {
                 this.ViewerToolSection,
                 this.ViewerSuv3DChordKey,
                 this.ViewerSuv3DChordDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerCaptureEnabledKey,
+                this.ViewerToolEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerCaptureChordKey,
+                this.ViewerCaptureChordDefault
             )
         ]
     }
@@ -63,7 +76,9 @@ class RawFeatureSettings {
         viewerLengthEnabled,
         viewerLengthChord,
         viewerSuv3DEnabled,
-        viewerSuv3DChord
+        viewerSuv3DChord,
+        viewerCaptureEnabled,
+        viewerCaptureChord
     ) {
         this.GlobalHjklArrows := String(globalHjklArrows)
         this.ViewerArrowEnabled := String(viewerArrowEnabled)
@@ -72,6 +87,8 @@ class RawFeatureSettings {
         this.ViewerLengthChord := String(viewerLengthChord)
         this.ViewerSuv3DEnabled := String(viewerSuv3DEnabled)
         this.ViewerSuv3DChord := String(viewerSuv3DChord)
+        this.ViewerCaptureEnabled := String(viewerCaptureEnabled)
+        this.ViewerCaptureChord := String(viewerCaptureChord)
     }
 }
 
@@ -83,7 +100,9 @@ class FeatureSettings {
         viewerLengthEnabled := false,
         viewerLengthChord := "",
         viewerSuv3DEnabled := false,
-        viewerSuv3DChord := ""
+        viewerSuv3DChord := "",
+        viewerCaptureEnabled := false,
+        viewerCaptureChord := ""
     ) {
         this.GlobalHjklArrows := globalHjklArrows = true
         this.ViewerArrowEnabled := viewerArrowEnabled = true
@@ -92,6 +111,8 @@ class FeatureSettings {
         this.ViewerLengthChord := String(viewerLengthChord)
         this.ViewerSuv3DEnabled := viewerSuv3DEnabled = true
         this.ViewerSuv3DChord := String(viewerSuv3DChord)
+        this.ViewerCaptureEnabled := viewerCaptureEnabled = true
+        this.ViewerCaptureChord := String(viewerCaptureChord)
     }
 }
 

@@ -12,4 +12,9 @@ RegisterConfiguredFeatures(settings) {
         ReservedApplicationHotkeyChords(),
         MedExViewerToolForegroundActive
     )
+    RegisterHotkeyDefinitions(
+        ViewerCaptureHotkeyDefinitions(settings),
+        ReservedApplicationHotkeyChords(),
+        MedExViewerForegroundActive
+    )
 }

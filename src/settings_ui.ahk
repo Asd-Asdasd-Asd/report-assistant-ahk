@@ -156,18 +156,22 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "仅在 MedEx 报告程序或 Viewer 位于前台时生效；保存后程序会重新加载。"
+            "工具选择可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")
         this.Window.Add("Text", "x402 y126 w220", "快捷键")
+        this.Window.Add("Text", "x648 y126 w70", "Win")
 
         this.Window.Add("Text", "x72 y174 w170", "箭头")
         this.ViewerArrowEnabledInput := this.Window.Add(
             "CheckBox", "x276 y166 w90 h26", "启用"
         )
         this.ViewerArrowChordInput := this.Window.Add(
-            "Hotkey", "x402 y166 w220 h26 Limit15"
+            "Hotkey", "x402 y166 w220 h26"
+        )
+        this.ViewerArrowWinInput := this.Window.Add(
+            "CheckBox", "x648 y166 w70 h26", "使用"
         )
 
         this.Window.Add("Text", "x72 y222 w170", "长度测量")
@@ -175,7 +179,10 @@ class ReportAssistantSettingsWindow {
             "CheckBox", "x276 y214 w90 h26", "启用"
         )
         this.ViewerLengthChordInput := this.Window.Add(
-            "Hotkey", "x402 y214 w220 h26 Limit15"
+            "Hotkey", "x402 y214 w220 h26"
+        )
+        this.ViewerLengthWinInput := this.Window.Add(
+            "CheckBox", "x648 y214 w70 h26", "使用"
         )
 
         this.Window.Add("Text", "x72 y270 w170", "3D SUV测量")
@@ -183,19 +190,39 @@ class ReportAssistantSettingsWindow {
             "CheckBox", "x276 y262 w90 h26", "启用"
         )
         this.ViewerSuv3DChordInput := this.Window.Add(
-            "Hotkey", "x402 y262 w220 h26 Limit15"
+            "Hotkey", "x402 y262 w220 h26"
+        )
+        this.ViewerSuv3DWinInput := this.Window.Add(
+            "CheckBox", "x648 y262 w70 h26", "使用"
+        )
+
+        this.Window.Add("Text", "x72 y318 w170", "截图（发送 F12）")
+        this.ViewerCaptureEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y310 w90 h26", "启用"
+        )
+        this.ViewerCaptureChordInput := this.Window.Add(
+            "Hotkey", "x402 y310 w220 h26"
+        )
+        this.ViewerCaptureWinInput := this.Window.Add(
+            "CheckBox", "x648 y310 w70 h26", "使用"
         )
         for control in [
             this.ViewerArrowEnabledInput,
             this.ViewerLengthEnabledInput,
-            this.ViewerSuv3DEnabledInput
+            this.ViewerSuv3DEnabledInput,
+            this.ViewerCaptureEnabledInput,
+            this.ViewerArrowWinInput,
+            this.ViewerLengthWinInput,
+            this.ViewerSuv3DWinInput,
+            this.ViewerCaptureWinInput
         ] {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
         for control in [
             this.ViewerArrowChordInput,
             this.ViewerLengthChordInput,
-            this.ViewerSuv3DChordInput
+            this.ViewerSuv3DChordInput,
+            this.ViewerCaptureChordInput
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -321,15 +348,43 @@ class ReportAssistantSettingsWindow {
             this.ViewerArrowEnabledInput.Value :=
                 this.FeatureSettings.ViewerArrowEnabled ? 1 : 0
             this.ViewerArrowChordInput.Value :=
-                this.FeatureSettings.ViewerArrowChord
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerArrowChord
+                )
+            this.ViewerArrowWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerArrowChord
+                ) ? 1 : 0
             this.ViewerLengthEnabledInput.Value :=
                 this.FeatureSettings.ViewerLengthEnabled ? 1 : 0
             this.ViewerLengthChordInput.Value :=
-                this.FeatureSettings.ViewerLengthChord
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerLengthChord
+                )
+            this.ViewerLengthWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerLengthChord
+                ) ? 1 : 0
             this.ViewerSuv3DEnabledInput.Value :=
                 this.FeatureSettings.ViewerSuv3DEnabled ? 1 : 0
             this.ViewerSuv3DChordInput.Value :=
-                this.FeatureSettings.ViewerSuv3DChord
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerSuv3DChord
+                )
+            this.ViewerSuv3DWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerSuv3DChord
+                ) ? 1 : 0
+            this.ViewerCaptureEnabledInput.Value :=
+                this.FeatureSettings.ViewerCaptureEnabled ? 1 : 0
+            this.ViewerCaptureChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerCaptureChord
+                )
+            this.ViewerCaptureWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerCaptureChord
+                ) ? 1 : 0
         } finally {
             this.LoadingControls := false
         }
@@ -339,11 +394,25 @@ class ReportAssistantSettingsWindow {
         this.FeatureSettings := FeatureSettings(
             this.FeatureSettings.GlobalHjklArrows,
             this.ViewerArrowEnabledInput.Value = 1,
-            this.ViewerArrowChordInput.Value,
+            MergeViewerHotkeyChord(
+                this.ViewerArrowChordInput.Value,
+                this.ViewerArrowWinInput.Value = 1
+            ),
             this.ViewerLengthEnabledInput.Value = 1,
-            this.ViewerLengthChordInput.Value,
+            MergeViewerHotkeyChord(
+                this.ViewerLengthChordInput.Value,
+                this.ViewerLengthWinInput.Value = 1
+            ),
             this.ViewerSuv3DEnabledInput.Value = 1,
-            this.ViewerSuv3DChordInput.Value
+            MergeViewerHotkeyChord(
+                this.ViewerSuv3DChordInput.Value,
+                this.ViewerSuv3DWinInput.Value = 1
+            ),
+            this.ViewerCaptureEnabledInput.Value = 1,
+            MergeViewerHotkeyChord(
+                this.ViewerCaptureChordInput.Value,
+                this.ViewerCaptureWinInput.Value = 1
+            )
         )
     }
 
@@ -518,6 +587,8 @@ class ReportAssistantSettingsWindow {
             this.ViewerLengthChordInput.Focus()
         else if field = "ViewerSuv3DChord"
             this.ViewerSuv3DChordInput.Focus()
+        else if field = "ViewerCaptureChord"
+            this.ViewerCaptureChordInput.Focus()
     }
 
     FocusValidationError(validation) {

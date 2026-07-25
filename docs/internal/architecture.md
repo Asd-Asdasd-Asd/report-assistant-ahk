@@ -66,7 +66,7 @@ MxNMSoft 测量值由 `MxNMMeasurementProvider` 解析自动目标，再通过�
 
 因此阅片动作应逐个迁移，不能一次性照搬 legacy 点击序列。每个动作必须验证 process/window、fail closed、避免 modal feedback，并在需要移动鼠标时恢复原位置。
 
-v0.6.1 的箭头、长度测量和 3D SUV 快捷键使用一个更窄的 config + native HWND 策略。`mxnm_viewer_tool_commands.ahk` 从 Vendor 配置解析 button-pad 原点和 command rows，按当前 frame rect 映射目标中心，再用 `WindowFromPoint`、PID、client rect 和 `GetDlgCtrlID` 校验。验证通过后，向按钮直接父窗口发送有超时上限的同步 `WM_COMMAND / BN_CLICKED`。该路径不使用 UIA、不移动鼠标、不切换焦点，也没有后台 warmup 或轮询。完整坐标模型与现场纠错见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
+v0.6.1 的箭头、长度测量和 3D SUV 快捷键使用一个更窄的 config + native HWND 策略。`mxnm_viewer_tool_commands.ahk` 从 Vendor 配置解析 button-pad 原点和 command rows，按当前 frame rect 映射目标中心，再用 `WindowFromPoint`、PID、client rect 和 `GetDlgCtrlID` 校验。验证通过后，向按钮直接父窗口发送有超时上限的同步 `WM_COMMAND / BN_CLICKED`。3D SUV 会等待完整 chord 物理释放后单次投递，避免 Vendor 把仍按下的 modifier 解释为临时工具状态。截图映射只在 Viewer 前台时发送 F12，并用无文字、NoActivate 的全 Viewer 快速白闪表示派发。Settings 原生 Hotkey control 之外使用独立 Win checkbox，以支持 AHK `#` modifier。以上路径不使用 UIA、不移动鼠标、不切换焦点，也没有后台 warmup 或周期轮询。完整坐标模型与现场纠错见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
 
 ## `src/` 模块职责
 

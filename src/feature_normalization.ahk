@@ -10,7 +10,9 @@ NormalizeFeatureSettings(raw) {
         ParseOptionalFeatureEnabled(raw.ViewerLengthEnabled),
         NormalizeOptionalHotkeyChord(raw.ViewerLengthChord),
         ParseOptionalFeatureEnabled(raw.ViewerSuv3DEnabled),
-        NormalizeOptionalHotkeyChord(raw.ViewerSuv3DChord)
+        NormalizeOptionalHotkeyChord(raw.ViewerSuv3DChord),
+        ParseOptionalFeatureEnabled(raw.ViewerCaptureEnabled),
+        NormalizeOptionalHotkeyChord(raw.ViewerCaptureChord)
     )
 }
 
@@ -42,6 +44,12 @@ ValidateViewerToolHotkeySettings(settings) {
             label: "3D SUV测量",
             enabled: settings.ViewerSuv3DEnabled,
             chord: settings.ViewerSuv3DChord
+        },
+        {
+            field: "ViewerCaptureChord",
+            label: "截图",
+            enabled: settings.ViewerCaptureEnabled,
+            chord: settings.ViewerCaptureChord
         }
     ]
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
@@ -67,11 +75,12 @@ ValidateViewerToolHotkeySettings(settings) {
                 "启用“" definition.label "”前必须设置快捷键。"
             )
         }
-        if !ViewerToolHotkeyChordHasTwoModifiers(chord) {
+        if !ViewerToolHotkeyChordIsSafe(chord) {
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键至少需要两个修饰键。"
+                "“" definition.label "”快捷键需要 Win，"
+                    . "或至少两个 Ctrl/Alt/Shift 修饰键。"
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -87,9 +96,11 @@ ValidateViewerToolHotkeySettings(settings) {
     return MakeViewerToolHotkeyValidation(true)
 }
 
-ViewerToolHotkeyChordHasTwoModifiers(chord) {
-    if !RegExMatch(String(chord), "^([!+^]+)(.+)$", &match)
+ViewerToolHotkeyChordIsSafe(chord) {
+    if !RegExMatch(String(chord), "^([!+^#]+)(.+)$", &match)
         return false
+    if InStr(match[1], "#")
+        return true
     modifierCount := 0
     for modifier in ["^", "!", "+"] {
         if InStr(match[1], modifier)
@@ -113,4 +124,31 @@ ViewerToolHotkeySettingsMatch(expected, actual) {
         && expected.ViewerLengthChord = actual.ViewerLengthChord
         && expected.ViewerSuv3DEnabled = actual.ViewerSuv3DEnabled
         && expected.ViewerSuv3DChord = actual.ViewerSuv3DChord
+        && expected.ViewerCaptureEnabled = actual.ViewerCaptureEnabled
+        && expected.ViewerCaptureChord = actual.ViewerCaptureChord
+}
+
+ViewerHotkeyUsesWin(chord) {
+    if !RegExMatch(
+        Trim(String(chord), " `t`r`n"),
+        "^([!+^#]+)",
+        &match
+    ) {
+        return false
+    }
+    return InStr(match[1], "#") > 0
+}
+
+ViewerHotkeyNativeChord(chord) {
+    normalized := Trim(String(chord), " `t`r`n")
+    if !RegExMatch(normalized, "^([!+^#]+)(.+)$", &match)
+        return normalized
+    return StrReplace(match[1], "#") . match[2]
+}
+
+MergeViewerHotkeyChord(nativeChord, usesWin) {
+    normalized := Trim(String(nativeChord), " `t`r`n")
+    if normalized = ""
+        return ""
+    return NormalizeHotkeyChord((usesWin ? "#" : "") . normalized)
 }
