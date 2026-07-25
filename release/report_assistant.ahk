@@ -1,9 +1,9 @@
 ; Generated file. Edit src/*.ahk instead.
-; Application version: 0.6.0
-; Source revision: c76b1b2357819f2a9c2764ff2f93623ed4be78ab-dirty
-; Generated at: 2026-07-25 20:29:43 UTC
-;@Ahk2Exe-SetFileVersion 0.6.0.0
-;@Ahk2Exe-SetProductVersion 0.6.0
+; Application version: 0.6.1
+; Source revision: 383f242f11e60c38807b3845d3ee4c031bbea193
+; Generated at: 2026-07-25 22:08:31 UTC
+;@Ahk2Exe-SetFileVersion 0.6.1.0
+;@Ahk2Exe-SetProductVersion 0.6.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
 
 #Requires AutoHotkey v2.0
@@ -12,10 +12,10 @@
 
 ; --- BEGIN app_metadata.ahk ---
 class AppMetadata {
-    static Version := "0.6.0"
+    static Version := "0.6.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-26"
-    static SourceRevision := "c76b1b2357819f2a9c2764ff2f93623ed4be78ab-dirty"
+    static SourceRevision := "383f242f11e60c38807b3845d3ee4c031bbea193"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11686,6 +11686,601 @@ CloseOwnedMxNMViewerDialog(hwnd) {
 
 ; --- END mxnm_annotation_cleaner.ahk ---
 
+; --- BEGIN mxnm_viewer_tool_commands.ahk ---
+class MxNMViewerToolCommand {
+    static Arrow := 21043
+    static Length := 21048
+    static Suv3D := 21193
+    static BuiltInRowCount := 3
+    static ButtonCenterX := 17
+    static ButtonCenterY := 17
+    static ButtonPitch := 38
+
+    static Specs() {
+        return [
+            {id: "arrow", label: "箭头", commandId: this.Arrow},
+            {id: "length", label: "长度测量", commandId: this.Length},
+            {id: "suv3d", label: "3D SUV测量", commandId: this.Suv3D}
+        ]
+    }
+}
+
+class MxNMViewerToolCode {
+    static READY := "READY"
+    static CONFIG_UNAVAILABLE := "CONFIG_UNAVAILABLE"
+    static COMMAND_SCHEMA_INVALID := "COMMAND_SCHEMA_INVALID"
+    static VIEWER_NOT_FOUND := "VIEWER_NOT_FOUND"
+    static VIEWER_NOT_UNIQUE := "VIEWER_NOT_UNIQUE"
+    static WRONG_FOREGROUND := "WRONG_FOREGROUND"
+    static COMMAND_UNKNOWN := "COMMAND_UNKNOWN"
+    static BUTTON_TARGET_INVALID := "BUTTON_TARGET_INVALID"
+    static BUTTON_ID_MISMATCH := "BUTTON_ID_MISMATCH"
+    static DISPATCH_FAILED := "DISPATCH_FAILED"
+    static BUSY := "BUSY"
+    static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
+}
+
+class MxNMViewerToolCommandProvider {
+    static CachedPlan := 0
+    static Busy := false
+
+    static PrepareAtStartup(viewerExe := "") {
+        if viewerExe = ""
+            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+        if this.PrepareFromPathCache(viewerExe)
+            return true
+        if !WinExist("ahk_exe " viewerExe)
+            return false
+        return this.ResolvePlan(viewerExe).ok
+    }
+
+    static PrepareFromPathCache(viewerExe := "") {
+        if viewerExe = ""
+            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+        cache := LoadValidatedMxNMConfigPathCache()
+        if !IsObject(cache)
+            || StrLower(cache["viewerExe"]) != StrLower(viewerExe) {
+            return false
+        }
+        plan := BuildMxNMViewerToolCommandPlan(
+            viewerExe,
+            cache["configPaths"]
+        )
+        if !plan.ok
+            return false
+        this.CachedPlan := plan
+        return true
+    }
+
+    static ResolvePlan(viewerExe := "") {
+        if viewerExe = ""
+            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+        if IsReusableMxNMViewerToolCommandPlan(this.CachedPlan, viewerExe)
+            return this.CachedPlan
+
+        configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
+        plan := BuildMxNMViewerToolCommandPlan(viewerExe, configPaths)
+        if plan.ok {
+            this.CachedPlan := plan
+            SaveValidatedMxNMConfigPathCache(viewerExe, configPaths)
+        }
+        return plan
+    }
+
+    static Invoke(commandName, viewerExe := "") {
+        if this.Busy
+            return MakeMxNMViewerToolResult(false, MxNMViewerToolCode.BUSY)
+        this.Busy := true
+        try {
+            if !MedExViewerToolForegroundActive()
+                return MakeMxNMViewerToolResult(
+                    false,
+                    MxNMViewerToolCode.WRONG_FOREGROUND
+                )
+            if viewerExe = ""
+                viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+            plan := this.ResolvePlan(viewerExe)
+            if !plan.ok
+                return MakeMxNMViewerToolResult(false, plan.code)
+            commandKey := StrLower(String(commandName))
+            if !plan.commands.Has(commandKey) {
+                return MakeMxNMViewerToolResult(
+                    false,
+                    MxNMViewerToolCode.COMMAND_UNKNOWN
+                )
+            }
+
+            viewerWindows := CaptureMxNMViewerWindowGeometry(
+                viewerExe,
+                plan.viewerProcessPath
+            )
+            runtimeFrame := ResolveMxNMRuntimeFrame(viewerWindows)
+            if !runtimeFrame.ok {
+                code := viewerWindows.Length = 0
+                    ? MxNMViewerToolCode.VIEWER_NOT_FOUND
+                    : MxNMViewerToolCode.VIEWER_NOT_UNIQUE
+                return MakeMxNMViewerToolResult(false, code)
+            }
+            if !DllCall(
+                "User32\IsWindow",
+                "Ptr", runtimeFrame.frame.hwnd,
+                "Int"
+            ) {
+                return MakeMxNMViewerToolResult(
+                    false,
+                    MxNMViewerToolCode.VIEWER_NOT_FOUND
+                )
+            }
+
+            command := plan.commands[commandKey]
+            buttonOffset := {
+                x: MxNMViewerToolCommand.ButtonCenterX,
+                y: (
+                    MxNMViewerToolCommand.BuiltInRowCount
+                    + command.row - 1
+                ) * MxNMViewerToolCommand.ButtonPitch
+                + MxNMViewerToolCommand.ButtonCenterY
+            }
+            screenPoint := MapMxNMViewerToolPointToRuntimeFrame(
+                {x: plan.padX, y: plan.padY},
+                buttonOffset,
+                plan.mainGeometry,
+                runtimeFrame.frame
+            )
+            target := ResolveMxNMViewerToolButtonTarget(
+                screenPoint,
+                runtimeFrame.frame.hwnd,
+                command.commandId
+            )
+            if !target.ok {
+                result := MakeMxNMViewerToolResult(false, target.code)
+                result.commandId := command.commandId
+                result.commandRow := command.row
+                result.commandColumn := command.column
+                result.viewerHwnd := runtimeFrame.frame.hwnd
+                result.screenPoint := screenPoint
+                if target.HasOwnProp("hwnd")
+                    result.buttonHwnd := target.hwnd
+                if target.HasOwnProp("rootHwnd")
+                    result.buttonRootHwnd := target.rootHwnd
+                if target.HasOwnProp("parentHwnd")
+                    result.buttonParentHwnd := target.parentHwnd
+                if target.HasOwnProp("controlId")
+                    result.runtimeControlId := target.controlId
+                return result
+            }
+            dispatched := DispatchMxNMViewerToolButton(target)
+            if !dispatched {
+                result := MakeMxNMViewerToolResult(
+                    false,
+                    MxNMViewerToolCode.DISPATCH_FAILED
+                )
+                result.commandId := command.commandId
+                result.commandRow := command.row
+                result.commandColumn := command.column
+                result.viewerHwnd := runtimeFrame.frame.hwnd
+                result.buttonHwnd := target.hwnd
+                result.buttonParentHwnd := target.parentHwnd
+                result.buttonRootHwnd := target.rootHwnd
+                result.runtimeControlId := target.controlId
+                result.screenPoint := screenPoint
+                return result
+            }
+            result := MakeMxNMViewerToolResult(
+                true,
+                MxNMViewerToolCode.READY
+            )
+            result.commandId := command.commandId
+            result.commandRow := command.row
+            result.commandColumn := command.column
+            result.viewerHwnd := runtimeFrame.frame.hwnd
+            result.buttonHwnd := target.hwnd
+            result.buttonParentHwnd := target.parentHwnd
+            result.buttonRootHwnd := target.rootHwnd
+            result.runtimeControlId := target.controlId
+            result.screenPoint := screenPoint
+            return result
+        } catch {
+            return MakeMxNMViewerToolResult(
+                false,
+                MxNMViewerToolCode.UNEXPECTED_ERROR
+            )
+        } finally {
+            this.Busy := false
+        }
+    }
+}
+
+MedExViewerToolForegroundActive(*) {
+    global REPORT_EDITOR_EXE
+    global VIEWER_EXE
+
+    try foregroundHwnd := WinExist("A")
+    catch
+        return false
+    if !foregroundHwnd
+        return false
+    try processName := WinGetProcessName("ahk_id " foregroundHwnd)
+    catch
+        return false
+    return StrLower(processName) = StrLower(REPORT_EDITOR_EXE)
+        || StrLower(processName) = StrLower(VIEWER_EXE)
+}
+
+BuildMxNMViewerToolCommandPlan(viewerExe, configPaths) {
+    failure := MakeMxNMViewerToolCommandPlan(viewerExe)
+    if !IsObject(configPaths) || !configPaths.ok
+        return failure
+    configResult := MxNMConfigGeometryProvider.LoadStaticConfig(
+        viewerExe,
+        configPaths
+    )
+    if !configResult.ok || !configResult.mainGeometry.frameSizeResolved
+        return failure
+    try configText := FileRead(configPaths.mainConfigPath)
+    catch
+        return failure
+
+    parsed := ParseMxNMSCBtnPadCommands(configText)
+    if !parsed.ok {
+        failure.code := MxNMViewerToolCode.COMMAND_SCHEMA_INVALID
+        return failure
+    }
+    commands := Map()
+    for spec in MxNMViewerToolCommand.Specs() {
+        matches := []
+        for entry in parsed.entries {
+            if entry.commandId = spec.commandId
+                matches.Push(entry)
+        }
+        if matches.Length != 1 {
+            failure.code := MxNMViewerToolCode.COMMAND_SCHEMA_INVALID
+            return failure
+        }
+        if matches[1].column != 1 {
+            failure.code := MxNMViewerToolCode.COMMAND_SCHEMA_INVALID
+            return failure
+        }
+        commands[spec.id] := {
+            label: spec.label,
+            commandId: spec.commandId,
+            row: matches[1].row,
+            column: matches[1].column
+        }
+    }
+
+    failure.viewerProcessPath := configPaths.viewerProcessPath
+    failure.mainConfigSha256 := configResult.mainConfigSha256
+    if failure.mainConfigSha256 = ""
+        return failure
+    failure.commands := commands
+    failure.rowCount := parsed.rowCount
+    failure.padX := parsed.padX
+    failure.padY := parsed.padY
+    failure.mainGeometry := configResult.mainGeometry
+    failure.ok := true
+    failure.code := MxNMViewerToolCode.READY
+    return failure
+}
+
+ParseMxNMSCBtnPadCommands(configText) {
+    currentSection := ""
+    rowCountFound := false
+    rowCount := 0
+    rows := Map()
+    padValues := Map()
+    for line in StrSplit(String(configText), "`n", "`r") {
+        trimmedLine := Trim(line, " `t")
+        if RegExMatch(trimmedLine, "^\[([^\]]+)\]$", &sectionMatch) {
+            currentSection := sectionMatch[1]
+            continue
+        }
+        if trimmedLine = ""
+            || SubStr(trimmedLine, 1, 1) = ";"
+            || SubStr(trimmedLine, 1, 1) = "#" {
+            continue
+        }
+        if !RegExMatch(trimmedLine, "^([^=]+)=(.*)$", &entryMatch)
+            continue
+        key := Trim(entryMatch[1], " `t")
+        value := Trim(entryMatch[2], " `t")
+        if StrLower(currentSection) = "showsetting"
+            && RegExMatch(
+                key,
+                "i)^SCBtnPadPos([XY])$",
+                &padMatch
+            ) {
+            axis := StrLower(padMatch[1])
+            if padValues.Has(axis)
+                || !RegExMatch(value, "^-?\d+$") {
+                return MakeMxNMSCBtnPadParseFailure()
+            }
+            padValues[axis] := Integer(value)
+            continue
+        }
+        if StrLower(currentSection) != "scbtnpadsetting"
+            continue
+        if StrLower(key) = "rownum" {
+            if rowCountFound || !RegExMatch(value, "^\d+$")
+                return MakeMxNMSCBtnPadParseFailure()
+            rowCountFound := true
+            rowCount := Integer(value)
+            if rowCount < 1 || rowCount > 100
+                return MakeMxNMSCBtnPadParseFailure()
+            continue
+        }
+        if !RegExMatch(key, "i)^Row(\d+)$", &rowMatch)
+            continue
+        rowIndex := Integer(rowMatch[1])
+        if rows.Has(rowIndex)
+            return MakeMxNMSCBtnPadParseFailure()
+        if !RegExMatch(value, "^\d+(?:\s*\|\s*\d+)*$")
+            return MakeMxNMSCBtnPadParseFailure()
+        commandIds := []
+        for rawId in StrSplit(value, "|")
+            commandIds.Push(Integer(Trim(rawId, " `t")))
+        rows[rowIndex] := commandIds
+    }
+    if !rowCountFound || rows.Count != rowCount
+        || !padValues.Has("x") || !padValues.Has("y")
+        return MakeMxNMSCBtnPadParseFailure()
+
+    entries := []
+    loop rowCount {
+        rowIndex := A_Index
+        if !rows.Has(rowIndex)
+            return MakeMxNMSCBtnPadParseFailure()
+        for column, commandId in rows[rowIndex] {
+            entries.Push({
+                row: rowIndex,
+                column: column,
+                commandId: commandId
+            })
+        }
+    }
+    return {
+        ok: true,
+        rowCount: rowCount,
+        padX: padValues["x"],
+        padY: padValues["y"],
+        entries: entries
+    }
+}
+
+MakeMxNMSCBtnPadParseFailure() {
+    return {
+        ok: false,
+        rowCount: 0,
+        padX: 0,
+        padY: 0,
+        entries: []
+    }
+}
+
+MakeMxNMViewerToolCommandPlan(viewerExe) {
+    return {
+        ok: false,
+        code: MxNMViewerToolCode.CONFIG_UNAVAILABLE,
+        viewerExe: String(viewerExe),
+        viewerProcessPath: "",
+        mainConfigSha256: "",
+        rowCount: 0,
+        padX: 0,
+        padY: 0,
+        mainGeometry: 0,
+        commands: Map()
+    }
+}
+
+IsReusableMxNMViewerToolCommandPlan(plan, viewerExe) {
+    return IsObject(plan)
+        && plan.ok
+        && StrLower(plan.viewerExe) = StrLower(viewerExe)
+        && plan.viewerProcessPath != ""
+        && IsObject(plan.mainGeometry)
+        && Type(plan.commands) = "Map"
+        && plan.commands.Count = MxNMViewerToolCommand.Specs().Length
+}
+
+MakeMxNMViewerToolResult(ok, code) {
+    return {
+        ok: ok = true,
+        code: String(code),
+        commandId: 0,
+        commandRow: 0,
+        commandColumn: 0,
+        viewerHwnd: 0,
+        buttonHwnd: 0,
+        buttonParentHwnd: 0,
+        buttonRootHwnd: 0,
+        runtimeControlId: 0,
+        screenPoint: 0
+    }
+}
+
+MapMxNMViewerToolPointToRuntimeFrame(
+    logicalPadPoint,
+    buttonOffset,
+    mainGeometry,
+    runtimeFrame
+) {
+    return {
+        x: runtimeFrame.windowX + Round(
+            logicalPadPoint.x
+            * runtimeFrame.windowWidth
+            / mainGeometry.frameWidth
+        ) + buttonOffset.x,
+        y: runtimeFrame.windowY + Round(
+            logicalPadPoint.y
+            * runtimeFrame.windowHeight
+            / mainGeometry.frameHeight
+        ) + buttonOffset.y
+    }
+}
+
+ResolveMxNMViewerToolButtonTarget(
+    screenPoint,
+    runtimeFrameHwnd,
+    expectedControlId
+) {
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try pointHwnd := DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch {
+        pointHwnd := 0
+    }
+    if !pointHwnd {
+        return {
+            ok: false,
+            code: MxNMViewerToolCode.BUTTON_TARGET_INVALID
+        }
+    }
+    try rootHwnd := DllCall(
+        "User32\GetAncestor",
+        "Ptr", pointHwnd,
+        "UInt", 2,
+        "Ptr"
+    )
+    catch {
+        rootHwnd := 0
+    }
+    try parentHwnd := DllCall(
+        "User32\GetParent",
+        "Ptr", pointHwnd,
+        "Ptr"
+    )
+    catch {
+        parentHwnd := 0
+    }
+    try pointPid := WinGetPID("ahk_id " rootHwnd)
+    catch {
+        pointPid := 0
+    }
+    try runtimePid := WinGetPID("ahk_id " runtimeFrameHwnd)
+    catch {
+        runtimePid := 0
+    }
+    clientRect := MxNMViewerToolClientRectScreen(rootHwnd)
+    if !rootHwnd || !parentHwnd || !pointPid || pointPid != runtimePid
+        || !IsObject(clientRect)
+        || screenPoint.x < clientRect.left
+        || screenPoint.x >= clientRect.right
+        || screenPoint.y < clientRect.top
+        || screenPoint.y >= clientRect.bottom {
+        return {
+            ok: false,
+            code: MxNMViewerToolCode.BUTTON_TARGET_INVALID,
+            hwnd: pointHwnd,
+            parentHwnd: parentHwnd,
+            rootHwnd: rootHwnd
+        }
+    }
+    try parentPid := WinGetPID("ahk_id " parentHwnd)
+    catch {
+        parentPid := 0
+    }
+    if !parentPid || parentPid != runtimePid {
+        return {
+            ok: false,
+            code: MxNMViewerToolCode.BUTTON_TARGET_INVALID,
+            hwnd: pointHwnd,
+            parentHwnd: parentHwnd,
+            rootHwnd: rootHwnd
+        }
+    }
+    try controlId := DllCall(
+        "User32\GetDlgCtrlID",
+        "Ptr", pointHwnd,
+        "Int"
+    )
+    catch {
+        controlId := 0
+    }
+    if controlId != expectedControlId {
+        return {
+            ok: false,
+            code: MxNMViewerToolCode.BUTTON_ID_MISMATCH,
+            hwnd: pointHwnd,
+            parentHwnd: parentHwnd,
+            rootHwnd: rootHwnd,
+            controlId: controlId
+        }
+    }
+    return {
+        ok: true,
+        code: MxNMViewerToolCode.READY,
+        hwnd: pointHwnd,
+        parentHwnd: parentHwnd,
+        rootHwnd: rootHwnd,
+        controlId: controlId
+    }
+}
+
+DispatchMxNMViewerToolButton(target, timeoutMs := 250) {
+    messageResult := Buffer(A_PtrSize, 0)
+    try {
+        return DllCall(
+            "User32\SendMessageTimeoutW",
+            "Ptr", target.parentHwnd,
+            "UInt", 0x0111,
+            "UPtr", target.controlId,
+            "Ptr", target.hwnd,
+            "UInt", 0x0002,
+            "UInt", Max(1, Integer(timeoutMs)),
+            "Ptr", messageResult.Ptr,
+            "Ptr"
+        ) != 0
+    } catch {
+        return false
+    }
+}
+
+MxNMViewerToolClientRectScreen(hwnd) {
+    rectBuffer := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetClientRect",
+        "Ptr", hwnd,
+        "Ptr", rectBuffer.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    topLeft := Buffer(8, 0)
+    bottomRight := Buffer(8, 0)
+    NumPut("Int", NumGet(rectBuffer, 0, "Int"), topLeft, 0)
+    NumPut("Int", NumGet(rectBuffer, 4, "Int"), topLeft, 4)
+    NumPut("Int", NumGet(rectBuffer, 8, "Int"), bottomRight, 0)
+    NumPut("Int", NumGet(rectBuffer, 12, "Int"), bottomRight, 4)
+    if !DllCall(
+        "User32\ClientToScreen",
+        "Ptr", hwnd,
+        "Ptr", topLeft.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    if !DllCall(
+        "User32\ClientToScreen",
+        "Ptr", hwnd,
+        "Ptr", bottomRight.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    return {
+        left: NumGet(topLeft, 0, "Int"),
+        top: NumGet(topLeft, 4, "Int"),
+        right: NumGet(bottomRight, 0, "Int"),
+        bottom: NumGet(bottomRight, 4, "Int")
+    }
+}
+
+; --- END mxnm_viewer_tool_commands.ahk ---
+
 ; --- BEGIN medex_color_reset_logic.ahk ---
 class ColorResetCode {
     static OK := "COLOR_RESET_OK"
@@ -15157,6 +15752,17 @@ class FeatureDefaults {
     static Section := "Features"
     static GlobalHjklArrowsKey := "GlobalHjklArrows"
     static GlobalHjklArrowsDefault := "false"
+    static ViewerToolSection := "ViewerToolHotkeys"
+    static ViewerArrowEnabledKey := "ArrowEnabled"
+    static ViewerArrowChordKey := "ArrowChord"
+    static ViewerLengthEnabledKey := "LengthEnabled"
+    static ViewerLengthChordKey := "LengthChord"
+    static ViewerSuv3DEnabledKey := "Suv3DEnabled"
+    static ViewerSuv3DChordKey := "Suv3DChord"
+    static ViewerToolEnabledDefault := "false"
+    static ViewerArrowChordDefault := "^!1"
+    static ViewerLengthChordDefault := "^!2"
+    static ViewerSuv3DChordDefault := "^!3"
 
     static ManagedConfigDefaults() {
         return [
@@ -15164,20 +15770,78 @@ class FeatureDefaults {
                 this.Section,
                 this.GlobalHjklArrowsKey,
                 this.GlobalHjklArrowsDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerArrowEnabledKey,
+                this.ViewerToolEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerArrowChordKey,
+                this.ViewerArrowChordDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerLengthEnabledKey,
+                this.ViewerToolEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerLengthChordKey,
+                this.ViewerLengthChordDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerSuv3DEnabledKey,
+                this.ViewerToolEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerSuv3DChordKey,
+                this.ViewerSuv3DChordDefault
             )
         ]
     }
 }
 
 class RawFeatureSettings {
-    __New(globalHjklArrows) {
+    __New(
+        globalHjklArrows,
+        viewerArrowEnabled,
+        viewerArrowChord,
+        viewerLengthEnabled,
+        viewerLengthChord,
+        viewerSuv3DEnabled,
+        viewerSuv3DChord
+    ) {
         this.GlobalHjklArrows := String(globalHjklArrows)
+        this.ViewerArrowEnabled := String(viewerArrowEnabled)
+        this.ViewerArrowChord := String(viewerArrowChord)
+        this.ViewerLengthEnabled := String(viewerLengthEnabled)
+        this.ViewerLengthChord := String(viewerLengthChord)
+        this.ViewerSuv3DEnabled := String(viewerSuv3DEnabled)
+        this.ViewerSuv3DChord := String(viewerSuv3DChord)
     }
 }
 
 class FeatureSettings {
-    __New(globalHjklArrows := false) {
+    __New(
+        globalHjklArrows := false,
+        viewerArrowEnabled := false,
+        viewerArrowChord := "",
+        viewerLengthEnabled := false,
+        viewerLengthChord := "",
+        viewerSuv3DEnabled := false,
+        viewerSuv3DChord := ""
+    ) {
         this.GlobalHjklArrows := globalHjklArrows = true
+        this.ViewerArrowEnabled := viewerArrowEnabled = true
+        this.ViewerArrowChord := String(viewerArrowChord)
+        this.ViewerLengthEnabled := viewerLengthEnabled = true
+        this.ViewerLengthChord := String(viewerLengthChord)
+        this.ViewerSuv3DEnabled := viewerSuv3DEnabled = true
+        this.ViewerSuv3DChord := String(viewerSuv3DChord)
     }
 }
 
@@ -15346,7 +16010,15 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         "SchemaVersion=" ReportAssistantConfigDefaults.SchemaVersion,
         "",
         "[" FeatureDefaults.Section "]",
-        FeatureDefaults.GlobalHjklArrowsKey "=" FeatureDefaults.GlobalHjklArrowsDefault
+        FeatureDefaults.GlobalHjklArrowsKey "=" FeatureDefaults.GlobalHjklArrowsDefault,
+        "",
+        "[" FeatureDefaults.ViewerToolSection "]",
+        FeatureDefaults.ViewerArrowEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerArrowChordKey "=" FeatureDefaults.ViewerArrowChordDefault,
+        FeatureDefaults.ViewerLengthEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerLengthChordKey "=" FeatureDefaults.ViewerLengthChordDefault,
+        FeatureDefaults.ViewerSuv3DEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerSuv3DChordKey "=" FeatureDefaults.ViewerSuv3DChordDefault
     ]
     for entry in defaults {
         lines.Push("")
@@ -16927,11 +17599,23 @@ SaveEditableReportHotstringConfig(
     deletedSections,
     originalText,
     modifiedSectionKeys,
-    configPath := ""
+    configPath := "",
+    featureSettings := 0
 ) {
     validation := ValidateEditableReportHotstringEntries(entries)
     if !validation.Ok
         return ReportHotstringEditorSaveResult(false, validation.Message)
+    if IsObject(featureSettings) {
+        featureValidation := ValidateViewerToolHotkeySettings(
+            featureSettings
+        )
+        if !featureValidation.Ok {
+            return ReportHotstringEditorSaveResult(
+                false,
+                featureValidation.Message
+            )
+        }
+    }
 
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
@@ -17006,6 +17690,19 @@ SaveEditableReportHotstringConfig(
             )
         }
 
+        if IsObject(featureSettings) {
+            WriteViewerToolHotkeySettings(tempPath, featureSettings)
+            savedFeatures := LoadFeatureSettings(tempPath)
+            if !ViewerToolHotkeySettingsMatch(
+                featureSettings,
+                savedFeatures
+            ) {
+                throw Error(
+                    "Saved viewer tool hotkeys did not match settings"
+                )
+            }
+        }
+
         savedLoad := LoadEditableReportHotstringConfig(tempPath)
         if !savedLoad.Ok
             throw Error("Saved configuration could not be read: " savedLoad.Message)
@@ -17028,6 +17725,17 @@ SaveEditableReportHotstringConfig(
             throw Error("Final configuration validation failed")
         if !EditableReportHotstringEntriesMatch(entries, finalLoad.Entries)
             throw Error("Final configuration did not match the edited templates")
+        if IsObject(featureSettings) {
+            finalFeatures := LoadFeatureSettings(configPath)
+            if !ViewerToolHotkeySettingsMatch(
+                featureSettings,
+                finalFeatures
+            ) {
+                throw Error(
+                    "Final viewer tool hotkeys did not match settings"
+                )
+            }
+        }
         if !ValidateEditableReportHotstringSaveResult(
             originalLoad.Entries,
             entries,
@@ -17057,6 +17765,46 @@ SaveEditableReportHotstringConfig(
             false, "无法保存配置，原配置未被本次操作覆盖。"
         )
     }
+}
+
+WriteViewerToolHotkeySettings(configPath, settings) {
+    section := FeatureDefaults.ViewerToolSection
+    IniWrite(
+        settings.ViewerArrowEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerArrowEnabledKey
+    )
+    IniWrite(
+        settings.ViewerArrowChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerArrowChordKey
+    )
+    IniWrite(
+        settings.ViewerLengthEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerLengthEnabledKey
+    )
+    IniWrite(
+        settings.ViewerLengthChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerLengthChordKey
+    )
+    IniWrite(
+        settings.ViewerSuv3DEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerSuv3DEnabledKey
+    )
+    IniWrite(
+        settings.ViewerSuv3DChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerSuv3DChordKey
+    )
 }
 
 EditableReportHotstringEntriesMatch(expected, actual) {
@@ -17470,7 +18218,15 @@ ReportMeasurementContextValue(context, key, defaultValue := 0) {
 
 ; --- BEGIN feature_config.ahk ---
 LoadRawFeatureSettings(configPath := "") {
-    defaults := RawFeatureSettings(FeatureDefaults.GlobalHjklArrowsDefault)
+    defaults := RawFeatureSettings(
+        FeatureDefaults.GlobalHjklArrowsDefault,
+        FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerArrowChordDefault,
+        FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerLengthChordDefault,
+        FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerSuv3DChordDefault
+    )
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
         catch
@@ -17489,6 +18245,42 @@ LoadRawFeatureSettings(configPath := "") {
                 FeatureDefaults.Section,
                 FeatureDefaults.GlobalHjklArrowsKey,
                 FeatureDefaults.GlobalHjklArrowsDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerArrowEnabledKey,
+                FeatureDefaults.ViewerToolEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerArrowChordKey,
+                FeatureDefaults.ViewerArrowChordDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerLengthEnabledKey,
+                FeatureDefaults.ViewerToolEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerLengthChordKey,
+                FeatureDefaults.ViewerLengthChordDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerSuv3DEnabledKey,
+                FeatureDefaults.ViewerToolEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerSuv3DChordKey,
+                FeatureDefaults.ViewerSuv3DChordDefault
             )
         )
     } catch {
@@ -17505,7 +18297,13 @@ LoadFeatureSettings(configPath := "") {
 
 NormalizeFeatureSettings(raw) {
     return FeatureSettings(
-        ParseOptionalFeatureEnabled(raw.GlobalHjklArrows)
+        ParseOptionalFeatureEnabled(raw.GlobalHjklArrows),
+        ParseOptionalFeatureEnabled(raw.ViewerArrowEnabled),
+        NormalizeOptionalHotkeyChord(raw.ViewerArrowChord),
+        ParseOptionalFeatureEnabled(raw.ViewerLengthEnabled),
+        NormalizeOptionalHotkeyChord(raw.ViewerLengthChord),
+        ParseOptionalFeatureEnabled(raw.ViewerSuv3DEnabled),
+        NormalizeOptionalHotkeyChord(raw.ViewerSuv3DChord)
     )
 }
 
@@ -17514,21 +18312,133 @@ ParseOptionalFeatureEnabled(value) {
     return normalized = "true"
 }
 
+NormalizeOptionalHotkeyChord(value) {
+    return Trim(String(value), " `t`r`n")
+}
+
+ValidateViewerToolHotkeySettings(settings) {
+    definitions := [
+        {
+            field: "ViewerArrowChord",
+            label: "箭头",
+            enabled: settings.ViewerArrowEnabled,
+            chord: settings.ViewerArrowChord
+        },
+        {
+            field: "ViewerLengthChord",
+            label: "长度测量",
+            enabled: settings.ViewerLengthEnabled,
+            chord: settings.ViewerLengthChord
+        },
+        {
+            field: "ViewerSuv3DChord",
+            label: "3D SUV测量",
+            enabled: settings.ViewerSuv3DEnabled,
+            chord: settings.ViewerSuv3DChord
+        }
+    ]
+    seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
+    if settings.GlobalHjklArrows {
+        for definition in GlobalHjklArrowHotkeyDefinitions()
+            seen[NormalizeHotkeyChord(definition.Chord)] := true
+    }
+    for definition in definitions {
+        chord := NormalizeOptionalHotkeyChord(definition.chord)
+        if InStr(chord, "`r") || InStr(chord, "`n") {
+            return MakeViewerToolHotkeyValidation(
+                false,
+                definition.field,
+                definition.label "快捷键格式无效。"
+            )
+        }
+        if !definition.enabled
+            continue
+        if chord = "" {
+            return MakeViewerToolHotkeyValidation(
+                false,
+                definition.field,
+                "启用“" definition.label "”前必须设置快捷键。"
+            )
+        }
+        if !ViewerToolHotkeyChordHasTwoModifiers(chord) {
+            return MakeViewerToolHotkeyValidation(
+                false,
+                definition.field,
+                "“" definition.label "”快捷键至少需要两个修饰键。"
+            )
+        }
+        chordKey := NormalizeHotkeyChord(chord)
+        if seen.Has(chordKey) {
+            return MakeViewerToolHotkeyValidation(
+                false,
+                definition.field,
+                "“" definition.label "”快捷键与其他功能重复。"
+            )
+        }
+        seen[chordKey] := true
+    }
+    return MakeViewerToolHotkeyValidation(true)
+}
+
+ViewerToolHotkeyChordHasTwoModifiers(chord) {
+    if !RegExMatch(String(chord), "^([!+^]+)(.+)$", &match)
+        return false
+    modifierCount := 0
+    for modifier in ["^", "!", "+"] {
+        if InStr(match[1], modifier)
+            modifierCount += 1
+    }
+    return modifierCount >= 2
+}
+
+MakeViewerToolHotkeyValidation(ok, field := "", message := "") {
+    return {
+        Ok: ok = true,
+        Field: String(field),
+        Message: String(message)
+    }
+}
+
+ViewerToolHotkeySettingsMatch(expected, actual) {
+    return expected.ViewerArrowEnabled = actual.ViewerArrowEnabled
+        && expected.ViewerArrowChord = actual.ViewerArrowChord
+        && expected.ViewerLengthEnabled = actual.ViewerLengthEnabled
+        && expected.ViewerLengthChord = actual.ViewerLengthChord
+        && expected.ViewerSuv3DEnabled = actual.ViewerSuv3DEnabled
+        && expected.ViewerSuv3DChord = actual.ViewerSuv3DChord
+}
+
 ; --- END feature_normalization.ahk ---
 
 ; --- BEGIN hotkey_registration.ahk ---
-RegisterHotkeyDefinitions(definitions, reservedChords := 0) {
+RegisterHotkeyDefinitions(
+    definitions,
+    reservedChords := 0,
+    contextCallback := 0
+) {
+    static registeredChords := Map()
     seenChords := BuildHotkeyChordSet(reservedChords)
+    for registeredChord, _ in registeredChords
+        seenChords[registeredChord] := true
     registeredIds := []
-    for definition in definitions {
-        chordKey := NormalizeHotkeyChord(definition.Chord)
-        if chordKey = "" || seenChords.Has(chordKey)
-            continue
-        try {
-            Hotkey(definition.Chord, definition.Handler)
-            seenChords[chordKey] := true
-            registeredIds.Push(definition.Id)
+    useContext := HasMethod(contextCallback, "Call")
+    if useContext
+        HotIf(contextCallback)
+    try {
+        for definition in definitions {
+            chordKey := NormalizeHotkeyChord(definition.Chord)
+            if chordKey = "" || seenChords.Has(chordKey)
+                continue
+            try {
+                Hotkey(definition.Chord, definition.Handler)
+                seenChords[chordKey] := true
+                registeredChords[chordKey] := true
+                registeredIds.Push(definition.Id)
+            }
         }
+    } finally {
+        if useContext
+            HotIf()
     }
     return registeredIds
 }
@@ -17546,11 +18456,19 @@ BuildHotkeyChordSet(chords := 0) {
 }
 
 NormalizeHotkeyChord(chord) {
-    return StrLower(Trim(chord, " `t`r`n"))
+    normalized := StrLower(Trim(chord, " `t`r`n"))
+    if !RegExMatch(normalized, "^([!+^#]+)(.+)$", &match)
+        return normalized
+    canonicalModifiers := ""
+    for modifier in ["^", "!", "+", "#"] {
+        if InStr(match[1], modifier)
+            canonicalModifiers .= modifier
+    }
+    return canonicalModifiers match[2]
 }
 
 ReservedApplicationHotkeyChords() {
-    return ["^!Esc", "^!q"]
+    return ["^!Esc", "^!q", "^!F8"]
 }
 
 ; --- END hotkey_registration.ahk ---
@@ -17583,6 +18501,58 @@ SendGlobalHjklArrow(direction, *) {
 
 ; --- END global_hjkl_arrows.ahk ---
 
+; --- BEGIN viewer_tool_hotkeys.ahk ---
+ViewerToolHotkeyDefinitions(settings) {
+    definitions := []
+    if settings.ViewerArrowEnabled && settings.ViewerArrowChord != "" {
+        definitions.Push(HotkeyDefinition(
+            "viewer-tool-arrow",
+            settings.ViewerArrowChord,
+            InvokeMxNMViewerToolHotkey.Bind("arrow")
+        ))
+    }
+    if settings.ViewerLengthEnabled && settings.ViewerLengthChord != "" {
+        definitions.Push(HotkeyDefinition(
+            "viewer-tool-length",
+            settings.ViewerLengthChord,
+            InvokeMxNMViewerToolHotkey.Bind("length")
+        ))
+    }
+    if settings.ViewerSuv3DEnabled && settings.ViewerSuv3DChord != "" {
+        definitions.Push(HotkeyDefinition(
+            "viewer-tool-suv3d",
+            settings.ViewerSuv3DChord,
+            InvokeMxNMViewerToolHotkey.Bind("suv3d")
+        ))
+    }
+    return definitions
+}
+
+InvokeMxNMViewerToolHotkey(commandName, *) {
+    result := MxNMViewerToolCommandProvider.Invoke(commandName)
+    if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
+        return
+    Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+}
+
+MxNMViewerToolFailureMessage(code) {
+    if code = MxNMViewerToolCode.COMMAND_SCHEMA_INVALID
+        return "Viewer 工具配置已变化，快捷键未执行"
+    if code = MxNMViewerToolCode.VIEWER_NOT_FOUND
+        return "未找到 MedEx Viewer"
+    if code = MxNMViewerToolCode.VIEWER_NOT_UNIQUE
+        return "MedEx Viewer 窗口不唯一，快捷键未执行"
+    if code = MxNMViewerToolCode.BUTTON_TARGET_INVALID
+        || code = MxNMViewerToolCode.BUTTON_ID_MISMATCH {
+        return "Viewer 工具按钮布局校验失败，未执行点击"
+    }
+    if code = MxNMViewerToolCode.BUSY
+        return "Viewer 工具快捷键正在执行"
+    return "Viewer 工具快捷键执行失败"
+}
+
+; --- END viewer_tool_hotkeys.ahk ---
+
 ; --- BEGIN features.ahk ---
 RegisterConfiguredFeatures(LoadFeatureSettings())
 
@@ -17593,6 +18563,11 @@ RegisterConfiguredFeatures(settings) {
             ReservedApplicationHotkeyChords()
         )
     }
+    RegisterHotkeyDefinitions(
+        ViewerToolHotkeyDefinitions(settings),
+        ReservedApplicationHotkeyChords(),
+        MedExViewerToolForegroundActive
+    )
 }
 
 ; --- END features.ahk ---
@@ -17667,6 +18642,7 @@ class ReportAssistantSettingsWindow {
         this.ConfigPath := loadResult.ConfigPath
         this.OriginalText := loadResult.OriginalText
         this.Entries := loadResult.Entries
+        this.FeatureSettings := LoadFeatureSettings(this.ConfigPath)
         this.OriginalSections := Map()
         for entry in this.Entries
             this.OriginalSections[StrLower(entry.Section)] := true
@@ -17754,8 +18730,51 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs.UseTab(2)
         this.Window.Add(
-            "Text", "x40 y70 w820 h30 Center", "快捷键设置将在后续版本开放。"
+            "Text", "x40 y64 w820 h38",
+            "仅在 MedEx 报告程序或 Viewer 位于前台时生效；保存后程序会重新加载。"
         )
+        this.Window.Add("Text", "x72 y126 w170", "功能")
+        this.Window.Add("Text", "x276 y126 w90", "状态")
+        this.Window.Add("Text", "x402 y126 w220", "快捷键")
+
+        this.Window.Add("Text", "x72 y174 w170", "箭头")
+        this.ViewerArrowEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y166 w90 h26", "启用"
+        )
+        this.ViewerArrowChordInput := this.Window.Add(
+            "Hotkey", "x402 y166 w220 h26 Limit15"
+        )
+
+        this.Window.Add("Text", "x72 y222 w170", "长度测量")
+        this.ViewerLengthEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y214 w90 h26", "启用"
+        )
+        this.ViewerLengthChordInput := this.Window.Add(
+            "Hotkey", "x402 y214 w220 h26 Limit15"
+        )
+
+        this.Window.Add("Text", "x72 y270 w170", "3D SUV测量")
+        this.ViewerSuv3DEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y262 w90 h26", "启用"
+        )
+        this.ViewerSuv3DChordInput := this.Window.Add(
+            "Hotkey", "x402 y262 w220 h26 Limit15"
+        )
+        for control in [
+            this.ViewerArrowEnabledInput,
+            this.ViewerLengthEnabledInput,
+            this.ViewerSuv3DEnabledInput
+        ] {
+            control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
+        }
+        for control in [
+            this.ViewerArrowChordInput,
+            this.ViewerLengthChordInput,
+            this.ViewerSuv3DChordInput
+        ] {
+            control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
+        }
+        this.LoadViewerToolHotkeyControls()
 
         this.Tabs.UseTab(3)
         this.Window.Add(
@@ -17871,6 +18890,45 @@ class ReportAssistantSettingsWindow {
         this.Dirty := true
     }
 
+    LoadViewerToolHotkeyControls() {
+        this.LoadingControls := true
+        try {
+            this.ViewerArrowEnabledInput.Value :=
+                this.FeatureSettings.ViewerArrowEnabled ? 1 : 0
+            this.ViewerArrowChordInput.Value :=
+                this.FeatureSettings.ViewerArrowChord
+            this.ViewerLengthEnabledInput.Value :=
+                this.FeatureSettings.ViewerLengthEnabled ? 1 : 0
+            this.ViewerLengthChordInput.Value :=
+                this.FeatureSettings.ViewerLengthChord
+            this.ViewerSuv3DEnabledInput.Value :=
+                this.FeatureSettings.ViewerSuv3DEnabled ? 1 : 0
+            this.ViewerSuv3DChordInput.Value :=
+                this.FeatureSettings.ViewerSuv3DChord
+        } finally {
+            this.LoadingControls := false
+        }
+    }
+
+    StoreViewerToolHotkeyControls() {
+        this.FeatureSettings := FeatureSettings(
+            this.FeatureSettings.GlobalHjklArrows,
+            this.ViewerArrowEnabledInput.Value = 1,
+            this.ViewerArrowChordInput.Value,
+            this.ViewerLengthEnabledInput.Value = 1,
+            this.ViewerLengthChordInput.Value,
+            this.ViewerSuv3DEnabledInput.Value = 1,
+            this.ViewerSuv3DChordInput.Value
+        )
+    }
+
+    OnViewerHotkeyChanged(*) {
+        if this.LoadingControls
+            return
+        this.StoreViewerToolHotkeyControls()
+        this.Dirty := true
+    }
+
     OnInsertTemplateElement(*) {
         entryIndex := this.FindEntryIndexBySection(this.SelectedSection)
         definitionIndex := this.TemplateElementInput.Value
@@ -17964,12 +19022,28 @@ class ReportAssistantSettingsWindow {
 
     OnSave(*) {
         this.StoreEditorToEntry()
+        this.StoreViewerToolHotkeyControls()
         validation := ValidateEditableReportHotstringEntries(this.Entries)
         if !validation.Ok {
             if validation.Row > 0
                 this.FocusValidationError(validation)
             MsgBox(
                 validation.Message,
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Icon!"
+            )
+            return
+        }
+        featureValidation := ValidateViewerToolHotkeySettings(
+            this.FeatureSettings
+        )
+        if !featureValidation.Ok {
+            this.Tabs.Choose(2)
+            this.FocusViewerToolHotkeyValidationError(
+                featureValidation.Field
+            )
+            MsgBox(
+                featureValidation.Message,
                 ReportAssistantSettingsDefaults.WindowTitle,
                 "Icon!"
             )
@@ -17986,7 +19060,8 @@ class ReportAssistantSettingsWindow {
             this.DeletedSections,
             this.OriginalText,
             this.ModifiedSectionKeys,
-            this.ConfigPath
+            this.ConfigPath,
+            this.FeatureSettings
         )
         if !saveResult.Ok {
             MsgBox(
@@ -18009,6 +19084,15 @@ class ReportAssistantSettingsWindow {
                 "Icon!"
             )
         }
+    }
+
+    FocusViewerToolHotkeyValidationError(field) {
+        if field = "ViewerArrowChord"
+            this.ViewerArrowChordInput.Focus()
+        else if field = "ViewerLengthChord"
+            this.ViewerLengthChordInput.Focus()
+        else if field = "ViewerSuv3DChord"
+            this.ViewerSuv3DChordInput.Focus()
     }
 
     FocusValidationError(validation) {
@@ -18145,6 +19229,7 @@ ReloadReportAssistantFromTray(*) {
 
 ConfigureReportAssistantTrayMenu()
 MxNMMeasurementProvider.PrepareTargetPlanFromPathCache()
+MxNMViewerToolCommandProvider.PrepareAtStartup()
 
 #SuspendExempt
 
