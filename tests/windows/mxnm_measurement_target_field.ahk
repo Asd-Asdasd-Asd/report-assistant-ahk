@@ -2,12 +2,12 @@
 #SingleInstance Force
 #Warn
 
-#Include ..\..\src\Lib\UIA.ahk
 #Include ..\..\src\measurement_model.ahk
 #Include ..\..\src\measurement_parser.ahk
 #Include ..\..\src\measurement_clipboard.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_measurement_target_resolver.ahk
+#Include ..\..\src\mxnm_measurement_provider.ahk
 #Include ..\..\src\context_measurement_provider.ahk
 
 CoordMode "Mouse", "Screen"
@@ -19,7 +19,9 @@ CoordMode "ToolTip", "Screen"
 PreviewMxNMMeasurementTarget() {
     foregroundBefore := WinExist("A")
     MouseGetPos &mouseBeforeX, &mouseBeforeY
-    target := MxNMMeasurementTargetResolver.Resolve()
+    targetStartedAt := A_TickCount
+    target := MxNMMeasurementProvider.ResolveTarget()
+    target.targetResolutionMs := A_TickCount - targetStartedAt
     foregroundAfter := WinExist("A")
     MouseGetPos &mouseAfterX, &mouseAfterY
     WriteMxNMMeasurementTargetFieldOutput(
@@ -53,7 +55,9 @@ RunMxNMAutomaticTargetSuvMax() {
     ToolTip(, , , 1)
     foregroundBefore := WinExist("A")
     MouseGetPos &mouseBeforeX, &mouseBeforeY
-    target := MxNMMeasurementTargetResolver.Resolve()
+    targetStartedAt := A_TickCount
+    target := MxNMMeasurementProvider.ResolveTarget()
+    target.targetResolutionMs := A_TickCount - targetStartedAt
     if target.ok {
         result := ContextMeasurementProvider.ReadSuvMax(
             Map("imageScreenPoint", target.screenPoint)
@@ -163,8 +167,7 @@ FormatMxNMMeasurementTargetFieldOutput(
             MxNMTargetFieldPoint(target.logicalPoint),
         "ImageRect=" MxNMTargetFieldRect(target.imageRect),
         "ScreenPoint=" MxNMTargetFieldPoint(target.screenPoint),
-        "UiaPaneCount=" target.uiaPaneCount,
-        "UiaGeometryMatchCount=" target.uiaGeometryMatchCount,
+        "TargetResolutionMs=" target.targetResolutionMs,
         "ActionWindowResolved=" .
             MxNMTargetFieldBoolean(target.actionHwnd != 0),
         "MeasurementInvoked=" .

@@ -265,50 +265,42 @@ class MeasurementCaptureTests(unittest.TestCase):
         for forbidden in ("MouseMove", "WinActivate", "SoundBeep"):
             self.assertNotIn(forbidden, cleaner)
 
-    def test_production_target_is_warmed_and_revalidated_before_cache_reuse(
+    def test_production_target_caches_only_config_plan_and_resolves_runtime_each_read(
         self,
     ) -> None:
         provider = source("src/mxnm_measurement_provider.ahk")
         main = source("src/main.ahk")
-        warmup = source("src/mxnm_measurement_warmup.ahk")
         for required in (
-            "static CachedTarget := 0",
-            "IsReusableMxNMMeasurementTarget(this.CachedTarget)",
-            'WinExist("ahk_id " target.actionHwnd)',
-            "WinGetPID",
-            "WinGetProcessName",
-            "MxNMMeasurementRectsEqual",
-            "MxNMPointInsideRect",
+            "static CachedPlan := 0",
+            "IsReusableMxNMMeasurementTargetPlan(",
+            "LoadValidatedMxNMConfigPathCache()",
+            "SaveValidatedMxNMConfigPathCache(",
+            'cache["configPaths"]',
+            "StrLower(configPaths.viewerProcessPath)",
+            "= StrLower(plan.viewerProcessPath)",
+            "refreshedPlan := MxNMMeasurementTargetResolver.BuildPlan(",
+            "MxNMMeasurementTargetResolver.Resolve(plan, viewerExe)",
+            "static PrepareTargetPlan(options := 0)",
+            "static PrepareTargetPlanFromPathCache(viewerExe := \"\")",
             '"targetResolutionMs"',
             '"totalReadMs"',
         ):
             self.assertIn(required, provider)
-        self.assertIn("StartMxNMMeasurementTargetWarmup()", main)
-        for required in (
+        self.assertIn(
+            "MxNMMeasurementProvider.PrepareTargetPlanFromPathCache()",
+            main,
+        )
+        for forbidden in (
+            "CachedTarget",
+            "HasReusableTarget",
+            "WarmTarget",
+            "StartMxNMMeasurementTargetWarmup",
             "RegisterShellHookWindow",
             "RegisterWindowMessageW",
-            "OnMessage(shellMessageId, HandleMxNMShellHookMessage)",
-            "ProbeMxNMMeasurementWarmup()",
-            "MxNMMeasurementProvider.WarmTarget()",
-            "FallbackPollIntervalMs := 15000",
-            "ReadyHealthCheckIntervalMs := 60000",
-            "ViewerSettleMs := 1500",
+            "MxNMMeasurementWarmup",
         ):
-            self.assertIn(required, warmup)
-        self.assertNotIn("MedExReportHotstringsEnabled()", warmup)
-        for forbidden in (
-            "WinActivate",
-            "MouseMove",
-            "A_Clipboard",
-            "PrepareMxNMContextCommand",
-        ):
-            self.assertNotIn(forbidden, warmup)
-        shell_callback = warmup[
-            warmup.index("HandleMxNMShellHookMessage(") :
-            warmup.index("ProbeMxNMMeasurementWarmup(*)")
-        ]
-        self.assertNotIn("WarmTarget()", shell_callback)
-        self.assertNotIn("UIA.", shell_callback)
+            self.assertNotIn(forbidden, provider + main)
+        self.assertFalse((ROOT / "src" / "mxnm_measurement_warmup.ahk").exists())
 
     def test_geometry_is_owned_by_one_resolver_and_fails_closed(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
@@ -334,8 +326,10 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"measurement_parser.ahk"',
             '"measurement_clipboard.ahk"',
             '"mxnm_config_geometry_provider.ahk"',
+            '"mxnm_config_path_cache.ahk"',
             '"context_measurement_provider.ahk"',
-            '"mxnm_measurement_warmup.ahk"',
+            '"mxnm_measurement_target_resolver.ahk"',
+            '"mxnm_measurement_provider.ahk"',
             '"hotstrings.ahk"',
         )
         positions = [build.index(component) for component in ordered_components]
@@ -348,8 +342,10 @@ class MeasurementCaptureTests(unittest.TestCase):
             "measurement_parser.ahk",
             "measurement_clipboard.ahk",
             "mxnm_config_geometry_provider.ahk",
+            "mxnm_config_path_cache.ahk",
             "context_measurement_provider.ahk",
-            "mxnm_measurement_warmup.ahk",
+            "mxnm_measurement_target_resolver.ahk",
+            "mxnm_measurement_provider.ahk",
         ):
             self.assertIn(f"; --- BEGIN {component} ---", release)
         for symbol in (
@@ -367,7 +363,7 @@ class MeasurementCaptureTests(unittest.TestCase):
     ) -> None:
         harness = source("tests/windows/mxnm_line_axes_field.ahk")
         for required in (
-            "MxNMMeasurementProvider.WarmTarget()",
+            "MxNMMeasurementProvider.PrepareTargetPlan()",
             "MxNMMeasurementProvider.ReadLineAxes()",
             "MeasurementType.LINE_AXES",
             "mxnm_line_axes_field.txt",

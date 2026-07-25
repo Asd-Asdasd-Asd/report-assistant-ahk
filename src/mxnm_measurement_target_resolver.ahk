@@ -1,61 +1,57 @@
-class MxNMUiaImageRegionCode {
-    static READY_FOR_FIELD_VALIDATION := "READY_FOR_FIELD_VALIDATION"
-    static CONFIG_GEOMETRY_UNAVAILABLE := "CONFIG_GEOMETRY_UNAVAILABLE"
-    static UIA_UNAVAILABLE := "UIA_UNAVAILABLE"
-    static UIA_IMAGE_REGION_NOT_FOUND := "UIA_IMAGE_REGION_NOT_FOUND"
-    static UIA_IMAGE_REGION_AMBIGUOUS := "UIA_IMAGE_REGION_AMBIGUOUS"
-}
-
 class MxNMMeasurementTargetCode {
     static READY_FOR_FIELD_VALIDATION := "READY_FOR_FIELD_VALIDATION"
     static CONFIG_GEOMETRY_UNAVAILABLE := "CONFIG_GEOMETRY_UNAVAILABLE"
     static LAYOUT_SCHEMA_INVALID := "LAYOUT_SCHEMA_INVALID"
     static LAYOUT_SAFE_POINT_NOT_FOUND := "LAYOUT_SAFE_POINT_NOT_FOUND"
-    static UIA_UNAVAILABLE := "UIA_UNAVAILABLE"
-    static UIA_IMAGE_REGION_NOT_FOUND := "UIA_IMAGE_REGION_NOT_FOUND"
-    static UIA_IMAGE_REGION_AMBIGUOUS := "UIA_IMAGE_REGION_AMBIGUOUS"
+    static RUNTIME_FRAME_NOT_UNIQUE := "RUNTIME_FRAME_NOT_UNIQUE"
     static ACTION_WINDOW_INVALID := "ACTION_WINDOW_INVALID"
     static POINT_OUT_OF_BOUNDS := "POINT_OUT_OF_BOUNDS"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
 
 class MxNMMeasurementTargetResolver {
-    static Resolve(viewerExe := "") {
+    static BuildPlan(viewerExe := "", configPaths := 0) {
         if viewerExe = ""
             viewerExe := MxNMConfigGeometryDefaults.ViewerExe
-        return ResolveMxNMMeasurementTarget(viewerExe)
+        return BuildMxNMMeasurementTargetPlan(viewerExe, configPaths)
+    }
+
+    static Resolve(plan, viewerExe := "") {
+        if viewerExe = ""
+            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+        return ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe)
     }
 }
 
-ResolveMxNMMeasurementTarget(viewerExe) {
-    result := MakeMxNMMeasurementTargetResult()
+BuildMxNMMeasurementTargetPlan(viewerExe, configPaths := 0) {
+    plan := MakeMxNMMeasurementTargetPlan()
     try {
-        configResult := MxNMConfigGeometryProvider.AuditCurrentConfig(
-            viewerExe
+        if !IsObject(configPaths)
+            configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
+        configResult := MxNMConfigGeometryProvider.LoadStaticConfig(
+            viewerExe,
+            configPaths
         )
-        result.configCode := configResult.code
+        plan.configCode := configResult.code
         if !configResult.ok
-            return result
-        result.configReady := true
-        result.runtimeFrameResolved :=
-            configResult.runtimeFrameResolved
-        result.mappedImageRectResolved :=
-            configResult.mappedImageRectResolved
-        if !result.runtimeFrameResolved
-            || !result.mappedImageRectResolved {
-            return result
+            return plan
+        plan.configReady := true
+        if !configResult.mainGeometry.frameSizeResolved
+            || !configResult.mainGeometry.imagePositionResolved
+            || !configResult.mainGeometry.imageSizeResolved {
+            return plan
         }
 
         layoutResult := ParseMxNMDeclaredLayoutModels(
             configResult.layoutEntries,
             configResult.mainGeometry
         )
-        result.layoutModelCount := layoutResult.modelCount
+        plan.layoutModelCount := layoutResult.modelCount
         if !layoutResult.ok {
-            result.code := MxNMMeasurementTargetCode.LAYOUT_SCHEMA_INVALID
-            return result
+            plan.code := MxNMMeasurementTargetCode.LAYOUT_SCHEMA_INVALID
+            return plan
         }
-        result.layoutReady := true
+        plan.layoutReady := true
 
         safePointResult := FindMxNMCrossLayoutSafePoint(
             layoutResult.models,
@@ -63,27 +59,88 @@ ResolveMxNMMeasurementTarget(viewerExe) {
             configResult.mainGeometry.imageHeight
         )
         if !safePointResult.ok {
-            result.code :=
+            plan.code :=
                 MxNMMeasurementTargetCode.LAYOUT_SAFE_POINT_NOT_FOUND
-            return result
+            return plan
         }
-        result.logicalPoint := safePointResult.point
-        result.minimumLogicalClearance :=
+        plan.viewerExe := viewerExe
+        plan.viewerProcessPath := configResult.viewerProcessPath
+        plan.mainConfigSha256 := configResult.mainConfigSha256
+        plan.layoutConfigSha256 := configResult.layoutConfigSha256
+        plan.mainGeometry := configResult.mainGeometry
+        plan.logicalPoint := safePointResult.point
+        plan.minimumLogicalClearance :=
             safePointResult.minimumClearance
-        result.minimumRequiredClearance :=
+        plan.minimumRequiredClearance :=
             safePointResult.minimumRequiredClearance
+        plan.ok := true
+        plan.code := MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION
+        return plan
+    } catch {
+        plan.code := MxNMMeasurementTargetCode.UNEXPECTED_ERROR
+        return plan
+    }
+}
 
-        uiaResult := ResolveMxNMUiaImageRegion(configResult)
-        result.uiaPaneCount := uiaResult.paneCount
-        result.uiaGeometryMatchCount := uiaResult.geometryMatchCount
-        if !uiaResult.ok {
-            result.code := MapMxNMUiaCodeToTargetCode(uiaResult.code)
+MakeMxNMMeasurementTargetPlan() {
+    return {
+        ok: false,
+        code: MxNMMeasurementTargetCode.CONFIG_GEOMETRY_UNAVAILABLE,
+        configCode: "",
+        configReady: false,
+        layoutReady: false,
+        layoutModelCount: 0,
+        viewerExe: "",
+        viewerProcessPath: "",
+        mainConfigSha256: "",
+        layoutConfigSha256: "",
+        mainGeometry: 0,
+        logicalPoint: 0,
+        minimumLogicalClearance: 0,
+        minimumRequiredClearance: 0
+    }
+}
+
+ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
+    result := MakeMxNMMeasurementTargetResult()
+    try {
+        if IsObject(plan) && plan.HasOwnProp("configCode")
+            result.configCode := plan.configCode
+        if !IsReusableMxNMMeasurementTargetPlan(plan, viewerExe)
+            return result
+        result.configReady := true
+        result.layoutReady := true
+        result.layoutModelCount := plan.layoutModelCount
+        result.logicalPoint := plan.logicalPoint
+        result.minimumLogicalClearance := plan.minimumLogicalClearance
+        result.minimumRequiredClearance := plan.minimumRequiredClearance
+
+        if !WinExist("ahk_exe " viewerExe) {
+            result.configCode := MxNMConfigGeometryCode.VIEWER_NOT_FOUND
             return result
         }
-        result.imageRect := uiaResult.matchedRects[1]
-        result.screenPoint := MapMxNMLogicalPointToUiaRect(
-            result.logicalPoint,
-            configResult.mainGeometry,
+        viewerWindows := CaptureMxNMViewerWindowGeometry(
+            viewerExe,
+            plan.viewerProcessPath
+        )
+        runtimeFrameResult := ResolveMxNMRuntimeFrame(viewerWindows)
+        if !runtimeFrameResult.ok {
+            result.code := MxNMMeasurementTargetCode.RUNTIME_FRAME_NOT_UNIQUE
+            result.configCode := runtimeFrameResult.code
+            return result
+        }
+        result.runtimeFrameResolved := true
+        mappedImageResult := MapMxNMLogicalImageRectToRuntime(
+            plan.mainGeometry,
+            runtimeFrameResult.frame
+        )
+        if !mappedImageResult.ok
+            return result
+        result.mappedImageRectResolved := true
+        result.imageRect := mappedImageResult.rect
+        result.screenPoint := MapMxNMLogicalPointToRuntimeRect(
+            plan.logicalPoint,
+            plan.mainGeometry,
             result.imageRect
         )
         if !MxNMPointInsideRect(result.screenPoint, result.imageRect) {
@@ -94,7 +151,7 @@ ResolveMxNMMeasurementTarget(viewerExe) {
         actionWindowResult := ResolveMxNMActionWindowFromPoint(
             viewerExe,
             result.screenPoint,
-            configResult.runtimeFrame.hwnd
+            runtimeFrameResult.frame.hwnd
         )
         if !actionWindowResult.ok {
             result.code := actionWindowResult.code
@@ -110,6 +167,15 @@ ResolveMxNMMeasurementTarget(viewerExe) {
         result.code := MxNMMeasurementTargetCode.UNEXPECTED_ERROR
         return result
     }
+}
+
+IsReusableMxNMMeasurementTargetPlan(plan, viewerExe) {
+    return IsObject(plan)
+        && plan.ok
+        && StrLower(plan.viewerExe) = StrLower(viewerExe)
+        && plan.viewerProcessPath != ""
+        && IsObject(plan.mainGeometry)
+        && IsObject(plan.logicalPoint)
 }
 
 MakeMxNMMeasurementTargetResult() {
@@ -128,9 +194,7 @@ MakeMxNMMeasurementTargetResult() {
         imageRect: 0,
         screenPoint: 0,
         actionHwnd: 0,
-        actionPid: 0,
-        uiaPaneCount: 0,
-        uiaGeometryMatchCount: 0
+        actionPid: 0
     }
 }
 
@@ -344,153 +408,16 @@ MxNMPointStrictlyInsideRect(point, rect) {
         && point.y < rect.bottom
 }
 
-ResolveMxNMUiaImageRegion(configResult) {
-    result := {
-        ok: false,
-        code: MxNMUiaImageRegionCode.CONFIG_GEOMETRY_UNAVAILABLE,
-        configReady: false,
-        runtimeFrameResolved: false,
-        mappedImageRectResolved: false,
-        paneCount: 0,
-        geometryMatchCount: 0,
-        mappedRect: 0,
-        matchedRects: []
-    }
-    if !configResult.ok
-        return result
-    result.configReady := true
-    result.runtimeFrameResolved := configResult.runtimeFrameResolved
-    result.mappedImageRectResolved :=
-        configResult.mappedImageRectResolved
-    if !result.runtimeFrameResolved
-        || !result.mappedImageRectResolved {
-        return result
-    }
-    result.mappedRect := configResult.mappedImageRect
-
-    global UIA
-    if !IsSet(UIA) {
-        result.code := MxNMUiaImageRegionCode.UIA_UNAVAILABLE
-        return result
-    }
-
-    horizontalTolerance := Max(
-        12,
-        Round(configResult.runtimeFrame.windowWidth * 0.01)
-    )
-    verticalTolerance := Max(
-        12,
-        Round(configResult.runtimeFrame.windowHeight * 0.01)
-    )
-    seenRects := Map()
-    try {
-        for viewerWindow in configResult.viewerWindows {
-            try rootElement := UIA.ElementFromHandle(
-                viewerWindow.hwnd,
-                ,
-                false
-            )
-            catch {
-                continue
-            }
-            elements := [rootElement]
-            try paneElements := rootElement.FindElements({Type: "Pane"})
-            catch {
-                paneElements := []
-            }
-            for paneElement in paneElements
-                elements.Push(paneElement)
-
-            for element in elements {
-                try elementType := element.Type
-                catch {
-                    continue
-                }
-                if elementType != UIA.ControlType.Pane
-                    continue
-                try rectangle := element.BoundingRectangle
-                catch {
-                    continue
-                }
-                rect := {
-                    left: Round(rectangle.l),
-                    top: Round(rectangle.t),
-                    right: Round(rectangle.r),
-                    bottom: Round(rectangle.b)
-                }
-                if rect.right <= rect.left || rect.bottom <= rect.top
-                    continue
-                rectKey := rect.left "," rect.top ","
-                    . rect.right "," rect.bottom
-                if seenRects.Has(rectKey)
-                    continue
-                seenRects[rectKey] := true
-                result.paneCount += 1
-
-                try isOffscreen := element.IsOffscreen
-                catch {
-                    isOffscreen := true
-                }
-                if isOffscreen
-                    continue
-                if MxNMUiaRectMatchesMappedGeometry(
-                    rect,
-                    result.mappedRect,
-                    horizontalTolerance,
-                    verticalTolerance
-                ) {
-                    result.matchedRects.Push(rect)
-                }
-            }
-        }
-    } catch {
-        result.code := MxNMUiaImageRegionCode.UIA_UNAVAILABLE
-        return result
-    }
-
-    result.geometryMatchCount := result.matchedRects.Length
-    if result.geometryMatchCount = 0 {
-        result.code :=
-            MxNMUiaImageRegionCode.UIA_IMAGE_REGION_NOT_FOUND
-        return result
-    }
-    if result.geometryMatchCount != 1 {
-        result.code :=
-            MxNMUiaImageRegionCode.UIA_IMAGE_REGION_AMBIGUOUS
-        return result
-    }
-    result.ok := true
-    result.code :=
-        MxNMUiaImageRegionCode.READY_FOR_FIELD_VALIDATION
-    return result
-}
-
-MxNMUiaRectMatchesMappedGeometry(
-    actualRect,
-    mappedRect,
-    horizontalTolerance,
-    verticalTolerance
-) {
-    return Abs(actualRect.left - mappedRect.left)
-            <= horizontalTolerance
-        && Abs(actualRect.right - mappedRect.right)
-            <= horizontalTolerance
-        && Abs(actualRect.top - mappedRect.top)
-            <= verticalTolerance
-        && Abs(actualRect.bottom - mappedRect.bottom)
-            <= verticalTolerance
-}
-
-MapMxNMLogicalPointToUiaRect(point, mainGeometry, uiaRect) {
+MapMxNMLogicalPointToRuntimeRect(point, mainGeometry, runtimeRect) {
     return {
-        x: uiaRect.left + Round(
+        x: runtimeRect.left + Round(
             point.x
-            * (uiaRect.right - uiaRect.left)
+            * (runtimeRect.right - runtimeRect.left)
             / mainGeometry.imageWidth
         ),
-        y: uiaRect.top + Round(
+        y: runtimeRect.top + Round(
             point.y
-            * (uiaRect.bottom - uiaRect.top)
+            * (runtimeRect.bottom - runtimeRect.top)
             / mainGeometry.imageHeight
         )
     }
@@ -503,16 +430,6 @@ MxNMPointInsideRect(point, rect) {
         && point.x < rect.right
         && point.y >= rect.top
         && point.y < rect.bottom
-}
-
-MapMxNMUiaCodeToTargetCode(uiaCode) {
-    if uiaCode = MxNMUiaImageRegionCode.UIA_UNAVAILABLE
-        return MxNMMeasurementTargetCode.UIA_UNAVAILABLE
-    if uiaCode = MxNMUiaImageRegionCode.UIA_IMAGE_REGION_NOT_FOUND
-        return MxNMMeasurementTargetCode.UIA_IMAGE_REGION_NOT_FOUND
-    if uiaCode = MxNMUiaImageRegionCode.UIA_IMAGE_REGION_AMBIGUOUS
-        return MxNMMeasurementTargetCode.UIA_IMAGE_REGION_AMBIGUOUS
-    return MxNMMeasurementTargetCode.CONFIG_GEOMETRY_UNAVAILABLE
 }
 
 ResolveMxNMActionWindowFromPoint(

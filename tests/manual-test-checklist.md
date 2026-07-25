@@ -400,7 +400,7 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [x] 修正版 config audit：`RuntimeFrameCandidateCount=1`、`RuntimeFrameResolved=true`、`MappedImageRectResolved=true`、`MappedImageRect=2566,81,3991,1434`。
 - [x] 确认结果不包含 absolute path、raw vendor config、患者信息、检查信息或报告内容。
 - [x] 本阶段未调用 context menu/provider，未读写 clipboard，未移动鼠标或切换焦点。
-- [x] 单独运行 `tests\windows\mxnm_uia_image_region_audit.ahk`；`State=READY_FOR_FIELD_VALIDATION`、两个 resolved 字段和 `ConfigReady` 均为 `true`，`UiaPaneCount=9`、`UiaGeometryMatchCount=1`。
+- [x] 历史 checkpoint 曾单独运行现已移除的 `mxnm_uia_image_region_audit.ahk`；`State=READY_FOR_FIELD_VALIDATION`、两个 resolved 字段和 `ConfigReady` 均为 `true`，`UiaPaneCount=9`、`UiaGeometryMatchCount=1`。
 - [x] 相同布局连续运行三次；`UiaCandidateRect=2566,80,3991,1440` 保持不变，使用视觉反馈且无声音。
 - [x] Config + UIA 主图区矩形 checkpoint 通过；本 checkpoint 未生成 production image point，未接入 provider 或 `;fzg`。
 
@@ -416,6 +416,18 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [x] 关闭 viewer 后复跑：`TargetState=CONFIG_GEOMETRY_UNAVAILABLE`、`ConfigState=VIEWER_NOT_FOUND`、`MeasurementInvoked=false`；foreground/mouse 不变，clipboard/popup/command 均不可达。
 - [x] Field-only automatic target checkpoint 通过 Windows 验证；下一 checkpoint 才允许设计 provider 默认集成。
 - [x] 本 checkpoint 未修改 `main.ahk`、generated release、provider 默认行为、hotstrings 或 `;fzg`。
+
+### Config-only on-demand measurement target（待 Windows 复验）
+
+- [ ] 只运行 regenerated release；确认启动后没有 measurement shell hook、后台 warmup 或周期性 target timer。
+- [ ] 删除或暂时移走 `%LocalAppData%\MedExReportAssistant\mxnm-config-path-cache.ini`，保持 viewer 运行并执行一次 `;fzg`；确认成功后生成 cache，且 cache 只包含 schema、viewer exe/process path 和时间，不包含 vendor config 原文。
+- [ ] 完全退出并重新启动 release；先不启动 viewer，确认 release 正常启动且没有窗口查找提示。随后启动 viewer，首次 `;fzg` 的 `TargetResolutionMs` 不再包含配置读取/布局解析停顿。
+- [ ] viewer 运行时将 cache 中的 process path 改为另一不存在路径并重启 release；确认 cache 被拒绝，测量 fail closed 或在当前 viewer 上重新发现并修复 cache，不使用错误路径。
+- [ ] 保持 viewer 在日常固定位置，连续执行 `;fzg` 与 `;cma`；记录 `targetResolutionMs`，确认第二次及以后使用 cached config plan，且 target resolution 无偶发秒级延迟。
+- [ ] 单独运行 `tests\windows\mxnm_measurement_target_field.ahk`，按 `Ctrl+Alt+F10`；确认 `LogicalPoint`、config-derived `ImageRect`、`ScreenPoint` 和 `ActionWindowResolved` 正确，不再输出 UIA 字段。
+- [ ] 移动或调整可调整的上层 viewer frame 后复跑；确认每次按当前 rect 重算坐标，未复用旧 `screenPoint` 或 action HWND。
+- [ ] 关闭 viewer 后复跑；确认在 popup/clipboard 前快速 fail closed。
+- [ ] 完成 SUVMax、长短轴、annotation cleanup、foreground/mouse/clipboard/popup invariants 复验。
 
 ### SUVMax production candidate
 

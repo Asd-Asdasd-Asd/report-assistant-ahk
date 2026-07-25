@@ -2,7 +2,6 @@
 #SingleInstance Force
 #Warn
 
-#Include ..\..\src\Lib\UIA.ahk
 #Include ..\..\src\measurement_model.ahk
 #Include ..\..\src\measurement_parser.ahk
 #Include ..\..\src\measurement_clipboard.ahk
@@ -14,7 +13,7 @@
 
 CoordMode "Mouse", "Screen"
 
-MxNMMeasurementProvider.WarmTarget()
+MxNMMeasurementProvider.PrepareTargetPlan()
 
 ^!F11::RunMxNMLineAxesField(false)
 ^!F12::RunMxNMLineAxesField(true)

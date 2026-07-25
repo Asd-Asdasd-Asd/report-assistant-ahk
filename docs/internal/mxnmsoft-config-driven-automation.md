@@ -12,7 +12,17 @@
 
 > 对 MedEx 明确写入配置的布局变化自动适应；对瞬时运行状态和语义变化继续进行轻量运行时识别；对未知 Schema 或坐标不一致 fail closed。
 
-因此推荐的长期路线是 **config-first hybrid automation**，而不是完全移除 UIA、窗口消息或现场校验。
+measurement target 当前采用 **config-only geometry + window-message transport**：
+vendor config 负责静态布局与跨 layout 安全点，运行时只读取 frame/window rect
+并执行 HWND/PID/process/client-rect 核验。UIA 已从 measurement target
+resolver 移除，但仍可由其他 MedEx 功能或独立诊断使用；窗口消息和现场校验
+继续保留。
+
+配置路径采用一次发现、长期复用：首次成功测量时从运行中的
+`MedExNMFusion.exe` 验证 process path，并写入独立的机器级 path cache。
+后续报告助手启动时从该 process path 重新派生固定相对配置路径，校验 exe
+和两个配置文件仍存在，然后在没有 viewer 窗口的情况下读取配置并建立静态
+plan。cache 不保存 vendor config 原文；安装路径或配置文件失效时拒绝复用。
 
 ## 目录画像
 

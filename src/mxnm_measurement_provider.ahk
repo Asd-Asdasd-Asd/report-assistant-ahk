@@ -1,5 +1,5 @@
 class MxNMMeasurementProvider {
-    static CachedTarget := 0
+    static CachedPlan := 0
 
     static ReadSuvMax(options := 0) {
         return ReadMxNMMeasurementWithTarget(
@@ -16,36 +16,113 @@ class MxNMMeasurementProvider {
     }
 
     static ResolveTarget(options := 0) {
-        forceRefresh := MeasurementOption(
-            options, "forceTargetRefresh", false
+        viewerExe := MeasurementOption(
+            options,
+            "viewerExe",
+            MxNMConfigGeometryDefaults.ViewerExe
         )
-        if !forceRefresh && IsReusableMxNMMeasurementTarget(this.CachedTarget)
-            return this.CachedTarget
+        plan := this.ResolvePlan(options)
+        target := MxNMMeasurementTargetResolver.Resolve(plan, viewerExe)
+        if target.ok
+            return target
+        if !IsReusableMxNMMeasurementTargetPlan(plan, viewerExe)
+            return target
 
-        this.CachedTarget := 0
-        target := MxNMMeasurementTargetResolver.Resolve(
+        configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
+        if !configPaths.ok
+            || StrLower(configPaths.viewerProcessPath)
+                = StrLower(plan.viewerProcessPath) {
+            return target
+        }
+        refreshedPlan := MxNMMeasurementTargetResolver.BuildPlan(
+            viewerExe,
+            configPaths
+        )
+        if !refreshedPlan.ok
+            return target
+        this.CachedPlan := refreshedPlan
+        SaveValidatedMxNMConfigPathCache(viewerExe, configPaths)
+        return MxNMMeasurementTargetResolver.Resolve(
+            refreshedPlan,
+            viewerExe
+        )
+    }
+
+    static ResolvePlan(options := 0) {
+        viewerExe := MeasurementOption(
+            options,
+            "viewerExe",
+            MxNMConfigGeometryDefaults.ViewerExe
+        )
+        forcePlanRefresh := MeasurementOption(
+            options,
+            "forceTargetPlanRefresh",
             MeasurementOption(
                 options,
-                "viewerExe",
-                MxNMConfigGeometryDefaults.ViewerExe
+                "forceTargetRefresh",
+                false
             )
         )
-        if target.ok {
-            target.cacheClientRect := MxNMTargetClientRectScreen(
-                target.actionHwnd
-            )
-            if IsObject(target.cacheClientRect)
-                this.CachedTarget := target
+        if !forcePlanRefresh
+            && IsReusableMxNMMeasurementTargetPlan(
+                this.CachedPlan,
+                viewerExe
+            ) {
+            return this.CachedPlan
         }
-        return target
+
+        this.CachedPlan := 0
+        cache := LoadValidatedMxNMConfigPathCache()
+        if IsObject(cache)
+            && StrLower(cache["viewerExe"]) = StrLower(viewerExe) {
+            plan := MxNMMeasurementTargetResolver.BuildPlan(
+                viewerExe,
+                cache["configPaths"]
+            )
+        } else {
+            configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
+            plan := MxNMMeasurementTargetResolver.BuildPlan(
+                viewerExe,
+                configPaths
+            )
+            if plan.ok {
+                SaveValidatedMxNMConfigPathCache(
+                    viewerExe,
+                    configPaths
+                )
+            }
+        }
+        if plan.ok
+            this.CachedPlan := plan
+        return plan
     }
 
-    static HasReusableTarget() {
-        return IsReusableMxNMMeasurementTarget(this.CachedTarget)
+    static PrepareTargetPlan(options := 0) {
+        return this.ResolvePlan(options).ok
     }
 
-    static WarmTarget() {
-        return this.ResolveTarget().ok
+    static PrepareTargetPlanFromPathCache(viewerExe := "") {
+        if viewerExe = ""
+            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+        if IsReusableMxNMMeasurementTargetPlan(
+            this.CachedPlan,
+            viewerExe
+        ) {
+            return true
+        }
+        cache := LoadValidatedMxNMConfigPathCache()
+        if !IsObject(cache)
+            || StrLower(cache["viewerExe"]) != StrLower(viewerExe) {
+            return false
+        }
+        plan := MxNMMeasurementTargetResolver.BuildPlan(
+            viewerExe,
+            cache["configPaths"]
+        )
+        if !plan.ok
+            return false
+        this.CachedPlan := plan
+        return true
     }
 }
 
@@ -112,38 +189,6 @@ CloneMeasurementOptions(options := 0) {
             clone[key] := value
     }
     return clone
-}
-
-IsReusableMxNMMeasurementTarget(target) {
-    if !IsObject(target) || !target.ok
-        || !target.actionHwnd || !target.actionPid
-        || !target.HasOwnProp("cacheClientRect")
-        || !IsObject(target.cacheClientRect)
-        return false
-    if !WinExist("ahk_id " target.actionHwnd)
-        return false
-    try currentPid := WinGetPID("ahk_id " target.actionHwnd)
-    catch {
-        return false
-    }
-    try processName := WinGetProcessName("ahk_id " target.actionHwnd)
-    catch {
-        return false
-    }
-    if currentPid != target.actionPid
-        || StrLower(processName) != StrLower(MxNMConfigGeometryDefaults.ViewerExe)
-        return false
-    currentRect := MxNMTargetClientRectScreen(target.actionHwnd)
-    return IsObject(currentRect)
-        && MxNMMeasurementRectsEqual(currentRect, target.cacheClientRect)
-        && MxNMPointInsideRect(target.screenPoint, currentRect)
-}
-
-MxNMMeasurementRectsEqual(leftRect, rightRect) {
-    return leftRect.left = rightRect.left
-        && leftRect.top = rightRect.top
-        && leftRect.right = rightRect.right
-        && leftRect.bottom = rightRect.bottom
 }
 
 MakeMxNMTargetFailureMeasurement(

@@ -26,49 +26,62 @@ class MxNMConfigGeometryProvider {
             viewerExe := MxNMConfigGeometryDefaults.ViewerExe
         return AuditMxNMConfigGeometry(viewerExe)
     }
+
+    static LoadStaticConfig(viewerExe, configPaths) {
+        if viewerExe = ""
+            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+        return LoadMxNMStaticConfigGeometry(viewerExe, configPaths)
+    }
 }
 
 AuditMxNMConfigGeometry(viewerExe) {
-    result := {
-        ok: false,
-        code: MxNMConfigGeometryCode.UNEXPECTED_ERROR,
-        viewerExe: viewerExe,
-        viewerProcessPathResolved: false,
-        configRootRelationValidated: false,
-        mainConfigExists: false,
-        layoutConfigExists: false,
-        mainConfigSha256: "",
-        layoutConfigSha256: "",
-        mainEntries: [],
-        layoutEntries: [],
-        mainGeometry: {
-            framePositionResolved: false,
-            frameX: 0,
-            frameY: 0,
-            frameSizeResolved: false,
-            frameWidth: 0,
-            frameHeight: 0,
-            imagePositionResolved: false,
-            imageX: 0,
-            imageY: 0,
-            imageSizeResolved: false,
-            imageWidth: 0,
-            imageHeight: 0
-        },
-        viewerWindows: [],
-        runtimeFrameCandidateCount: 0,
-        runtimeFrameResolved: false,
-        runtimeFrame: 0,
-        mappedImageRectResolved: false,
-        mappedImageRect: 0
+    configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
+    if !configPaths.ok {
+        result := MakeMxNMConfigGeometryResult(viewerExe)
+        result.code := configPaths.code
+        return result
     }
+    result := LoadMxNMStaticConfigGeometry(viewerExe, configPaths)
+    if !result.ok
+        return result
 
     try {
-        configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
-        if !configPaths.ok {
-            result.code := configPaths.code
+        result.viewerWindows := CaptureMxNMViewerWindowGeometry(
+            viewerExe,
+            configPaths.viewerProcessPath
+        )
+        runtimeFrameResult := ResolveMxNMRuntimeFrame(result.viewerWindows)
+        result.runtimeFrameCandidateCount :=
+            runtimeFrameResult.candidateCount
+        if runtimeFrameResult.ok {
+            result.runtimeFrameResolved := true
+            result.runtimeFrame := runtimeFrameResult.frame
+            mappedImageResult := MapMxNMLogicalImageRectToRuntime(
+                result.mainGeometry,
+                result.runtimeFrame
+            )
+            if mappedImageResult.ok {
+                result.mappedImageRectResolved := true
+                result.mappedImageRect := mappedImageResult.rect
+            }
+        }
+        return result
+    } catch {
+        result.ok := false
+        result.code := MxNMConfigGeometryCode.UNEXPECTED_ERROR
+        return result
+    }
+}
+
+LoadMxNMStaticConfigGeometry(viewerExe, configPaths) {
+    result := MakeMxNMConfigGeometryResult(viewerExe)
+    try {
+        if !IsObject(configPaths) || !configPaths.ok {
+            if IsObject(configPaths) && configPaths.HasOwnProp("code")
+                result.code := configPaths.code
             return result
         }
+        result.viewerProcessPath := configPaths.viewerProcessPath
         result.viewerProcessPathResolved := true
         result.configRootRelationValidated := true
         result.mainConfigExists := true
@@ -104,25 +117,6 @@ AuditMxNMConfigGeometry(viewerExe) {
         result.mainEntries := mainAudit.entries
         result.layoutEntries := layoutAudit.entries
         result.mainGeometry := ParseMxNMMainGeometry(result.mainEntries)
-        result.viewerWindows := CaptureMxNMViewerWindowGeometry(
-            viewerExe,
-            configPaths.viewerProcessPath
-        )
-        runtimeFrameResult := ResolveMxNMRuntimeFrame(result.viewerWindows)
-        result.runtimeFrameCandidateCount :=
-            runtimeFrameResult.candidateCount
-        if runtimeFrameResult.ok {
-            result.runtimeFrameResolved := true
-            result.runtimeFrame := runtimeFrameResult.frame
-            mappedImageResult := MapMxNMLogicalImageRectToRuntime(
-                result.mainGeometry,
-                result.runtimeFrame
-            )
-            if mappedImageResult.ok {
-                result.mappedImageRectResolved := true
-                result.mappedImageRect := mappedImageResult.rect
-            }
-        }
         if result.mainEntries.Length = 0
             && result.layoutEntries.Length = 0 {
             result.code := MxNMConfigGeometryCode.GEOMETRY_KEYS_NOT_FOUND
@@ -136,6 +130,44 @@ AuditMxNMConfigGeometry(viewerExe) {
         result.code := MxNMConfigGeometryCode.UNEXPECTED_ERROR
         return result
     }
+}
+
+MakeMxNMConfigGeometryResult(viewerExe) {
+    result := {
+        ok: false,
+        code: MxNMConfigGeometryCode.UNEXPECTED_ERROR,
+        viewerExe: viewerExe,
+        viewerProcessPath: "",
+        viewerProcessPathResolved: false,
+        configRootRelationValidated: false,
+        mainConfigExists: false,
+        layoutConfigExists: false,
+        mainConfigSha256: "",
+        layoutConfigSha256: "",
+        mainEntries: [],
+        layoutEntries: [],
+        mainGeometry: {
+            framePositionResolved: false,
+            frameX: 0,
+            frameY: 0,
+            frameSizeResolved: false,
+            frameWidth: 0,
+            frameHeight: 0,
+            imagePositionResolved: false,
+            imageX: 0,
+            imageY: 0,
+            imageSizeResolved: false,
+            imageWidth: 0,
+            imageHeight: 0
+        },
+        viewerWindows: [],
+        runtimeFrameCandidateCount: 0,
+        runtimeFrameResolved: false,
+        runtimeFrame: 0,
+        mappedImageRectResolved: false,
+        mappedImageRect: 0
+    }
+    return result
 }
 
 ParseMxNMMainGeometry(entries) {
@@ -444,7 +476,28 @@ ResolveMxNMConfigPathsFromViewer(viewerExe) {
         viewerProcessPath := candidatePath
         break
     }
-    SplitPath viewerProcessPath, , &viewerDirectory
+    return ResolveMxNMConfigPathsFromProcessPath(
+        viewerExe,
+        viewerProcessPath
+    )
+}
+
+ResolveMxNMConfigPathsFromProcessPath(viewerExe, viewerProcessPath) {
+    viewerProcessPath := NormalizeMxNMConfigPath(viewerProcessPath)
+    if viewerProcessPath = "" {
+        return {
+            ok: false,
+            code: MxNMConfigGeometryCode.PROCESS_PATH_UNAVAILABLE
+        }
+    }
+    SplitPath viewerProcessPath, &processFileName, &viewerDirectory
+    if StrLower(processFileName) != StrLower(viewerExe)
+        || !MxNMConfigFileExists(viewerProcessPath) {
+        return {
+            ok: false,
+            code: MxNMConfigGeometryCode.PROCESS_PATH_UNAVAILABLE
+        }
+    }
     normalizedViewerDirectory := NormalizeMxNMConfigPath(viewerDirectory)
     configDirectory := NormalizeMxNMConfigPath(
         normalizedViewerDirectory "\" .

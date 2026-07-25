@@ -15,11 +15,11 @@
 #Include measurement_parser.ahk
 #Include measurement_clipboard.ahk
 #Include mxnm_config_geometry_provider.ahk
+#Include mxnm_config_path_cache.ahk
 #Include context_measurement_provider.ahk
 #Include <UIA>
 #Include mxnm_measurement_target_resolver.ahk
 #Include mxnm_measurement_provider.ahk
-#Include mxnm_measurement_warmup.ahk
 #Include mxnm_annotation_cleaner.ahk
 #Include medex_color_reset_logic.ahk
 #Include medex_candidate_g_logic.ahk
@@ -49,7 +49,7 @@
 #Include tray_menu.ahk
 
 ConfigureReportAssistantTrayMenu()
-StartMxNMMeasurementTargetWarmup()
+MxNMMeasurementProvider.PrepareTargetPlanFromPathCache()
 
 #SuspendExempt
 

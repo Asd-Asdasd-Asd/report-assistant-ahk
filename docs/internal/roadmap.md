@@ -201,9 +201,9 @@ M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/cl
 
 技术自动化失败不等同于“无标注”。`AUTOMATION_FAILED` 不得触发静默的空值或旧值 fallback。
 
-Release status（2026-07-24）：v0.6.0 measurement baseline 已完成。foundation、config/UIA automatic target、SUVMax 与长短轴 production insertion、context-menu `删除全部标注` + `NOT_ANNOTATED` postcondition、target-cache latency、通用 `{{suvmax}}`/`{{size}}`、报告事务及无焦点视觉提示均已实现，并完成 Windows 端到端验证。更细的 failure injection、其他 workstation profile，以及同一模板组合两种 measurement 的多锚点语义进入 v0.6.x 后续工作。
+Release status（2026-07-26）：v0.6.0 measurement baseline 已完成。SUVMax 与长短轴 production insertion、context-menu `删除全部标注` + `NOT_ANNOTATED` postcondition、通用 `{{suvmax}}`/`{{size}}`、报告事务及无焦点视觉提示均已实现。measurement target 已从 config/UIA target cache 改为持久化 viewer path、启动时建立 config-only static plan、读取时 on-demand runtime mapping，并移除后台 warmup/轮询；该新路径尚待 Windows 延迟和 transport 复验。更细的 failure injection、其他 workstation profile，以及同一模板组合两种 measurement 的多锚点语义进入 v0.6.x 后续工作。
 
-Config-first target resolver foundation 和 field-only automatic target checkpoint 均已通过 Windows 验证。resolver 从声明的 `ShowModel1..N` 计算跨布局 maximin point，再以 UIA geometry 和 action HWND ownership 校验；当前配置由 AHK 实测 logical `(63,95)` / screen `(2686,217)`。自动 transport 已从非目标活动 pane 返回 `FOUND`，foreground、mouse、clipboard、popup 和 runtime ID invariants 全部通过；viewer missing 时在 provider/clipboard 前 fail closed。总 UIA Pane 数可在 9/10 间变化，仅唯一 geometry match 是硬门槛。该 field 结论现已用于 production adapter；底层 command/type/parser provider 仍保持通用边界。
+历史 Config + UIA target resolver foundation 和 field-only automatic target checkpoint 均已通过 Windows 验证。当前 resolver 继续从声明的 `ShowModel1..N` 计算跨布局 maximin point，但直接映射到 config-derived runtime image rectangle，再以 action HWND ownership、PID、进程名和 client rect 校验；不再枚举 UIA Pane。底层 command/type/parser provider 边界不变。
 
 ## Later versions
 

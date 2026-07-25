@@ -184,17 +184,19 @@ class MxNMConfigGeometryTests(unittest.TestCase):
         self.assertNotIn("CountMxNMFrameMatchedWindows", provider)
         self.assertNotIn("frameMatchedWindowCount", provider)
 
-    def test_uia_audit_is_geometry_only_and_privacy_safe(self) -> None:
-        harness = source("tests/windows/mxnm_uia_image_region_audit.ahk")
+    def test_measurement_target_resolution_is_config_only(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")
-        self.assertIn("mxnm_measurement_target_resolver.ahk", harness)
-        self.assertIn("ResolveMxNMUiaImageRegion", harness)
-        self.assertIn("UIA.ElementFromHandle", resolver)
-        self.assertIn('FindElements({Type: "Pane"})', resolver)
-        self.assertIn("BoundingRectangle", resolver)
-        self.assertIn("UiaGeometryMatchCount=", harness)
-        self.assertIn("UIA_IMAGE_REGION_AMBIGUOUS", resolver)
+        self.assertIn("BuildMxNMMeasurementTargetPlan", resolver)
+        self.assertIn("MapMxNMLogicalPointToRuntimeRect", resolver)
+        self.assertIn("CaptureMxNMViewerWindowGeometry", resolver)
+        self.assertIn("ResolveMxNMRuntimeFrame", resolver)
+        self.assertIn("ResolveMxNMActionWindowFromPoint", resolver)
         for forbidden in (
+            "UIA.",
+            "FindElements",
+            "BoundingRectangle",
+            "ResolveMxNMUiaImageRegion",
+            "UIA_IMAGE_REGION",
             ".Name",
             "CachedName",
             "A_Clipboard",
@@ -203,7 +205,41 @@ class MxNMConfigGeometryTests(unittest.TestCase):
             "SoundBeep",
             "WinActivate",
         ):
-            self.assertNotIn(forbidden, harness + resolver)
+            self.assertNotIn(forbidden, resolver)
+
+    def test_static_plan_loading_does_not_enumerate_runtime_windows(self) -> None:
+        provider = source("src/mxnm_config_geometry_provider.ahk")
+        static_loader = provider.split(
+            "LoadMxNMStaticConfigGeometry(viewerExe, configPaths) {", 1
+        )[1].split("\n\nMakeMxNMConfigGeometryResult", 1)[0]
+        self.assertIn("ComputeMxNMConfigSha256", static_loader)
+        self.assertIn("ReadMxNMGeometryAuditEntries", static_loader)
+        for forbidden in (
+            "WinGetList",
+            "WinGetProcessPath",
+            "CaptureMxNMViewerWindowGeometry",
+            "ResolveMxNMRuntimeFrame",
+        ):
+            self.assertNotIn(forbidden, static_loader)
+
+    def test_path_cache_persists_only_validated_viewer_identity(self) -> None:
+        cache = source("src/mxnm_config_path_cache.ahk")
+        for required in (
+            'static FileName := "mxnm-config-path-cache.ini"',
+            "ResolveMxNMConfigPathsFromProcessPath(",
+            '"ViewerExe"',
+            '"ViewerProcessPath"',
+            "LoadValidatedMxNMConfigPathCache(tempPath)",
+        ):
+            self.assertIn(required, cache)
+        for forbidden in (
+            "WinGetList",
+            "WinGetProcessPath",
+            "MainConfigPath",
+            "LayoutConfigPath",
+            "UIA.",
+        ):
+            self.assertNotIn(forbidden, cache)
 
 
 if __name__ == "__main__":
