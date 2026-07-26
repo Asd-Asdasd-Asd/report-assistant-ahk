@@ -1,6 +1,6 @@
 # MxNM Viewer 工具快捷键
 
-本文档固化 v0.6.1 的箭头、长度测量和 3D SUV 测量快捷键实现，以及 2026-07-26 Windows 现场验证中得到的结论。
+本文档固化 v0.6.1 的箭头、长度测量、3D SUV、截图和清除全部标注快捷键实现，以及 2026-07-26 Windows 现场验证中得到的结论。
 
 ## 已验证范围
 
@@ -31,6 +31,14 @@ F12 派发成功后，以约 23% opacity 的白色 overlay 覆盖 Viewer outer r
 现场确认 `21193` 在快捷键 modifier 仍物理按下时投递，会进入由 modifier 维持的临时状态：抬起主键后仍可测量，但释放 modifier 就会自动取消。这不是期望的产品交互，也不表示 Vendor command 必须持续重复。
 
 production 因此在 hotkey key-down 后等待主键及所有声明 modifier 完全物理释放，再复核 foreground HWND 未变化，最后只执行一次完整 config、geometry、HWND、PID、control-ID 校验和 command 投递。静态 `active` guard 屏蔽等待期间的操作系统重复 hotkey thread。这样 Vendor 收到 `21193` 时不再带着 Ctrl、Alt、Shift 或 Win 的物理按下状态，目标交互与箭头、长度一致：按下并松开一次完成选择，选择后无需继续按住快捷键。
+
+## 清除全部标注
+
+第五项默认快捷键为 `Ctrl+Alt+5`，默认关闭，作用域与三个工具选择快捷键相同。handler 等待完整 chord 物理释放并复核 foreground HWND 未变化后，调用既有 `MxNMAnnotationCleaner.DeleteAll()`；它不使用标注工具面板上的 `21081`，也不增加任何工具面板坐标。
+
+清除继续复用 production context-menu transport：从 config-only measurement target 取得当前图像点，向 Viewer 投递右键消息，按精确可见文字找到 `删除全部标注`，核验 popup PID 和运行时 control ID，异步执行命令并检测意外 confirmation。独立清除快捷键使用 `COMMAND_ONLY` mode，命令成功投递后不再通过 SUVMax 和直线测量菜单复读结果，因此整个动作只创建一次右键菜单。报告写入后的既有清除仍复核本次使用的 measurement type。失败时只显示短暂视觉提示；不移动鼠标、不切换前台窗口，也不因清除失败改变报告内容。
+
+清除同样等待主键及所有声明 modifier 完全物理释放，并在 foreground HWND 未变化时只执行一次。等待期间保持 `active` guard，避免长按触发键盘重复而多次发送清除命令；释放后再运行 context-menu transport，也避免把 Ctrl、Alt、Shift 或 Win 的物理按下状态带入 Vendor 菜单处理。
 
 ## 配置与运行时模型
 

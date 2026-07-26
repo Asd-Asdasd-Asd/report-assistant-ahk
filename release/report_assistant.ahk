@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.1
-; Source revision: 10e235f7a9a2d6b0a25d65b746256129c4c7f269
-; Generated at: 2026-07-25 22:47:36 UTC
+; Source revision: aeed953da6732bef212bbba907a15077ce0f329d-dirty
+; Generated at: 2026-07-25 23:46:01 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.1.0
 ;@Ahk2Exe-SetProductVersion 0.6.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-26"
-    static SourceRevision := "10e235f7a9a2d6b0a25d65b746256129c4c7f269"
+    static SourceRevision := "aeed953da6732bef212bbba907a15077ce0f329d-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11563,6 +11563,10 @@ class MxNMAnnotationCleanupCode {
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
 
+class MxNMAnnotationCleanupVerificationMode {
+    static COMMAND_ONLY := "command_only"
+}
+
 class MxNMAnnotationCleaner {
     static DeleteAll(expectedViewerHwnd := 0, expectedViewerPid := 0,
         options := 0,
@@ -11668,6 +11672,13 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
     } finally {
         if actionContext["popupHwnd"]
             CloseContextMeasurementPopup(actionContext["popupHwnd"])
+    }
+
+    if cleanupMeasurementType = MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY {
+        result.ok := true
+        result.code := MxNMAnnotationCleanupCode.OK
+        result.failureReason := MeasurementFailureReason.NONE
+        return result
     }
 
     verificationOptions := CloneMeasurementOptions(options)
@@ -15835,11 +15846,14 @@ class FeatureDefaults {
     static ViewerSuv3DChordKey := "Suv3DChord"
     static ViewerCaptureEnabledKey := "CaptureEnabled"
     static ViewerCaptureChordKey := "CaptureChord"
+    static ViewerClearEnabledKey := "ClearEnabled"
+    static ViewerClearChordKey := "ClearChord"
     static ViewerToolEnabledDefault := "false"
     static ViewerArrowChordDefault := "^!1"
     static ViewerLengthChordDefault := "^!2"
     static ViewerSuv3DChordDefault := "^!3"
     static ViewerCaptureChordDefault := "^!4"
+    static ViewerClearChordDefault := "^!5"
 
     static ManagedConfigDefaults() {
         return [
@@ -15887,6 +15901,16 @@ class FeatureDefaults {
                 this.ViewerToolSection,
                 this.ViewerCaptureChordKey,
                 this.ViewerCaptureChordDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerClearEnabledKey,
+                this.ViewerToolEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ViewerToolSection,
+                this.ViewerClearChordKey,
+                this.ViewerClearChordDefault
             )
         ]
     }
@@ -15902,7 +15926,9 @@ class RawFeatureSettings {
         viewerSuv3DEnabled,
         viewerSuv3DChord,
         viewerCaptureEnabled,
-        viewerCaptureChord
+        viewerCaptureChord,
+        viewerClearEnabled,
+        viewerClearChord
     ) {
         this.GlobalHjklArrows := String(globalHjklArrows)
         this.ViewerArrowEnabled := String(viewerArrowEnabled)
@@ -15913,6 +15939,8 @@ class RawFeatureSettings {
         this.ViewerSuv3DChord := String(viewerSuv3DChord)
         this.ViewerCaptureEnabled := String(viewerCaptureEnabled)
         this.ViewerCaptureChord := String(viewerCaptureChord)
+        this.ViewerClearEnabled := String(viewerClearEnabled)
+        this.ViewerClearChord := String(viewerClearChord)
     }
 }
 
@@ -15926,7 +15954,9 @@ class FeatureSettings {
         viewerSuv3DEnabled := false,
         viewerSuv3DChord := "",
         viewerCaptureEnabled := false,
-        viewerCaptureChord := ""
+        viewerCaptureChord := "",
+        viewerClearEnabled := false,
+        viewerClearChord := ""
     ) {
         this.GlobalHjklArrows := globalHjklArrows = true
         this.ViewerArrowEnabled := viewerArrowEnabled = true
@@ -15937,6 +15967,8 @@ class FeatureSettings {
         this.ViewerSuv3DChord := String(viewerSuv3DChord)
         this.ViewerCaptureEnabled := viewerCaptureEnabled = true
         this.ViewerCaptureChord := String(viewerCaptureChord)
+        this.ViewerClearEnabled := viewerClearEnabled = true
+        this.ViewerClearChord := String(viewerClearChord)
     }
 }
 
@@ -16115,7 +16147,9 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         FeatureDefaults.ViewerSuv3DEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerSuv3DChordKey "=" FeatureDefaults.ViewerSuv3DChordDefault,
         FeatureDefaults.ViewerCaptureEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
-        FeatureDefaults.ViewerCaptureChordKey "=" FeatureDefaults.ViewerCaptureChordDefault
+        FeatureDefaults.ViewerCaptureChordKey "=" FeatureDefaults.ViewerCaptureChordDefault,
+        FeatureDefaults.ViewerClearEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerClearChordKey "=" FeatureDefaults.ViewerClearChordDefault
     ]
     for entry in defaults {
         lines.Push("")
@@ -17914,6 +17948,18 @@ WriteViewerToolHotkeySettings(configPath, settings) {
         section,
         FeatureDefaults.ViewerCaptureChordKey
     )
+    IniWrite(
+        settings.ViewerClearEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerClearEnabledKey
+    )
+    IniWrite(
+        settings.ViewerClearChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerClearChordKey
+    )
 }
 
 EditableReportHotstringEntriesMatch(expected, actual) {
@@ -18336,7 +18382,9 @@ LoadRawFeatureSettings(configPath := "") {
         FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerSuv3DChordDefault,
         FeatureDefaults.ViewerToolEnabledDefault,
-        FeatureDefaults.ViewerCaptureChordDefault
+        FeatureDefaults.ViewerCaptureChordDefault,
+        FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerClearChordDefault
     )
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
@@ -18404,6 +18452,18 @@ LoadRawFeatureSettings(configPath := "") {
                 FeatureDefaults.ViewerToolSection,
                 FeatureDefaults.ViewerCaptureChordKey,
                 FeatureDefaults.ViewerCaptureChordDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerClearEnabledKey,
+                FeatureDefaults.ViewerToolEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ViewerToolSection,
+                FeatureDefaults.ViewerClearChordKey,
+                FeatureDefaults.ViewerClearChordDefault
             )
         )
     } catch {
@@ -18428,7 +18488,9 @@ NormalizeFeatureSettings(raw) {
         ParseOptionalFeatureEnabled(raw.ViewerSuv3DEnabled),
         NormalizeOptionalHotkeyChord(raw.ViewerSuv3DChord),
         ParseOptionalFeatureEnabled(raw.ViewerCaptureEnabled),
-        NormalizeOptionalHotkeyChord(raw.ViewerCaptureChord)
+        NormalizeOptionalHotkeyChord(raw.ViewerCaptureChord),
+        ParseOptionalFeatureEnabled(raw.ViewerClearEnabled),
+        NormalizeOptionalHotkeyChord(raw.ViewerClearChord)
     )
 }
 
@@ -18466,6 +18528,12 @@ ValidateViewerToolHotkeySettings(settings) {
             label: "截图",
             enabled: settings.ViewerCaptureEnabled,
             chord: settings.ViewerCaptureChord
+        },
+        {
+            field: "ViewerClearChord",
+            label: "清除全部标注",
+            enabled: settings.ViewerClearEnabled,
+            chord: settings.ViewerClearChord
         }
     ]
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
@@ -18542,6 +18610,8 @@ ViewerToolHotkeySettingsMatch(expected, actual) {
         && expected.ViewerSuv3DChord = actual.ViewerSuv3DChord
         && expected.ViewerCaptureEnabled = actual.ViewerCaptureEnabled
         && expected.ViewerCaptureChord = actual.ViewerCaptureChord
+        && expected.ViewerClearEnabled = actual.ViewerClearEnabled
+        && expected.ViewerClearChord = actual.ViewerClearChord
 }
 
 ViewerHotkeyUsesWin(chord) {
@@ -18688,6 +18758,15 @@ ViewerToolHotkeyDefinitions(settings) {
             )
         ))
     }
+    if settings.ViewerClearEnabled && settings.ViewerClearChord != "" {
+        definitions.Push(HotkeyDefinition(
+            "viewer-clear-annotations",
+            settings.ViewerClearChord,
+            InvokeMxNMViewerClearHotkey.Bind(
+                settings.ViewerClearChord
+            )
+        ))
+    }
     return definitions
 }
 
@@ -18777,6 +18856,34 @@ InvokeMxNMViewerSuv3DHotkey(chord, *) {
     }
 }
 
+InvokeMxNMViewerClearHotkey(chord, *) {
+    static active := false
+    if active
+        return
+    try foregroundHwnd := WinExist("A")
+    catch
+        return
+    if !foregroundHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != foregroundHwnd
+            return
+        result := MxNMAnnotationCleaner.DeleteAll(
+            0,
+            0,
+            0,
+            MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY
+        )
+        if !result.ok
+            Flash(MxNMViewerClearFailureMessage(result.code), 1800)
+    } finally {
+        active := false
+    }
+}
+
 ViewerHotkeyChordHasPressedComponent(chord) {
     normalized := Trim(String(chord), " `t`r`n")
     if !RegExMatch(normalized, "^([!+^#]*)(.+)$", &match)
@@ -18804,6 +18911,18 @@ ViewerHotkeyChordHasPressedComponent(chord) {
         return false
     }
     return false
+}
+
+MxNMViewerClearFailureMessage(code) {
+    if code = MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
+        return "未找到可清除的 Viewer 图像"
+    if code = MxNMAnnotationCleanupCode.TARGET_CHANGED
+        return "Viewer 已变化，未执行清除"
+    if code = MxNMAnnotationCleanupCode.CONFIRMATION_REQUIRED
+        return "清除需要人工确认，未继续执行"
+    if code = MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED
+        return "已执行清除，但未能确认结果"
+    return "Viewer 标注清除失败"
 }
 
 InvokeMxNMViewerToolHotkey(commandName, *) {
@@ -19014,7 +19133,7 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "工具选择可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
+            "工具选择和清除可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")
@@ -19064,15 +19183,28 @@ class ReportAssistantSettingsWindow {
         this.ViewerCaptureWinInput := this.Window.Add(
             "CheckBox", "x648 y310 w70 h26", "使用"
         )
+
+        this.Window.Add("Text", "x72 y366 w170", "清除全部标注")
+        this.ViewerClearEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y358 w90 h26", "启用"
+        )
+        this.ViewerClearChordInput := this.Window.Add(
+            "Hotkey", "x402 y358 w220 h26"
+        )
+        this.ViewerClearWinInput := this.Window.Add(
+            "CheckBox", "x648 y358 w70 h26", "使用"
+        )
         for control in [
             this.ViewerArrowEnabledInput,
             this.ViewerLengthEnabledInput,
             this.ViewerSuv3DEnabledInput,
             this.ViewerCaptureEnabledInput,
+            this.ViewerClearEnabledInput,
             this.ViewerArrowWinInput,
             this.ViewerLengthWinInput,
             this.ViewerSuv3DWinInput,
-            this.ViewerCaptureWinInput
+            this.ViewerCaptureWinInput,
+            this.ViewerClearWinInput
         ] {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -19080,7 +19212,8 @@ class ReportAssistantSettingsWindow {
             this.ViewerArrowChordInput,
             this.ViewerLengthChordInput,
             this.ViewerSuv3DChordInput,
-            this.ViewerCaptureChordInput
+            this.ViewerCaptureChordInput,
+            this.ViewerClearChordInput
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -19243,6 +19376,16 @@ class ReportAssistantSettingsWindow {
                 ViewerHotkeyUsesWin(
                     this.FeatureSettings.ViewerCaptureChord
                 ) ? 1 : 0
+            this.ViewerClearEnabledInput.Value :=
+                this.FeatureSettings.ViewerClearEnabled ? 1 : 0
+            this.ViewerClearChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerClearChord
+                )
+            this.ViewerClearWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerClearChord
+                ) ? 1 : 0
         } finally {
             this.LoadingControls := false
         }
@@ -19270,6 +19413,11 @@ class ReportAssistantSettingsWindow {
             MergeViewerHotkeyChord(
                 this.ViewerCaptureChordInput.Value,
                 this.ViewerCaptureWinInput.Value = 1
+            ),
+            this.ViewerClearEnabledInput.Value = 1,
+            MergeViewerHotkeyChord(
+                this.ViewerClearChordInput.Value,
+                this.ViewerClearWinInput.Value = 1
             )
         )
     }
@@ -19447,6 +19595,8 @@ class ReportAssistantSettingsWindow {
             this.ViewerSuv3DChordInput.Focus()
         else if field = "ViewerCaptureChord"
             this.ViewerCaptureChordInput.Focus()
+        else if field = "ViewerClearChord"
+            this.ViewerClearChordInput.Focus()
     }
 
     FocusValidationError(validation) {

@@ -15,6 +15,10 @@ class MxNMAnnotationCleanupCode {
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
 
+class MxNMAnnotationCleanupVerificationMode {
+    static COMMAND_ONLY := "command_only"
+}
+
 class MxNMAnnotationCleaner {
     static DeleteAll(expectedViewerHwnd := 0, expectedViewerPid := 0,
         options := 0,
@@ -120,6 +124,13 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
     } finally {
         if actionContext["popupHwnd"]
             CloseContextMeasurementPopup(actionContext["popupHwnd"])
+    }
+
+    if cleanupMeasurementType = MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY {
+        result.ok := true
+        result.code := MxNMAnnotationCleanupCode.OK
+        result.failureReason := MeasurementFailureReason.NONE
+        return result
     }
 
     verificationOptions := CloneMeasurementOptions(options)

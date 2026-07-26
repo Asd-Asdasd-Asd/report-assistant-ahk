@@ -23,6 +23,15 @@ ViewerToolHotkeyDefinitions(settings) {
             )
         ))
     }
+    if settings.ViewerClearEnabled && settings.ViewerClearChord != "" {
+        definitions.Push(HotkeyDefinition(
+            "viewer-clear-annotations",
+            settings.ViewerClearChord,
+            InvokeMxNMViewerClearHotkey.Bind(
+                settings.ViewerClearChord
+            )
+        ))
+    }
     return definitions
 }
 
@@ -112,6 +121,34 @@ InvokeMxNMViewerSuv3DHotkey(chord, *) {
     }
 }
 
+InvokeMxNMViewerClearHotkey(chord, *) {
+    static active := false
+    if active
+        return
+    try foregroundHwnd := WinExist("A")
+    catch
+        return
+    if !foregroundHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != foregroundHwnd
+            return
+        result := MxNMAnnotationCleaner.DeleteAll(
+            0,
+            0,
+            0,
+            MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY
+        )
+        if !result.ok
+            Flash(MxNMViewerClearFailureMessage(result.code), 1800)
+    } finally {
+        active := false
+    }
+}
+
 ViewerHotkeyChordHasPressedComponent(chord) {
     normalized := Trim(String(chord), " `t`r`n")
     if !RegExMatch(normalized, "^([!+^#]*)(.+)$", &match)
@@ -139,6 +176,18 @@ ViewerHotkeyChordHasPressedComponent(chord) {
         return false
     }
     return false
+}
+
+MxNMViewerClearFailureMessage(code) {
+    if code = MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
+        return "未找到可清除的 Viewer 图像"
+    if code = MxNMAnnotationCleanupCode.TARGET_CHANGED
+        return "Viewer 已变化，未执行清除"
+    if code = MxNMAnnotationCleanupCode.CONFIRMATION_REQUIRED
+        return "清除需要人工确认，未继续执行"
+    if code = MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED
+        return "已执行清除，但未能确认结果"
+    return "Viewer 标注清除失败"
 }
 
 InvokeMxNMViewerToolHotkey(commandName, *) {

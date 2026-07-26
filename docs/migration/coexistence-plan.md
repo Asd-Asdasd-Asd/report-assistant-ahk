@@ -16,6 +16,7 @@
 | `;cmx` | 新项目 | 源码行为已对齐；Windows 回归通过 |
 | `;red`、`;fzg`、`;fwj`、`;fjd` | 新项目 current mainline；legacy duplicate 必须停用 | Candidate G、template plan 与 MedEx-only entry guard 已实现；release smoke test 仍必需 |
 | RAlt+H/J/K/L | 新项目 | 将 `GlobalHjklArrows` 设为 `true`；compatibility 不再注册这四个按键 |
+| Viewer 截图、Arrow、SUV 工具与清除 | 新项目 | 使用设置页中彼此独立、默认关闭的快捷键；compatibility 不再注册 Ctrl+Win+Shift+S/M/A |
 | Legacy viewer/annotation hotkeys | compatibility | 用户确认仍需要，且未被新项目逐项验证替代 |
 | Shift+Alt+R snapshot save | 原 legacy only，compatibility 不启用 | 只为旧 `red_not.clip` 流程服务；新项目验证后退役 |
 | Ctrl+Alt+Esc / Ctrl+Alt+Q | 新项目 | 注意它们不控制 compatibility 进程 |
@@ -52,8 +53,6 @@ Compatibility 已移除 RAlt+H/J/K/L；与 EXE 同时运行时，这四个方向
 - compatibility 正在执行 Ctrl+C/Ctrl+V 传递时，不触发新项目 hotstrings。
 - 新项目 color reset 不得延长或改变 `WithClipboardRestore()` 的 clipboard contract。
 
-v0.5.x 应评估 named mutex 或轻量跨进程 busy marker，但只有在 compatibility 确实需要继续使用 clipboard workflow 时引入。
-
 ### Mouse and coordinates
 
 Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 screen coordinates、缺少窗口校验，且部分流程不恢复鼠标位置。用户触发一个动作后必须等它结束，再触发另一个动作。不得在 geometry/window validation 失败后添加补偿性 blind click。
@@ -83,7 +82,7 @@ Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 scre
 
 1. v0.5.0：新项目接管经过验证的报告 hotstrings；随后由新项目 `GlobalHjklArrows` 接管 RAlt+H/J/K/L，compatibility 只保留其余未迁移 viewer actions。
 2. v0.5.x：逐项加入 window guard、DPI/layout validation、retry 和 diagnostics；每迁移并验证一个动作，就从下一版 compatibility 中禁用一个动作。
-3. v0.6.0：测量读取采用 structured states；验证后才考虑替代相关 legacy measurement hotkeys。
+3. v0.6.0–v0.6.1：测量读取采用 structured states；Viewer 截图、Arrow、SUV 工具选择和清除由新项目的独立快捷键接管，移除 compatibility 的截图、Arrow 与 SUV 复按状态机。
 4. Later：扩展 Settings 的占位页，评估更新支持及必要的 direct editor command；compatibility 清空后归档，不删除原始 legacy reference。
 
 每次缩减必须在 Chinese maintainer/update notes 中写明：移除了哪个 compatibility capability、由哪个新模块接管、验证结果，以及出现问题时如何停止测试并恢复人工 workflow。
@@ -101,7 +100,6 @@ Compatibility 保留的坐标动作仍是高风险 legacy behavior：固定 scre
 
 - Shift+Alt+B/H/L 三组固定数值流程；
 - Shift+Alt+S 快速标图；
-- Ctrl+Win+Shift+S/M/A/C；
-- SUV 3 秒复按与 Arrow 1 秒复按的“清除”语义是否必须原样保留。
+- Ctrl+Win+Shift+C。
 
 XButton1 notification 是历史测试项，不属于正式 compatibility 功能；除非发现实际 hotkey conflict，否则忽略。

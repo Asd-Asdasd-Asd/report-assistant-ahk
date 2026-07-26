@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Added a configurable, default-disabled clear-annotations hotkey that reuses the verified `删除全部标注` context-menu cleanup path.
+
 ## [0.6.1] - 2026-07-26
 
 ### Added

@@ -31,13 +31,23 @@ class LegacyCompatTests(unittest.TestCase):
             "+!h::",
             "+!l::",
             "+!s::",
-            "^#+s::",
-            "^#+m::",
-            "^#+a::",
             "^#+c::",
         )
         for hotkey in retained_hotkeys:
             self.assertIn(hotkey, compat)
+
+    def test_retired_legacy_viewer_actions_are_absent(self) -> None:
+        compat = source("legacy/medex_legacy_compat.ahk")
+        for hotkey in ("^#+s::", "^#+m::", "^#+a::"):
+            self.assertNotIn(hotkey, compat)
+        self.assertNotIn("LastPressSUVTime", compat)
+        self.assertNotIn("LastPressArrowTime", compat)
+        for coordinate in (
+            "1981, 1350",
+            "2471, 826",
+            "2470, 651",
+        ):
+            self.assertNotIn(coordinate, compat)
 
     def test_legacy_snapshot_writer_remains_excluded(self) -> None:
         compat = source("legacy/medex_legacy_compat.ahk")

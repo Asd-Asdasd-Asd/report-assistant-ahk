@@ -462,6 +462,18 @@ WriteViewerToolHotkeySettings(configPath, settings) {
         section,
         FeatureDefaults.ViewerCaptureChordKey
     )
+    IniWrite(
+        settings.ViewerClearEnabled ? "true" : "false",
+        configPath,
+        section,
+        FeatureDefaults.ViewerClearEnabledKey
+    )
+    IniWrite(
+        settings.ViewerClearChord,
+        configPath,
+        section,
+        FeatureDefaults.ViewerClearChordKey
+    )
 }
 
 EditableReportHotstringEntriesMatch(expected, actual) {

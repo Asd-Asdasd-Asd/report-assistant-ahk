@@ -12,7 +12,9 @@ NormalizeFeatureSettings(raw) {
         ParseOptionalFeatureEnabled(raw.ViewerSuv3DEnabled),
         NormalizeOptionalHotkeyChord(raw.ViewerSuv3DChord),
         ParseOptionalFeatureEnabled(raw.ViewerCaptureEnabled),
-        NormalizeOptionalHotkeyChord(raw.ViewerCaptureChord)
+        NormalizeOptionalHotkeyChord(raw.ViewerCaptureChord),
+        ParseOptionalFeatureEnabled(raw.ViewerClearEnabled),
+        NormalizeOptionalHotkeyChord(raw.ViewerClearChord)
     )
 }
 
@@ -50,6 +52,12 @@ ValidateViewerToolHotkeySettings(settings) {
             label: "截图",
             enabled: settings.ViewerCaptureEnabled,
             chord: settings.ViewerCaptureChord
+        },
+        {
+            field: "ViewerClearChord",
+            label: "清除全部标注",
+            enabled: settings.ViewerClearEnabled,
+            chord: settings.ViewerClearChord
         }
     ]
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
@@ -126,6 +134,8 @@ ViewerToolHotkeySettingsMatch(expected, actual) {
         && expected.ViewerSuv3DChord = actual.ViewerSuv3DChord
         && expected.ViewerCaptureEnabled = actual.ViewerCaptureEnabled
         && expected.ViewerCaptureChord = actual.ViewerCaptureChord
+        && expected.ViewerClearEnabled = actual.ViewerClearEnabled
+        && expected.ViewerClearChord = actual.ViewerClearChord
 }
 
 ViewerHotkeyUsesWin(chord) {

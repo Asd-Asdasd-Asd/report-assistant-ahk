@@ -473,10 +473,11 @@ Prerequisite：[ ] AutoHotkey v2 可用，repository 包含 production/field 共
 - [x] 将报告编辑器置于前台后重复，确认 Viewer 工具仍正确切换，前台窗口和鼠标位置保持不变。
 - [x] 检查 `%TEMP%\MedExAHK\mxnm_viewer_tool_command_field.txt`：`State=READY`、对应 `CommandId` 与 `RuntimeControlId` 均为 `21043/21048/21193`、`CommandRow=1/3/6`、`TargetScreenPoint` 分别落在目标按钮、`ForegroundUnchanged=true`、`MouseUnchanged=true`。
 - [ ] 启动 regenerated release，在设置页逐项启用 `Ctrl+Alt+1/2/3`；确认仅在报告程序或 Viewer 前台生效，在其他应用中不触发也不吞键。
-- [ ] 分别为四项勾选 Win，保存并重开设置；确认 Win 状态与完整 chord 原样恢复，Win+单键可用，未勾 Win 的单个 Ctrl/Alt/Shift 仍被拒绝。
+- [ ] 分别为五项勾选 Win，保存并重开设置；确认 Win 状态与完整 chord 原样恢复，Win+单键可用，未勾 Win 的单个 Ctrl/Alt/Shift 仍被拒绝。
 - [ ] 启用截图映射；保持 Viewer 前台按一次配置键，确认等价于 F12，整个 Viewer 只快速白闪约 90 ms，无文字、声音、焦点或鼠标变化，且闪光未进入最终截图。
 - [ ] 保持报告窗口及其他程序前台按截图映射；确认不发送 F12、不显示闪光，也不吞掉原程序按键。
 - [ ] 按下并完全松开 3D SUV 快捷键一次，再完成一次无害测量；确认松开全部按键后工具仍保持选中，不需要按住主键或修饰键，也不会持续重复 command。
+- [ ] 添加非临床测试标注后按清除快捷键；确认效果等同于右键菜单“删除全部标注”，前台窗口、鼠标和 clipboard 保持不变。关闭 Viewer、改变前台或制造菜单失败时只显示短暂失败提示。
 - [ ] 在 custom template 中配置 `大小{{size}}{{red:（见图）}}`，重新加载 release，无 `#Warn`、解析错误或提示音。
 - [ ] 1/2/3 轴分别触发 custom hotstring；确认报告插入 `1.2cm`、`2.2cm×1.2cm` 或三轴降序格式，并在写入成功后清除 viewer 标注。
 - [ ] 无标注时触发：不插入尺寸、不提示，caret 留在 `{{size}}`；键入第一个数值后运行 `;cmx`，确认继续得到手动 `cm×cm` 流程。

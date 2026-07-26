@@ -9,6 +9,9 @@
 ;   ;red, ;fzg, ;fwj, ;fjd, ;cmx
 ;   RAlt+H/J/K/L（由 EXE 的 GlobalHjklArrows=true 接管）
 ;   Shift+Alt+R red_not.clip snapshot save
+;   Ctrl+Win+Shift+S Viewer 截图
+;   Ctrl+Win+Shift+M SUV/清除复按状态机
+;   Ctrl+Win+Shift+A Arrow/清除复按状态机
 ;
 ; 以下固定坐标和固定数值从 legacy/karabiner.ahk 保守复制，尚未增加窗口校验。
 ; 启用前必须在目标工作站确认；不得与原始 legacy scripts 同时运行。
@@ -105,60 +108,6 @@ A_IconTip := "MedEx Legacy Compatibility"
     MouseMove 2884, 704
     SendInput("{WheelDown}")
     MouseMove xpos, ypos
-}
-
-^#+s::
-{
-    CoordMode "Mouse", "Screen"
-    MouseGetPos &xpos, &ypos
-    MouseClick "left", 1981, 1350
-    MouseMove xpos, ypos
-}
-
-global LastPressSUVTime := 0
-
-^#+m::
-{
-    CoordMode "Mouse", "Screen"
-    startTime := A_TickCount
-    timeSinceLastPress := startTime - LastPressSUVTime
-
-    if (timeSinceLastPress > 3000) {
-        MouseGetPos &xpos, &ypos
-        MouseClick "left", 2471, 826
-        MouseMove xpos, ypos
-    } else {
-        MouseGetPos &xpos, &ypos
-        MouseClick "left", 1963, 627
-        MouseClick "left", 2043, 1113
-        MouseMove xpos, ypos
-    }
-
-    global LastPressSUVTime := startTime
-    return
-}
-
-global LastPressArrowTime := 0
-
-^#+a::
-{
-    CoordMode "Mouse", "Screen"
-    startTime := A_TickCount
-    timeSinceLastPress := startTime - LastPressArrowTime
-
-    if (timeSinceLastPress > 1000) {
-        MouseGetPos &xpos, &ypos
-        MouseClick "left", 2470, 651
-        MouseMove xpos, ypos
-    } else {
-        MouseGetPos &xpos, &ypos
-        MouseClick "left", 2079, 626
-        MouseClick "left", 2170, 989
-        MouseMove xpos, ypos
-    }
-
-    global LastPressArrowTime := startTime
-    return
 }
 
 ^#+c::

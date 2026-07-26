@@ -262,6 +262,10 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertIn("InvokePreparedMxNMContextCommand(actionContext, true)", cleaner)
         self.assertIn("CONFIRMATION_REQUIRED", cleaner)
         self.assertIn("verification.state != MeasurementState.NOT_ANNOTATED", cleaner)
+        self.assertIn(
+            "MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY",
+            cleaner,
+        )
         for forbidden in ("MouseMove", "WinActivate", "SoundBeep"):
             self.assertNotIn(forbidden, cleaner)
 

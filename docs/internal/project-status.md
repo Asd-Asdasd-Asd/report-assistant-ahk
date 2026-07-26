@@ -30,7 +30,7 @@
 - v0.6.x measurement target 已改为 config-only on-demand resolution：首次成功发现 viewer 后持久化经验证的 process path，后续应用启动直接从固定相对路径读取 vendor config 并建立静态 plan，不需要 viewer 窗口存在；进程生命周期只缓存 `mainGeometry`、跨布局 `logicalPoint`、配置 hash 和 viewer process path。每次读取重新查找唯一 runtime frame、读取当前 rect、映射 `screenPoint`，并执行 `WindowFromPoint`、PID、进程路径、进程名和 client-rect 校验。measurement target 不再使用 UIA、shell hook、后台 warmup、重试或 15/60 秒轮询；Windows 现场已确认启动约 4 秒后配置 plan 可用，后续 `;fzg` 延迟稳定。
 - v0.6.0 长短轴 workflow 已接入通用 `{{size}}` 模板，共用自动 target、context popup transport、clipboard restore、报告事务和标注清除。`复制直线测量值` 的新鲜空剪贴板映射为 `NOT_ANNOTATED`；1-3 个正数严格解析后按数值降序输出，使用 `×` 和逐项 `cm`。未标注或失败时留下人工输入锚点，可继续使用 `;cmx`。
 - v0.6.x 增加 builtin `;cma -> {{size}}`。现有配置通过 additive reconciliation 获取该入口：默认 trigger 空闲时直接启用；已有等价 custom `;cma` 时不重复添加；已有不同用途的 `;cma` 时保留用户条目，并以禁用的 `;cma-size` 添加 builtin。配置 normalization 失败或 trigger 重复时继续整体 fail-closed，同时显示无焦点视觉提示。
-- v0.6.1 增加默认关闭的箭头、长度测量、3D SUV 和截图 Viewer 快捷键。前三项共用 config-derived button plan、runtime frame mapping、native HWND/control-ID 校验和直接父窗口 `WM_COMMAND / BN_CLICKED`；3D SUV 等待完整 chord 物理释放后单次投递，避免 Vendor modifier-dependent temporary state。截图仅在 Viewer 前台发送 F12，并显示约 90 ms 的无文字全窗口白色 dispatch pulse。设置页用独立 Win checkbox 补足 native Hotkey control 不支持 Win modifier 的限制。
+- v0.6.1 增加默认关闭的箭头、长度测量、3D SUV、截图和清除全部标注 Viewer 快捷键。前三项共用 config-derived button plan、runtime frame mapping、native HWND/control-ID 校验和直接父窗口 `WM_COMMAND / BN_CLICKED`；3D SUV 等待完整 chord 物理释放后单次投递，避免 Vendor modifier-dependent temporary state。截图仅在 Viewer 前台发送 F12，并显示约 90 ms 的无文字全窗口白色 dispatch pulse。清除快捷键复用既有 `删除全部标注` context-menu cleaner，不依赖工具面板坐标或 `21081`。设置页用独立 Win checkbox 补足 native Hotkey control 不支持 Win modifier 的限制。
 - 历史 Config + UIA measurement target checkpoint 已通过 Windows 验证；当前 config-only production resolver 保留相同跨布局安全点、runtime frame mapping、action HWND ownership 和 transport invariants，并已完成当前工作站 Windows 延迟与 transport 复验。
 
 ## 验证状态
@@ -49,7 +49,7 @@
 - 长短轴 workflow 已在 Windows 完成端到端验证并由用户确认通过。
 - Config-only measurement target：无 UIA、无 warmup timer、无周期轮询的启动缓存和按次 runtime mapping 已通过当前工作站复验。
 - v0.6.1 Viewer 工具快捷键：箭头 `21043`、长度 `21048`、3D SUV `21193` 均已验证；从 Viewer/报告窗口切换焦点后单次触发成功，foreground 与鼠标保持不变。
-- Win modifier 设置持久化、F12 release-then-send、全窗口 pulse 和新的 3D SUV hold semantics 尚待 Windows 现场验证。
+- Win modifier 设置持久化、F12 release-then-send、全窗口 pulse、3D SUV release-then-dispatch 和独立清除快捷键尚待 Windows 现场验证。
 
 ### 自动测试覆盖
 

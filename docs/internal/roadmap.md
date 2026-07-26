@@ -209,7 +209,7 @@ Release status（2026-07-26）：v0.6.0 measurement baseline 已完成。SUVMax 
 
 目标：用可配置快捷键选择高频 Viewer 工具，同时保持报告前台、鼠标位置和 fail-closed 边界。
 
-Release status（2026-07-26）：当前工作站已验证箭头、长度测量和 3D SUV。设置页提供四项默认关闭的快捷键并可独立加入 Win modifier；Vendor command ID 分别为 `21043`、`21048`、`21193`。前三项从 Vendor 配置建立静态 button plan，每次按当前 frame rect 映射坐标，以 native HWND、PID、client rect 和 control ID 核验，再向直接父窗口发送 bounded synchronous `WM_COMMAND / BN_CLICKED`。第四项只在 Viewer 前台把用户 chord 映射为 F12，并显示无文字短 pulse。Win 设置与截图映射仍待 Windows 现场验收。不使用 UIA、hover、鼠标移动、焦点切换、后台 warmup 或周期轮询。
+Release status（2026-07-26）：当前工作站已验证箭头、长度测量和 3D SUV。设置页提供五项默认关闭的快捷键并可独立加入 Win modifier；Vendor command ID 分别为 `21043`、`21048`、`21193`。前三项从 Vendor 配置建立静态 button plan，每次按当前 frame rect 映射坐标，以 native HWND、PID、client rect 和 control ID 核验，再向直接父窗口发送 bounded synchronous `WM_COMMAND / BN_CLICKED`。第四项只在 Viewer 前台把用户 chord 映射为 F12，并显示无文字短 pulse；第五项复用已验证的 `删除全部标注` context-menu cleaner，不使用工具面板 `21081`。Win 设置、截图映射与独立清除快捷键仍待 Windows 现场验收。不使用 UIA、hover、鼠标移动、焦点切换、后台 warmup 或周期轮询。
 
 本轮确认了 floating root 不能与 main frame HWND 强制相等、panel origin 与固定按钮偏移需要分别处理、非活动父窗口上的 `BM_CLICK` 会丢失首次动作，以及嵌套 `A_Index` 会把所有 Vendor rows 错记为 1。详细记录见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
 

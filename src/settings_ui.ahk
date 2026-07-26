@@ -156,7 +156,7 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "工具选择可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
+            "工具选择和清除可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")
@@ -206,15 +206,28 @@ class ReportAssistantSettingsWindow {
         this.ViewerCaptureWinInput := this.Window.Add(
             "CheckBox", "x648 y310 w70 h26", "使用"
         )
+
+        this.Window.Add("Text", "x72 y366 w170", "清除全部标注")
+        this.ViewerClearEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y358 w90 h26", "启用"
+        )
+        this.ViewerClearChordInput := this.Window.Add(
+            "Hotkey", "x402 y358 w220 h26"
+        )
+        this.ViewerClearWinInput := this.Window.Add(
+            "CheckBox", "x648 y358 w70 h26", "使用"
+        )
         for control in [
             this.ViewerArrowEnabledInput,
             this.ViewerLengthEnabledInput,
             this.ViewerSuv3DEnabledInput,
             this.ViewerCaptureEnabledInput,
+            this.ViewerClearEnabledInput,
             this.ViewerArrowWinInput,
             this.ViewerLengthWinInput,
             this.ViewerSuv3DWinInput,
-            this.ViewerCaptureWinInput
+            this.ViewerCaptureWinInput,
+            this.ViewerClearWinInput
         ] {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -222,7 +235,8 @@ class ReportAssistantSettingsWindow {
             this.ViewerArrowChordInput,
             this.ViewerLengthChordInput,
             this.ViewerSuv3DChordInput,
-            this.ViewerCaptureChordInput
+            this.ViewerCaptureChordInput,
+            this.ViewerClearChordInput
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -385,6 +399,16 @@ class ReportAssistantSettingsWindow {
                 ViewerHotkeyUsesWin(
                     this.FeatureSettings.ViewerCaptureChord
                 ) ? 1 : 0
+            this.ViewerClearEnabledInput.Value :=
+                this.FeatureSettings.ViewerClearEnabled ? 1 : 0
+            this.ViewerClearChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ViewerClearChord
+                )
+            this.ViewerClearWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ViewerClearChord
+                ) ? 1 : 0
         } finally {
             this.LoadingControls := false
         }
@@ -412,6 +436,11 @@ class ReportAssistantSettingsWindow {
             MergeViewerHotkeyChord(
                 this.ViewerCaptureChordInput.Value,
                 this.ViewerCaptureWinInput.Value = 1
+            ),
+            this.ViewerClearEnabledInput.Value = 1,
+            MergeViewerHotkeyChord(
+                this.ViewerClearChordInput.Value,
+                this.ViewerClearWinInput.Value = 1
             )
         )
     }
@@ -589,6 +618,8 @@ class ReportAssistantSettingsWindow {
             this.ViewerSuv3DChordInput.Focus()
         else if field = "ViewerCaptureChord"
             this.ViewerCaptureChordInput.Focus()
+        else if field = "ViewerClearChord"
+            this.ViewerClearChordInput.Focus()
     }
 
     FocusValidationError(validation) {

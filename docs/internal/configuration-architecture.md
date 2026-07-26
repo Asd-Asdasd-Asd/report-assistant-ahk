@@ -167,7 +167,7 @@ Schema 1 migration 是唯一保留 legacy `text`、`red-reset` 和 `red-left4` �
 - 原文件内容仍与窗口打开时一致；
 - builtin 不能删除，custom 只能按 stable Section 明确删除。
 
-保存使用 backup + 同目录临时文件。未修改的 hotstring section、`[Features]`、未知 sections/keys 和注释通过复制原文件保留；只重写 UI 明确修改的 section。Viewer 工具快捷键由设置页事务更新 `[ViewerToolHotkeys]`，要求至少两个修饰键，并拒绝 duplicate/reserved chords。临时与 final 均重新读取并比较目标/非目标 sections。成功后调用完整 `Reload()`。
+保存使用 backup + 同目录临时文件。未修改的 hotstring section、`[Features]`、未知 sections/keys 和注释通过复制原文件保留；只重写 UI 明确修改的 section。Viewer 工具、截图与清除快捷键由设置页事务更新 `[ViewerToolHotkeys]`，要求 Win 或至少两个 Ctrl/Alt/Shift 修饰键，并拒绝 duplicate/reserved chords。临时与 final 均重新读取并比较目标/非目标 sections。成功后调用完整 `Reload()`。
 
 ## Update preservation
 

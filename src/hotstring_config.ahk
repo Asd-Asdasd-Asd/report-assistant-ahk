@@ -66,7 +66,9 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         FeatureDefaults.ViewerSuv3DEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerSuv3DChordKey "=" FeatureDefaults.ViewerSuv3DChordDefault,
         FeatureDefaults.ViewerCaptureEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
-        FeatureDefaults.ViewerCaptureChordKey "=" FeatureDefaults.ViewerCaptureChordDefault
+        FeatureDefaults.ViewerCaptureChordKey "=" FeatureDefaults.ViewerCaptureChordDefault,
+        FeatureDefaults.ViewerClearEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
+        FeatureDefaults.ViewerClearChordKey "=" FeatureDefaults.ViewerClearChordDefault
     ]
     for entry in defaults {
         lines.Push("")

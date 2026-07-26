@@ -58,7 +58,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         hotkeys = source("src/viewer_tool_hotkeys.ahk")
         features = source("src/features.ahk")
         self.assertIn('static ViewerToolEnabledDefault := "false"', model)
-        for chord in ('"^!1"', '"^!2"', '"^!3"', '"^!4"'):
+        for chord in ('"^!1"', '"^!2"', '"^!3"', '"^!4"', '"^!5"'):
             self.assertIn(chord, model)
         self.assertIn(
             "MedExViewerToolForegroundActive",
@@ -69,13 +69,19 @@ class ViewerToolHotkeyTests(unittest.TestCase):
     def test_settings_ui_exposes_all_viewer_hotkeys_and_win_modifier(self) -> None:
         ui = source("src/settings_ui.ahk")
         editor = source("src/hotstring_config_editor.ahk")
-        for label in ("箭头", "长度测量", "3D SUV测量", "截图（发送 F12）"):
+        for label in (
+            "箭头",
+            "长度测量",
+            "3D SUV测量",
+            "截图（发送 F12）",
+            "清除全部标注",
+        ):
             self.assertIn(label, ui)
-        self.assertEqual(ui.count('"Hotkey"'), 4)
-        self.assertEqual(ui.count('"CheckBox", "x276'), 4)
-        self.assertEqual(ui.count('"CheckBox", "x648'), 4)
-        self.assertEqual(ui.count('w90 h26", "启用"'), 4)
-        self.assertEqual(ui.count('w70 h26", "使用"'), 4)
+        self.assertEqual(ui.count('"Hotkey"'), 5)
+        self.assertEqual(ui.count('"CheckBox", "x276'), 5)
+        self.assertEqual(ui.count('"CheckBox", "x648'), 5)
+        self.assertEqual(ui.count('w90 h26", "启用"'), 5)
+        self.assertEqual(ui.count('w70 h26", "使用"'), 5)
         self.assertNotIn("Limit15", ui)
         self.assertIn("ValidateViewerToolHotkeySettings(", ui)
         self.assertIn(
@@ -112,6 +118,27 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn('"User32\\SetWindowDisplayAffinity"', pulse)
         self.assertNotIn('window.Add("Text"', pulse)
         self.assertIn("NoActivate", pulse)
+
+    def test_clear_hotkey_reuses_verified_context_menu_cleanup(self) -> None:
+        hotkeys = source("src/viewer_tool_hotkeys.ahk")
+        self.assertIn('"viewer-clear-annotations"', hotkeys)
+        self.assertIn("InvokeMxNMViewerClearHotkey.Bind(", hotkeys)
+        handler = hotkeys.split(
+            "InvokeMxNMViewerClearHotkey(chord, *)", 1
+        )[1].split(
+            "ViewerHotkeyChordHasPressedComponent(chord) {", 1
+        )[0]
+        self.assertIn("MxNMAnnotationCleaner.DeleteAll(", handler)
+        self.assertIn(
+            "MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY",
+            handler,
+        )
+        self.assertIn(
+            "while ViewerHotkeyChordHasPressedComponent(chord)",
+            handler,
+        )
+        self.assertIn("MxNMViewerClearFailureMessage(result.code)", handler)
+        self.assertNotIn("21081", hotkeys)
 
     def test_suv3d_dispatches_once_after_the_chord_is_released(self) -> None:
         hotkeys = source("src/viewer_tool_hotkeys.ahk")

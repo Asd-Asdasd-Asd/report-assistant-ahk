@@ -27,9 +27,9 @@
 | Shift+Alt+H Head montage | `legacy/karabiner.ahk:64-86` | placeholder only | 未迁移 | 高；参数已确认 | 同上 | compatibility 暂留；Head=`4/11/1.2` | M4 |
 | Shift+Alt+L Lung montage | `legacy/karabiner.ahk:88-112` | placeholder only | 未迁移 | 高；参数及 lung-window reset 已确认 | 同上；遗漏 window reset 会改变报告图表现 | compatibility 暂留；Lung=`7.5/23/0.9` 并显式恢复 lung window | M4 |
 | Shift+Alt+S caption + advance | `legacy/karabiner.ahk:114-124`；Ctrl+C → caption → Ctrl+V → MouseMove → WheelDown | 无 | 未迁移 | 高；无需额外 click 已确认 | 不保存/恢复剪贴板；可能与 CF_HTML transaction 冲突 | compatibility 保留；迁移时验证 empty copy、commit semantics、WheelDown equivalence 和 mouse restore | M4 |
-| Viewer screenshot | `legacy/karabiner.ahk:126-132` | 无 | 未迁移 | 高频；官方 F12 已确认可靠 | command sent 不等于截图成功 | compatibility 保留；M3 使用 F12，反馈只能表示 command sent | M3 |
-| Ctrl+Win+Shift+M SUV activate/clear | `legacy/karabiner.ahk:134-156` | 无 | 未迁移 | 高频；3000 ms repeat semantics 已确认 | local timing state 可与应用状态失同步 | compatibility 保留；M3 保留 distinct tab/clear control，失败、超时、window/process change 时清 state | M3 |
-| Ctrl+Win+Shift+A Arrow activate/clear | `legacy/karabiner.ahk:158-180` | 无 | 未迁移 | 高频；1000 ms repeat semantics 已确认 | 同上 | compatibility 保留；不得与 SUV clear control 合并 | M3 |
+| Viewer screenshot | `legacy/karabiner.ahk:126-132` | `src/viewer_tool_hotkeys.ahk` → configurable chord → Viewer F12 + dispatch pulse | 已迁移，待最终 Windows 验收 | 高频；官方 F12 已确认可靠 | command sent 不等于截图成功 | compatibility 不再注册 Ctrl+Win+Shift+S；只由新项目提供 | v0.6.1 |
+| Ctrl+Win+Shift+M SUV activate/clear | `legacy/karabiner.ahk:134-156` | `src/viewer_tool_hotkeys.ahk` 的 SUV 与清除独立快捷键 | 已替代；不保留 3000 ms 复按状态机 | 高频 | legacy local timing state 可与真实 Viewer 状态失同步 | compatibility 不再注册；新项目用两个显式动作表达用户意图 | v0.6.1 |
+| Ctrl+Win+Shift+A Arrow activate/clear | `legacy/karabiner.ahk:158-180` | `src/viewer_tool_hotkeys.ahk` 的 Arrow 与清除独立快捷键 | 已替代；不保留 1000 ms 复按状态机 | 高频 | legacy local timing state 可与真实 Viewer 状态失同步 | compatibility 不再注册；新项目用两个显式动作表达用户意图 | v0.6.1 |
 | Ctrl+Win+Shift+C cover images | `legacy/karabiner.ahk:182-196` | 无 | 未迁移 | 高价值；左 MIP/右 coronal sectional/fusion 已确认 | 多个固定坐标、无 window guard；中途失败仍继续 | compatibility 保留；保持独立于 montage，M4 逐步校验并 fail closed | M4 |
 | Copy SUVMax | 现场 context menu Name=`复制SUVMax值` | 仅调查文档 | 未迁移 | 计划功能 | `SUVMax: 0.000` 仍会更新 clipboard，不能当作 meaningful ROI | M3 使用 named Button/Invoke 和 sentinel；区分 zero value 与 automation failure | M3 |
 | Copy line measurements | 现场 context menu Name=`复制直线测量值` | `MxNMMeasurementProvider.ReadLineAxes()` → `{{size}}` | candidate 已实现，待 Windows 验收 | 计划功能 | no-line 会新鲜更新为空；sequence 未更新仍是失败；只接受严格 1-3 轴 | M3 按数值降序输出，区分 fresh empty、valid、unexpected 和 invoke failure | v0.6.0 |
@@ -72,16 +72,16 @@ Legacy 中的 XButton1 notification 是历史测试项，不属于正式功能�
 
 ## 共享状态与并行运行风险
 
-- 两个 AHK 进程不共享 `LastPressSUVTime`、`LastPressArrowTime`、suspend state 或配置对象。
+- 两个 AHK 进程不共享 suspend state 或配置对象；SUV 与 Arrow 的复按状态已经随对应 compatibility hotkeys 一并移除。
 - 所有 active legacy hotkeys/hotstrings 都是 global；没有 `#HotIf` window scoping。
 - 系统剪贴板和鼠标是跨进程共享资源，但当前没有 mutex、busy flag 或跨进程 lock。
 - 新项目 `Ctrl+Alt+Esc` 只暂停新项目。兼容脚本仍可响应热键并执行固定坐标动作。
 - 当前 sample config 的 `medexworkstation.exe` 与调查确认的 `medexworkstations.exe` 不一致；不能在实现时静默忽略。
 - 默认 AHK tray icons 外观相似。没有明确 tooltip/menu 时容易误判哪个进程仍在运行。
-- Legacy 的定时行为依赖 `A_TickCount`：SUV 复按阈值为 3000 ms，Arrow 复按阈值为 1000 ms。迁移时不能把它们当作普通单击动作。
+- Compatibility 已不再使用 SUV/Arrow 的 `A_TickCount` 复按状态。
 
 ## 当前迁移结论
 
 新项目已覆盖 6 个报告文本入口；`;red`、`;fwj`、`;fjd` 使用已提升为 mainline 的 Candidate G，`;fzg` 使用已现场验证的 phrase-specific no-reset path，`;cma` 自动读取直线测量值，`;cmx` 保持简单 caret relocation。报告入口不能与 legacy duplicate 同时启用。RAlt+H/J/K/L 已由 `GlobalHjklArrows` 接管并从 compatibility 移除；其他 active `legacy/karabiner.ahk` 阅片/键盘行为仍未迁移。
 
-在用户确认各 legacy 功能的真实日常依赖之前，兼容脚本应保守保留尚未迁移的 viewer actions；当前移除项为已由新项目接管的既有 hotstrings、RAlt+H/J/K/L，以及仅服务于已弃用 clipboard snapshot 路径的 Shift+Alt+R。
+在用户确认各 legacy 功能的真实日常依赖之前，兼容脚本应保守保留尚未迁移的 viewer actions。Shift+Alt+S 快速标图仍由 compatibility 提供；Ctrl+Win+Shift+S 截图、Ctrl+Win+Shift+M SUV/清除状态机和 Ctrl+Win+Shift+A Arrow/清除状态机已经移除。原始 `legacy/karabiner.ahk` 继续保留作为行为参考。
