@@ -54,15 +54,16 @@ production 因此在 hotkey key-down 后等待主键及所有声明 modifier 完
 
 每次按键只做以下工作：
 
-1. 找到唯一的 runtime Viewer frame，并读取当前 window rect。
-2. 将配置中的按钮面板原点按 logical frame → runtime frame 比例映射。
-3. 枚举 Viewer 同进程中的 native child controls，只保留目标 command ID、
+1. 枚举 Viewer 同进程中的 native child controls，只保留目标 command ID、
    visible/enabled 且 class 为 `Button` 的候选。
-4. 按直接父窗口分组，并校验父面板实际左上角与 Vendor `SCBtnPadPos` 映射
+2. 按直接父窗口分组，要求三个目标 ID 在同一面板内各唯一出现一次，实际
+   控件顺序与 Vendor row/column 顺序一致。
+3. 从候选父面板沿 `GA_ROOTOWNER` 取得 outer Viewer，并在已验证进程窗口
+   集合中找到其当前 rect。
+4. 将 Vendor 按钮面板原点按 logical frame → outer Viewer 比例映射，校验
+   父面板实际左上角与 `SCBtnPadPos` 映射
    一致。
-5. 要求三个目标 ID 在同一面板内各唯一出现一次，实际控件顺序与 Vendor
-   row/column 顺序一致。
-6. 向按钮的直接父窗口发送带 250 ms 上限的同步 `WM_COMMAND / BN_CLICKED`。
+5. 向按钮的直接父窗口发送带 250 ms 上限的同步 `WM_COMMAND / BN_CLICKED`。
 
 正常路径不移动鼠标、不切换前台窗口，也不需要 hover。250 ms 是窗口失去响应时的等待上限，不是固定延迟；正常投递会立即返回。
 
@@ -83,6 +84,11 @@ padScreenY = windowY + round(SCBtnPadPosY * windowHeight / FrameHeight)
 `y=600..637`、`682..719`。旧固定 pitch 算法分别误中 `21044` 和
 `21078`，因此固定首行、尺寸、中心和 `38 px` pitch 均只保留在
 Checkpoint 1 审计回归中，不属于 production resolver。
+
+同一机器还证明，主图区激活会新增一个同进程顶层图像窗口，使“outer frame
+必须包含全部 Viewer 顶层窗口”的通用规则得到零个候选。工具 resolver
+因此不再使用该包含关系，而由已验证工具父面板的 `GA_ROOTOWNER` 唯一反查
+outer Viewer。额外图像层不会参与按钮身份判断。
 
 ## 本轮发现
 

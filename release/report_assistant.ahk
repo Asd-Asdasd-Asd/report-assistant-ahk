@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.1
-; Source revision: 769ed0658d8cf024712b054390bd2003471a7088-dirty
-; Generated at: 2026-07-27 11:53:48 UTC
+; Source revision: edcf52b423abe2bddf77d9bfdaaf56fcb2ab0d2d-dirty
+; Generated at: 2026-07-27 12:15:01 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.1.0
 ;@Ahk2Exe-SetProductVersion 0.6.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-27"
-    static SourceRevision := "769ed0658d8cf024712b054390bd2003471a7088-dirty"
+    static SourceRevision := "edcf52b423abe2bddf77d9bfdaaf56fcb2ab0d2d-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11886,18 +11886,7 @@ class MxNMViewerToolCommandProvider {
                 viewerExe,
                 plan.viewerProcessPath
             )
-            runtimeFrame := ResolveMxNMRuntimeFrame(viewerWindows)
-            if !runtimeFrame.ok {
-                code := viewerWindows.Length = 0
-                    ? MxNMViewerToolCode.VIEWER_NOT_FOUND
-                    : MxNMViewerToolCode.VIEWER_NOT_UNIQUE
-                return MakeMxNMViewerToolResult(false, code)
-            }
-            if !DllCall(
-                "User32\IsWindow",
-                "Ptr", runtimeFrame.frame.hwnd,
-                "Int"
-            ) {
+            if viewerWindows.Length = 0 {
                 return MakeMxNMViewerToolResult(
                     false,
                     MxNMViewerToolCode.VIEWER_NOT_FOUND
@@ -11907,8 +11896,7 @@ class MxNMViewerToolCommandProvider {
             command := plan.commands[commandKey]
             controlSet := ResolveMxNMViewerToolControlSet(
                 plan,
-                viewerWindows,
-                runtimeFrame.frame
+                viewerWindows
             )
             if !controlSet.ok {
                 result := MakeMxNMViewerToolResult(
@@ -11918,7 +11906,7 @@ class MxNMViewerToolCommandProvider {
                 result.commandId := command.commandId
                 result.commandRow := command.row
                 result.commandColumn := command.column
-                result.viewerHwnd := runtimeFrame.frame.hwnd
+                result.viewerHwnd := controlSet.frameHwnd
                 result.buttonPanelHwnd := controlSet.panelHwnd
                 result.runtimeCandidateCount :=
                     controlSet.candidateCount
@@ -11935,7 +11923,7 @@ class MxNMViewerToolCommandProvider {
                 result.commandId := command.commandId
                 result.commandRow := command.row
                 result.commandColumn := command.column
-                result.viewerHwnd := runtimeFrame.frame.hwnd
+                result.viewerHwnd := controlSet.frame.hwnd
                 result.buttonHwnd := target.hwnd
                 result.buttonParentHwnd := target.parentHwnd
                 result.buttonRootHwnd := target.rootHwnd
@@ -11953,7 +11941,7 @@ class MxNMViewerToolCommandProvider {
             result.commandId := command.commandId
             result.commandRow := command.row
             result.commandColumn := command.column
-            result.viewerHwnd := runtimeFrame.frame.hwnd
+            result.viewerHwnd := controlSet.frame.hwnd
             result.buttonHwnd := target.hwnd
             result.buttonParentHwnd := target.parentHwnd
             result.buttonRootHwnd := target.rootHwnd
@@ -12223,28 +12211,27 @@ MapMxNMViewerToolPointToRuntimeFrame(
     }
 }
 
-ResolveMxNMViewerToolControlSet(plan, viewerWindows, runtimeFrame) {
+ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     failure := {
         ok: false,
         code: MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE,
+        frameHwnd: 0,
         panelHwnd: 0,
         candidateCount: 0,
         controls: Map()
     }
     if !IsObject(plan)
-        || !IsObject(runtimeFrame)
         || viewerWindows.Length = 0 {
         return failure
     }
-    try runtimePid := WinGetPID(
-        "ahk_id " runtimeFrame.hwnd
+    processResult := ResolveMxNMViewerToolProcess(
+        viewerWindows
     )
-    catch
-        runtimePid := 0
-    if !runtimePid {
-        failure.code := MxNMViewerToolCode.BUTTON_TARGET_INVALID
+    if !processResult.ok {
+        failure.code := processResult.code
         return failure
     }
+    runtimePid := processResult.pid
 
     commandKeyById := Map()
     for commandKey, command in plan.commands
@@ -12258,11 +12245,6 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows, runtimeFrame) {
     if candidates.Length = 0
         return failure
 
-    padOrigin := MapMxNMViewerToolPadOriginToRuntimeFrame(
-        {x: plan.padX, y: plan.padY},
-        plan.mainGeometry,
-        runtimeFrame
-    )
     groups := Map()
     for candidate in candidates {
         if !groups.Has(candidate.parentHwnd) {
@@ -12280,15 +12262,6 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows, runtimeFrame) {
 
     validGroups := []
     for _, group in groups {
-        if !MxNMViewerToolPanelMatchesPadOrigin(
-            group.parentHwnd,
-            group.parentRect,
-            padOrigin,
-            runtimeFrame,
-            runtimePid
-        ) {
-            continue
-        }
         controls := Map()
         complete := true
         for commandKey, _ in plan.commands {
@@ -12309,7 +12282,31 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows, runtimeFrame) {
         ) {
             continue
         }
+        frameHwnd := MxNMViewerToolGetRootOwnerHwnd(
+            group.parentHwnd
+        )
+        runtimeFrame := FindMxNMViewerToolWindowGeometry(
+            viewerWindows,
+            frameHwnd
+        )
+        if !IsObject(runtimeFrame)
+            continue
+        padOrigin := MapMxNMViewerToolPadOriginToRuntimeFrame(
+            {x: plan.padX, y: plan.padY},
+            plan.mainGeometry,
+            runtimeFrame
+        )
+        if !MxNMViewerToolPanelMatchesPadOrigin(
+            group.parentHwnd,
+            group.parentRect,
+            padOrigin,
+            runtimeFrame,
+            runtimePid
+        ) {
+            continue
+        }
         validGroups.Push({
+            frame: runtimeFrame,
             panelHwnd: group.parentHwnd,
             controls: controls
         })
@@ -12323,10 +12320,49 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows, runtimeFrame) {
     return {
         ok: true,
         code: MxNMViewerToolCode.READY,
+        frameHwnd: validGroups[1].frame.hwnd,
+        frame: validGroups[1].frame,
         panelHwnd: validGroups[1].panelHwnd,
         candidateCount: candidates.Length,
         controls: validGroups[1].controls
     }
+}
+
+ResolveMxNMViewerToolProcess(viewerWindows) {
+    pids := Map()
+    for viewerWindow in viewerWindows {
+        try pid := WinGetPID("ahk_id " viewerWindow.hwnd)
+        catch
+            pid := 0
+        if pid
+            pids[pid] := true
+    }
+    if pids.Count != 1 {
+        return {
+            ok: false,
+            code: pids.Count = 0
+                ? MxNMViewerToolCode.VIEWER_NOT_FOUND
+                : MxNMViewerToolCode.VIEWER_NOT_UNIQUE,
+            pid: 0
+        }
+    }
+    for pid, _ in pids {
+        return {
+            ok: true,
+            code: MxNMViewerToolCode.READY,
+            pid: pid
+        }
+    }
+}
+
+FindMxNMViewerToolWindowGeometry(viewerWindows, hwnd) {
+    if !hwnd
+        return 0
+    for viewerWindow in viewerWindows {
+        if viewerWindow.hwnd = hwnd
+            return viewerWindow
+    }
+    return 0
 }
 
 EnumerateMxNMViewerToolControlCandidates(
@@ -12561,6 +12597,17 @@ MxNMViewerToolGetRootHwnd(hwnd) {
         "User32\GetAncestor",
         "Ptr", hwnd,
         "UInt", 2,
+        "Ptr"
+    )
+    catch
+        return 0
+}
+
+MxNMViewerToolGetRootOwnerHwnd(hwnd) {
+    try return DllCall(
+        "User32\GetAncestor",
+        "Ptr", hwnd,
+        "UInt", 3,
         "Ptr"
     )
     catch

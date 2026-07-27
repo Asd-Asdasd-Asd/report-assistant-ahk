@@ -63,6 +63,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         ):
             self.assertNotIn(legacy_constant, invoke)
         self.assertIn("ResolveMxNMViewerToolControlSet", invoke)
+        self.assertNotIn("ResolveMxNMRuntimeFrame", invoke)
         self.assertIn(
             "MxNMViewerToolRectCenter(target.rect)",
             invoke,
@@ -82,10 +83,13 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "candidate.parentHwnd",
             "PanelOriginToleranceRatio",
             "PanelOriginToleranceMaxPx",
+            "MxNMViewerToolGetRootOwnerHwnd",
+            "FindMxNMViewerToolWindowGeometry",
             "ValidateMxNMViewerToolControlLayout",
             "validGroups.Length != 1",
         ):
             self.assertIn(required, resolver)
+        self.assertIn('"UInt", 3', resolver)
         self.assertIn("leftCommand.row < rightCommand.row", resolver)
         self.assertIn(
             "leftCommand.column < rightCommand.column",

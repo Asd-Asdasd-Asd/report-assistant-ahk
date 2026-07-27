@@ -99,6 +99,20 @@ Checkpoint 1 通过，可以进入 Checkpoint 2。现有证据支持继续采用
 生产 profile 根路径 `MultNMSoftInfo\1`，但仅把 `SCBtnPadPos` 作为 runtime
 工具面板身份锚点；按钮位置必须从实际 native controls 读取。
 
+### 2026-07-27 Checkpoint 2 激活层级补充证据
+
+第二台机器在主图区获得激活后，Viewer 顶层窗口数由 `10` 增至 `11`，
+`RuntimeFrameCandidateCount` 由 `1` 变为 `0`；点击主图区以外的位置后恢复。
+三个目标按钮 HWND、父面板和实际矩形在两种状态下不变。该结果证明：
+
+- 额外图像层不完全包含在外层 Viewer frame 内，使共享的“一个窗口包含所有
+  Viewer 顶层窗口”规则失败；
+- 这不是按钮消失、鼠标 hover 或 command ID 变化；
+- 工具 resolver 应从已经完成 ID、可见性、顺序和面板原点校验的按钮父面板
+  沿 `GA_ROOTOWNER` 反向锁定外层 Viewer，而不要求它包含无关图像层；
+- measurement target 同时返回 `RUNTIME_FRAME_NOT_UNIQUE`，但其处理仍属于
+  Checkpoint 3，本 checkpoint 不提前修改。
+
 ## Checkpoint 2：自适应工具按钮 resolver
 
 ### 实现范围
@@ -109,6 +123,8 @@ Checkpoint 1 通过，可以进入 Checkpoint 2。现有证据支持继续采用
 - Vendor 配置只提供工具区域、row/column 和 command ID。
 - runtime 在受限区域内枚举同 PID、visible/enabled 的 native controls。
 - 目标 command ID 必须唯一，几何顺序必须与 Vendor row/column 一致。
+- 从唯一有效工具父面板沿 `GA_ROOTOWNER` 反向解析 outer frame；不再要求
+  outer frame 包含进程内所有临时/图像顶层窗口。
 - 向真实控件的直接父窗口投递 bounded `WM_COMMAND / BN_CLICKED`。
 - 删除固定按钮中心、固定 `38 px` pitch 和固定前三行的生产依赖。
 - 每次 Viewer session 或配置 hash 变化后重新解析；证据不唯一时禁用该项。
