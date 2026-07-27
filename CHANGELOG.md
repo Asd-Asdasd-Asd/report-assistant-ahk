@@ -6,9 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Added
+## [0.6.2] - 2026-07-27
 
-- Added a configurable, default-disabled clear-annotations hotkey that reuses the verified `删除全部标注` context-menu cleanup path.
+### Changed
+
+- Viewer tool selection now discovers the live native command controls and resolves their shared owner hierarchy instead of assuming one workstation's button spacing or frame offsets.
+- Viewer hotkeys now accept one Ctrl, Alt, Shift, or Win modifier. A single unmodified letter or digit is also supported and is automatically scoped to the Viewer foreground.
+- Arrow and length hotkeys now wait for complete key release and dispatch once, preventing repeat-trigger behavior for unmodified keys.
+- Formal and checkpoint builds now write only to the sibling `report-assistant-build` directory; the checkpoint launcher moved under `tools/field-testing`.
+
+### Fixed
+
+- Fixed adjacent-command activation on Viewer layouts whose native button sizes and vertical spacing differ from the original workstation.
+- Fixed Viewer image resolution after the main image area creates or exposes additional same-process top-level windows.
+- Fixed clear-annotation ambiguity by ranking image owner families and accepting only a unique best Viewer family.
+- Reused the validated measurement client point across target resolution and command transport, avoiding a second inconsistent frame lookup.
 
 ## [0.6.1] - 2026-07-26
 

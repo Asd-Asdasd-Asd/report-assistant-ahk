@@ -1,6 +1,6 @@
 # 项目状态与交接
 
-更新时间：2026-07-26
+更新时间：2026-07-27
 当前版本以 `src/app_metadata.ahk` 为唯一真源，并显示在 EXE“关于麦旋风…”和发布目录 `版本信息.md`。
 
 ## 当前 mainline
@@ -12,7 +12,7 @@
 - Explicit comparison/rollback：`uiaInvoke`。
 - Automatic cross-strategy fallback：无。
 - 当前验证 profile：MedEx `0.0.1.0`、1920×1080、100% scaling、DPI 96。
-- 当前 application version：`0.6.1`。
+- 当前 application version：`0.6.2`。
 
 ## 当前已实现
 
@@ -31,6 +31,7 @@
 - v0.6.0 长短轴 workflow 已接入通用 `{{size}}` 模板，共用自动 target、context popup transport、clipboard restore、报告事务和标注清除。`复制直线测量值` 的新鲜空剪贴板映射为 `NOT_ANNOTATED`；1-3 个正数严格解析后按数值降序输出，使用 `×` 和逐项 `cm`。未标注或失败时留下人工输入锚点，可继续使用 `;cmx`。
 - v0.6.x 增加 builtin `;cma -> {{size}}`。现有配置通过 additive reconciliation 获取该入口：默认 trigger 空闲时直接启用；已有等价 custom `;cma` 时不重复添加；已有不同用途的 `;cma` 时保留用户条目，并以禁用的 `;cma-size` 添加 builtin。配置 normalization 失败或 trigger 重复时继续整体 fail-closed，同时显示无焦点视觉提示。
 - v0.6.1 增加默认关闭的箭头、长度测量、3D SUV、截图和清除全部标注 Viewer 快捷键。前三项共用 config-derived button plan、同 PID visible/enabled native control-set 唯一性/顺序校验和直接父窗口 `WM_COMMAND / BN_CLICKED`；outer Viewer 从有效工具面板的 `GA_ROOTOWNER` 反查，不受主图区激活后额外同进程顶层图像窗口影响。production 已移除固定按钮中心、固定首三行和固定 pitch 依赖。3D SUV 等待完整 chord 物理释放后单次投递，避免 Vendor modifier-dependent temporary state。截图仅在 Viewer 前台发送 F12，并显示约 90 ms 的无文字全窗口白色 dispatch pulse。清除快捷键复用既有 `删除全部标注` context-menu cleaner，不依赖工具面板坐标或 `21081`。设置页用独立 Win checkbox 补足 native Hotkey control 不支持 Win modifier 的限制。
+- v0.6.2 将 Viewer 工具定位改为 live native command-control discovery，并以工具面板和图像 owner-family 解析跨机器 HWND 层级；measurement、SUVMax、尺寸和清除链复用同一 validated client point。快捷键允许单修饰键；无修饰时只接受单个字母或数字并自动限制为 Viewer-only。正式构建和 checkpoint 构建全部写入仓库同级 `report-assistant-build`，checkout 保持可直接 pull。
 - 历史 Config + UIA measurement target checkpoint 已通过 Windows 验证；当前 config-only production resolver 保留相同跨布局安全点、runtime frame mapping、action HWND ownership 和 transport invariants，并已完成当前工作站 Windows 延迟与 transport 复验。
 
 ## 验证状态
@@ -48,9 +49,9 @@
 - `删除全部标注` field path：`CleanupState=OK`、command invoked、无 confirmation、复查 `NOT_ANNOTATED`，foreground/mouse 均保持不变。
 - 长短轴 workflow 已在 Windows 完成端到端验证并由用户确认通过。
 - Config-only measurement target：无 UIA、无 warmup timer、无周期轮询的启动缓存和按次 runtime mapping 已通过当前工作站复验。
-- v0.6.1 Viewer 工具旧固定偏移路径仅在首台机器通过；第二台机器已证明按钮内部布局不同并误中相邻 ID。新的 native control-set resolver 已完成静态实现，正在 Checkpoint 2 等待至少三台机器的完整 branch EXE 现场验证。
-- Checkpoint 2 当前两台机器已通过工具按钮验证；Checkpoint 3A 已根据主图区激活时 `ViewerWindowCount 10→11`、旧 containing-frame candidate `1→0`、image-owner candidate `2` 的现场证据替换 measurement outer-frame 选择规则。多个图像 owner 候选只在其 Viewer owner-family 得分存在唯一严格最大值时解析，等待清除、SUVMax 和尺寸的 Windows EXE 验证。
-- Win modifier 设置持久化、F12 release-then-send、全窗口 pulse、3D SUV release-then-dispatch 和独立清除快捷键尚待 Windows 现场验证。
+- 多台机器的箭头、长度和 3D SUV 各连续测试 10 次通过；native control-set resolver 不再依赖原工作站按钮间距。
+- 主图区激活产生额外同进程顶层窗口的机器上，owner-family resolver 已恢复唯一目标；独立清除快捷键现场验证成功。
+- 单修饰键、Viewer-only 无修饰字母/数字、Win modifier 设置持久化、F12 pulse 仍需随 v0.6.2 EXE 做最终 Windows smoke test。
 
 ### 自动测试覆盖
 
@@ -61,7 +62,7 @@
 - measurement result/parser、sentinel + clipboard sequence freshness、single restore owner、provider dynamic popup/command identity 和 privacy-safe field harness。
 - Viewer command schema、三按钮坐标映射、设置读写、hotkey registration 和 generated-release integration。
 
-当前完整 Python suite 为 249 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
+当前完整 Python suite 为 271 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
 
 ## 当前 production flow
 
