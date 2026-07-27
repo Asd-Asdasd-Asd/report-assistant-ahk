@@ -40,6 +40,8 @@ class MxNMViewerRuntimeProbeTests(unittest.TestCase):
         probe = source("src/mxnm_viewer_runtime_probe.ahk")
         self.assertIn("AuditMxNMVendorProfiles", probe)
         self.assertIn("ReadMxNMVendorDisplayHints", probe)
+        self.assertIn("MxNMVendorSafeDisplayHintValue", probe)
+        self.assertIn("<numeric-tokens:", probe)
         for keyword in (
             "Resolution",
             "Screen",
@@ -76,6 +78,10 @@ class MxNMViewerRuntimeProbeTests(unittest.TestCase):
         )
         self.assertIn("^!F6::BeginMxNMAdaptiveCheckpoint1()", harness)
         self.assertIn("^!F7::CaptureMxNMAdaptiveManualPoint()", harness)
+        self.assertIn(
+            "#Include ..\\..\\src\\mxnm_config_path_cache.ahk",
+            harness,
+        )
         self.assertIn('["arrow", "length", "suv3d", "image"]', harness)
         self.assertIn("InteractionMode=READ_ONLY", harness)
         self.assertIn("AutomaticForegroundUnchanged=", harness)

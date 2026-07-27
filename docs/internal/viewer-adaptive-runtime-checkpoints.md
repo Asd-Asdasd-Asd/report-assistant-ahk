@@ -43,6 +43,28 @@
   当前预测点之间的结构差异。
 - 能明确判断图像实际 point HWND、父链和当前错误选取的 root HWND 之间的差异。
 
+### 2026-07-27 首台机器结果
+
+首台原验证环境完成只读采集：
+
+- `ProfileAuditState=READY`，发现三个候选。当前生产路径
+  `1/MxNMSoft.ini` 为 `Frame=1348×1000`、`Image=750×940`、
+  `SCBtnPad=(280,360)`；另外两个候选分别携带 `1280×1024` 和
+  `1920×1040` 的 `ScreenWidth/ScreenHeight` 提示。候选文件名和 screen
+  字段尚不足以证明 Vendor 的实时选择规则。
+- 三个预测工具点与用户实际指向点命中相同的 visible `Button`，control ID
+  分别为 `21043`、`21048`、`21193`。同进程还存在一套相同 ID 的 hidden
+  controls，因此 Checkpoint 2 必须同时要求 visible/enabled、Vendor 工具
+  区域和几何顺序，不能按 ID 全局取第一个。
+- 工具按钮 parent 是独立 `#32770` 工具面板，root owner 是外层 Viewer。
+- 预测和人工图像点均命中独立 `#32770` 图像窗口；它由外层 Viewer owned，
+  不是外层 Viewer 的 child。measurement resolver 必须保留 point HWND、
+  parent 和 root-owner 关系。
+- foreground 和 mouse invariants 均通过。
+
+该结果证明审计路径和原机器结构，但尚未满足 Checkpoint 1 退出条件；仍需
+至少一台工具快捷键失败机器的同格式结果。
+
 ## Checkpoint 2：自适应工具按钮 resolver
 
 ### 实现范围

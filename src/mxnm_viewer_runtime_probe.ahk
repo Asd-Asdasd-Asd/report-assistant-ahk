@@ -315,10 +315,7 @@ ReadMxNMVendorDisplayHints(path, sourceId) {
             continue
         }
         value := Trim(entryMatch[2], " `t")
-        safeValue := RegExMatch(
-            value,
-            "^[A-Za-z0-9_.:, xX-]{1,80}$"
-        ) ? value : "<present>"
+        safeValue := MxNMVendorSafeDisplayHintValue(value)
         hints.Push({
             source: sourceId,
             section: currentSection,
@@ -327,6 +324,34 @@ ReadMxNMVendorDisplayHints(path, sourceId) {
         })
     }
     return hints
+}
+
+MxNMVendorSafeDisplayHintValue(value) {
+    if RegExMatch(
+        value,
+        "^[A-Za-z0-9_.:, xX|;/\[\]()-]{1,120}$"
+    ) {
+        return value
+    }
+    numericTokens := []
+    searchPosition := 1
+    while RegExMatch(
+        value,
+        "-?\d+(?:\.\d+)?",
+        &numberMatch,
+        searchPosition
+    ) {
+        numericTokens.Push(numberMatch[0])
+        searchPosition := numberMatch.Pos + numberMatch.Len
+        if numericTokens.Length >= 24
+            break
+    }
+    if numericTokens.Length = 0
+        return "<present>"
+    summary := ""
+    for index, token in numericTokens
+        summary .= (index = 1 ? "" : ",") token
+    return "<numeric-tokens:" summary ">"
 }
 
 CaptureMxNMWindowChainAtPoint(screenPoint, expectedPid := 0) {
