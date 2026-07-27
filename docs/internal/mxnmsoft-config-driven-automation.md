@@ -13,8 +13,10 @@
 > 对 MedEx 明确写入配置的布局变化自动适应；对瞬时运行状态和语义变化继续进行轻量运行时识别；对未知 Schema 或坐标不一致 fail closed。
 
 measurement target 当前采用 **config-only geometry + window-message transport**：
-vendor config 负责静态布局与跨 layout 安全点，运行时只读取 frame/window rect
-并执行 HWND/PID/process/client-rect 核验。UIA 已从 measurement target
+vendor config 负责静态布局与跨 layout 安全点，运行时对每个 outer-frame
+候选映射安全点，并要求点下 HWND 的 `GA_ROOTOWNER` 唯一回到同一 frame，
+再执行 HWND/PID/process/client-rect 核验。它不要求 outer frame 包含同进程
+全部临时图像顶层窗口。UIA 已从 measurement target
 resolver 移除，但仍可由其他 MedEx 功能或独立诊断使用；窗口消息和现场校验
 继续保留。
 
@@ -207,6 +209,10 @@ config complete logical image rectangle
 `FramePos=(1000,0)`、`FrameSize=1348×1000`，同进程暴露 10 个可见 window；唯一包含其余 window 的 runtime frame 为
 `(1920,0,2561,1440)`。`FramePos` 因此不是可与 physical screen origin
 直接比较的坐标，旧的 exact-position match 返回 0 属于错误判据，现已移除。
+该 containing-frame 结论只作为历史 audit 证据：后续多机现场发现主图区
+激活会新增第 11 个同进程顶层图像窗口，使 containing-frame 候选从 1 变为
+0。production measurement resolver 已改用映射点的 root-owner 一致性，不再
+依赖“包含全部窗口”。
 
 在 runtime frame 内分别按 X/Y 比例映射逻辑主图区，得到约
 `[2566,81,3991,1434]`。它与人工选中的 UIA Pane

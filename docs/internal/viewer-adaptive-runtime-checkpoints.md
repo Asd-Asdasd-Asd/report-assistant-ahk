@@ -154,6 +154,28 @@ Checkpoint 1 通过，可以进入 Checkpoint 2。现有证据支持继续采用
 
 ## Checkpoint 3：自适应测量与用户自校验兜底
 
+### Checkpoint 3A：主图区激活状态的 outer frame
+
+Checkpoint 2 现场确认工具按钮修复通过，但右键清除在主图区激活状态仍返回
+target unavailable。此前成对日志已经证明旧 measurement resolver 因第 11 个
+同进程图像顶层窗口得到零个 containing-frame 候选。
+
+3A 不取消校验。新规则对每个 outer-frame 候选分别映射 Vendor 图像安全点，
+只接受该点实际 HWND 的 `GA_ROOTOWNER` 唯一回到同一候选的结果；随后继续
+校验 action HWND 的进程名、PID、root owner 和 client bounds。这样临时图像
+层可以成为实际右键接收窗口，但它必须仍属于唯一 outer Viewer。
+
+现场先验证：
+
+1. 主图区激活并保持旧版持续失败状态，分别执行清除、SUVMax 和尺寸。
+2. 点击 Viewer 通用位置恢复旧状态后重复。
+3. 原机器执行同样回归。
+4. 每条路径记录是否出现一次菜单、结果、foreground/mouse/clipboard，以及
+   `RuntimeFrameCandidateCount`。
+
+3A 通过只证明当前多顶层窗口问题已解决；不同机器若仍存在右键接收 ancestor
+差异，再继续执行下面的自动 receiver 与用户自校验范围。
+
 ### 实现范围
 
 - Vendor profile、`ShowImage*`、`ShowModelN/LowWnd*` 继续提供逻辑图像区和

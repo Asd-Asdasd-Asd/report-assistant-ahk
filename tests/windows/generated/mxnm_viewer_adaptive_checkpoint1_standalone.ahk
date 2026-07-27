@@ -1603,35 +1603,27 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
             viewerExe,
             plan.viewerProcessPath
         )
-        runtimeFrameResult := ResolveMxNMRuntimeFrame(viewerWindows)
-        if !runtimeFrameResult.ok {
+        runtimeTarget := ResolveMxNMRuntimeImageTarget(
+            plan,
+            viewerWindows
+        )
+        result.runtimeFrameCandidateCount :=
+            runtimeTarget.candidateCount
+        if !runtimeTarget.ok {
             result.code := MxNMMeasurementTargetCode.RUNTIME_FRAME_NOT_UNIQUE
-            result.configCode := runtimeFrameResult.code
+            result.configCode :=
+                MxNMConfigGeometryCode.RUNTIME_FRAME_NOT_UNIQUE
             return result
         }
         result.runtimeFrameResolved := true
-        mappedImageResult := MapMxNMLogicalImageRectToRuntime(
-            plan.mainGeometry,
-            runtimeFrameResult.frame
-        )
-        if !mappedImageResult.ok
-            return result
         result.mappedImageRectResolved := true
-        result.imageRect := mappedImageResult.rect
-        result.screenPoint := MapMxNMLogicalPointToRuntimeRect(
-            plan.logicalPoint,
-            plan.mainGeometry,
-            result.imageRect
-        )
-        if !MxNMPointInsideRect(result.screenPoint, result.imageRect) {
-            result.code := MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
-            return result
-        }
+        result.imageRect := runtimeTarget.imageRect
+        result.screenPoint := runtimeTarget.screenPoint
 
         actionWindowResult := ResolveMxNMActionWindowFromPoint(
             viewerExe,
             result.screenPoint,
-            runtimeFrameResult.frame.hwnd
+            runtimeTarget.frame.hwnd
         )
         if !actionWindowResult.ok {
             result.code := actionWindowResult.code
@@ -1647,6 +1639,82 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         result.code := MxNMMeasurementTargetCode.UNEXPECTED_ERROR
         return result
     }
+}
+
+ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
+    failure := {
+        ok: false,
+        candidateCount: 0,
+        frame: 0,
+        imageRect: 0,
+        screenPoint: 0
+    }
+    if !IsObject(plan)
+        || !IsObject(plan.mainGeometry)
+        || !IsObject(plan.logicalPoint)
+        || viewerWindows.Length = 0 {
+        return failure
+    }
+    candidates := []
+    for candidateFrame in viewerWindows {
+        mappedImage := MapMxNMLogicalImageRectToRuntime(
+            plan.mainGeometry,
+            candidateFrame
+        )
+        if !mappedImage.ok
+            continue
+        screenPoint := MapMxNMLogicalPointToRuntimeRect(
+            plan.logicalPoint,
+            plan.mainGeometry,
+            mappedImage.rect
+        )
+        if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
+            continue
+        rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
+            screenPoint
+        )
+        if !rootOwnerHwnd
+            || rootOwnerHwnd != candidateFrame.hwnd {
+            continue
+        }
+        candidates.Push({
+            frame: candidateFrame,
+            imageRect: mappedImage.rect,
+            screenPoint: screenPoint
+        })
+    }
+    failure.candidateCount := candidates.Length
+    if candidates.Length != 1
+        return failure
+    return {
+        ok: true,
+        candidateCount: 1,
+        frame: candidates[1].frame,
+        imageRect: candidates[1].imageRect,
+        screenPoint: candidates[1].screenPoint
+    }
+}
+
+ResolveMxNMRootOwnerFromPoint(screenPoint) {
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try pointHwnd := DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch
+        pointHwnd := 0
+    if !pointHwnd
+        return 0
+    try return DllCall(
+        "User32\GetAncestor",
+        "Ptr", pointHwnd,
+        "UInt", 3,
+        "Ptr"
+    )
+    catch
+        return 0
 }
 
 IsReusableMxNMMeasurementTargetPlan(plan, viewerExe) {
@@ -1665,6 +1733,7 @@ MakeMxNMMeasurementTargetResult() {
         configCode: "",
         configReady: false,
         runtimeFrameResolved: false,
+        runtimeFrameCandidateCount: 0,
         mappedImageRectResolved: false,
         layoutReady: false,
         layoutModelCount: 0,
@@ -1944,6 +2013,16 @@ ResolveMxNMActionWindowFromPoint(
     }
     if !rootHwnd
         rootHwnd := pointHwnd
+    try rootOwnerHwnd := DllCall(
+        "User32\GetAncestor",
+        "Ptr", pointHwnd,
+        "UInt", 3,
+        "Ptr"
+    )
+    catch
+        rootOwnerHwnd := 0
+    if !rootOwnerHwnd
+        rootOwnerHwnd := rootHwnd
 
     try processName := WinGetProcessName("ahk_id " rootHwnd)
     catch {
@@ -1958,7 +2037,9 @@ ResolveMxNMActionWindowFromPoint(
         runtimePid := 0
     }
     if StrLower(processName) != StrLower(viewerExe)
-        || !actionPid || actionPid != runtimePid {
+        || !actionPid
+        || actionPid != runtimePid
+        || rootOwnerHwnd != runtimeFrameHwnd {
         return {
             ok: false,
             code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
@@ -2897,7 +2978,9 @@ FormatMxNMAdaptiveMeasurementAudit(
 ) {
     output :=
         "MeasurementPlanState=" plan.code "`r`n" .
-        "MeasurementTargetState=" target.code "`r`n"
+        "MeasurementTargetState=" target.code "`r`n" .
+        "MeasurementRuntimeFrameCandidateCount=" .
+            target.runtimeFrameCandidateCount "`r`n"
     if IsObject(target.screenPoint) {
         output .=
             "PredictedMeasurementPoint=" .

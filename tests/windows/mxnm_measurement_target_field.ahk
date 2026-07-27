@@ -156,6 +156,8 @@ FormatMxNMMeasurementTargetFieldOutput(
         "ConfigReady=" MxNMTargetFieldBoolean(target.configReady),
         "RuntimeFrameResolved=" .
             MxNMTargetFieldBoolean(target.runtimeFrameResolved),
+        "RuntimeFrameCandidateCount=" .
+            target.runtimeFrameCandidateCount,
         "MappedImageRectResolved=" .
             MxNMTargetFieldBoolean(target.mappedImageRectResolved),
         "LayoutReady=" MxNMTargetFieldBoolean(target.layoutReady),

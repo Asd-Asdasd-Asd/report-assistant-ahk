@@ -85,6 +85,8 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "FindMxNMCrossLayoutSafePoint",
             "MxNMPointClearanceAcrossLayouts",
             "minimumRequiredClearance",
+            "ResolveMxNMRuntimeImageTarget",
+            "ResolveMxNMRootOwnerFromPoint",
             "ResolveMxNMActionWindowFromPoint",
             "WindowFromPoint",
             "GetAncestor",
@@ -94,6 +96,15 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn('"LowWndSize"', resolver)
         self.assertIn("* 0.05", resolver)
         self.assertIn("* 0.01", resolver)
+        runtime_resolver = resolver.split(
+            "ResolveMxNMRuntimeImageTarget(", 1
+        )[1].split("IsReusableMxNMMeasurementTargetPlan", 1)[0]
+        self.assertIn("rootOwnerHwnd != candidateFrame.hwnd", runtime_resolver)
+        self.assertIn("candidates.Length != 1", runtime_resolver)
+        action_resolver = resolver.split(
+            "ResolveMxNMActionWindowFromPoint(", 2
+        )[-1]
+        self.assertIn("rootOwnerHwnd != runtimeFrameHwnd", action_resolver)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")

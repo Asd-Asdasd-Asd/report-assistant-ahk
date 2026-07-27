@@ -315,7 +315,9 @@ FormatMxNMAdaptiveMeasurementAudit(
 ) {
     output :=
         "MeasurementPlanState=" plan.code "`r`n" .
-        "MeasurementTargetState=" target.code "`r`n"
+        "MeasurementTargetState=" target.code "`r`n" .
+        "MeasurementRuntimeFrameCandidateCount=" .
+            target.runtimeFrameCandidateCount "`r`n"
     if IsObject(target.screenPoint) {
         output .=
             "PredictedMeasurementPoint=" .

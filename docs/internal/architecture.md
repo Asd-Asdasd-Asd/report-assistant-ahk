@@ -52,7 +52,7 @@ MxNMSoft 测量值由 `MxNMMeasurementProvider` 解析自动目标，再通过�
 
 `ContextMeasurementProvider` 返回 structured measurement data，包括 measurement type、raw value、formatted value、source、failure reason、context 和 components。hotstrings 或上层报告逻辑只负责决定最终插入的报告文本，不直接承担窗口消息、控件查找和解析细节。
 
-自动 target 使用 config-only 两层模型。首次从运行中的 viewer 验证安装根目录后，将 `viewerProcessPath` 写入 `%LocalAppData%\MedExReportAssistant\mxnm-config-path-cache.ini`；后续启动从该路径重新派生并校验两个固定 vendor config 路径，在不枚举 viewer 窗口的情况下读取配置并建立静态 plan。进程生命周期缓存 `mainGeometry`、配置 hash、viewer process path 和跨 layout maximin point；每次读取只重新解析唯一 runtime frame 和当前 window rect，映射 image rectangle/point，再通过 `WindowFromPoint`、PID、进程路径、进程名和 client rect fail closed。measurement target 不注册 shell hook、不运行后台 timer，也不依赖 UIA image-region geometry。当前图像读取失败时，manual fallback 仍是上层 workflow。系统优先 false negative，不复用旧剪贴板值，也不把最后一条 SUV log 自动当作当前图像测量值。
+自动 target 使用 config-only 两层模型。首次从运行中的 viewer 验证安装根目录后，将 `viewerProcessPath` 写入 `%LocalAppData%\MedExReportAssistant\mxnm-config-path-cache.ini`；后续启动从该路径重新派生并校验两个固定 vendor config 路径，在不枚举 viewer 窗口的情况下读取配置并建立静态 plan。进程生命周期缓存 `mainGeometry`、配置 hash、viewer process path 和跨 layout maximin point；每次读取对每个 runtime outer-frame 候选映射 image rectangle/point，并要求该点实际 HWND 的 `GA_ROOTOWNER` 唯一回到同一 frame，再通过 `WindowFromPoint`、PID、进程路径、进程名、root-owner 和 client rect fail closed。该规则允许 Viewer 主图区激活后出现额外同进程图像顶层窗口，但不会取消 Viewer/图像身份校验。measurement target 不注册 shell hook、不运行后台 timer，也不依赖 UIA image-region geometry。当前图像读取失败时，manual fallback 仍是上层 workflow。系统优先 false negative，不复用旧剪贴板值，也不把最后一条 SUV log 自动当作当前图像测量值。
 
 `{{suvmax}}` 和 `{{size}}` 分别触发 SUVMax 与 1–3 轴读取。只有 `FOUND` 插入数值；`NOT_ANNOTATED`/`AUTOMATION_FAILED` 留下人工输入锚点。报告事务成功后才调用 `删除全部标注`，清除失败不回滚报告。line command 只有在 command 后 clipboard sequence 确实更新为空时才判定 `NOT_ANNOTATED`。
 

@@ -189,7 +189,8 @@ class MxNMConfigGeometryTests(unittest.TestCase):
         self.assertIn("BuildMxNMMeasurementTargetPlan", resolver)
         self.assertIn("MapMxNMLogicalPointToRuntimeRect", resolver)
         self.assertIn("CaptureMxNMViewerWindowGeometry", resolver)
-        self.assertIn("ResolveMxNMRuntimeFrame", resolver)
+        self.assertIn("ResolveMxNMRuntimeImageTarget", resolver)
+        self.assertIn("ResolveMxNMRootOwnerFromPoint", resolver)
         self.assertIn("ResolveMxNMActionWindowFromPoint", resolver)
         for forbidden in (
             "UIA.",
