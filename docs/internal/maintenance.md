@@ -29,7 +29,7 @@
 - `assets/icon/source/medex-icon.svg` 是图标唯一可编辑来源。
 - `assets/icon/generated/*.png` 与 `assets/icon/generated/medex-icon.ico` 由 `scripts/generate-icon.sh` 生成，并与 SVG 一起提交。
 - 除自动生成的 `版本信息.md` 外，`assets/publish/*.md` 是发布包静态资源的 source truth；Windows 构建时 overlay 到 `publish/`。
-- `publish/*.exe` 是本地发布 staging artifact，不提交。
+- `..\report-assistant-build\` 是仓库外的本地构建根目录，不提交。
 
 ## Windows 一键构建
 
@@ -38,13 +38,19 @@ Windows 构建机需安装 Python 3、AutoHotkey v2，并包含 Ahk2Exe compiler
 - `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`
 - `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`
 
-双击仓库根目录的 `Build EXE.cmd`。脚本会从当前 checkout 重新生成 `release/report_assistant.ahk` 和 `assets/publish/版本信息.md`，使用 `assets/icon/generated/medex-icon.ico` 作为 Ahk2Exe 图标，编译并验证临时 EXE，同步 `assets/publish/` 中的发布资源，最后把产物安全提升为：
+双击仓库根目录的 `Build EXE.cmd`。脚本从当前 checkout 在仓库同级
+`report-assistant-build/` 中生成临时 release source 和版本信息，使用
+`assets/icon/generated/medex-icon.ico` 作为 Ahk2Exe 图标，编译并验证临时
+EXE，同步 `assets/publish/` 中的发布资源，最后把产物安全提升为：
 
 ```text
-publish\麦旋风.exe
+..\report-assistant-build\publish\麦旋风.exe
 ```
 
-构建成功后先测试 EXE，再压缩 `publish/` 的内容用于内部发布。不要分发仓库根目录或构建脚本；此流程不会创建 installer 或 automatic updater。
+构建过程不写入 checkout，完成后 `git status` 应保持不变，可以直接
+`git pull`。构建成功后先测试 EXE，再压缩外部 `publish/` 的内容用于内部
+发布。不要分发仓库根目录或构建脚本；此流程不会创建 installer 或
+automatic updater。
 
 静态资源使用 overlay 同步：构建只复制 `assets/publish/` 中当前存在的文件，不审核或删除 `publish/` 中的其他文档、图标。若静态资源被删除或重命名，正式发布前应手工清空 `publish/`，再从 clean commit 重新构建。
 

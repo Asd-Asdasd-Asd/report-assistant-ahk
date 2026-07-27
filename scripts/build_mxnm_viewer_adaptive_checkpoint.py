@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 
@@ -118,11 +119,30 @@ def build_checkpoint_text(root: Path = ROOT) -> str:
     return result
 
 
-def main() -> int:
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(build_checkpoint_text(), encoding="utf-8")
-    print(f"Wrote {OUTPUT.relative_to(ROOT)}")
-    print(f"Size: {OUTPUT.stat().st_size} bytes")
+def write_checkpoint(output: Path = OUTPUT) -> None:
+    output = output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(build_checkpoint_text(), encoding="utf-8")
+    print(f"Wrote {output}")
+    print(f"Size: {output.stat().st_size} bytes")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Generate the standalone Viewer checkpoint AHK."
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=OUTPUT,
+        help="Destination for the generated standalone checkpoint AHK.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    write_checkpoint(args.output)
     return 0
 
 

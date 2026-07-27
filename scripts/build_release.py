@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
@@ -282,9 +283,14 @@ def build_release_text(
     return release_text
 
 
-def main() -> int:
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    VERSION_INFO_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+def write_release_outputs(
+    output: Path = OUTPUT,
+    version_info_output: Path = VERSION_INFO_OUTPUT,
+) -> None:
+    output = output.resolve()
+    version_info_output = version_info_output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    version_info_output.parent.mkdir(parents=True, exist_ok=True)
     built_at = datetime.now(timezone.utc)
     timestamp = built_at.strftime("%Y-%m-%d %H:%M:%S UTC")
     build_date = built_at.astimezone(SHANGHAI_TIMEZONE).strftime("%Y-%m-%d")
@@ -301,19 +307,19 @@ def main() -> int:
         build_date,
         source_revision,
     )
-    OUTPUT.write_bytes(release_text.encode("utf-8"))
-    VERSION_INFO_OUTPUT.write_bytes(version_info_text.encode("utf-8"))
+    output.write_bytes(release_text.encode("utf-8"))
+    version_info_output.write_bytes(version_info_text.encode("utf-8"))
 
-    written_text = OUTPUT.read_bytes().decode("utf-8")
-    written_version_info = VERSION_INFO_OUTPUT.read_bytes().decode("utf-8")
+    written_text = output.read_bytes().decode("utf-8")
+    written_version_info = version_info_output.read_bytes().decode("utf-8")
     bom_count = written_text.count("\ufeff")
     if bom_count != 0:
         raise ValueError(f"Generated release BOM scan failed: count={bom_count}")
     if "\ufeff" in written_version_info:
         raise ValueError("Generated version info contains an embedded U+FEFF character")
 
-    print(f"Wrote {OUTPUT.relative_to(ROOT)}")
-    print(f"Wrote {VERSION_INFO_OUTPUT.relative_to(ROOT)}")
+    print(f"Wrote {output}")
+    print(f"Wrote {version_info_output}")
     print(f"Build date: {build_date}")
     print(f"Source revision: {source_revision}")
     if source_revision == "UNSTAMPED":
@@ -322,6 +328,30 @@ def main() -> int:
             "This build is for temporary testing only."
         )
     print(f"Embedded U+FEFF count: {bom_count}")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Generate the standalone release AHK and version metadata."
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=OUTPUT,
+        help="Destination for the generated standalone AHK.",
+    )
+    parser.add_argument(
+        "--version-info-output",
+        type=Path,
+        default=VERSION_INFO_OUTPUT,
+        help="Destination for generated version information.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    write_release_outputs(args.output, args.version_info_output)
     return 0
 
 

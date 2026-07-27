@@ -39,13 +39,22 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         )
         self.assertIn("Split-Path -Parent $PSScriptRoot", script)
         self.assertIn("Join-Path $PSScriptRoot 'build_release.py'", script)
-        self.assertIn("Join-Path $repositoryRoot 'release\\report_assistant.ahk'", script)
+        self.assertIn("'..\\report-assistant-build'", script)
+        self.assertIn(
+            "Join-Path $releaseSourceDirectory 'report_assistant.ahk'",
+            script,
+        )
         self.assertIn(
             "Join-Path $repositoryRoot 'assets\\icon\\generated\\medex-icon.ico'",
             script,
         )
         self.assertIn("Join-Path $repositoryRoot 'assets\\publish'", script)
-        self.assertIn("Join-Path $repositoryRoot 'publish'", script)
+        self.assertIn("Join-Path $buildRoot 'publish'", script)
+        self.assertNotIn(
+            "Join-Path $repositoryRoot 'release\\report_assistant.ahk'",
+            script,
+        )
+        self.assertNotIn("Join-Path $repositoryRoot 'publish'", script)
 
     def test_python_and_required_inputs_are_validated(self) -> None:
         script = text(POWERSHELL, "utf-8-sig")
@@ -58,6 +67,8 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         self.assertIn("Application icon was not found", script)
         self.assertIn("Application icon is empty", script)
         self.assertIn("Generated release script", script)
+        self.assertIn("'--output'", script)
+        self.assertIn("'--version-info-output'", script)
 
     def test_ahk2exe_arguments_and_temporary_validation_are_present(self) -> None:
         script = text(POWERSHELL, "utf-8-sig")
@@ -146,7 +157,7 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
 
     def test_success_output_identifies_exact_artifact(self) -> None:
         script = text(POWERSHELL, "utf-8-sig")
-        self.assertIn("$displayArtifactPath = 'publish\\麦旋风.exe'", script)
+        self.assertIn("$displayArtifactPath = $finalExe", script)
         self.assertIn("Write-Host 'Artifact:'", script)
         self.assertGreaterEqual(script.count("Write-Host '================================'"), 2)
 
@@ -170,7 +181,7 @@ class WindowsBuildWorkflowTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, combined)
 
-    def test_publish_is_ignored_and_assets_are_tracked_sources(self) -> None:
+    def test_legacy_publish_is_ignored_and_assets_are_tracked_sources(self) -> None:
         gitignore = text(ROOT / ".gitignore")
         self.assertIn("/publish/", gitignore)
         self.assertTrue((ROOT / "assets" / "publish" / "首次使用.md").is_file())

@@ -7,7 +7,7 @@
 
 - Application version source：`src/app_metadata.ahk`；版本号只在这里人工修改。
 - Config：Schema 2，路径 `%LocalAppData%\MedExReportAssistant\config.ini`。
-- Portable artifact：`publish\麦旋风.exe`。
+- Portable artifact：`..\report-assistant-build\publish\麦旋风.exe`。
 - Production color-reset strategy：`relativeMousePixelValidated`。
 - Explicit comparison/rollback：`uiaInvoke`。
 - Automatic cross-strategy fallback：无。

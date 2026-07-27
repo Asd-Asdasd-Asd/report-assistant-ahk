@@ -67,14 +67,18 @@ Windows 构建机安装 Python 3、AutoHotkey v2 与 Ahk2Exe 后，双击根目�
 ```text
 existing source
 → scripts/build_release.py
-→ release/report_assistant.ahk
+→ ..\report-assistant-build\release-source\report_assistant.ahk
 → Ahk2Exe + assets/icon/generated/medex-icon.ico
-→ publish/麦旋风.building.exe
+→ ..\report-assistant-build\publish\麦旋风.building.exe
 → validate
-→ publish/麦旋风.exe
+→ ..\report-assistant-build\publish\麦旋风.exe
 ```
 
-构建会 overlay 同步 `assets/publish/`，不会审核或删除 `publish/` 中的其他文件。失败时删除本轮 `.building.exe` 并保留 last-known-good final；promotion 阶段使用短期 `.previous.exe` 恢复保护。
+所有 Windows 构建产物都写入仓库同级的 `report-assistant-build/`，不会修改
+checkout 内任何文件，因此构建后可直接 `git pull`。构建会 overlay 同步
+`assets/publish/`，不会审核或删除外部 `publish/` 中的其他文件。失败时删除
+本轮 `.building.exe` 并保留 last-known-good final；promotion 阶段使用短期
+`.previous.exe` 恢复保护。
 
 需要提交到 Git 的生成文件：
 
@@ -83,7 +87,7 @@ existing source
 - `assets/icon/generated/medex-icon-*.png`
 - `assets/icon/generated/medex-icon.ico`
 
-`assets/icon/source/medex-icon.svg` 是图标唯一可编辑源文件；macOS 生成方法见 `docs/internal/icon-assets.md`。编译出的 EXE 和 `publish/` 不提交。
+`assets/icon/source/medex-icon.svg` 是图标唯一可编辑源文件；macOS 生成方法见 `docs/internal/icon-assets.md`。外部 `report-assistant-build/` 不属于仓库，也不提交。
 
 ## 发布验证
 
@@ -92,7 +96,7 @@ existing source
 3. 运行 `git diff --check`。
 4. 从 clean commit 在 Windows 双击 `Build EXE.cmd`。
 5. 按 `docs/internal/release-checklist.md` 和 `tests/manual-test-checklist.md` 完成 Windows/MedEx 验收。
-6. 只压缩并分发 `publish/` 的内容。
+6. 只压缩并分发 `..\report-assistant-build\publish\` 的内容。
 
 当前已知延期：重新编译后的首次颜色下拉操作，偶尔会正确选中黑色但菜单仍留在屏幕上；之后的操作通常正常。本问题暂不通过额外盲点或重复点击规避，发布验收时应单独记录。
 

@@ -8,19 +8,23 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
+$buildRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $repositoryRoot '..\report-assistant-build')
+)
+$releaseSourceDirectory = Join-Path $buildRoot 'release-source'
 $buildReleaseScript = Join-Path $PSScriptRoot 'build_release.py'
-$releaseScript = Join-Path $repositoryRoot 'release\report_assistant.ahk'
+$releaseScript = Join-Path $releaseSourceDirectory 'report_assistant.ahk'
 $iconPath = Join-Path $repositoryRoot 'assets\icon\generated\medex-icon.ico'
-$publishDirectory = Join-Path $repositoryRoot 'publish'
+$publishDirectory = Join-Path $buildRoot 'publish'
 $publishAssetsDirectory = Join-Path $repositoryRoot 'assets\publish'
-$versionInfoSource = Join-Path $publishAssetsDirectory '版本信息.md'
+$versionInfoSource = Join-Path $releaseSourceDirectory '版本信息.md'
 $buildingExe = Join-Path $publishDirectory '麦旋风.building.exe'
 $previousExe = Join-Path $publishDirectory '麦旋风.previous.exe'
 $finalExe = Join-Path $publishDirectory '麦旋风.exe'
 $buildingVersionInfo = Join-Path $publishDirectory '版本信息.building.md'
 $previousVersionInfo = Join-Path $publishDirectory '版本信息.previous.md'
 $finalVersionInfo = Join-Path $publishDirectory '版本信息.md'
-$displayArtifactPath = 'publish\麦旋风.exe'
+$displayArtifactPath = $finalExe
 
 $stage = 'initialization'
 $promotionStarted = $false
@@ -274,7 +278,13 @@ try {
 
     $stage = 'generate release script'
     $releaseStartedUtc = [DateTime]::UtcNow
-    $pythonArguments = @($python.PrefixArguments) + @($buildReleaseScript)
+    $pythonArguments = @($python.PrefixArguments) + @(
+        $buildReleaseScript,
+        '--output',
+        $releaseScript,
+        '--version-info-output',
+        $versionInfoSource
+    )
     & $python.Executable @pythonArguments
     if ($LASTEXITCODE -ne 0) {
         throw "build_release.py failed with exit code $LASTEXITCODE."

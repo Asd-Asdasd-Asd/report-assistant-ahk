@@ -12,9 +12,10 @@
 目标机器没有 AutoHotkey 时，在一台安装了 AutoHotkey v2 与 Ahk2Exe 的
 Windows 构建机双击 `Build Viewer Checkpoint EXE.cmd`。它只编译只读
 standalone harness，输出
-`publish-field\MxNM-Viewer-Checkpoint1.exe` 和 SHA-256 文件；其他机器只
-需要复制该 EXE。Checkpoint 1 不嵌入正式“麦旋风.exe”，避免触碰正式配置、
-singleton、托盘和功能状态。
+`..\report-assistant-build\viewer-checkpoint\publish\MxNM-Viewer-Checkpoint1.exe`
+和 SHA-256 文件；其他机器只需要复制该 EXE。生成的 standalone AHK 也位于
+外部 build root，构建不会修改 checkout。Checkpoint 1 不嵌入正式
+“麦旋风.exe”，避免触碰正式配置、singleton、托盘和功能状态。
 
 ## Checkpoint 1：Vendor profile 与 HWND 只读审计
 
@@ -40,7 +41,7 @@ singleton、托盘和功能状态。
    `tests/windows/generated/mxnm_viewer_adaptive_checkpoint1_standalone.ahk`，
    目标机器只需该文件和 AutoHotkey v2。
    目标机器没有 AutoHotkey 时，发布
-   `publish-field\MxNM-Viewer-Checkpoint1.exe`。
+   `..\report-assistant-build\viewer-checkpoint\publish\MxNM-Viewer-Checkpoint1.exe`。
 3. 按 `Ctrl+Alt+F6` 执行自动只读审计。
 4. 按提示把鼠标依次放在箭头、长度测量、3D SUV 按钮中心和任意有效图像
    内部；每次按 `Ctrl+Alt+F7`，不要点击。
@@ -132,7 +133,8 @@ Checkpoint 1 通过，可以进入 Checkpoint 2。现有证据支持继续采用
 ### Windows 现场验证
 
 1. 在 Windows 构建机拉取本 branch，双击仓库根目录 `Build EXE.cmd`。构建
-   成功后，目标机器只需复制 `publish\麦旋风.exe`；不需要 AutoHotkey、
+   成功后，目标机器只需复制
+   `..\report-assistant-build\publish\麦旋风.exe`；不需要 AutoHotkey、
    Python、源码或其他依赖。
 2. 在设置中启用箭头、长度和 3D SUV 三个 Viewer 快捷键。先在原验证机器和
    Checkpoint 1 的失败机器上测试，再补至少一台结构不同的机器。

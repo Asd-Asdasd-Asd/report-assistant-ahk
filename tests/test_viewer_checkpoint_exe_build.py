@@ -36,6 +36,14 @@ class ViewerCheckpointExeBuildTests(unittest.TestCase):
             "mxnm_viewer_adaptive_checkpoint1_standalone.ahk",
             script,
         )
+        self.assertIn("'..\\report-assistant-build'", script)
+        self.assertIn("Join-Path $checkpointRoot 'source'", script)
+        self.assertIn("Join-Path $checkpointRoot 'publish'", script)
+        self.assertIn(
+            "build_mxnm_viewer_adaptive_checkpoint.py",
+            script,
+        )
+        self.assertIn("'--output'", script)
         self.assertIn("MxNM-Viewer-Checkpoint1.building.exe", script)
         self.assertIn("MxNM-Viewer-Checkpoint1.exe", script)
         self.assertIn("MxNM-Viewer-Checkpoint1.sha256.txt", script)
@@ -72,7 +80,7 @@ class ViewerCheckpointExeBuildTests(unittest.TestCase):
             generated,
         )
 
-    def test_field_publish_directory_is_ignored(self) -> None:
+    def test_legacy_field_publish_directory_is_ignored(self) -> None:
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/publish-field/", gitignore)
 

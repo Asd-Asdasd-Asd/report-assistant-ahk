@@ -39,14 +39,15 @@
 - [ ] 双击根目录 `Build EXE.cmd`，确认重新生成 release source、嵌入图标、同步静态资源并输出：
 
 ```text
-publish\麦旋风.exe
+..\report-assistant-build\publish\麦旋风.exe
 ```
 
-- [ ] `publish/` 包含本轮需要分发的 `麦旋风.exe`、`版本信息.md`、`首次使用.md`、`配置指南.md` 和 `更新说明.md`。
+- [ ] 构建前后 checkout 的 `git status --short` 一致，构建没有修改 tracked 或 untracked repository files。
+- [ ] 外部 `report-assistant-build\publish\` 包含本轮需要分发的 `麦旋风.exe`、`版本信息.md`、`首次使用.md`、`配置指南.md` 和 `更新说明.md`。
 - [ ] 在资源管理器与系统托盘中确认正式图标。
 - [ ] 连续构建两次，final 被安全替换且没有遗留 `.building.exe` 或 `.previous.exe`。
 - [ ] 模拟 compiler path 错误：构建非零退出、清理 `.building.exe`、保留 last-known-good final。
-- [ ] 若静态资源曾删除或重命名，构建前手工清空 `publish/`；正常构建不审核整个目录。
+- [ ] 若静态资源曾删除或重命名，构建前手工清空外部 `report-assistant-build\publish\`；正常构建不审核整个目录。
 
 ## Windows / MedEx 验收
 

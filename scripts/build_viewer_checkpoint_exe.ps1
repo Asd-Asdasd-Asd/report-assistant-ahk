@@ -8,8 +8,14 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$inputScript = Join-Path $repositoryRoot 'tests\windows\generated\mxnm_viewer_adaptive_checkpoint1_standalone.ahk'
-$outputDirectory = Join-Path $repositoryRoot 'publish-field'
+$buildRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $repositoryRoot '..\report-assistant-build')
+)
+$checkpointRoot = Join-Path $buildRoot 'viewer-checkpoint'
+$checkpointSourceDirectory = Join-Path $checkpointRoot 'source'
+$checkpointBuilder = Join-Path $PSScriptRoot 'build_mxnm_viewer_adaptive_checkpoint.py'
+$inputScript = Join-Path $checkpointSourceDirectory 'mxnm_viewer_adaptive_checkpoint1_standalone.ahk'
+$outputDirectory = Join-Path $checkpointRoot 'publish'
 $buildingExe = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.building.exe'
 $finalExe = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.exe'
 $hashFile = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.sha256.txt'
@@ -53,11 +59,41 @@ function Remove-TemporaryLog {
     }
 }
 
+function Resolve-PythonCommand {
+    $candidates = @(
+        [pscustomobject]@{ Name = 'py.exe'; PrefixArguments = @('-3') },
+        [pscustomobject]@{ Name = 'python.exe'; PrefixArguments = @() },
+        [pscustomobject]@{ Name = 'python3.exe'; PrefixArguments = @() }
+    )
+
+    foreach ($candidate in $candidates) {
+        $command = Get-Command $candidate.Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $command) {
+            continue
+        }
+        try {
+            $versionArguments = @($candidate.PrefixArguments) + @('--version')
+            & $command.Source @versionArguments *> $null
+            if ($LASTEXITCODE -eq 0) {
+                return [pscustomobject]@{
+                    Executable = $command.Source
+                    PrefixArguments = @($candidate.PrefixArguments)
+                }
+            }
+        }
+        catch {
+            continue
+        }
+    }
+
+    throw 'Python 3 was not found. Install Python or make py.exe/python.exe available on PATH.'
+}
+
 try {
     foreach ($required in @(
         [pscustomobject]@{ Path = $CompilerPath; Name = 'Ahk2Exe compiler' },
         [pscustomobject]@{ Path = $BasePath; Name = 'AutoHotkey v2 base executable' },
-        [pscustomobject]@{ Path = $inputScript; Name = 'Standalone checkpoint script' },
+        [pscustomobject]@{ Path = $checkpointBuilder; Name = 'Checkpoint generator' },
         [pscustomobject]@{ Path = $iconPath; Name = 'Application icon' }
     )) {
         if (-not (Test-Path -LiteralPath $required.Path -PathType Leaf)) {
@@ -66,6 +102,21 @@ try {
         if ((Get-Item -LiteralPath $required.Path).Length -le 0) {
             throw "$($required.Name) is empty: $($required.Path)"
         }
+    }
+
+    $python = Resolve-PythonCommand
+    $pythonArguments = @($python.PrefixArguments) + @(
+        $checkpointBuilder,
+        '--output',
+        $inputScript
+    )
+    & $python.Executable @pythonArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Checkpoint generator failed with exit code $LASTEXITCODE."
+    }
+    if (-not (Test-Path -LiteralPath $inputScript -PathType Leaf) -or
+        (Get-Item -LiteralPath $inputScript).Length -le 0) {
+        throw "Standalone checkpoint script was not generated: $inputScript"
     }
 
     if (-not (Test-Path -LiteralPath $outputDirectory -PathType Container)) {

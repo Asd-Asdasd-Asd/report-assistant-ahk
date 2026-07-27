@@ -19,6 +19,7 @@ from scripts.build_release import (
     stamp_source_revision,
     strip_leading_component_bom,
     windows_file_version,
+    write_release_outputs,
 )
 
 
@@ -138,6 +139,23 @@ class BuildReleaseEncodingTests(unittest.TestCase):
                 resolve_source_revision(root),
                 f"{clean_revision}-dirty",
             )
+
+    def test_external_outputs_do_not_modify_tracked_defaults(self) -> None:
+        release_before = RELEASE.read_bytes()
+        version_before = VERSION_INFO.read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            external_root = Path(directory)
+            external_release = external_root / "release-source" / "app.ahk"
+            external_version = (
+                external_root / "release-source" / "版本信息.md"
+            )
+            write_release_outputs(external_release, external_version)
+            self.assertTrue(external_release.is_file())
+            self.assertTrue(external_version.is_file())
+            self.assertGreater(external_release.stat().st_size, 0)
+            self.assertGreater(external_version.stat().st_size, 0)
+        self.assertEqual(RELEASE.read_bytes(), release_before)
+        self.assertEqual(VERSION_INFO.read_bytes(), version_before)
 
     def test_only_a_leading_component_bom_is_removed(self) -> None:
         value = "\ufefffirst\ufeffsecond"

@@ -13,6 +13,7 @@ from scripts.build_mxnm_viewer_adaptive_checkpoint import (
     OUTPUT,
     build_checkpoint_text,
     viewer_tool_probe_subset,
+    write_checkpoint,
 )
 
 
@@ -79,6 +80,15 @@ class MxNMViewerCheckpointBuildTests(unittest.TestCase):
         raw = OUTPUT.read_bytes()
         self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))
         self.assertNotIn("\ufeff", raw.decode("utf-8"))
+
+    def test_external_output_does_not_modify_tracked_default(self) -> None:
+        before = OUTPUT.read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            external = Path(directory) / "checkpoint" / "standalone.ahk"
+            write_checkpoint(external)
+            self.assertTrue(external.is_file())
+            self.assertGreater(external.stat().st_size, 0)
+        self.assertEqual(OUTPUT.read_bytes(), before)
 
 
 if __name__ == "__main__":
