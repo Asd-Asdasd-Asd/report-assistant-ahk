@@ -60,7 +60,7 @@ singleton、托盘和功能状态。
   当前预测点之间的结构差异。
 - 能明确判断图像实际 point HWND、父链和当前错误选取的 root HWND 之间的差异。
 
-### 2026-07-27 首台机器结果
+### 2026-07-27 多机结果与退出结论
 
 首台原验证环境完成只读采集：
 
@@ -79,14 +79,33 @@ singleton、托盘和功能状态。
   parent 和 root-owner 关系。
 - foreground 和 mouse invariants 均通过。
 
-该结果证明审计路径和原机器结构，但尚未满足 Checkpoint 1 退出条件；仍需
-至少一台工具快捷键失败机器的同格式结果。
+第二台原本快捷键失败的机器完成同版只读采集：
+
+- 仍由生产路径 `1/MxNMSoft.ini` 提供与 runtime 一致的 frame、image 和
+  `SCBtnPad`；外层 Viewer、工具面板和图像窗口层级与首台机器相同。
+- 旧算法预测箭头中心 `(2469,649)`，实际命中相邻 `21044`；预测长度中心
+  `(2469,725)`，实际命中相邻 `21078`。真正的 `21043` 和 `21048` 分别位于
+  `y=600..637` 和 `y=682..719`。`21193` 仅因预测点仍落在按钮边缘而偶然
+  命中。
+- 这证明跨机器失败不是 Vendor profile 或外层分辨率选择错误，而是工具面板
+  内部首行位置、按钮高度和行距并不固定。生产代码不得再依赖固定前三行、
+  `38 px` pitch 或推算中心点。
+- 三个目标 ID 在两台机器均存在唯一的 visible/enabled 原生 `Button` 组合，
+  具有相同直接父面板，且实际纵向顺序与 Vendor command row 一致。hidden
+  重复控件可通过可见性排除。
+- foreground、mouse 和只读约束在两台机器均通过。
+
+Checkpoint 1 通过，可以进入 Checkpoint 2。现有证据支持继续采用 Vendor
+生产 profile 根路径 `MultNMSoftInfo\1`，但仅把 `SCBtnPadPos` 作为 runtime
+工具面板身份锚点；按钮位置必须从实际 native controls 读取。
 
 ## Checkpoint 2：自适应工具按钮 resolver
 
 ### 实现范围
 
-- 用 Checkpoint 1 证明的 Vendor profile 选择规则代替固定目录 `1`。
+- 使用 Checkpoint 1 两台机器均验证的 Vendor 生产 profile
+  `MultNMSoftInfo\1`，并继续校验配置路径、hash 与 runtime frame；若未来
+  Vendor 暴露明确的实时 selector，再单独替换 profile 选择层。
 - Vendor 配置只提供工具区域、row/column 和 command ID。
 - runtime 在受限区域内枚举同 PID、visible/enabled 的 native controls。
 - 目标 command ID 必须唯一，几何顺序必须与 Vendor row/column 一致。
@@ -96,12 +115,20 @@ singleton、托盘和功能状态。
 
 ### Windows 现场验证
 
-1. 在原验证机器和 Checkpoint 1 的失败机器上分别测试箭头、长度和 3D SUV。
-2. 每项连续执行 10 次，确认一次按键只改变一次工具状态。
-3. 验证不同显示布局、同分辨率不同机器、多屏副屏场景。
-4. 验证报告窗口或其他程序前台时不触发、不吞键。
-5. 保存 field result，确认 command ID、实际 HWND/parent、配置 hash、
-   profile identity、foreground/mouse invariants。
+1. 在 Windows 构建机拉取本 branch，双击仓库根目录 `Build EXE.cmd`。构建
+   成功后，目标机器只需复制 `publish\麦旋风.exe`；不需要 AutoHotkey、
+   Python、源码或其他依赖。
+2. 在设置中启用箭头、长度和 3D SUV 三个 Viewer 快捷键。先在原验证机器和
+   Checkpoint 1 的失败机器上测试，再补至少一台结构不同的机器。
+3. 每项连续执行 10 次，确认一次按键只改变一次工具状态；记录为
+   `arrow=n/10, length=n/10, suv3d=n/10`，并注明是否出现“Viewer 工具按钮
+   布局校验失败”。
+4. 重新启动 Viewer 后复测三项各一次；若 Viewer 支持切换布局，再切换一个
+   布局各测一次。记录分辨率、缩放、Viewer 所在屏幕和是否多屏。
+5. 在报告窗口前台各触发一次，确认 Viewer 工具被选择且报告焦点不改变；在
+   无关程序前台各触发一次，确认不触发也不吞键。
+6. 本 checkpoint 不验收 SUV/尺寸自动读取；它们仍保持旧实现，统一留到
+   Checkpoint 3。
 
 ### 通过条件
 

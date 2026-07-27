@@ -39,8 +39,8 @@ def viewer_tool_probe_subset(text: str) -> str:
     provider_marker = "class MxNMViewerToolCommandProvider {"
     plan_marker = "BuildMxNMViewerToolCommandPlan(viewerExe, configPaths) {"
     result_marker = "MakeMxNMViewerToolResult(ok, code) {"
-    mapping_marker = "MapMxNMViewerToolPointToRuntimeFrame("
-    target_marker = "ResolveMxNMViewerToolButtonTarget("
+    mapping_marker = "MapMxNMViewerToolPadOriginToRuntimeFrame("
+    target_marker = "DispatchMxNMViewerToolButton("
     for marker in (
         provider_marker,
         plan_marker,

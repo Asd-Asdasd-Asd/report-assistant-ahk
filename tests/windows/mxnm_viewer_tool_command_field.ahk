@@ -44,7 +44,10 @@ RunMxNMViewerToolCommandField(commandName) {
         . "ButtonHwnd=" result.buttonHwnd "`r`n"
         . "ButtonParentHwnd=" result.buttonParentHwnd "`r`n"
         . "ButtonRootHwnd=" result.buttonRootHwnd "`r`n"
+        . "ButtonPanelHwnd=" result.buttonPanelHwnd "`r`n"
         . "RuntimeControlId=" result.runtimeControlId "`r`n"
+        . "RuntimeCandidateCount="
+            . result.runtimeCandidateCount "`r`n"
         . "DispatchElapsedMs=" elapsedMs "`r`n"
         . "ForegroundUnchanged="
             . MxNMViewerToolFieldBool(

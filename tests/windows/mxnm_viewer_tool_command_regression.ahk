@@ -110,11 +110,117 @@ RunMxNMViewerToolCommandRegression() {
     )
     AssertMxNMViewerTool(
         mappedSuv3D.x = 2469 && mappedSuv3D.y = 839,
-        "observed 3D SUV center mapping"
+        "legacy observed 3D SUV center mapping"
+    )
+
+    padOrigin := MapMxNMViewerToolPadOriginToRuntimeFrame(
+        {x: 280, y: 360},
+        {frameWidth: 1348, frameHeight: 1000},
+        {
+            windowX: 1920,
+            windowY: 0,
+            windowWidth: 2561,
+            windowHeight: 1440
+        }
+    )
+    AssertMxNMViewerTool(
+        padOrigin.x = 2452 && padOrigin.y = 518,
+        "vendor pad origin mapping"
+    )
+
+    commands := BuildMxNMViewerToolLayoutCommands()
+    panelRect := {left: 2452, top: 518, right: 2528, bottom: 1094}
+    originalControls := BuildMxNMViewerToolLayoutControls(
+        [632, 708, 822],
+        [666, 742, 856]
+    )
+    shiftedControls := BuildMxNMViewerToolLayoutControls(
+        [600, 682, 805],
+        [637, 719, 842]
+    )
+    AssertMxNMViewerTool(
+        ValidateMxNMViewerToolControlLayout(
+            commands,
+            originalControls,
+            panelRect
+        ),
+        "original runtime layout accepted"
+    )
+    AssertMxNMViewerTool(
+        ValidateMxNMViewerToolControlLayout(
+            commands,
+            shiftedControls,
+            panelRect
+        ),
+        "shifted runtime layout accepted"
+    )
+    reversedControls := BuildMxNMViewerToolLayoutControls(
+        [682, 600, 805],
+        [719, 637, 842]
+    )
+    AssertMxNMViewerTool(
+        !ValidateMxNMViewerToolControlLayout(
+            commands,
+            reversedControls,
+            panelRect
+        ),
+        "vendor row order mismatch rejected"
     )
 
     ToolTip "Viewer 工具命令配置回归通过"
     SetTimer (() => ToolTip()), -2500
+}
+
+BuildMxNMViewerToolLayoutCommands() {
+    return Map(
+        "arrow", {
+            commandId: MxNMViewerToolCommand.Arrow,
+            row: 1,
+            column: 1
+        },
+        "length", {
+            commandId: MxNMViewerToolCommand.Length,
+            row: 3,
+            column: 1
+        },
+        "suv3d", {
+            commandId: MxNMViewerToolCommand.Suv3D,
+            row: 6,
+            column: 1
+        }
+    )
+}
+
+BuildMxNMViewerToolLayoutControls(tops, bottoms) {
+    return Map(
+        "arrow", {
+            controlId: MxNMViewerToolCommand.Arrow,
+            rect: {
+                left: 2452,
+                top: tops[1],
+                right: 2489,
+                bottom: bottoms[1]
+            }
+        },
+        "length", {
+            controlId: MxNMViewerToolCommand.Length,
+            rect: {
+                left: 2452,
+                top: tops[2],
+                right: 2489,
+                bottom: bottoms[2]
+            }
+        },
+        "suv3d", {
+            controlId: MxNMViewerToolCommand.Suv3D,
+            rect: {
+                left: 2452,
+                top: tops[3],
+                right: 2489,
+                bottom: bottoms[3]
+            }
+        }
+    )
 }
 
 BuildMxNMViewerToolFixture(rows) {

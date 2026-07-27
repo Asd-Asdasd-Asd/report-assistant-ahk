@@ -1,6 +1,6 @@
 # MxNM Viewer 工具快捷键
 
-本文档固化 v0.6.1 的箭头、长度测量、3D SUV、截图和清除全部标注快捷键实现，以及 2026-07-26 Windows 现场验证中得到的结论。
+本文档固化 v0.6.1 的箭头、长度测量、3D SUV、截图和清除全部标注快捷键实现，以及 2026-07-26 至 2026-07-27 Windows 多机验证中得到的结论。
 
 ## 已验证范围
 
@@ -56,35 +56,33 @@ production 因此在 hotkey key-down 后等待主键及所有声明 modifier 完
 
 1. 找到唯一的 runtime Viewer frame，并读取当前 window rect。
 2. 将配置中的按钮面板原点按 logical frame → runtime frame 比例映射。
-3. 加上固定按钮内部偏移，得到目标按钮中心。
-4. 使用 `WindowFromPoint` 获取该点的 native HWND。
-5. 校验目标 root/client rect、Viewer PID、直接父窗口 PID 和 `GetDlgCtrlID`。
+3. 枚举 Viewer 同进程中的 native child controls，只保留目标 command ID、
+   visible/enabled 且 class 为 `Button` 的候选。
+4. 按直接父窗口分组，并校验父面板实际左上角与 Vendor `SCBtnPadPos` 映射
+   一致。
+5. 要求三个目标 ID 在同一面板内各唯一出现一次，实际控件顺序与 Vendor
+   row/column 顺序一致。
 6. 向按钮的直接父窗口发送带 250 ms 上限的同步 `WM_COMMAND / BN_CLICKED`。
 
 正常路径不移动鼠标、不切换前台窗口，也不需要 hover。250 ms 是窗口失去响应时的等待上限，不是固定延迟；正常投递会立即返回。
 
-## 坐标换算
+## 面板映射与实际控件
 
-当前 Vendor 按钮为固定 34 px 控件，中心偏移为 `(17,17)`，垂直 pitch 为 38 px。配置面板之前还有 3 个内置按钮，因此配置第 `row` 行的中心偏移为：
-
-```text
-x = 17
-y = (3 + row - 1) * 38 + 17
-```
-
-只缩放 `SCBtnPadPosX/Y` 定义的面板原点；按钮尺寸和按钮间距保持 runtime 像素，不随整个 frame 比例再次缩放：
+只缩放 `SCBtnPadPosX/Y` 定义的面板原点：
 
 ```text
 padScreenX = windowX + round(SCBtnPadPosX * windowWidth / FrameWidth)
 padScreenY = windowY + round(SCBtnPadPosY * windowHeight / FrameHeight)
-buttonPoint = padScreenPoint + fixedButtonOffset
 ```
 
-现场 frame 下三个中心约为：
+该点只用于识别工具面板，不再生成按钮点击坐标。按钮中心来自运行时
+`GetWindowRect`，用于诊断；命令直接投递给实际 HWND，不移动或点击鼠标。
 
-- 箭头：`(2468,649)`；
-- 长度测量：`(2468,725)`；
-- 3D SUV 测量：`(2468,839)`。
+2026-07-27 的第二台机器表明：相同 Viewer frame、相同面板原点下，箭头和
+长度按钮分别从首台机器的 `y=632..666`、`708..742` 变为
+`y=600..637`、`682..719`。旧固定 pitch 算法分别误中 `21044` 和
+`21078`，因此固定首行、尺寸、中心和 `38 px` pitch 均只保留在
+Checkpoint 1 审计回归中，不属于 production resolver。
 
 ## 本轮发现
 
@@ -98,11 +96,16 @@ buttonPoint = padScreenPoint + fixedButtonOffset
 
 ### 根 HWND 不相等不代表目标错误
 
-MxNM Viewer 使用同一进程中的多个顶层或浮动窗口。要求 `button root == runtime frame HWND` 会误拒绝正确按钮。最终边界改为同一 PID、点位属于目标 root client rect，并继续核对 native control ID。
+MxNM Viewer 使用同一进程中的多个顶层或浮动窗口。要求
+`button root == runtime frame HWND` 会误拒绝正确按钮。最终边界改为同一
+PID、同一直接父面板、父面板匹配 Vendor 原点，并继续核对 native control
+ID、可见性、启用状态和几何顺序。
 
-### 面板原点与按钮偏移不能采用同一种缩放
+### 面板原点可以缩放，按钮位置必须实测
 
-缩放整个 logical point 会把箭头算到 `(2483,707)`；完全不缩放会算到 `(2216,490)`。现场证明正确模型是缩放配置面板原点，再加固定像素按钮偏移。
+缩放整个 logical point 或完全不缩放都会得到错误目标。多机证据进一步证明
+即使正确映射面板原点，固定像素按钮偏移仍不可迁移。production 只映射
+Vendor 面板原点，按钮位置完全由 native HWND 实际矩形决定。
 
 ### 非活动父窗口上的 `BM_CLICK` 不可靠
 
@@ -119,10 +122,10 @@ MxNM Viewer 使用同一进程中的多个顶层或浮动窗口。要求 `button
 - Vendor 配置或 frame geometry 不可用；
 - 三个 command ID 不唯一、行列格式异常或不在第一列；
 - Viewer frame 缺失或不唯一；
-- `WindowFromPoint` 目标不存在；
-- root/parent 与 Viewer PID 不一致；
-- 目标点不在 root client rect；
-- runtime control ID 与 Vendor command ID 不一致；
+- 同 PID 的可见、启用 native `Button` 候选缺失；
+- 候选不在同一直接父面板，或面板原点与 Vendor 映射不一致；
+- 任一目标 ID 在候选面板中不唯一；
+- runtime control ID 或实际几何顺序与 Vendor command schema 不一致；
 - 父窗口消息超时或发送失败。
 
 配置变化不会通过猜测、UIA Name 或重复点击自动绕过。其他工作站、分辨率、缩放和 Vendor 版本仍须逐机验证后再启用。
@@ -136,4 +139,6 @@ MxNM Viewer 使用同一进程中的多个顶层或浮动窗口。要求 `button
   - `Ctrl+Alt+F11`：3D SUV 测量
 - Python structural coverage：`tests/test_viewer_tool_hotkeys.py`
 
-现场已确认三个按钮均可从 Viewer 或报告窗口前台一次触发成功，且 `ForegroundUnchanged=true`、`MouseUnchanged=true`。
+旧固定偏移路径仅在首台机器确认成功；第二台机器已证明其不可迁移。新的
+native control-set resolver 仍需按 Checkpoint 2 在至少三台机器完成 EXE
+现场验证后，才能标记跨机器通过。

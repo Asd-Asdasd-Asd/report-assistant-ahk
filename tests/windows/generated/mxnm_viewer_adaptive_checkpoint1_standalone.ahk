@@ -787,10 +787,16 @@ class MxNMViewerToolCommand {
     static Arrow := 21043
     static Length := 21048
     static Suv3D := 21193
+    ; Checkpoint 1 legacy mapping evidence only. Production target resolution
+    ; no longer depends on these values.
     static BuiltInRowCount := 3
     static ButtonCenterX := 17
     static ButtonCenterY := 17
     static ButtonPitch := 38
+    static NativeClassName := "Button"
+    static PanelOriginToleranceRatio := 0.01
+    static PanelOriginToleranceMinPx := 4
+    static PanelOriginToleranceMaxPx := 16
 
     static Specs() {
         return [
@@ -810,7 +816,8 @@ class MxNMViewerToolCode {
     static WRONG_FOREGROUND := "WRONG_FOREGROUND"
     static COMMAND_UNKNOWN := "COMMAND_UNKNOWN"
     static BUTTON_TARGET_INVALID := "BUTTON_TARGET_INVALID"
-    static BUTTON_ID_MISMATCH := "BUTTON_ID_MISMATCH"
+    static BUTTON_SET_NOT_UNIQUE := "BUTTON_SET_NOT_UNIQUE"
+    static BUTTON_LAYOUT_INVALID := "BUTTON_LAYOUT_INVALID"
     static DISPATCH_FAILED := "DISPATCH_FAILED"
     static BUSY := "BUSY"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
@@ -991,6 +998,26 @@ IsReusableMxNMViewerToolCommandPlan(plan, viewerExe) {
         && plan.commands.Count = MxNMViewerToolCommand.Specs().Length
 }
 
+MapMxNMViewerToolPadOriginToRuntimeFrame(
+    logicalPadPoint,
+    mainGeometry,
+    runtimeFrame
+) {
+    return {
+        x: runtimeFrame.windowX + Round(
+            logicalPadPoint.x
+            * runtimeFrame.windowWidth
+            / mainGeometry.frameWidth
+        ),
+        y: runtimeFrame.windowY + Round(
+            logicalPadPoint.y
+            * runtimeFrame.windowHeight
+            / mainGeometry.frameHeight
+        )
+    }
+}
+
+; Retained only for Checkpoint 1 regression/audit comparison.
 MapMxNMViewerToolPointToRuntimeFrame(
     logicalPadPoint,
     buttonOffset,
@@ -1008,6 +1035,384 @@ MapMxNMViewerToolPointToRuntimeFrame(
             * runtimeFrame.windowHeight
             / mainGeometry.frameHeight
         ) + buttonOffset.y
+    }
+}
+
+ResolveMxNMViewerToolControlSet(plan, viewerWindows, runtimeFrame) {
+    failure := {
+        ok: false,
+        code: MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE,
+        panelHwnd: 0,
+        candidateCount: 0,
+        controls: Map()
+    }
+    if !IsObject(plan)
+        || !IsObject(runtimeFrame)
+        || viewerWindows.Length = 0 {
+        return failure
+    }
+    try runtimePid := WinGetPID(
+        "ahk_id " runtimeFrame.hwnd
+    )
+    catch
+        runtimePid := 0
+    if !runtimePid {
+        failure.code := MxNMViewerToolCode.BUTTON_TARGET_INVALID
+        return failure
+    }
+
+    commandKeyById := Map()
+    for commandKey, command in plan.commands
+        commandKeyById[command.commandId] := commandKey
+    candidates := EnumerateMxNMViewerToolControlCandidates(
+        viewerWindows,
+        runtimePid,
+        commandKeyById
+    )
+    failure.candidateCount := candidates.Length
+    if candidates.Length = 0
+        return failure
+
+    padOrigin := MapMxNMViewerToolPadOriginToRuntimeFrame(
+        {x: plan.padX, y: plan.padY},
+        plan.mainGeometry,
+        runtimeFrame
+    )
+    groups := Map()
+    for candidate in candidates {
+        if !groups.Has(candidate.parentHwnd) {
+            groups[candidate.parentHwnd] := {
+                parentHwnd: candidate.parentHwnd,
+                parentRect: candidate.parentRect,
+                controls: Map()
+            }
+        }
+        group := groups[candidate.parentHwnd]
+        if !group.controls.Has(candidate.commandKey)
+            group.controls[candidate.commandKey] := []
+        group.controls[candidate.commandKey].Push(candidate)
+    }
+
+    validGroups := []
+    for _, group in groups {
+        if !MxNMViewerToolPanelMatchesPadOrigin(
+            group.parentHwnd,
+            group.parentRect,
+            padOrigin,
+            runtimeFrame,
+            runtimePid
+        ) {
+            continue
+        }
+        controls := Map()
+        complete := true
+        for commandKey, _ in plan.commands {
+            if !group.controls.Has(commandKey)
+                || group.controls[commandKey].Length != 1 {
+                complete := false
+                break
+            }
+            controls[commandKey] :=
+                group.controls[commandKey][1]
+        }
+        if !complete
+            continue
+        if !ValidateMxNMViewerToolControlLayout(
+            plan.commands,
+            controls,
+            group.parentRect
+        ) {
+            continue
+        }
+        validGroups.Push({
+            panelHwnd: group.parentHwnd,
+            controls: controls
+        })
+    }
+    if validGroups.Length != 1 {
+        failure.code := validGroups.Length = 0
+            ? MxNMViewerToolCode.BUTTON_LAYOUT_INVALID
+            : MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE
+        return failure
+    }
+    return {
+        ok: true,
+        code: MxNMViewerToolCode.READY,
+        panelHwnd: validGroups[1].panelHwnd,
+        candidateCount: candidates.Length,
+        controls: validGroups[1].controls
+    }
+}
+
+EnumerateMxNMViewerToolControlCandidates(
+    viewerWindows,
+    runtimePid,
+    commandKeyById
+) {
+    candidates := []
+    seen := Map()
+    for viewerWindow in viewerWindows {
+        CollectMxNMViewerToolControlCandidate(
+            runtimePid,
+            commandKeyById,
+            seen,
+            candidates,
+            viewerWindow.hwnd,
+            0
+        )
+        callback := CallbackCreate(
+            CollectMxNMViewerToolControlCandidate.Bind(
+                runtimePid,
+                commandKeyById,
+                seen,
+                candidates
+            ),
+            "Fast",
+            2
+        )
+        try DllCall(
+            "User32\EnumChildWindows",
+            "Ptr", viewerWindow.hwnd,
+            "Ptr", callback,
+            "Ptr", 0,
+            "Int"
+        )
+        finally CallbackFree(callback)
+    }
+    return candidates
+}
+
+CollectMxNMViewerToolControlCandidate(
+    runtimePid,
+    commandKeyById,
+    seen,
+    candidates,
+    hwnd,
+    *
+) {
+    if !hwnd || seen.Has(hwnd)
+        return true
+    seen[hwnd] := true
+    try controlId := DllCall(
+        "User32\GetDlgCtrlID",
+        "Ptr", hwnd,
+        "Int"
+    )
+    catch
+        return true
+    if !commandKeyById.Has(controlId)
+        return true
+    if !DllCall(
+        "User32\IsWindowVisible",
+        "Ptr", hwnd,
+        "Int"
+    ) || !DllCall(
+        "User32\IsWindowEnabled",
+        "Ptr", hwnd,
+        "Int"
+    ) {
+        return true
+    }
+    try candidatePid := WinGetPID("ahk_id " hwnd)
+    catch
+        candidatePid := 0
+    if candidatePid != runtimePid
+        return true
+    className := MxNMViewerToolWindowClass(hwnd)
+    if StrLower(className)
+        != StrLower(MxNMViewerToolCommand.NativeClassName) {
+        return true
+    }
+    try parentHwnd := DllCall(
+        "User32\GetParent",
+        "Ptr", hwnd,
+        "Ptr"
+    )
+    catch
+        parentHwnd := 0
+    if !parentHwnd
+        return true
+    try parentPid := WinGetPID("ahk_id " parentHwnd)
+    catch
+        parentPid := 0
+    if parentPid != runtimePid
+        return true
+    rect := MxNMViewerToolWindowRectScreen(hwnd)
+    parentRect := MxNMViewerToolWindowRectScreen(parentHwnd)
+    if !IsObject(rect)
+        || !IsObject(parentRect)
+        || !MxNMViewerToolRectInside(rect, parentRect) {
+        return true
+    }
+    candidates.Push({
+        hwnd: hwnd,
+        parentHwnd: parentHwnd,
+        rootHwnd: MxNMViewerToolGetRootHwnd(hwnd),
+        controlId: controlId,
+        commandKey: commandKeyById[controlId],
+        className: className,
+        rect: rect,
+        parentRect: parentRect
+    })
+    return true
+}
+
+MxNMViewerToolPanelMatchesPadOrigin(
+    panelHwnd,
+    panelRect,
+    padOrigin,
+    runtimeFrame,
+    runtimePid
+) {
+    if !panelHwnd
+        || !IsObject(panelRect)
+        || !DllCall(
+            "User32\IsWindowVisible",
+            "Ptr", panelHwnd,
+            "Int"
+        ) {
+        return false
+    }
+    try panelPid := WinGetPID("ahk_id " panelHwnd)
+    catch
+        panelPid := 0
+    if panelPid != runtimePid
+        return false
+    tolerance := Min(
+        MxNMViewerToolCommand.PanelOriginToleranceMaxPx,
+        Max(
+            MxNMViewerToolCommand.PanelOriginToleranceMinPx,
+            Round(
+                Min(
+                    runtimeFrame.windowWidth,
+                    runtimeFrame.windowHeight
+                ) * MxNMViewerToolCommand.PanelOriginToleranceRatio
+            )
+        )
+    )
+    if Abs(panelRect.left - padOrigin.x) > tolerance
+        || Abs(panelRect.top - padOrigin.y) > tolerance {
+        return false
+    }
+    frameRect := {
+        left: runtimeFrame.windowX,
+        top: runtimeFrame.windowY,
+        right: runtimeFrame.windowX
+            + runtimeFrame.windowWidth,
+        bottom: runtimeFrame.windowY
+            + runtimeFrame.windowHeight
+    }
+    return panelRect.left >= frameRect.left - tolerance
+        && panelRect.top >= frameRect.top - tolerance
+        && panelRect.right <= frameRect.right + tolerance
+        && panelRect.bottom <= frameRect.bottom + tolerance
+}
+
+ValidateMxNMViewerToolControlLayout(
+    commands,
+    controls,
+    panelRect
+) {
+    if Type(commands) != "Map"
+        || Type(controls) != "Map"
+        || !IsObject(panelRect)
+        || commands.Count != controls.Count {
+        return false
+    }
+    for commandKey, command in commands {
+        if !controls.Has(commandKey)
+            return false
+        control := controls[commandKey]
+        if !IsObject(control)
+            || control.controlId != command.commandId
+            || !IsObject(control.rect)
+            || !MxNMViewerToolRectInside(
+                control.rect,
+                panelRect
+            ) {
+            return false
+        }
+    }
+    for leftKey, leftCommand in commands {
+        leftRect := controls[leftKey].rect
+        for rightKey, rightCommand in commands {
+            if leftKey = rightKey
+                continue
+            rightRect := controls[rightKey].rect
+            if leftCommand.row < rightCommand.row
+                && leftRect.top >= rightRect.top {
+                return false
+            }
+            if leftCommand.row = rightCommand.row
+                && leftCommand.column < rightCommand.column
+                && leftRect.left >= rightRect.left {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+MxNMViewerToolRectInside(innerRect, outerRect) {
+    return innerRect.right > innerRect.left
+        && innerRect.bottom > innerRect.top
+        && outerRect.right > outerRect.left
+        && outerRect.bottom > outerRect.top
+        && innerRect.left >= outerRect.left
+        && innerRect.top >= outerRect.top
+        && innerRect.right <= outerRect.right
+        && innerRect.bottom <= outerRect.bottom
+}
+
+MxNMViewerToolRectCenter(rect) {
+    return {
+        x: Round((rect.left + rect.right) / 2),
+        y: Round((rect.top + rect.bottom) / 2)
+    }
+}
+
+MxNMViewerToolGetRootHwnd(hwnd) {
+    try return DllCall(
+        "User32\GetAncestor",
+        "Ptr", hwnd,
+        "UInt", 2,
+        "Ptr"
+    )
+    catch
+        return 0
+}
+
+MxNMViewerToolWindowClass(hwnd) {
+    classBuffer := Buffer(512, 0)
+    try length := DllCall(
+        "User32\GetClassNameW",
+        "Ptr", hwnd,
+        "Ptr", classBuffer.Ptr,
+        "Int", 255,
+        "Int"
+    )
+    catch
+        length := 0
+    return length > 0
+        ? StrGet(classBuffer, length, "UTF-16")
+        : ""
+}
+
+MxNMViewerToolWindowRectScreen(hwnd) {
+    rectBuffer := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetWindowRect",
+        "Ptr", hwnd,
+        "Ptr", rectBuffer.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    return {
+        left: NumGet(rectBuffer, 0, "Int"),
+        top: NumGet(rectBuffer, 4, "Int"),
+        right: NumGet(rectBuffer, 8, "Int"),
+        bottom: NumGet(rectBuffer, 12, "Int")
     }
 }
 

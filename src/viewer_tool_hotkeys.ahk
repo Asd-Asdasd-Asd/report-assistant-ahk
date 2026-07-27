@@ -205,7 +205,8 @@ MxNMViewerToolFailureMessage(code) {
     if code = MxNMViewerToolCode.VIEWER_NOT_UNIQUE
         return "MedEx Viewer 窗口不唯一，快捷键未执行"
     if code = MxNMViewerToolCode.BUTTON_TARGET_INVALID
-        || code = MxNMViewerToolCode.BUTTON_ID_MISMATCH {
+        || code = MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE
+        || code = MxNMViewerToolCode.BUTTON_LAYOUT_INVALID {
         return "Viewer 工具按钮布局校验失败，未执行点击"
     }
     if code = MxNMViewerToolCode.BUSY

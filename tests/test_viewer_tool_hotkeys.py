@@ -26,10 +26,13 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn('"UPtr", target.controlId', commands)
         self.assertIn('"Ptr", target.hwnd', commands)
         self.assertNotIn('"UInt", 0x00F5', commands)
-        self.assertIn('"User32\\WindowFromPoint"', commands)
+        self.assertNotIn('"User32\\WindowFromPoint"', commands)
+        self.assertIn('"User32\\EnumChildWindows"', commands)
         self.assertIn('"User32\\GetDlgCtrlID"', commands)
-        self.assertIn("pointPid != runtimePid", commands)
-        self.assertIn("MxNMViewerToolClientRectScreen", commands)
+        self.assertIn("candidatePid != runtimePid", commands)
+        self.assertIn("MxNMViewerToolWindowRectScreen", commands)
+        self.assertIn("IsWindowVisible", commands)
+        self.assertIn("IsWindowEnabled", commands)
         self.assertIn("PrepareAtStartup", commands)
         for forbidden in ("UIA.", "MouseMove", "Click(", "Sleep "):
             self.assertNotIn(forbidden, commands)
@@ -41,17 +44,54 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn("rows.Count != rowCount", commands)
         self.assertIn("matches.Length != 1", commands)
         self.assertIn("SCBtnPadPos", commands)
-        self.assertIn("ButtonPitch := 38", commands)
         self.assertIn("matches[1].column != 1", commands)
         self.assertIn("rowIndex := A_Index", commands)
         self.assertIn("row: rowIndex", commands)
         self.assertNotIn("row: A_Index", commands)
-        mapping = commands.split(
-            "MapMxNMViewerToolPointToRuntimeFrame(", 2
-        )[-1]
-        self.assertIn("logicalPadPoint.x", mapping)
-        self.assertIn("runtimeFrame.windowWidth", mapping)
-        self.assertIn(") + buttonOffset.x", mapping)
+        self.assertIn(
+            "MapMxNMViewerToolPadOriginToRuntimeFrame",
+            commands,
+        )
+        invoke = commands.split(
+            "static Invoke(commandName, viewerExe := \"\") {", 1
+        )[1].split("MedExViewerToolForegroundActive(*) {", 1)[0]
+        for legacy_constant in (
+            "BuiltInRowCount",
+            "ButtonCenterX",
+            "ButtonCenterY",
+            "ButtonPitch",
+        ):
+            self.assertNotIn(legacy_constant, invoke)
+        self.assertIn("ResolveMxNMViewerToolControlSet", invoke)
+        self.assertIn(
+            "MxNMViewerToolRectCenter(target.rect)",
+            invoke,
+        )
+
+    def test_runtime_control_set_is_unique_visible_and_ordered(self) -> None:
+        commands = source("src/mxnm_viewer_tool_commands.ahk")
+        resolver = commands.split(
+            "\nResolveMxNMViewerToolControlSet(", 1
+        )[1].split("DispatchMxNMViewerToolButton(", 1)[0]
+        for required in (
+            "commandKeyById",
+            "EnumChildWindows",
+            "IsWindowVisible",
+            "IsWindowEnabled",
+            "NativeClassName",
+            "candidate.parentHwnd",
+            "PanelOriginToleranceRatio",
+            "PanelOriginToleranceMaxPx",
+            "ValidateMxNMViewerToolControlLayout",
+            "validGroups.Length != 1",
+        ):
+            self.assertIn(required, resolver)
+        self.assertIn("leftCommand.row < rightCommand.row", resolver)
+        self.assertIn(
+            "leftCommand.column < rightCommand.column",
+            resolver,
+        )
+        self.assertNotIn("WindowFromPoint", resolver)
 
     def test_hotkeys_are_disabled_by_default_and_medex_scoped(self) -> None:
         model = source("src/feature_model.ahk")
