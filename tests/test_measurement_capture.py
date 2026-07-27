@@ -272,6 +272,10 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"failureStage"] := "TARGET_CLIENT_POINT"',
             cleaner,
         )
+        self.assertIn(
+            '"targetRuntimeFrameOwnerFamilyCount"',
+            cleaner,
+        )
         self.assertNotIn(
             "ContextMeasurementScreenToClient(",
             cleaner,

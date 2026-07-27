@@ -100,7 +100,14 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ResolveMxNMRuntimeImageTarget(", 1
         )[1].split("IsReusableMxNMMeasurementTargetPlan", 1)[0]
         self.assertIn("rootOwnerHwnd != candidateFrame.hwnd", runtime_resolver)
-        self.assertIn("candidates.Length != 1", runtime_resolver)
+        self.assertIn(
+            "SelectMxNMRuntimeImageTargetByOwnerFamily",
+            runtime_resolver,
+        )
+        self.assertIn("CountMxNMRuntimeOwnerFamily", runtime_resolver)
+        self.assertIn("bestCount != 1", runtime_resolver)
+        self.assertIn("bestScore < 2", runtime_resolver)
+        self.assertIn("ResolveMxNMRootOwnerHwnd", runtime_resolver)
         action_resolver = resolver.split(
             "ResolveMxNMActionWindowFromPoint(", 2
         )[-1]

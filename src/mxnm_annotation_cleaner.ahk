@@ -57,6 +57,8 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
         result.context["targetConfigCode"] := target.configCode
         result.context["targetRuntimeFrameCandidateCount"] :=
             target.runtimeFrameCandidateCount
+        result.context["targetRuntimeFrameOwnerFamilyCount"] :=
+            target.runtimeFrameOwnerFamilyCount
         if !target.ok {
             result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE

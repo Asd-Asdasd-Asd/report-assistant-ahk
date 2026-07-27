@@ -49,7 +49,7 @@
 - 长短轴 workflow 已在 Windows 完成端到端验证并由用户确认通过。
 - Config-only measurement target：无 UIA、无 warmup timer、无周期轮询的启动缓存和按次 runtime mapping 已通过当前工作站复验。
 - v0.6.1 Viewer 工具旧固定偏移路径仅在首台机器通过；第二台机器已证明按钮内部布局不同并误中相邻 ID。新的 native control-set resolver 已完成静态实现，正在 Checkpoint 2 等待至少三台机器的完整 branch EXE 现场验证。
-- Checkpoint 2 当前两台机器已通过工具按钮验证；Checkpoint 3A 已根据主图区激活时 `ViewerWindowCount 10→11`、旧 frame candidate `1→0` 的现场证据替换 measurement outer-frame 选择规则，等待清除、SUVMax 和尺寸的 Windows EXE 验证。
+- Checkpoint 2 当前两台机器已通过工具按钮验证；Checkpoint 3A 已根据主图区激活时 `ViewerWindowCount 10→11`、旧 containing-frame candidate `1→0`、image-owner candidate `2` 的现场证据替换 measurement outer-frame 选择规则。多个图像 owner 候选只在其 Viewer owner-family 得分存在唯一严格最大值时解析，等待清除、SUVMax 和尺寸的 Windows EXE 验证。
 - Win modifier 设置持久化、F12 release-then-send、全窗口 pulse、3D SUV release-then-dispatch 和独立清除快捷键尚待 Windows 现场验证。
 
 ### 自动测试覆盖

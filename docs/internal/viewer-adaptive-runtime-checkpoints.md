@@ -183,6 +183,12 @@ PID 和 client bounds 校验时同时返回 `actionClientPoint`；清除直接�
 点，不再单独调用一次 `ScreenToClient`。失败提示也拆分为 target resolution
 和 client-point validation 两个阶段。
 
+第三轮完整 EXE 提示进一步确认主图区激活时存在两个通过“映射点 root owner
+回到自身”校验的 frame 候选。resolver 不取消唯一性，也不按枚举顺序选择：
+它统计每个候选作为 `GA_ROOTOWNER` 所拥有的去重 Viewer window family，
+只接受 owner-family 数量唯一且严格最大的候选；多候选时最大 family 至少
+包含两个窗口。若两套结构得分相同则继续 fail closed。
+
 ### 实现范围
 
 - Vendor profile、`ShowImage*`、`ShowModelN/LowWnd*` 继续提供逻辑图像区和

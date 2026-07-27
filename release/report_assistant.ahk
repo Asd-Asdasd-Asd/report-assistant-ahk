@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.1
-; Source revision: 4b3eda54d63e52bdfc58406db4b0dee7e02f4f37-dirty
-; Generated at: 2026-07-27 12:56:32 UTC
+; Source revision: 3271300bcf57b23801dcaab113c9e0ca86f3e542-dirty
+; Generated at: 2026-07-27 13:03:41 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.1.0
 ;@Ahk2Exe-SetProductVersion 0.6.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-27"
-    static SourceRevision := "4b3eda54d63e52bdfc58406db4b0dee7e02f4f37-dirty"
+    static SourceRevision := "3271300bcf57b23801dcaab113c9e0ca86f3e542-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -10908,6 +10908,8 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         )
         result.runtimeFrameCandidateCount :=
             runtimeTarget.candidateCount
+        result.runtimeFrameOwnerFamilyCount :=
+            runtimeTarget.ownerFamilyCount
         if !runtimeTarget.ok {
             result.code := MxNMMeasurementTargetCode.RUNTIME_FRAME_NOT_UNIQUE
             result.configCode :=
@@ -10945,6 +10947,7 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
     failure := {
         ok: false,
         candidateCount: 0,
+        ownerFamilyCount: 0,
         frame: 0,
         imageRect: 0,
         screenPoint: 0
@@ -10984,15 +10987,84 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         })
     }
     failure.candidateCount := candidates.Length
-    if candidates.Length != 1
+    selected := SelectMxNMRuntimeImageTargetByOwnerFamily(
+        candidates,
+        viewerWindows
+    )
+    failure.ownerFamilyCount := selected.ownerFamilyCount
+    if !selected.ok
         return failure
     return {
         ok: true,
-        candidateCount: 1,
-        frame: candidates[1].frame,
-        imageRect: candidates[1].imageRect,
-        screenPoint: candidates[1].screenPoint
+        candidateCount: candidates.Length,
+        ownerFamilyCount: selected.ownerFamilyCount,
+        frame: selected.candidate.frame,
+        imageRect: selected.candidate.imageRect,
+        screenPoint: selected.candidate.screenPoint
     }
+}
+
+SelectMxNMRuntimeImageTargetByOwnerFamily(
+    candidates,
+    viewerWindows
+) {
+    failure := {
+        ok: false,
+        ownerFamilyCount: 0,
+        candidate: 0
+    }
+    if candidates.Length = 0
+        return failure
+    if candidates.Length = 1 {
+        return {
+            ok: true,
+            ownerFamilyCount: CountMxNMRuntimeOwnerFamily(
+                viewerWindows,
+                candidates[1].frame.hwnd
+            ),
+            candidate: candidates[1]
+        }
+    }
+
+    bestScore := -1
+    bestCount := 0
+    bestCandidate := 0
+    for candidate in candidates {
+        score := CountMxNMRuntimeOwnerFamily(
+            viewerWindows,
+            candidate.frame.hwnd
+        )
+        if score > bestScore {
+            bestScore := score
+            bestCount := 1
+            bestCandidate := candidate
+        } else if score = bestScore {
+            bestCount += 1
+        }
+    }
+    failure.ownerFamilyCount := Max(0, bestScore)
+    if bestCount != 1 || bestScore < 2
+        return failure
+    return {
+        ok: true,
+        ownerFamilyCount: bestScore,
+        candidate: bestCandidate
+    }
+}
+
+CountMxNMRuntimeOwnerFamily(viewerWindows, frameHwnd) {
+    count := 0
+    seen := Map()
+    for viewerWindow in viewerWindows {
+        if seen.Has(viewerWindow.hwnd)
+            continue
+        seen[viewerWindow.hwnd] := true
+        if ResolveMxNMRootOwnerHwnd(viewerWindow.hwnd)
+            = frameHwnd {
+            count += 1
+        }
+    }
+    return count
 }
 
 ResolveMxNMRootOwnerFromPoint(screenPoint) {
@@ -11007,9 +11079,15 @@ ResolveMxNMRootOwnerFromPoint(screenPoint) {
         pointHwnd := 0
     if !pointHwnd
         return 0
+    return ResolveMxNMRootOwnerHwnd(pointHwnd)
+}
+
+ResolveMxNMRootOwnerHwnd(hwnd) {
+    if !hwnd
+        return 0
     try return DllCall(
         "User32\GetAncestor",
-        "Ptr", pointHwnd,
+        "Ptr", hwnd,
         "UInt", 3,
         "Ptr"
     )
@@ -11034,6 +11112,7 @@ MakeMxNMMeasurementTargetResult() {
         configReady: false,
         runtimeFrameResolved: false,
         runtimeFrameCandidateCount: 0,
+        runtimeFrameOwnerFamilyCount: 0,
         mappedImageRectResolved: false,
         layoutReady: false,
         layoutModelCount: 0,
@@ -11717,6 +11796,8 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
         result.context["targetConfigCode"] := target.configCode
         result.context["targetRuntimeFrameCandidateCount"] :=
             target.runtimeFrameCandidateCount
+        result.context["targetRuntimeFrameOwnerFamilyCount"] :=
+            target.runtimeFrameOwnerFamilyCount
         if !target.ok {
             result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
@@ -19345,6 +19426,12 @@ MxNMViewerClearFailureMessage(result) {
             . MxNMViewerClearContextValue(
                 result,
                 "targetRuntimeFrameCandidateCount",
+                0
+            )
+            . "/"
+            . MxNMViewerClearContextValue(
+                result,
+                "targetRuntimeFrameOwnerFamilyCount",
                 0
             )
             . "）"

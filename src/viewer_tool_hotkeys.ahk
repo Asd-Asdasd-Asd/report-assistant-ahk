@@ -193,6 +193,12 @@ MxNMViewerClearFailureMessage(result) {
                 "targetRuntimeFrameCandidateCount",
                 0
             )
+            . "/"
+            . MxNMViewerClearContextValue(
+                result,
+                "targetRuntimeFrameOwnerFamilyCount",
+                0
+            )
             . "）"
     if code = MxNMAnnotationCleanupCode.TARGET_CLIENT_POINT_INVALID
         return "Viewer 图像坐标转换失败，未执行清除"

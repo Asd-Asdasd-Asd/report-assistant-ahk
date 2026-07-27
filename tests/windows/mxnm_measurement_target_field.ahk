@@ -158,6 +158,8 @@ FormatMxNMMeasurementTargetFieldOutput(
             MxNMTargetFieldBoolean(target.runtimeFrameResolved),
         "RuntimeFrameCandidateCount=" .
             target.runtimeFrameCandidateCount,
+        "RuntimeFrameOwnerFamilyCount=" .
+            target.runtimeFrameOwnerFamilyCount,
         "MappedImageRectResolved=" .
             MxNMTargetFieldBoolean(target.mappedImageRectResolved),
         "LayoutReady=" MxNMTargetFieldBoolean(target.layoutReady),
