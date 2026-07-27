@@ -1,9 +1,9 @@
 ; Generated file. Edit src/*.ahk instead.
-; Application version: 0.6.1
-; Source revision: ece27cef0e460c61c4689b4b7ec041d22d90ee56-dirty
-; Generated at: 2026-07-27 13:31:38 UTC
-;@Ahk2Exe-SetFileVersion 0.6.1.0
-;@Ahk2Exe-SetProductVersion 0.6.1
+; Application version: 0.6.2
+; Source revision: d82c8a04604660a9b0e4f0f61f68c4e6f383d142
+; Generated at: 2026-07-27 13:45:38 UTC
+;@Ahk2Exe-SetFileVersion 0.6.2.0
+;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
 
 #Requires AutoHotkey v2.0
@@ -12,10 +12,10 @@
 
 ; --- BEGIN app_metadata.ahk ---
 class AppMetadata {
-    static Version := "0.6.1"
+    static Version := "0.6.2"
     static Channel := "internal-test"
     static BuildDate := "2026-07-27"
-    static SourceRevision := "ece27cef0e460c61c4689b4b7ec041d22d90ee56-dirty"
+    static SourceRevision := "d82c8a04604660a9b0e4f0f61f68c4e6f383d142"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
