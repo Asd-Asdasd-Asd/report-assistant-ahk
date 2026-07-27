@@ -4,6 +4,11 @@
 完成代码、静态验证和 Windows Viewer 现场验证；现场结论未通过前不得进入
 下一 checkpoint。未知结构始终 fail closed，不使用未经验证的绝对坐标。
 
+跨机器现场脚本默认同时生成 standalone 单文件版本，便于内网发布和验证后
+删除。只有依赖大型 UIA 库、二进制资源，或合并后会显著增加文件大小和审查
+成本时，才发布保留相对目录的依赖包；该例外必须在 checkpoint 交付说明中
+列出依赖和代价。
+
 ## Checkpoint 1：Vendor profile 与 HWND 只读审计
 
 ### 实现范围
@@ -24,6 +29,9 @@
 
 1. 启动 Viewer 并保持全屏日常布局。
 2. 运行 `tests/windows/mxnm_viewer_adaptive_checkpoint1.ahk`。
+   内网发布优先使用单文件
+   `tests/windows/generated/mxnm_viewer_adaptive_checkpoint1_standalone.ahk`，
+   目标机器只需该文件和 AutoHotkey v2。
 3. 按 `Ctrl+Alt+F6` 执行自动只读审计。
 4. 按提示把鼠标依次放在箭头、长度测量、3D SUV 按钮中心和任意有效图像
    内部；每次按 `Ctrl+Alt+F7`，不要点击。

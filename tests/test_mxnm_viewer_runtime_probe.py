@@ -84,6 +84,7 @@ class MxNMViewerRuntimeProbeTests(unittest.TestCase):
         )
         self.assertIn('["arrow", "length", "suv3d", "image"]', harness)
         self.assertIn("InteractionMode=READ_ONLY", harness)
+        self.assertIn("CheckpointVersion=", harness)
         self.assertIn("AutomaticForegroundUnchanged=", harness)
         self.assertIn("AutomaticMouseUnchanged=", harness)
         self.assertIn("ManualCaptureComplete=true", harness)

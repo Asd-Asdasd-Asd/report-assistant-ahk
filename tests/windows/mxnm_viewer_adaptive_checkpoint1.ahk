@@ -11,6 +11,7 @@
 #Include ..\..\src\mxnm_viewer_runtime_probe.ahk
 
 global MXNM_ADAPTIVE_AUDIT_SESSION := 0
+global MXNM_ADAPTIVE_CHECKPOINT_VERSION := "1.1"
 
 ^!F6::BeginMxNMAdaptiveCheckpoint1()
 ^!F7::CaptureMxNMAdaptiveManualPoint()
@@ -202,8 +203,11 @@ CancelMxNMAdaptiveCheckpoint1() {
 }
 
 FormatMxNMAdaptiveProfileAudit(audit) {
+    global MXNM_ADAPTIVE_CHECKPOINT_VERSION
     output :=
         "Test=MxNMViewerAdaptiveCheckpoint1`r`n" .
+        "CheckpointVersion=" .
+        MXNM_ADAPTIVE_CHECKPOINT_VERSION "`r`n" .
         "InteractionMode=READ_ONLY`r`n" .
         "ProfileAuditState=" audit.code "`r`n" .
         "ProfileRootExists=" .
