@@ -8,7 +8,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CMD = ROOT / "Build Viewer Checkpoint EXE.cmd"
+CMD = (
+    ROOT
+    / "tools"
+    / "field-testing"
+    / "Build Viewer Checkpoint EXE.cmd"
+)
 POWERSHELL = ROOT / "scripts" / "build_viewer_checkpoint_exe.ps1"
 GENERATED = (
     ROOT
@@ -24,7 +29,7 @@ class ViewerCheckpointExeBuildTests(unittest.TestCase):
         self,
     ) -> None:
         cmd = CMD.read_text(encoding="utf-8")
-        self.assertIn('set "REPOSITORY_ROOT=%~dp0"', cmd)
+        self.assertIn('set "REPOSITORY_ROOT=%~dp0..\\..\\"', cmd)
         self.assertIn("powershell.exe -NoProfile -ExecutionPolicy Bypass", cmd)
         self.assertIn("build_viewer_checkpoint_exe.ps1", cmd)
         self.assertIn('set "BUILD_EXIT_CODE=%ERRORLEVEL%"', cmd)

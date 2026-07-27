@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.1
-; Source revision: 3271300bcf57b23801dcaab113c9e0ca86f3e542-dirty
-; Generated at: 2026-07-27 13:03:41 UTC
+; Source revision: ece27cef0e460c61c4689b4b7ec041d22d90ee56-dirty
+; Generated at: 2026-07-27 13:31:38 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.1.0
 ;@Ahk2Exe-SetProductVersion 0.6.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-27"
-    static SourceRevision := "3271300bcf57b23801dcaab113c9e0ca86f3e542-dirty"
+    static SourceRevision := "ece27cef0e460c61c4689b4b7ec041d22d90ee56-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -19063,8 +19063,9 @@ ValidateViewerToolHotkeySettings(settings) {
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键需要 Win，"
-                    . "或至少两个 Ctrl/Alt/Shift 修饰键。"
+                "“" definition.label "”快捷键需要至少一个修饰键；"
+                    . "无修饰时只能使用单个字母或数字，"
+                    . "且仅在 Viewer 前台生效。"
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -19081,16 +19082,21 @@ ValidateViewerToolHotkeySettings(settings) {
 }
 
 ViewerToolHotkeyChordIsSafe(chord) {
-    if !RegExMatch(String(chord), "^([!+^#]+)(.+)$", &match)
-        return false
-    if InStr(match[1], "#")
-        return true
-    modifierCount := 0
-    for modifier in ["^", "!", "+"] {
-        if InStr(match[1], modifier)
-            modifierCount += 1
-    }
-    return modifierCount >= 2
+    normalized := Trim(String(chord), " `t`r`n")
+    if RegExMatch(normalized, "^([!+^#]+)([^!+^#].*)$", &match)
+        return match[2] != ""
+    return ViewerHotkeyIsSafeBareChord(normalized)
+}
+
+ViewerHotkeyIsSafeBareChord(chord) {
+    return RegExMatch(
+        Trim(String(chord), " `t`r`n"),
+        "i)^[a-z0-9]$"
+    ) > 0
+}
+
+ViewerHotkeyChordIsBare(chord) {
+    return ViewerHotkeyIsSafeBareChord(chord)
 }
 
 MakeViewerToolHotkeyValidation(ok, field := "", message := "") {
@@ -19233,23 +19239,35 @@ SendGlobalHjklArrow(direction, *) {
 ; --- END global_hjkl_arrows.ahk ---
 
 ; --- BEGIN viewer_tool_hotkeys.ahk ---
-ViewerToolHotkeyDefinitions(settings) {
+ViewerToolHotkeyDefinitions(settings, bareOnly := false) {
     definitions := []
-    if settings.ViewerArrowEnabled && settings.ViewerArrowChord != "" {
+    if settings.ViewerArrowEnabled
+        && settings.ViewerArrowChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerArrowChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-arrow",
             settings.ViewerArrowChord,
-            InvokeMxNMViewerToolHotkey.Bind("arrow")
+            InvokeMxNMViewerToolHotkey.Bind(
+                "arrow",
+                settings.ViewerArrowChord
+            )
         ))
     }
-    if settings.ViewerLengthEnabled && settings.ViewerLengthChord != "" {
+    if settings.ViewerLengthEnabled
+        && settings.ViewerLengthChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerLengthChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-length",
             settings.ViewerLengthChord,
-            InvokeMxNMViewerToolHotkey.Bind("length")
+            InvokeMxNMViewerToolHotkey.Bind(
+                "length",
+                settings.ViewerLengthChord
+            )
         ))
     }
-    if settings.ViewerSuv3DEnabled && settings.ViewerSuv3DChord != "" {
+    if settings.ViewerSuv3DEnabled
+        && settings.ViewerSuv3DChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerSuv3DChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-suv3d",
             settings.ViewerSuv3DChord,
@@ -19258,7 +19276,9 @@ ViewerToolHotkeyDefinitions(settings) {
             )
         ))
     }
-    if settings.ViewerClearEnabled && settings.ViewerClearChord != "" {
+    if settings.ViewerClearEnabled
+        && settings.ViewerClearChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerClearChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-clear-annotations",
             settings.ViewerClearChord,
@@ -19456,11 +19476,28 @@ MxNMViewerClearContextValue(result, key, fallback := "") {
     return result.context[key]
 }
 
-InvokeMxNMViewerToolHotkey(commandName, *) {
-    result := MxNMViewerToolCommandProvider.Invoke(commandName)
-    if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
+InvokeMxNMViewerToolHotkey(commandName, chord, *) {
+    static active := false
+    if active
         return
-    Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+    try foregroundHwnd := WinExist("A")
+    catch
+        return
+    if !foregroundHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != foregroundHwnd
+            return
+        result := MxNMViewerToolCommandProvider.Invoke(commandName)
+        if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
+            return
+        Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+    } finally {
+        active := false
+    }
 }
 
 MxNMViewerToolFailureMessage(code) {
@@ -19493,9 +19530,14 @@ RegisterConfiguredFeatures(settings) {
         )
     }
     RegisterHotkeyDefinitions(
-        ViewerToolHotkeyDefinitions(settings),
+        ViewerToolHotkeyDefinitions(settings, false),
         ReservedApplicationHotkeyChords(),
         MedExViewerToolForegroundActive
+    )
+    RegisterHotkeyDefinitions(
+        ViewerToolHotkeyDefinitions(settings, true),
+        ReservedApplicationHotkeyChords(),
+        MedExViewerForegroundActive
     )
     RegisterHotkeyDefinitions(
         ViewerCaptureHotkeyDefinitions(settings),
@@ -19665,7 +19707,7 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "工具选择和清除可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
+            "允许一个修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")

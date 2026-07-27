@@ -10,7 +10,8 @@
 列出依赖和代价。
 
 目标机器没有 AutoHotkey 时，在一台安装了 AutoHotkey v2 与 Ahk2Exe 的
-Windows 构建机双击 `Build Viewer Checkpoint EXE.cmd`。它只编译只读
+Windows 构建机双击
+`tools\field-testing\Build Viewer Checkpoint EXE.cmd`。它只编译只读
 standalone harness，输出
 `..\report-assistant-build\viewer-checkpoint\publish\MxNM-Viewer-Checkpoint1.exe`
 和 SHA-256 文件；其他机器只需要复制该 EXE。生成的 standalone AHK 也位于

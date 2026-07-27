@@ -1,20 +1,32 @@
-ViewerToolHotkeyDefinitions(settings) {
+ViewerToolHotkeyDefinitions(settings, bareOnly := false) {
     definitions := []
-    if settings.ViewerArrowEnabled && settings.ViewerArrowChord != "" {
+    if settings.ViewerArrowEnabled
+        && settings.ViewerArrowChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerArrowChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-arrow",
             settings.ViewerArrowChord,
-            InvokeMxNMViewerToolHotkey.Bind("arrow")
+            InvokeMxNMViewerToolHotkey.Bind(
+                "arrow",
+                settings.ViewerArrowChord
+            )
         ))
     }
-    if settings.ViewerLengthEnabled && settings.ViewerLengthChord != "" {
+    if settings.ViewerLengthEnabled
+        && settings.ViewerLengthChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerLengthChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-length",
             settings.ViewerLengthChord,
-            InvokeMxNMViewerToolHotkey.Bind("length")
+            InvokeMxNMViewerToolHotkey.Bind(
+                "length",
+                settings.ViewerLengthChord
+            )
         ))
     }
-    if settings.ViewerSuv3DEnabled && settings.ViewerSuv3DChord != "" {
+    if settings.ViewerSuv3DEnabled
+        && settings.ViewerSuv3DChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerSuv3DChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-tool-suv3d",
             settings.ViewerSuv3DChord,
@@ -23,7 +35,9 @@ ViewerToolHotkeyDefinitions(settings) {
             )
         ))
     }
-    if settings.ViewerClearEnabled && settings.ViewerClearChord != "" {
+    if settings.ViewerClearEnabled
+        && settings.ViewerClearChord != ""
+        && ViewerHotkeyChordIsBare(settings.ViewerClearChord) = bareOnly {
         definitions.Push(HotkeyDefinition(
             "viewer-clear-annotations",
             settings.ViewerClearChord,
@@ -221,11 +235,28 @@ MxNMViewerClearContextValue(result, key, fallback := "") {
     return result.context[key]
 }
 
-InvokeMxNMViewerToolHotkey(commandName, *) {
-    result := MxNMViewerToolCommandProvider.Invoke(commandName)
-    if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
+InvokeMxNMViewerToolHotkey(commandName, chord, *) {
+    static active := false
+    if active
         return
-    Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+    try foregroundHwnd := WinExist("A")
+    catch
+        return
+    if !foregroundHwnd
+        return
+    active := true
+    try {
+        while ViewerHotkeyChordHasPressedComponent(chord)
+            Sleep 10
+        if WinExist("A") != foregroundHwnd
+            return
+        result := MxNMViewerToolCommandProvider.Invoke(commandName)
+        if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
+            return
+        Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+    } finally {
+        active := false
+    }
 }
 
 MxNMViewerToolFailureMessage(code) {

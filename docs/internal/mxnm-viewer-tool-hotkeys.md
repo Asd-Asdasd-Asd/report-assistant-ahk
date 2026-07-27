@@ -18,7 +18,7 @@
 
 AHK 动态 `Hotkey()` 原生支持 `#` 表示 Win，但 Windows common-control `Hotkey` 输入框没有 Win modifier flag，只能采集 Ctrl、Alt 和 Shift。设置页因此在每一行提供独立的 Win checkbox：加载时从 canonical chord 拆出 `#`，保存时再与 native Hotkey 值合并。
 
-Win 本身可作为安全修饰键；不使用 Win 时仍要求 Ctrl/Alt/Shift 中至少两个，避免覆盖普通单修饰键。归一化继续使用统一顺序 `^!+#`，并与 emergency/reserved 及其他已启用快捷键做不区分大小写的冲突检查。
+Ctrl、Alt、Shift、Win 中任意一个修饰键即可与主键组成快捷键。无修饰时只接受单个字母或数字，并自动缩窄为仅在 Viewer 前台注册；报告编辑器和其他程序不会拦截该单键。箭头和长度也在完整松键后单次执行，避免无修饰单键长按产生键盘重复。归一化继续使用统一顺序 `^!+#`，并与 emergency/reserved 及其他已启用快捷键做不区分大小写的冲突检查。
 
 ## F12 截图映射
 

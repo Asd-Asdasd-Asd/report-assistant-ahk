@@ -87,8 +87,9 @@ ValidateViewerToolHotkeySettings(settings) {
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键需要 Win，"
-                    . "或至少两个 Ctrl/Alt/Shift 修饰键。"
+                "“" definition.label "”快捷键需要至少一个修饰键；"
+                    . "无修饰时只能使用单个字母或数字，"
+                    . "且仅在 Viewer 前台生效。"
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -105,16 +106,21 @@ ValidateViewerToolHotkeySettings(settings) {
 }
 
 ViewerToolHotkeyChordIsSafe(chord) {
-    if !RegExMatch(String(chord), "^([!+^#]+)(.+)$", &match)
-        return false
-    if InStr(match[1], "#")
-        return true
-    modifierCount := 0
-    for modifier in ["^", "!", "+"] {
-        if InStr(match[1], modifier)
-            modifierCount += 1
-    }
-    return modifierCount >= 2
+    normalized := Trim(String(chord), " `t`r`n")
+    if RegExMatch(normalized, "^([!+^#]+)([^!+^#].*)$", &match)
+        return match[2] != ""
+    return ViewerHotkeyIsSafeBareChord(normalized)
+}
+
+ViewerHotkeyIsSafeBareChord(chord) {
+    return RegExMatch(
+        Trim(String(chord), " `t`r`n"),
+        "i)^[a-z0-9]$"
+    ) > 0
+}
+
+ViewerHotkeyChordIsBare(chord) {
+    return ViewerHotkeyIsSafeBareChord(chord)
 }
 
 MakeViewerToolHotkeyValidation(ok, field := "", message := "") {

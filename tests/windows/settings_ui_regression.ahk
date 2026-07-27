@@ -52,8 +52,20 @@ TestViewerHotkeyWinModifier() {
         "two standard modifiers were rejected"
     )
     AssertSettingsTest(
-        !ViewerToolHotkeyChordIsSafe("^1"),
-        "single standard modifier was accepted"
+        ViewerToolHotkeyChordIsSafe("^1"),
+        "single standard modifier was rejected"
+    )
+    AssertSettingsTest(
+        ViewerToolHotkeyChordIsSafe("s"),
+        "Viewer-only bare letter was rejected"
+    )
+    AssertSettingsTest(
+        ViewerToolHotkeyChordIsSafe("7"),
+        "Viewer-only bare digit was rejected"
+    )
+    AssertSettingsTest(
+        !ViewerToolHotkeyChordIsSafe("F7"),
+        "unsupported bare multi-character key was accepted"
     )
 }
 

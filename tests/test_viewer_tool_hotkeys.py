@@ -109,6 +109,57 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             source("src/mxnm_viewer_tool_commands.ahk"),
         )
         self.assertIn("MedExViewerToolForegroundActive", features)
+        self.assertIn(
+            "ViewerToolHotkeyDefinitions(settings, false)",
+            features,
+        )
+        self.assertIn(
+            "ViewerToolHotkeyDefinitions(settings, true)",
+            features,
+        )
+        self.assertIn("MedExViewerForegroundActive", features)
+
+    def test_single_modifier_and_viewer_only_bare_keys_are_supported(
+        self,
+    ) -> None:
+        normalization = source("src/feature_normalization.ahk")
+        hotkeys = source("src/viewer_tool_hotkeys.ahk")
+        features = source("src/features.ahk")
+        self.assertIn("ViewerHotkeyIsSafeBareChord", normalization)
+        self.assertIn('"i)^[a-z0-9]$"', normalization)
+        self.assertNotIn("modifierCount >= 2", normalization)
+        self.assertIn("bareOnly := false", hotkeys)
+        self.assertIn(
+            "ViewerHotkeyChordIsBare(settings.ViewerArrowChord) = bareOnly",
+            hotkeys,
+        )
+        self.assertIn(
+            "ViewerToolHotkeyDefinitions(settings, true)",
+            features,
+        )
+        self.assertIn(
+            "MedExViewerForegroundActive",
+            features,
+        )
+
+    def test_arrow_and_length_wait_for_release_to_prevent_bare_key_repeat(
+        self,
+    ) -> None:
+        hotkeys = source("src/viewer_tool_hotkeys.ahk")
+        self.assertIn(
+            'InvokeMxNMViewerToolHotkey.Bind(\n'
+            '                "arrow",',
+            hotkeys,
+        )
+        handler = hotkeys.split(
+            "InvokeMxNMViewerToolHotkey(commandName, chord, *)", 1
+        )[1]
+        self.assertIn("static active := false", handler)
+        self.assertIn(
+            "while ViewerHotkeyChordHasPressedComponent(chord)",
+            handler,
+        )
+        self.assertIn('if WinExist("A") != foregroundHwnd', handler)
 
     def test_settings_ui_exposes_all_viewer_hotkeys_and_win_modifier(self) -> None:
         ui = source("src/settings_ui.ahk")

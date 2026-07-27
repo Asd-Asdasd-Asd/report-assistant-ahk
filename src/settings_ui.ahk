@@ -156,7 +156,7 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "工具选择和清除可在报告程序或 Viewer 前台使用；截图仅在 Viewer 前台使用。"
+            "允许一个修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")
