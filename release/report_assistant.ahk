@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.1
-; Source revision: 301d51645f971a39ea5e0c9b218b2ff1c75c2d91-dirty
-; Generated at: 2026-07-27 12:30:35 UTC
+; Source revision: 4b3eda54d63e52bdfc58406db4b0dee7e02f4f37-dirty
+; Generated at: 2026-07-27 12:56:32 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.1.0
 ;@Ahk2Exe-SetProductVersion 0.6.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-27"
-    static SourceRevision := "301d51645f971a39ea5e0c9b218b2ff1c75c2d91-dirty"
+    static SourceRevision := "4b3eda54d63e52bdfc58406db4b0dee7e02f4f37-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -10930,6 +10930,7 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         }
         result.actionHwnd := actionWindowResult.hwnd
         result.actionPid := actionWindowResult.pid
+        result.actionClientPoint := actionWindowResult.clientPoint
         result.ok := true
         result.code :=
             MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION
@@ -11042,7 +11043,8 @@ MakeMxNMMeasurementTargetResult() {
         imageRect: 0,
         screenPoint: 0,
         actionHwnd: 0,
-        actionPid: 0
+        actionPid: 0,
+        actionClientPoint: 0
     }
 }
 
@@ -11352,11 +11354,40 @@ ResolveMxNMActionWindowFromPoint(
             code: MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
         }
     }
+    clientPoint := MxNMTargetScreenToClient(
+        rootHwnd,
+        screenPoint
+    )
+    if !IsObject(clientPoint) {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
+        }
+    }
     return {
         ok: true,
         code: MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION,
         hwnd: rootHwnd,
-        pid: actionPid
+        pid: actionPid,
+        clientPoint: clientPoint
+    }
+}
+
+MxNMTargetScreenToClient(hwnd, screenPoint) {
+    pointBuffer := Buffer(8, 0)
+    NumPut("Int", screenPoint.x, pointBuffer, 0)
+    NumPut("Int", screenPoint.y, pointBuffer, 4)
+    if !DllCall(
+        "User32\ScreenToClient",
+        "Ptr", hwnd,
+        "Ptr", pointBuffer.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    return {
+        x: NumGet(pointBuffer, 0, "Int"),
+        y: NumGet(pointBuffer, 4, "Int")
     }
 }
 
@@ -11637,6 +11668,7 @@ class MxNMAnnotationCleanupDefaults {
 class MxNMAnnotationCleanupCode {
     static OK := "OK"
     static TARGET_UNAVAILABLE := "TARGET_UNAVAILABLE"
+    static TARGET_CLIENT_POINT_INVALID := "TARGET_CLIENT_POINT_INVALID"
     static TARGET_CHANGED := "TARGET_CHANGED"
     static COMMAND_FAILED := "COMMAND_FAILED"
     static CONFIRMATION_REQUIRED := "CONFIRMATION_REQUIRED"
@@ -11682,7 +11714,11 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
     try {
         target := MxNMMeasurementProvider.ResolveTarget(options)
         result.context["targetCode"] := target.code
+        result.context["targetConfigCode"] := target.configCode
+        result.context["targetRuntimeFrameCandidateCount"] :=
+            target.runtimeFrameCandidateCount
         if !target.ok {
+            result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
             result.failureReason :=
                 MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
@@ -11696,12 +11732,11 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             return result
         }
 
-        clientPoint := ContextMeasurementScreenToClient(
-            target.actionHwnd,
-            target.screenPoint
-        )
+        clientPoint := target.actionClientPoint
         if !IsContextMeasurementPoint(clientPoint) {
-            result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
+            result.context["failureStage"] := "TARGET_CLIENT_POINT"
+            result.code :=
+                MxNMAnnotationCleanupCode.TARGET_CLIENT_POINT_INVALID
             result.failureReason :=
                 MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
             return result
@@ -19262,7 +19297,7 @@ InvokeMxNMViewerClearHotkey(chord, *) {
             MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY
         )
         if !result.ok
-            Flash(MxNMViewerClearFailureMessage(result.code), 1800)
+            Flash(MxNMViewerClearFailureMessage(result), 2200)
     } finally {
         active := false
     }
@@ -19297,9 +19332,24 @@ ViewerHotkeyChordHasPressedComponent(chord) {
     return false
 }
 
-MxNMViewerClearFailureMessage(code) {
+MxNMViewerClearFailureMessage(result) {
+    code := result.code
     if code = MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
-        return "未找到可清除的 Viewer 图像"
+        return "未找到可清除的 Viewer 图像（"
+            . MxNMViewerClearContextValue(
+                result,
+                "targetCode",
+                "UNKNOWN"
+            )
+            . "/"
+            . MxNMViewerClearContextValue(
+                result,
+                "targetRuntimeFrameCandidateCount",
+                0
+            )
+            . "）"
+    if code = MxNMAnnotationCleanupCode.TARGET_CLIENT_POINT_INVALID
+        return "Viewer 图像坐标转换失败，未执行清除"
     if code = MxNMAnnotationCleanupCode.TARGET_CHANGED
         return "Viewer 已变化，未执行清除"
     if code = MxNMAnnotationCleanupCode.CONFIRMATION_REQUIRED
@@ -19307,6 +19357,16 @@ MxNMViewerClearFailureMessage(code) {
     if code = MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED
         return "已执行清除，但未能确认结果"
     return "Viewer 标注清除失败"
+}
+
+MxNMViewerClearContextValue(result, key, fallback := "") {
+    if !IsObject(result)
+        || !result.HasOwnProp("context")
+        || Type(result.context) != "Map"
+        || !result.context.Has(key) {
+        return fallback
+    }
+    return result.context[key]
 }
 
 InvokeMxNMViewerToolHotkey(commandName, *) {

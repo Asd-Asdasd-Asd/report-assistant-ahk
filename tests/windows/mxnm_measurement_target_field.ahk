@@ -169,6 +169,8 @@ FormatMxNMMeasurementTargetFieldOutput(
             MxNMTargetFieldPoint(target.logicalPoint),
         "ImageRect=" MxNMTargetFieldRect(target.imageRect),
         "ScreenPoint=" MxNMTargetFieldPoint(target.screenPoint),
+        "ActionClientPoint=" .
+            MxNMTargetFieldPoint(target.actionClientPoint),
         "TargetResolutionMs=" target.targetResolutionMs,
         "ActionWindowResolved=" .
             MxNMTargetFieldBoolean(target.actionHwnd != 0),

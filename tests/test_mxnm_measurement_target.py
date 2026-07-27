@@ -105,6 +105,9 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ResolveMxNMActionWindowFromPoint(", 2
         )[-1]
         self.assertIn("rootOwnerHwnd != runtimeFrameHwnd", action_resolver)
+        self.assertIn("MxNMTargetScreenToClient", action_resolver)
+        self.assertIn("clientPoint: clientPoint", action_resolver)
+        self.assertIn("actionClientPoint", resolver)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")

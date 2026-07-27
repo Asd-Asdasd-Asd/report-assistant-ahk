@@ -181,7 +181,11 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "while ViewerHotkeyChordHasPressedComponent(chord)",
             handler,
         )
-        self.assertIn("MxNMViewerClearFailureMessage(result.code)", handler)
+        self.assertIn("MxNMViewerClearFailureMessage(result)", handler)
+        self.assertIn(
+            "TARGET_CLIENT_POINT_INVALID",
+            hotkeys,
+        )
         self.assertNotIn("21081", hotkeys)
 
     def test_suv3d_dispatches_once_after_the_chord_is_released(self) -> None:

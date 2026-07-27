@@ -143,7 +143,7 @@ InvokeMxNMViewerClearHotkey(chord, *) {
             MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY
         )
         if !result.ok
-            Flash(MxNMViewerClearFailureMessage(result.code), 1800)
+            Flash(MxNMViewerClearFailureMessage(result), 2200)
     } finally {
         active := false
     }
@@ -178,9 +178,24 @@ ViewerHotkeyChordHasPressedComponent(chord) {
     return false
 }
 
-MxNMViewerClearFailureMessage(code) {
+MxNMViewerClearFailureMessage(result) {
+    code := result.code
     if code = MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
-        return "未找到可清除的 Viewer 图像"
+        return "未找到可清除的 Viewer 图像（"
+            . MxNMViewerClearContextValue(
+                result,
+                "targetCode",
+                "UNKNOWN"
+            )
+            . "/"
+            . MxNMViewerClearContextValue(
+                result,
+                "targetRuntimeFrameCandidateCount",
+                0
+            )
+            . "）"
+    if code = MxNMAnnotationCleanupCode.TARGET_CLIENT_POINT_INVALID
+        return "Viewer 图像坐标转换失败，未执行清除"
     if code = MxNMAnnotationCleanupCode.TARGET_CHANGED
         return "Viewer 已变化，未执行清除"
     if code = MxNMAnnotationCleanupCode.CONFIRMATION_REQUIRED
@@ -188,6 +203,16 @@ MxNMViewerClearFailureMessage(code) {
     if code = MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED
         return "已执行清除，但未能确认结果"
     return "Viewer 标注清除失败"
+}
+
+MxNMViewerClearContextValue(result, key, fallback := "") {
+    if !IsObject(result)
+        || !result.HasOwnProp("context")
+        || Type(result.context) != "Map"
+        || !result.context.Has(key) {
+        return fallback
+    }
+    return result.context[key]
 }
 
 InvokeMxNMViewerToolHotkey(commandName, *) {

@@ -8,6 +8,7 @@ class MxNMAnnotationCleanupDefaults {
 class MxNMAnnotationCleanupCode {
     static OK := "OK"
     static TARGET_UNAVAILABLE := "TARGET_UNAVAILABLE"
+    static TARGET_CLIENT_POINT_INVALID := "TARGET_CLIENT_POINT_INVALID"
     static TARGET_CHANGED := "TARGET_CHANGED"
     static COMMAND_FAILED := "COMMAND_FAILED"
     static CONFIRMATION_REQUIRED := "CONFIRMATION_REQUIRED"
@@ -53,7 +54,11 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
     try {
         target := MxNMMeasurementProvider.ResolveTarget(options)
         result.context["targetCode"] := target.code
+        result.context["targetConfigCode"] := target.configCode
+        result.context["targetRuntimeFrameCandidateCount"] :=
+            target.runtimeFrameCandidateCount
         if !target.ok {
+            result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
             result.failureReason :=
                 MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
@@ -67,12 +72,11 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             return result
         }
 
-        clientPoint := ContextMeasurementScreenToClient(
-            target.actionHwnd,
-            target.screenPoint
-        )
+        clientPoint := target.actionClientPoint
         if !IsContextMeasurementPoint(clientPoint) {
-            result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
+            result.context["failureStage"] := "TARGET_CLIENT_POINT"
+            result.code :=
+                MxNMAnnotationCleanupCode.TARGET_CLIENT_POINT_INVALID
             result.failureReason :=
                 MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
             return result

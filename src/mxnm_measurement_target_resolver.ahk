@@ -151,6 +151,7 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         }
         result.actionHwnd := actionWindowResult.hwnd
         result.actionPid := actionWindowResult.pid
+        result.actionClientPoint := actionWindowResult.clientPoint
         result.ok := true
         result.code :=
             MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION
@@ -263,7 +264,8 @@ MakeMxNMMeasurementTargetResult() {
         imageRect: 0,
         screenPoint: 0,
         actionHwnd: 0,
-        actionPid: 0
+        actionPid: 0,
+        actionClientPoint: 0
     }
 }
 
@@ -573,11 +575,40 @@ ResolveMxNMActionWindowFromPoint(
             code: MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
         }
     }
+    clientPoint := MxNMTargetScreenToClient(
+        rootHwnd,
+        screenPoint
+    )
+    if !IsObject(clientPoint) {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
+        }
+    }
     return {
         ok: true,
         code: MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION,
         hwnd: rootHwnd,
-        pid: actionPid
+        pid: actionPid,
+        clientPoint: clientPoint
+    }
+}
+
+MxNMTargetScreenToClient(hwnd, screenPoint) {
+    pointBuffer := Buffer(8, 0)
+    NumPut("Int", screenPoint.x, pointBuffer, 0)
+    NumPut("Int", screenPoint.y, pointBuffer, 4)
+    if !DllCall(
+        "User32\ScreenToClient",
+        "Ptr", hwnd,
+        "Ptr", pointBuffer.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    return {
+        x: NumGet(pointBuffer, 0, "Int"),
+        y: NumGet(pointBuffer, 4, "Int")
     }
 }
 

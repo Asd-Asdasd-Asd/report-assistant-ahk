@@ -266,6 +266,16 @@ class MeasurementCaptureTests(unittest.TestCase):
             "MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY",
             cleaner,
         )
+        self.assertIn("target.actionClientPoint", cleaner)
+        self.assertIn('"failureStage"] := "TARGET_RESOLVE"', cleaner)
+        self.assertIn(
+            '"failureStage"] := "TARGET_CLIENT_POINT"',
+            cleaner,
+        )
+        self.assertNotIn(
+            "ContextMeasurementScreenToClient(",
+            cleaner,
+        )
         for forbidden in ("MouseMove", "WinActivate", "SoundBeep"):
             self.assertNotIn(forbidden, cleaner)
 
