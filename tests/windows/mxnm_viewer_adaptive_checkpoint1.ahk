@@ -11,7 +11,7 @@
 #Include ..\..\src\mxnm_viewer_runtime_probe.ahk
 
 global MXNM_ADAPTIVE_AUDIT_SESSION := 0
-global MXNM_ADAPTIVE_CHECKPOINT_VERSION := "1.1"
+global MXNM_ADAPTIVE_CHECKPOINT_VERSION := "1.2"
 
 ^!F6::BeginMxNMAdaptiveCheckpoint1()
 ^!F7::CaptureMxNMAdaptiveManualPoint()

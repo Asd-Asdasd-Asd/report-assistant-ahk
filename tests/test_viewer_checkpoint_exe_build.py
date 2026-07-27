@@ -48,8 +48,15 @@ class ViewerCheckpointExeBuildTests(unittest.TestCase):
         self.assertIn("Ahk2Exe.exe", script)
         self.assertIn("AutoHotkey64.exe", script)
         self.assertIn("medex-icon.ico", script)
+        self.assertIn("'/Validate'", script)
+        self.assertIn("'/ErrorStdOut'", script)
         self.assertIn("Start-Process", script)
         self.assertIn("-Wait", script)
+        self.assertIn("-RedirectStandardOutput", script)
+        self.assertIn("-RedirectStandardError", script)
+        self.assertIn("Write-ProcessOutput", script)
+        self.assertIn("AutoHotkey validation error", script)
+        self.assertIn("Ahk2Exe error output", script)
         self.assertIn("$compilerProcess.ExitCode", script)
         self.assertIn("$buildingItem.Length -le 0", script)
         self.assertIn("$buildingItem.LastWriteTimeUtc", script)
@@ -58,7 +65,7 @@ class ViewerCheckpointExeBuildTests(unittest.TestCase):
 
     def test_generated_script_has_exe_metadata(self) -> None:
         generated = GENERATED.read_text(encoding="utf-8")
-        self.assertIn(";@Ahk2Exe-SetFileVersion 0.0.1.1", generated)
+        self.assertIn(";@Ahk2Exe-SetFileVersion 0.0.1.2", generated)
         self.assertIn(";@Ahk2Exe-SetProductVersion 0.0.1", generated)
         self.assertIn(
             ";@Ahk2Exe-SetName MxNM Viewer Adaptive Checkpoint 1",

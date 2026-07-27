@@ -30,7 +30,7 @@ class MxNMViewerCheckpointBuildTests(unittest.TestCase):
         generated = OUTPUT.read_text(encoding="utf-8")
         self.assertNotIn("#Include", generated)
         self.assertIn("InteractionMode=READ_ONLY", generated)
-        self.assertIn('MXNM_ADAPTIVE_CHECKPOINT_VERSION := "1.1"', generated)
+        self.assertIn('MXNM_ADAPTIVE_CHECKPOINT_VERSION := "1.2"', generated)
         self.assertIn("CheckpointVersion=", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
@@ -55,6 +55,12 @@ class MxNMViewerCheckpointBuildTests(unittest.TestCase):
         self.assertIn("BuildMxNMViewerToolCommandPlan", subset)
         self.assertIn("ParseMxNMSCBtnPadCommands", subset)
         self.assertIn("MapMxNMViewerToolPointToRuntimeFrame", subset)
+        mapping = subset.split(
+            "MapMxNMViewerToolPointToRuntimeFrame(", 1
+        )[1]
+        self.assertIn("logicalPadPoint", mapping)
+        self.assertIn("return {", mapping)
+        self.assertNotIn("target :=", mapping)
         self.assertNotIn("MxNMViewerToolCommandProvider", subset)
         self.assertNotIn("DispatchMxNMViewerToolButton", subset)
         self.assertNotIn("SendMessage", subset)

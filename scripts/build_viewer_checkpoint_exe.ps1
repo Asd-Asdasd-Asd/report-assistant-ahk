@@ -14,12 +14,42 @@ $buildingExe = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.building.exe'
 $finalExe = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.exe'
 $hashFile = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.sha256.txt'
 $iconPath = Join-Path $repositoryRoot 'assets\icon\generated\medex-icon.ico'
+$validationStdoutLog = $null
+$validationStderrLog = $null
+$compilerStdoutLog = $null
+$compilerStderrLog = $null
 
 function Remove-BuildFile {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     if (Test-Path -LiteralPath $Path -PathType Leaf) {
         Remove-Item -LiteralPath $Path -Force
+    }
+}
+
+function Write-ProcessOutput {
+    param(
+        [string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [ConsoleColor]$Color = [ConsoleColor]::Gray
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or
+        -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return
+    }
+    $content = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
+    if (-not [string]::IsNullOrWhiteSpace($content)) {
+        Write-Host "${Label}:"
+        Write-Host $content.TrimEnd() -ForegroundColor $Color
+    }
+}
+
+function Remove-TemporaryLog {
+    param([string]$Path)
+
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -43,6 +73,26 @@ try {
     }
     Remove-BuildFile -Path $buildingExe
 
+    $validationStdoutLog = [System.IO.Path]::GetTempFileName()
+    $validationStderrLog = [System.IO.Path]::GetTempFileName()
+    $validationProcess = Start-Process `
+        -FilePath $BasePath `
+        -ArgumentList @(
+            '/ErrorStdOut',
+            '/Validate',
+            ('"{0}"' -f $inputScript)
+        ) `
+        -NoNewWindow `
+        -Wait `
+        -PassThru `
+        -RedirectStandardOutput $validationStdoutLog `
+        -RedirectStandardError $validationStderrLog
+    Write-ProcessOutput -Path $validationStdoutLog -Label 'AutoHotkey validation output'
+    Write-ProcessOutput -Path $validationStderrLog -Label 'AutoHotkey validation error' -Color Red
+    if ($validationProcess.ExitCode -ne 0) {
+        throw "AutoHotkey /Validate failed with exit code $($validationProcess.ExitCode)."
+    }
+
     $compileStartedUtc = [DateTime]::UtcNow
     $compilerArguments = @(
         '/in', ('"{0}"' -f $inputScript),
@@ -51,12 +101,18 @@ try {
         '/icon', ('"{0}"' -f $iconPath),
         '/silent', 'verbose'
     )
+    $compilerStdoutLog = [System.IO.Path]::GetTempFileName()
+    $compilerStderrLog = [System.IO.Path]::GetTempFileName()
     $compilerProcess = Start-Process `
         -FilePath $CompilerPath `
         -ArgumentList $compilerArguments `
         -NoNewWindow `
         -Wait `
-        -PassThru
+        -PassThru `
+        -RedirectStandardOutput $compilerStdoutLog `
+        -RedirectStandardError $compilerStderrLog
+    Write-ProcessOutput -Path $compilerStdoutLog -Label 'Ahk2Exe output'
+    Write-ProcessOutput -Path $compilerStderrLog -Label 'Ahk2Exe error output' -Color Red
     if ($compilerProcess.ExitCode -ne 0) {
         throw "Ahk2Exe failed with exit code $($compilerProcess.ExitCode)."
     }
@@ -89,10 +145,22 @@ try {
     Write-Host "SHA256:   $hash"
     Write-Host 'Only the EXE needs to be copied to target machines.'
     Write-Host '================================'
+    Remove-TemporaryLog -Path $validationStdoutLog
+    Remove-TemporaryLog -Path $validationStderrLog
+    Remove-TemporaryLog -Path $compilerStdoutLog
+    Remove-TemporaryLog -Path $compilerStderrLog
     exit 0
 }
 catch {
     Remove-BuildFile -Path $buildingExe
+    Write-ProcessOutput -Path $validationStdoutLog -Label 'AutoHotkey validation output'
+    Write-ProcessOutput -Path $validationStderrLog -Label 'AutoHotkey validation error' -Color Red
+    Write-ProcessOutput -Path $compilerStdoutLog -Label 'Ahk2Exe output'
+    Write-ProcessOutput -Path $compilerStderrLog -Label 'Ahk2Exe error output' -Color Red
+    Remove-TemporaryLog -Path $validationStdoutLog
+    Remove-TemporaryLog -Path $validationStderrLog
+    Remove-TemporaryLog -Path $compilerStdoutLog
+    Remove-TemporaryLog -Path $compilerStderrLog
     Write-Host '================================'
     Write-Host 'Viewer checkpoint EXE build failed.' -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
