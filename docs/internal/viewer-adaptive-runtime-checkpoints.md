@@ -9,6 +9,13 @@
 成本时，才发布保留相对目录的依赖包；该例外必须在 checkpoint 交付说明中
 列出依赖和代价。
 
+目标机器没有 AutoHotkey 时，在一台安装了 AutoHotkey v2 与 Ahk2Exe 的
+Windows 构建机双击 `Build Viewer Checkpoint EXE.cmd`。它只编译只读
+standalone harness，输出
+`publish-field\MxNM-Viewer-Checkpoint1.exe` 和 SHA-256 文件；其他机器只
+需要复制该 EXE。Checkpoint 1 不嵌入正式“麦旋风.exe”，避免触碰正式配置、
+singleton、托盘和功能状态。
+
 ## Checkpoint 1：Vendor profile 与 HWND 只读审计
 
 ### 实现范围
@@ -32,6 +39,8 @@
    内网发布优先使用单文件
    `tests/windows/generated/mxnm_viewer_adaptive_checkpoint1_standalone.ahk`，
    目标机器只需该文件和 AutoHotkey v2。
+   目标机器没有 AutoHotkey 时，发布
+   `publish-field\MxNM-Viewer-Checkpoint1.exe`。
 3. 按 `Ctrl+Alt+F6` 执行自动只读审计。
 4. 按提示把鼠标依次放在箭头、长度测量、3D SUV 按钮中心和任意有效图像
    内部；每次按 `Ctrl+Alt+F7`，不要点击。

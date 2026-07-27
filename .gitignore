@@ -7,6 +7,7 @@ tmp/
 screenshots/
 release/*.exe
 /publish/
+/publish-field/
 .DS_Store
 .vscode/
 .idea/
