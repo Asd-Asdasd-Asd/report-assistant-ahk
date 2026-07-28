@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.2
-; Source revision: d82c8a04604660a9b0e4f0f61f68c4e6f383d142
-; Generated at: 2026-07-27 13:45:38 UTC
+; Source revision: 7dfa1e9d0ce991c952cb9656b1de180845801c81
+; Generated at: 2026-07-28 09:22:05 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.2.0
 ;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.6.2"
     static Channel := "internal-test"
-    static BuildDate := "2026-07-27"
-    static SourceRevision := "d82c8a04604660a9b0e4f0f61f68c4e6f383d142"
+    static BuildDate := "2026-07-28"
+    static SourceRevision := "7dfa1e9d0ce991c952cb9656b1de180845801c81"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -12482,9 +12482,12 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         frameHwnd := MxNMViewerToolGetRootOwnerHwnd(
             group.parentHwnd
         )
-        runtimeFrame := FindMxNMViewerToolWindowGeometry(
+        runtimeFrame := ResolveMxNMViewerToolFrameGeometry(
             viewerWindows,
-            frameHwnd
+            frameHwnd,
+            plan.viewerExe,
+            plan.viewerProcessPath,
+            runtimePid
         )
         if !IsObject(runtimeFrame)
             continue
@@ -12560,6 +12563,143 @@ FindMxNMViewerToolWindowGeometry(viewerWindows, hwnd) {
             return viewerWindow
     }
     return 0
+}
+
+ResolveMxNMViewerToolFrameGeometry(
+    viewerWindows,
+    hwnd,
+    viewerExe,
+    expectedProcessPath,
+    runtimePid
+) {
+    runtimeFrame := FindMxNMViewerToolWindowGeometry(
+        viewerWindows,
+        hwnd
+    )
+    if IsObject(runtimeFrame)
+        return runtimeFrame
+    if !hwnd || !runtimePid
+        return 0
+    if !DllCall(
+        "User32\IsWindow",
+        "Ptr", hwnd,
+        "Int"
+    ) {
+        return 0
+    }
+    ownerPid := 0
+    try DllCall(
+        "User32\GetWindowThreadProcessId",
+        "Ptr", hwnd,
+        "UInt*", &ownerPid,
+        "UInt"
+    )
+    catch
+        return 0
+    if ownerPid != runtimePid
+        return 0
+    if MxNMViewerToolGetRootOwnerHwnd(hwnd) != hwnd
+        return 0
+    if !MxNMViewerToolRuntimeProcessMatchesPlan(
+        viewerWindows,
+        runtimePid,
+        viewerExe,
+        expectedProcessPath
+    ) {
+        return 0
+    }
+
+    return CaptureMxNMViewerToolWindowGeometry(hwnd)
+}
+
+MxNMViewerToolRuntimeProcessMatchesPlan(
+    viewerWindows,
+    runtimePid,
+    viewerExe,
+    expectedProcessPath
+) {
+    normalizedExpectedPath := StrLower(
+        NormalizeMxNMConfigPath(expectedProcessPath)
+    )
+    if !runtimePid || normalizedExpectedPath = ""
+        return false
+    for viewerWindow in viewerWindows {
+        try candidatePid := WinGetPID(
+            "ahk_id " viewerWindow.hwnd
+        )
+        catch
+            candidatePid := 0
+        if candidatePid != runtimePid
+            continue
+        try processPath := WinGetProcessPath(
+            "ahk_id " viewerWindow.hwnd
+        )
+        catch
+            processPath := ""
+        try processName := WinGetProcessName(
+            "ahk_id " viewerWindow.hwnd
+        )
+        catch
+            processName := ""
+        if StrLower(NormalizeMxNMConfigPath(processPath))
+                = normalizedExpectedPath
+            && StrLower(processName) = StrLower(viewerExe) {
+            return true
+        }
+    }
+    return false
+}
+
+CaptureMxNMViewerToolWindowGeometry(hwnd) {
+    windowRect := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetWindowRect",
+        "Ptr", hwnd,
+        "Ptr", windowRect.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    windowX := NumGet(windowRect, 0, "Int")
+    windowY := NumGet(windowRect, 4, "Int")
+    windowWidth := NumGet(windowRect, 8, "Int") - windowX
+    windowHeight := NumGet(windowRect, 12, "Int") - windowY
+    if windowWidth <= 0 || windowHeight <= 0
+        return 0
+
+    clientRect := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetClientRect",
+        "Ptr", hwnd,
+        "Ptr", clientRect.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    clientOrigin := Buffer(8, 0)
+    if !DllCall(
+        "User32\ClientToScreen",
+        "Ptr", hwnd,
+        "Ptr", clientOrigin.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    clientWidth := NumGet(clientRect, 8, "Int")
+    clientHeight := NumGet(clientRect, 12, "Int")
+    if clientWidth <= 0 || clientHeight <= 0
+        return 0
+    return {
+        hwnd: hwnd,
+        windowX: windowX,
+        windowY: windowY,
+        windowWidth: windowWidth,
+        windowHeight: windowHeight,
+        clientX: NumGet(clientOrigin, 0, "Int"),
+        clientY: NumGet(clientOrigin, 4, "Int"),
+        clientWidth: clientWidth,
+        clientHeight: clientHeight
+    }
 }
 
 EnumerateMxNMViewerToolControlCandidates(
