@@ -86,6 +86,8 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "MxNMPointClearanceAcrossLayouts",
             "minimumRequiredClearance",
             "ResolveMxNMRuntimeImageTarget",
+            "BuildMxNMRuntimeOwnerFrameCandidates",
+            "CaptureMxNMRuntimeOwnerFrame",
             "ResolveMxNMRootOwnerFromPoint",
             "ResolveMxNMActionWindowFromPoint",
             "WindowFromPoint",
@@ -108,6 +110,8 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("bestCount != 1", runtime_resolver)
         self.assertIn("bestScore < 2", runtime_resolver)
         self.assertIn("ResolveMxNMRootOwnerHwnd", runtime_resolver)
+        self.assertIn("GetWindowThreadProcessId", runtime_resolver)
+        self.assertIn("GetWindowRect", runtime_resolver)
         action_resolver = resolver.split(
             "ResolveMxNMActionWindowFromPoint(", 2
         )[-1]

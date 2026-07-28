@@ -1638,7 +1638,10 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         return failure
     }
     candidates := []
-    for candidateFrame in viewerWindows {
+    runtimeFrames := BuildMxNMRuntimeOwnerFrameCandidates(
+        viewerWindows
+    )
+    for candidateFrame in runtimeFrames {
         mappedImage := MapMxNMLogicalImageRectToRuntime(
             plan.mainGeometry,
             candidateFrame
@@ -1680,6 +1683,62 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         frame: selected.candidate.frame,
         imageRect: selected.candidate.imageRect,
         screenPoint: selected.candidate.screenPoint
+    }
+}
+
+BuildMxNMRuntimeOwnerFrameCandidates(viewerWindows) {
+    frames := []
+    seen := Map()
+    for viewerWindow in viewerWindows {
+        ownerHwnd := ResolveMxNMRootOwnerHwnd(viewerWindow.hwnd)
+        if !ownerHwnd || seen.Has(ownerHwnd)
+            continue
+        viewerPid := MxNMTargetWindowPid(viewerWindow.hwnd)
+        if !viewerPid || MxNMTargetWindowPid(ownerHwnd) != viewerPid
+            continue
+        if ResolveMxNMRootOwnerHwnd(ownerHwnd) != ownerHwnd
+            continue
+        ownerFrame := CaptureMxNMRuntimeOwnerFrame(ownerHwnd)
+        if !IsObject(ownerFrame)
+            continue
+        seen[ownerHwnd] := true
+        frames.Push(ownerFrame)
+    }
+    return frames
+}
+
+CaptureMxNMRuntimeOwnerFrame(hwnd) {
+    windowRect := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetWindowRect",
+        "Ptr", hwnd,
+        "Ptr", windowRect.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    windowX := NumGet(windowRect, 0, "Int")
+    windowY := NumGet(windowRect, 4, "Int")
+    windowWidth := NumGet(windowRect, 8, "Int") - windowX
+    windowHeight := NumGet(windowRect, 12, "Int") - windowY
+    if windowWidth <= 0 || windowHeight <= 0
+        return 0
+    clientRect := MxNMTargetClientRectScreen(hwnd)
+    if !IsObject(clientRect)
+        || clientRect.right <= clientRect.left
+        || clientRect.bottom <= clientRect.top {
+        return 0
+    }
+    return {
+        hwnd: hwnd,
+        windowX: windowX,
+        windowY: windowY,
+        windowWidth: windowWidth,
+        windowHeight: windowHeight,
+        clientX: clientRect.left,
+        clientY: clientRect.top,
+        clientWidth: clientRect.right - clientRect.left,
+        clientHeight: clientRect.bottom - clientRect.top
     }
 }
 
@@ -1772,6 +1831,21 @@ ResolveMxNMRootOwnerHwnd(hwnd) {
     )
     catch
         return 0
+}
+
+MxNMTargetWindowPid(hwnd) {
+    if !hwnd
+        return 0
+    pid := 0
+    try DllCall(
+        "User32\GetWindowThreadProcessId",
+        "Ptr", hwnd,
+        "UInt*", &pid,
+        "UInt"
+    )
+    catch
+        return 0
+    return pid
 }
 
 IsReusableMxNMMeasurementTargetPlan(plan, viewerExe) {
@@ -2091,10 +2165,7 @@ ResolveMxNMActionWindowFromPoint(
     catch {
         actionPid := 0
     }
-    try runtimePid := WinGetPID("ahk_id " runtimeFrameHwnd)
-    catch {
-        runtimePid := 0
-    }
+    runtimePid := MxNMTargetWindowPid(runtimeFrameHwnd)
     if StrLower(processName) != StrLower(viewerExe)
         || !actionPid
         || actionPid != runtimePid
