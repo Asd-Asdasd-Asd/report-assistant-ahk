@@ -4,13 +4,9 @@
 
 #Include ..\..\src\config.example.ahk
 #Include ..\..\src\app_config.ahk
-#Include ..\..\src\utils.ahk
-#Include ..\..\src\visual_feedback.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_config_path_cache.ahk
 #Include ..\..\src\mxnm_viewer_tool_commands.ahk
-#Include ..\..\src\feature_model.ahk
-#Include ..\..\src\viewer_tool_hotkeys.ahk
 
 ^!F9::RunMxNMViewerToolCommandField("arrow")
 ^!F10::RunMxNMViewerToolCommandField("length")
@@ -57,7 +53,8 @@ RunMxNMViewerToolCommandField(commandName) {
             . MxNMViewerToolFieldBool(
                 mouseBeforeX = mouseAfterX
                 && mouseBeforeY = mouseAfterY
-            ) "`r`n",
+            ) "`r`n"
+        . BuildMxNMViewerToolResolverAudit(),
         outputPath,
         "UTF-8"
     )
@@ -78,4 +75,142 @@ MxNMViewerToolFieldPoint(point) {
     if !IsObject(point)
         return ""
     return point.x "," point.y
+}
+
+BuildMxNMViewerToolResolverAudit() {
+    viewerExe := MxNMConfigGeometryDefaults.ViewerExe
+    plan := MxNMViewerToolCommandProvider.ResolvePlan(viewerExe)
+    output :=
+        "ResolverPlanState=" plan.code "`r`n"
+    if !plan.ok
+        return output
+    output .=
+        "ResolverPlanPad=" plan.padX "," plan.padY "`r`n"
+        . "ResolverPlanFrame="
+            . plan.mainGeometry.frameWidth ","
+            . plan.mainGeometry.frameHeight "`r`n"
+
+    viewerWindows := CaptureMxNMViewerWindowGeometry(
+        viewerExe,
+        plan.viewerProcessPath
+    )
+    output .= "ResolverViewerWindowCount="
+        . viewerWindows.Length "`r`n"
+    processResult := ResolveMxNMViewerToolProcess(viewerWindows)
+    output .= "ResolverProcessState=" processResult.code "`r`n"
+    if !processResult.ok
+        return output
+
+    commandKeyById := Map()
+    for commandKey, command in plan.commands
+        commandKeyById[command.commandId] := commandKey
+    candidates := EnumerateMxNMViewerToolControlCandidates(
+        viewerWindows,
+        processResult.pid,
+        commandKeyById
+    )
+    output .= "ResolverCandidateCount=" candidates.Length "`r`n"
+    groups := Map()
+    for candidate in candidates {
+        output .=
+            "ResolverCandidate="
+            . candidate.commandKey
+            . "|id=" candidate.controlId
+            . "|hwnd=" candidate.hwnd
+            . "|parent=" candidate.parentHwnd
+            . "|root=" candidate.rootHwnd
+            . "|rect=" MxNMViewerToolFieldRect(candidate.rect)
+            . "|parentRect="
+                . MxNMViewerToolFieldRect(candidate.parentRect)
+            . "`r`n"
+        if !groups.Has(candidate.parentHwnd) {
+            groups[candidate.parentHwnd] := {
+                parentHwnd: candidate.parentHwnd,
+                parentRect: candidate.parentRect,
+                controls: Map()
+            }
+        }
+        group := groups[candidate.parentHwnd]
+        if !group.controls.Has(candidate.commandKey)
+            group.controls[candidate.commandKey] := []
+        group.controls[candidate.commandKey].Push(candidate)
+    }
+
+    for _, group in groups {
+        controls := Map()
+        complete := true
+        counts := []
+        for commandKey, _ in plan.commands {
+            count := group.controls.Has(commandKey)
+                ? group.controls[commandKey].Length
+                : 0
+            counts.Push(commandKey ":" count)
+            if count != 1 {
+                complete := false
+                continue
+            }
+            controls[commandKey] := group.controls[commandKey][1]
+        }
+        layoutValid := complete
+            && ValidateMxNMViewerToolControlLayout(
+                plan.commands,
+                controls,
+                group.parentRect
+            )
+        frameHwnd := MxNMViewerToolGetRootOwnerHwnd(
+            group.parentHwnd
+        )
+        runtimeFrame := FindMxNMViewerToolWindowGeometry(
+            viewerWindows,
+            frameHwnd
+        )
+        frameFound := IsObject(runtimeFrame)
+        padOrigin := frameFound
+            ? MapMxNMViewerToolPadOriginToRuntimeFrame(
+                {x: plan.padX, y: plan.padY},
+                plan.mainGeometry,
+                runtimeFrame
+            )
+            : 0
+        anchorValid := layoutValid
+            && frameFound
+            && MxNMViewerToolPanelMatchesPadOrigin(
+                group.parentHwnd,
+                group.parentRect,
+                padOrigin,
+                runtimeFrame,
+                processResult.pid
+            )
+        output .=
+            "ResolverGroup="
+            . group.parentHwnd
+            . "|counts=" MxNMViewerToolFieldJoin(counts, ",")
+            . "|complete=" MxNMViewerToolFieldBool(complete)
+            . "|layoutValid="
+                . MxNMViewerToolFieldBool(layoutValid)
+            . "|rootOwner=" frameHwnd
+            . "|frameFound=" MxNMViewerToolFieldBool(frameFound)
+            . "|panelRect="
+                . MxNMViewerToolFieldRect(group.parentRect)
+            . "|expectedPad="
+                . MxNMViewerToolFieldPoint(padOrigin)
+            . "|anchorValid="
+                . MxNMViewerToolFieldBool(anchorValid)
+            . "`r`n"
+    }
+    return output
+}
+
+MxNMViewerToolFieldRect(rect) {
+    if !IsObject(rect)
+        return ""
+    return rect.left "," rect.top ","
+        . rect.right "," rect.bottom
+}
+
+MxNMViewerToolFieldJoin(values, separator) {
+    output := ""
+    for index, value in values
+        output .= (index = 1 ? "" : separator) value
+    return output
 }
