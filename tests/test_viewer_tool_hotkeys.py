@@ -84,7 +84,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "PanelOriginToleranceRatio",
             "PanelOriginToleranceMaxPx",
             "MxNMViewerToolGetRootOwnerHwnd",
-            "FindMxNMViewerToolWindowGeometry",
+            "ResolveMxNMViewerToolFrameGeometry",
             "ValidateMxNMViewerToolControlLayout",
             "validGroups.Length != 1",
         ):
@@ -96,6 +96,31 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             resolver,
         )
         self.assertNotIn("WindowFromPoint", resolver)
+
+    def test_tool_frame_can_be_validated_outside_visible_snapshot(self) -> None:
+        commands = source("src/mxnm_viewer_tool_commands.ahk")
+        direct = commands.split(
+            "\nResolveMxNMViewerToolFrameGeometry(", 1
+        )[1].split(
+            "\nEnumerateMxNMViewerToolControlCandidates(", 1
+        )[0]
+        for required in (
+            "FindMxNMViewerToolWindowGeometry",
+            "GetWindowThreadProcessId",
+            "ownerPid != runtimePid",
+            "MxNMViewerToolGetRootOwnerHwnd(hwnd) != hwnd",
+            "MxNMViewerToolRuntimeProcessMatchesPlan",
+            "NormalizeMxNMConfigPath(expectedProcessPath)",
+            "WinGetProcessPath",
+            "WinGetProcessName",
+            "CaptureMxNMViewerToolWindowGeometry",
+            "GetWindowRect",
+            "GetClientRect",
+            "ClientToScreen",
+        ):
+            self.assertIn(required, direct)
+        self.assertNotIn("WinActivate", direct)
+        self.assertNotIn("DetectHiddenWindows", direct)
 
     def test_hotkeys_are_disabled_by_default_and_medex_scoped(self) -> None:
         model = source("src/feature_model.ahk")

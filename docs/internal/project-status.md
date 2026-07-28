@@ -49,7 +49,7 @@
 - `删除全部标注` field path：`CleanupState=OK`、command invoked、无 confirmation、复查 `NOT_ANNOTATED`，foreground/mouse 均保持不变。
 - 长短轴 workflow 已在 Windows 完成端到端验证并由用户确认通过。
 - Config-only measurement target：无 UIA、无 warmup timer、无周期轮询的启动缓存和按次 runtime mapping 已通过当前工作站复验。
-- 多台机器的箭头、长度和 3D SUV 各连续测试 10 次通过；native control-set resolver 不再依赖原工作站按钮间距。
+- 多台机器的箭头、长度和 3D SUV 各连续测试 10 次通过；native control-set resolver 不再依赖原工作站按钮间距。2026-07-28 原工作站发现合法工具面板的 root owner 不在可见 Viewer snapshot 中；direct validated-owner geometry 补丁已实现并等待该机正式 EXE 复验。
 - 主图区激活产生额外同进程顶层窗口的机器上，owner-family resolver 已恢复唯一目标；独立清除快捷键现场验证成功。
 - 单修饰键、Viewer-only 无修饰字母/数字、Win modifier 设置持久化、F12 pulse 仍需随 v0.6.2 EXE 做最终 Windows smoke test。
 

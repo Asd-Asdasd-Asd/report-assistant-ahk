@@ -157,6 +157,19 @@ Checkpoint 1 通过，可以进入 Checkpoint 2。现有证据支持继续采用
 
 ## Checkpoint 3：自适应测量与用户自校验兜底
 
+### 2026-07-28 原工作站最终构建回归
+
+v0.6.2 最终构建在原工作站返回 `BUTTON_LAYOUT_INVALID`。扩展后的 field
+日志证明主工具面板三个目标 ID 均唯一、visible/enabled、顺序正确，
+`layoutValid=true`，但面板的 `GA_ROOTOWNER` 未出现在可见 Viewer window
+snapshot 中，因 `frameFound=false` 被错误淘汰。
+
+修复保留原 control-set、PID、进程名、完整路径、root-owner、panel origin
+和几何校验；仅在 snapshot lookup 失败时，允许对同一已验证 Viewer PID 的
+真正 root owner 直接读取 window/client rect。该补丁需要在原工作站使用
+正式 EXE 复测三项工具，并确认 field 日志为
+`snapshotFrameFound=false`、`frameFound=true`、`anchorValid=true`。
+
 ### Checkpoint 3A：主图区激活状态的 outer frame
 
 Checkpoint 2 现场确认工具按钮修复通过，但右键清除在主图区激活状态仍返回
