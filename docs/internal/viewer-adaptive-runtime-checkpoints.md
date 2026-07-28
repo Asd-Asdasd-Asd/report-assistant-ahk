@@ -164,11 +164,13 @@ v0.6.2 最终构建在原工作站返回 `BUTTON_LAYOUT_INVALID`。扩展后的 
 `layoutValid=true`，但面板的 `GA_ROOTOWNER` 未出现在可见 Viewer window
 snapshot 中，因 `frameFound=false` 被错误淘汰。
 
-修复保留原 control-set、PID、进程名、完整路径、root-owner、panel origin
-和几何校验；仅在 snapshot lookup 失败时，允许对同一已验证 Viewer PID 的
-真正 root owner 直接读取 window/client rect。该补丁需要在原工作站使用
-正式 EXE 复测三项工具，并确认 field 日志为
-`snapshotFrameFound=false`、`frameFound=true`、`anchorValid=true`。
+第一次补丁尝试直接读取同 PID root owner 的 window/client rect，但现场仍
+返回布局校验失败。这证明按钮 dispatch 不应再被 outer-frame membership
+或 panel-origin geometry 否决。最终规则保留精确 command ID、同 PID、
+visible/enabled、原生 `Button`、共同直接父面板、配置顺序和完整组唯一性；
+Viewer 顶层窗口数量、root owner 和 `SCBtnPadPos` 只保留为诊断证据。该补丁
+需要在原工作站使用正式 EXE 复测三项工具，并确认 field 日志中主组
+`selectionEligible=true`、最终 `State=READY`。
 
 ### Checkpoint 3A：主图区激活状态的 outer frame
 

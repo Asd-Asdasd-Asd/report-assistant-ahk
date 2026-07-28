@@ -1109,34 +1109,10 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         ) {
             continue
         }
-        frameHwnd := MxNMViewerToolGetRootOwnerHwnd(
-            group.parentHwnd
-        )
-        runtimeFrame := ResolveMxNMViewerToolFrameGeometry(
-            viewerWindows,
-            frameHwnd,
-            plan.viewerExe,
-            plan.viewerProcessPath,
-            runtimePid
-        )
-        if !IsObject(runtimeFrame)
-            continue
-        padOrigin := MapMxNMViewerToolPadOriginToRuntimeFrame(
-            {x: plan.padX, y: plan.padY},
-            plan.mainGeometry,
-            runtimeFrame
-        )
-        if !MxNMViewerToolPanelMatchesPadOrigin(
-            group.parentHwnd,
-            group.parentRect,
-            padOrigin,
-            runtimeFrame,
-            runtimePid
-        ) {
-            continue
-        }
         validGroups.Push({
-            frame: runtimeFrame,
+            frameHwnd: MxNMViewerToolGetRootOwnerHwnd(
+                group.parentHwnd
+            ),
             panelHwnd: group.parentHwnd,
             controls: controls
         })
@@ -1150,8 +1126,7 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     return {
         ok: true,
         code: MxNMViewerToolCode.READY,
-        frameHwnd: validGroups[1].frame.hwnd,
-        frame: validGroups[1].frame,
+        frameHwnd: validGroups[1].frameHwnd,
         panelHwnd: validGroups[1].panelHwnd,
         candidateCount: candidates.Length,
         controls: validGroups[1].controls
@@ -1193,143 +1168,6 @@ FindMxNMViewerToolWindowGeometry(viewerWindows, hwnd) {
             return viewerWindow
     }
     return 0
-}
-
-ResolveMxNMViewerToolFrameGeometry(
-    viewerWindows,
-    hwnd,
-    viewerExe,
-    expectedProcessPath,
-    runtimePid
-) {
-    runtimeFrame := FindMxNMViewerToolWindowGeometry(
-        viewerWindows,
-        hwnd
-    )
-    if IsObject(runtimeFrame)
-        return runtimeFrame
-    if !hwnd || !runtimePid
-        return 0
-    if !DllCall(
-        "User32\IsWindow",
-        "Ptr", hwnd,
-        "Int"
-    ) {
-        return 0
-    }
-    ownerPid := 0
-    try DllCall(
-        "User32\GetWindowThreadProcessId",
-        "Ptr", hwnd,
-        "UInt*", &ownerPid,
-        "UInt"
-    )
-    catch
-        return 0
-    if ownerPid != runtimePid
-        return 0
-    if MxNMViewerToolGetRootOwnerHwnd(hwnd) != hwnd
-        return 0
-    if !MxNMViewerToolRuntimeProcessMatchesPlan(
-        viewerWindows,
-        runtimePid,
-        viewerExe,
-        expectedProcessPath
-    ) {
-        return 0
-    }
-
-    return CaptureMxNMViewerToolWindowGeometry(hwnd)
-}
-
-MxNMViewerToolRuntimeProcessMatchesPlan(
-    viewerWindows,
-    runtimePid,
-    viewerExe,
-    expectedProcessPath
-) {
-    normalizedExpectedPath := StrLower(
-        NormalizeMxNMConfigPath(expectedProcessPath)
-    )
-    if !runtimePid || normalizedExpectedPath = ""
-        return false
-    for viewerWindow in viewerWindows {
-        try candidatePid := WinGetPID(
-            "ahk_id " viewerWindow.hwnd
-        )
-        catch
-            candidatePid := 0
-        if candidatePid != runtimePid
-            continue
-        try processPath := WinGetProcessPath(
-            "ahk_id " viewerWindow.hwnd
-        )
-        catch
-            processPath := ""
-        try processName := WinGetProcessName(
-            "ahk_id " viewerWindow.hwnd
-        )
-        catch
-            processName := ""
-        if StrLower(NormalizeMxNMConfigPath(processPath))
-                = normalizedExpectedPath
-            && StrLower(processName) = StrLower(viewerExe) {
-            return true
-        }
-    }
-    return false
-}
-
-CaptureMxNMViewerToolWindowGeometry(hwnd) {
-    windowRect := Buffer(16, 0)
-    if !DllCall(
-        "User32\GetWindowRect",
-        "Ptr", hwnd,
-        "Ptr", windowRect.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    windowX := NumGet(windowRect, 0, "Int")
-    windowY := NumGet(windowRect, 4, "Int")
-    windowWidth := NumGet(windowRect, 8, "Int") - windowX
-    windowHeight := NumGet(windowRect, 12, "Int") - windowY
-    if windowWidth <= 0 || windowHeight <= 0
-        return 0
-
-    clientRect := Buffer(16, 0)
-    if !DllCall(
-        "User32\GetClientRect",
-        "Ptr", hwnd,
-        "Ptr", clientRect.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    clientOrigin := Buffer(8, 0)
-    if !DllCall(
-        "User32\ClientToScreen",
-        "Ptr", hwnd,
-        "Ptr", clientOrigin.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    clientWidth := NumGet(clientRect, 8, "Int")
-    clientHeight := NumGet(clientRect, 12, "Int")
-    if clientWidth <= 0 || clientHeight <= 0
-        return 0
-    return {
-        hwnd: hwnd,
-        windowX: windowX,
-        windowY: windowY,
-        windowWidth: windowWidth,
-        windowHeight: windowHeight,
-        clientX: NumGet(clientOrigin, 0, "Int"),
-        clientY: NumGet(clientOrigin, 4, "Int"),
-        clientWidth: clientWidth,
-        clientHeight: clientHeight
-    }
 }
 
 EnumerateMxNMViewerToolControlCandidates(

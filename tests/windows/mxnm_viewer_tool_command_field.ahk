@@ -164,13 +164,7 @@ BuildMxNMViewerToolResolverAudit() {
             viewerWindows,
             frameHwnd
         )
-        runtimeFrame := ResolveMxNMViewerToolFrameGeometry(
-            viewerWindows,
-            frameHwnd,
-            plan.viewerExe,
-            plan.viewerProcessPath,
-            processResult.pid
-        )
+        runtimeFrame := snapshotFrame
         snapshotFrameFound := IsObject(snapshotFrame)
         frameFound := IsObject(runtimeFrame)
         padOrigin := frameFound
@@ -195,6 +189,8 @@ BuildMxNMViewerToolResolverAudit() {
             . "|counts=" MxNMViewerToolFieldJoin(counts, ",")
             . "|complete=" MxNMViewerToolFieldBool(complete)
             . "|layoutValid="
+                . MxNMViewerToolFieldBool(layoutValid)
+            . "|selectionEligible="
                 . MxNMViewerToolFieldBool(layoutValid)
             . "|rootOwner=" frameHwnd
             . "|snapshotFrameFound="

@@ -58,25 +58,22 @@ production 因此在 hotkey key-down 后等待主键及所有声明 modifier 完
    visible/enabled 且 class 为 `Button` 的候选。
 2. 按直接父窗口分组，要求三个目标 ID 在同一面板内各唯一出现一次，实际
    控件顺序与 Vendor row/column 顺序一致。
-3. 从候选父面板沿 `GA_ROOTOWNER` 取得 outer Viewer。优先复用已验证进程
-   窗口集合中的 rect；若 owner 不在可见窗口 snapshot 中，则要求它仍是
-   同一已验证 Viewer PID 的真正 root owner，并经同 PID 可见窗口再次核对
-   进程名和完整路径后，直接读取该 owner 的 window/client rect。
-4. 将 Vendor 按钮面板原点按 logical frame → outer Viewer 比例映射，校验
-   父面板实际左上角与 `SCBtnPadPos` 映射
-   一致。
-5. 向按钮的直接父窗口发送带 250 ms 上限的同步 `WM_COMMAND / BN_CLICKED`。
+3. 只接受唯一一组完整且顺序有效的原生按钮；不完整的旧/备用面板忽略，
+   两组完整可见面板仍 fail closed。
+4. 向按钮的直接父窗口发送带 250 ms 上限的同步 `WM_COMMAND / BN_CLICKED`。
 
 正常路径不移动鼠标、不切换前台窗口，也不需要 hover。250 ms 是窗口失去响应时的等待上限，不是固定延迟；正常投递会立即返回。
 
 2026-07-28 当前工作站回归发现，三个目标按钮组成的主面板可以同时满足唯一
 ID、可见/启用、顺序和面板原点校验，但其 `GA_ROOTOWNER` 不出现在
 `WinGetList` 的可见 Viewer snapshot 中。旧 resolver 因
-`frameFound=false` 错误淘汰该合法组。当前实现不再把 snapshot membership
-当作 owner 身份本身；direct fallback 仍要求 HWND 有效、owner PID 与已验证
-Viewer PID 相同、该 HWND 自身确为 root owner、进程名和完整路径匹配，并且
-window/client rect 均有效。跨进程 owner、错误路径和无有效几何继续 fail
-closed。
+`frameFound=false` 错误淘汰该合法组。进一步现场复测表明，即使直接读取
+owner geometry，outer-frame/panel-origin 仍会产生与按钮身份无关的 false
+negative。当前工具命令因此只让精确 command ID、同 PID、visible/enabled、
+原生 `Button`、共同直接父面板、配置顺序和完整组唯一性决定是否派发。
+Viewer 顶层窗口数量、root-owner snapshot membership 和 `SCBtnPadPos`
+不再拥有否决权。跨 PID、错误 control ID、不完整组、顺序错误和多组完整
+可见按钮仍继续 fail closed。
 
 ## 面板映射与实际控件
 
