@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.2
-; Source revision: fb7805c6e80197e41b122740c4ddd85628feda48
-; Generated at: 2026-07-28 09:30:00 UTC
+; Source revision: 0a1e95f7c617f5930d7cbf7dfb00c4ac1103d3d3
+; Generated at: 2026-07-28 09:43:13 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.2.0
 ;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.2"
     static Channel := "internal-test"
     static BuildDate := "2026-07-28"
-    static SourceRevision := "fb7805c6e80197e41b122740c4ddd85628feda48"
+    static SourceRevision := "0a1e95f7c617f5930d7cbf7dfb00c4ac1103d3d3"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -10959,7 +10959,10 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         return failure
     }
     candidates := []
-    for candidateFrame in viewerWindows {
+    runtimeFrames := BuildMxNMRuntimeOwnerFrameCandidates(
+        viewerWindows
+    )
+    for candidateFrame in runtimeFrames {
         mappedImage := MapMxNMLogicalImageRectToRuntime(
             plan.mainGeometry,
             candidateFrame
@@ -11001,6 +11004,62 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         frame: selected.candidate.frame,
         imageRect: selected.candidate.imageRect,
         screenPoint: selected.candidate.screenPoint
+    }
+}
+
+BuildMxNMRuntimeOwnerFrameCandidates(viewerWindows) {
+    frames := []
+    seen := Map()
+    for viewerWindow in viewerWindows {
+        ownerHwnd := ResolveMxNMRootOwnerHwnd(viewerWindow.hwnd)
+        if !ownerHwnd || seen.Has(ownerHwnd)
+            continue
+        viewerPid := MxNMTargetWindowPid(viewerWindow.hwnd)
+        if !viewerPid || MxNMTargetWindowPid(ownerHwnd) != viewerPid
+            continue
+        if ResolveMxNMRootOwnerHwnd(ownerHwnd) != ownerHwnd
+            continue
+        ownerFrame := CaptureMxNMRuntimeOwnerFrame(ownerHwnd)
+        if !IsObject(ownerFrame)
+            continue
+        seen[ownerHwnd] := true
+        frames.Push(ownerFrame)
+    }
+    return frames
+}
+
+CaptureMxNMRuntimeOwnerFrame(hwnd) {
+    windowRect := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetWindowRect",
+        "Ptr", hwnd,
+        "Ptr", windowRect.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    windowX := NumGet(windowRect, 0, "Int")
+    windowY := NumGet(windowRect, 4, "Int")
+    windowWidth := NumGet(windowRect, 8, "Int") - windowX
+    windowHeight := NumGet(windowRect, 12, "Int") - windowY
+    if windowWidth <= 0 || windowHeight <= 0
+        return 0
+    clientRect := MxNMTargetClientRectScreen(hwnd)
+    if !IsObject(clientRect)
+        || clientRect.right <= clientRect.left
+        || clientRect.bottom <= clientRect.top {
+        return 0
+    }
+    return {
+        hwnd: hwnd,
+        windowX: windowX,
+        windowY: windowY,
+        windowWidth: windowWidth,
+        windowHeight: windowHeight,
+        clientX: clientRect.left,
+        clientY: clientRect.top,
+        clientWidth: clientRect.right - clientRect.left,
+        clientHeight: clientRect.bottom - clientRect.top
     }
 }
 
@@ -11093,6 +11152,21 @@ ResolveMxNMRootOwnerHwnd(hwnd) {
     )
     catch
         return 0
+}
+
+MxNMTargetWindowPid(hwnd) {
+    if !hwnd
+        return 0
+    pid := 0
+    try DllCall(
+        "User32\GetWindowThreadProcessId",
+        "Ptr", hwnd,
+        "UInt*", &pid,
+        "UInt"
+    )
+    catch
+        return 0
+    return pid
 }
 
 IsReusableMxNMMeasurementTargetPlan(plan, viewerExe) {
@@ -11412,10 +11486,7 @@ ResolveMxNMActionWindowFromPoint(
     catch {
         actionPid := 0
     }
-    try runtimePid := WinGetPID("ahk_id " runtimeFrameHwnd)
-    catch {
-        runtimePid := 0
-    }
+    runtimePid := MxNMTargetWindowPid(runtimeFrameHwnd)
     if StrLower(processName) != StrLower(viewerExe)
         || !actionPid
         || actionPid != runtimePid
