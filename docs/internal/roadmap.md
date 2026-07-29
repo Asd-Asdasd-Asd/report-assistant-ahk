@@ -1,236 +1,47 @@
 # 路线图
 
-版本号用于内部沟通和发布节奏，不代表已经适合科室范围推广。
-
-## 长期发布策略
-
-源码继续采用模块化 AHK v2，并保留可生成的单文件 `.ahk` 作为调试产物。这样便于审查 diff、定位问题，也便于在 Windows 工作站上快速验证。
-
-v0.5.0 内测阶段开始增加 internal-test executable，降低普通用户的安装门槛；`.ahk` release 继续作为维护和诊断产物，不作为普通用户配置入口。
-
-用户配置从 v0.5.0 起放在应用二进制和 source release 之外，并在更新时保留。每次 internal release 必须同时提供简单中文用户说明和中文维护/更新说明。
-
-后续产品化阶段可以再加入完整 tray menu、version display、calibration mode、diagnostics export 和更容易远程支持的工具。
-
-Executable 只改变交付形式，不改变源代码真相来源或配置保存位置。初始内测采用 portable single-EXE，不提供 installer、固定安装路径、自动更新、旧 EXE backup 或 rollback system。
-
-## v0.1.0 项目初始化
-
-目标：建立可维护的项目骨架。
-
-范围：
-
-- 创建 `src/`、`legacy/`、`docs/`、`scripts/`、`release/`、`tests/`。
-- 保留 legacy 脚本。
-- 建立最小可运行入口和安全热键。
-
-不做：
-
-- 不完整迁移 legacy 行为。
-- 不启用自动提交类动作。
-- 不做科室范围发布。
-
-## v0.2.0 文档分层和项目治理
-
-目标：建立维护者文档和普通用户文档。
-
-范围：
-
-- 增加 `docs/internal/`。
-- 增加 `docs/user/`。
-- 记录架构、路线图、决策、维护流程和发布检查。
-- 编写面向普通用户的启动、热键、更新、故障处理和紧急停止说明。
-
-不做：
-
-- 不修改 AHK 功能逻辑。
-- 不迁移坐标动作。
-- 不改变 release 机制。
-
-## v0.3.0 hotstrings 模块重构
-
-目标：整理文本扩展逻辑，让短语维护更清晰。
-
-范围：
-
-- 梳理 legacy 中稳定、低风险的热字符串。
-- 统一命名和组织方式。
-- 增加必要的手动测试记录。
-
-不做：
-
-- 不处理复杂富文本。
-- 不引入数据库或外部服务。
-- 不迁移高风险窗口动作。
-
-## v0.4.0 红色 RTF 剪贴板插入
-
-目标：实现动态 RTF 剪贴板构造，用于插入红色 `（见图）`。
-
-范围：
-
-- 建立剪贴板保存、写入、粘贴、恢复事务。
-- 使用 Windows Clipboard API 写入 `Rich Text Format`。
-- 同时写入 `CF_UNICODETEXT` 作为兼容格式。
-- 替代对固定本地 `.clip` 文件的依赖。
-- 失败时明确提示，不静默降级成黑色文本。
-
-不做：
-
-- 不提交真实患者文本样例。
-- 不保存敏感剪贴板日志。
-- 不自动最终提交报告。
-- 不实现 HTML clipboard。
-
-## v0.4.1 调查记录和路线校正
-
-目标：记录 Windows 红字剪贴板测试和 MxNMSoft 现场调查，修正后续路线。
-
-范围：
-
-- 记录 RTF 语法问题和手工最小修复。
-- 记录 RTF + `CF_UNICODETEXT` 与 RTF only 的现场行为。
-- 将 RTF 红字插入重新分类为 experimental/reference。
-- 记录 HTML Clipboard / `CF_HTML` 作为下一步主路径。
-- 记录 line measurement 和 SUVMax 的 context-menu 读取发现。
-- 明确 SUV 策略从 log-first 改为 current-image context-menu first。
-
-不做：
-
-- 不修改 `src/` 功能代码。
-- 不实现 HTML clipboard。
-- 不实现 `ContextMeasurementProvider`。
-- 不重建 release。
-
-## v0.4.2 HTML Clipboard 红字插入
-
-目标：实现 HTML Clipboard / `CF_HTML` 红色 `（见图）` 插入。
-
-范围：
-
-- 动态构造 `CF_HTML` payload。
-- 保留 clipboard save/restore transaction。
-- 验证目标报告编辑器是否接受 HTML Clipboard。
-- 验证后续输入恢复黑色。
-- 增加 UTF-8 byte offset 的平台无关结构测试。
-- 移除 RTF 实现的活动运行路径。
-
-不做：
-
-- 不静默 fallback 成黑色文本。
-- 不依赖 `red_not.clip`。
-- 不加入隐藏格式边界字符或编辑器专用格式重置。
-- 不实现测量提取、ZMQ 或 `window.nodeApi` 集成。
-
-## v0.5.0 — Internal Test Foundation
-
-目标：建立能够开始小范围内部测试的安全基础，同时保留 legacy compatibility 作为未迁移功能的临时来源。
-
-Required scope：
-
-1. `CF_HTML` red-text insertion。
-2. MedEx insertion-color reset to black。
-3. 用户配置独立存放，不与 application binary 或 source release 混合。
-4. Configurable hotkeys。
-5. Configurable trigger strings for built-in hotstrings。
-6. Configurable replacement text for built-in hotstrings。
-7. 独立的 fully user-defined hotstrings 区域。
-8. 配置缺失或无效时使用 safe defaults。
-9. 应用更新不得覆盖 user configuration。
-10. Diagnostic logging 足以说明 color reset 或 automation 失败原因，且不记录报告内容。
-11. 打包 internal-test executable。
-12. 提供简单中文 internal-test user documentation。
-13. 每个 internal release 提供中文 maintainer/update notes。
-
-Explicitly deferred：
-
-- automatic SUVmax extraction；
-- automatic long-axis and short-axis extraction；
-- Settings 中“快捷键”和“其他”页的后续功能；
-- Electron JavaScript injection；
-- automatic updater；
-- multi-editor support。
-
-当前 v0.5.0 mainline 已完成 Candidate G promotion、MedEx-only entry guard、clipboard timing、Schema 2 template engine、原生 Settings UI、portable build 和正式图标。`relativeMousePixelValidated` 是 production default；旧 V1 `uiaInvoke` 仅显式 comparison/rollback，不能 automatic fallback。历史性能检查点及验证规则见 `performance-optimization-checkpoints.md`。
-
-## 首次有限内测里程碑
-
-| Milestone | Scope | Entry criteria | Exit criteria | Workstation validation | Blocks first limited test |
-| --- | --- | --- | --- | --- | --- |
-| M0 Evidence foundation | 固化 2026-07-13 证据、状态、架构、风险和测试计划 | 现场 artifacts 已回传 | 结论分类、矛盾和 M1 范围进入 durable docs；原始证据未修改 | 不需要新增工作站操作 | 是 |
-| M1 Color Reset V1 | semantic region anchor、dynamic local font anchor、local-offset click、无焦点诊断 | M0 完成 | 已完成：automation chain 与人工后续黑色确认通过 | 1920×1080、100% baseline 已通过 | 是（已满足） |
-| M2 Core retained behavior | 全局 HHKB navigation 与已稳定、无坐标的必要 legacy 行为 | M1 通过 | 新旧 hotkeys/hotstrings 无冲突，核心键盘行为通过回归 | 跨应用 HHKB 与共存 smoke test | 是 |
-| M3 High-frequency viewer migration | F12、SUV/Arrow、SUVMax/line measurement | M2 完成 | 每项 structured result、fail-closed 和现场验证完成 | 真实 viewer 必须逐项验证 | 否；稳定 compatibility 可临时承接 |
-| M4 Report-image workflows | montage、caption、cover images | 相应 UI survey 足够 | 参数、相对区域和业务输出逐项验证 | 真实 viewer/双屏验证 | 否；稳定 compatibility 可临时承接 |
-| M5 Minimum config/diagnostics | 独立 user config、safe defaults、必要日志和 feature ownership | M1/M2 interfaces 稳定 | 更新不覆盖配置；日志无临床内容；能禁用冲突入口 | 配置持久性和失败日志 smoke test | 最小范围是 |
-| M6 Portable package | compiled EXE、pinned dependency、版本、中文说明、跨版本单实例 | M0/M1/M2/最小 M5 完成 | 任意本地路径且无管理员权限启动；dependency bundled；配置独立保留 | compiled workstation smoke test | 是 |
-
-M3/M4 只有在 cleaned compatibility script 仍稳定、无 hotkey/hotstring/clipboard 冲突地提供对应日常功能时才不阻塞首次有限内测。如果 compatibility 缺失、已知不稳定或与新 build 冲突，对应功能立即重新成为 blocker。
-
-相对节奏：M0 约 1 个工作会话；M1 约 1–2 个开发会话加 1 次现场验证；M2 约 1–2 个会话；最小 M5 约 2–3 个会话；M6 约 2 个会话加现场 smoke test。M3/M4 在首次有限内测前后按风险逐项迁移，不承诺未经证据支持的精确小时数。
-
-## v0.5.x — Stabilization
-
-目标：处理内测暴露出的环境差异和可靠性问题。
-
-已完成基础 configuration migration 和 diagnostics；后续计划范围：
-
-- DPI and display-scaling compatibility；
-- resolution and layout variation；
-- MedEx version variation；
-- timing/retry improvements；
-- configuration migration；
-- improved diagnostics and failure logging。
-
-每个 stabilizing release 都应缩小 compatibility script，但只有在对应新实现完成并通过工作站验证后才能移除 legacy capability。
-
-## v0.6.0 — Measurement Capture
-
-目标：安全获取当前 annotation 对应的 measurement，不复用旧值，不把 automation failure 当成未标注。
-
-计划范围：
-
-- 从 image-window context menu 自动获取 SUVmax；
-- 自动获取 long-axis 和 short-axis；
-- annotation 存在时自动使用测量值；
-- annotation 不存在时 fallback 到 manual-input hotstrings；
-- 结果必须严格区分：
-  - `FOUND`；
-  - `NOT_ANNOTATED`；
-  - `AUTOMATION_FAILED`。
-
-技术自动化失败不等同于“无标注”。`AUTOMATION_FAILED` 不得触发静默的空值或旧值 fallback。
-
-Release status（2026-07-26）：v0.6.0 measurement baseline 已完成。SUVMax 与长短轴 production insertion、context-menu `删除全部标注` + `NOT_ANNOTATED` postcondition、通用 `{{suvmax}}`/`{{size}}`、报告事务及无焦点视觉提示均已实现。measurement target 已从 config/UIA target cache 改为持久化 viewer path、启动时建立 config-only static plan、读取时 on-demand runtime mapping，并移除后台 warmup/轮询；该新路径尚待 Windows 延迟和 transport 复验。更细的 failure injection、其他 workstation profile，以及同一模板组合两种 measurement 的多锚点语义进入 v0.6.x 后续工作。
-
-历史 Config + UIA target resolver foundation 和 field-only automatic target checkpoint 均已通过 Windows 验证。当前 resolver 继续从声明的 `ShowModel1..N` 计算跨布局 maximin point，但直接映射到 config-derived runtime image rectangle，再以 action HWND ownership、PID、进程名和 client rect 校验；不再枚举 UIA Pane。底层 command/type/parser provider 边界不变。
-
-## v0.6.1 — Viewer Tool Hotkeys
-
-目标：用可配置快捷键选择高频 Viewer 工具，同时保持报告前台、鼠标位置和 fail-closed 边界。
-
-Release status（2026-07-26）：当前工作站已验证箭头、长度测量和 3D SUV。设置页提供五项默认关闭的快捷键并可独立加入 Win modifier；Vendor command ID 分别为 `21043`、`21048`、`21193`。前三项从 Vendor 配置建立静态 button plan，每次按当前 frame rect 映射坐标，以 native HWND、PID、client rect 和 control ID 核验，再向直接父窗口发送 bounded synchronous `WM_COMMAND / BN_CLICKED`。第四项只在 Viewer 前台把用户 chord 映射为 F12，并显示无文字短 pulse；第五项复用已验证的 `删除全部标注` context-menu cleaner，不使用工具面板 `21081`。Win 设置、截图映射与独立清除快捷键仍待 Windows 现场验收。不使用 UIA、hover、鼠标移动、焦点切换、后台 warmup 或周期轮询。
-
-本轮确认了 floating root 不能与 main frame HWND 强制相等、panel origin 与固定按钮偏移需要分别处理、非活动父窗口上的 `BM_CLICK` 会丢失首次动作，以及嵌套 `A_Index` 会把所有 Vendor rows 错记为 1。详细记录见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
-
-## Later versions
-
-计划范围：
-
-- Settings 中“其他”页及“快捷键”页的后续功能；
-- import/export of user configuration；
-- automatic update support；
-- possible replacement of coordinate interaction with a direct Electron/editor command；
-- v0.6.0 稳定后可安排一次 1–2 个专注会话的只读 ZeroMQ 勘察，只判断现有广播是否包含可安全复用的 viewport、layout 或 measurement 状态；不默认进入 production，详见 `docs/internal/passive-zmq-exploration.md`；
-- 如果当前 popup UIA 路线持续不可靠，评估经过现场校准的 Candidate G relative-mouse profile；
-- workstation profiles and calibration；
-- 经过逐项验证的其他 viewer actions。
-
-Direct editor command 仍是未来调查方向，当前不声称存在可调用的 embedded editor API。
+本文只记录当前方向和未来边界。已完成版本及用户可见变化由
+`CHANGELOG.md` 和发布说明保存，不在路线图重复展开。
+
+## 当前 v0.6.x
+
+- 完成 Viewer native command-control resolver 和 measurement target 的跨机器
+  回归，以原工作站作为最终验收环境之一。
+- 继续验证其他 resolution、DPI/scaling、Viewer layout、multi-monitor 和
+  workstation profile；未知结构保持 fail closed。
+- 补充 SUVMax、尺寸和清除链的 failure injection、privacy-safe field evidence
+  与尾延迟记录。
+- 完成单修饰键、Viewer-only 无修饰字母/数字、Win modifier 持久化和 F12
+  dispatch pulse 的 release smoke test。
+- 保持 Manual measurement/caret fallback；同一模板暂不混用
+  `{{suvmax}}` 与 `{{size}}`。
+
+## 后续候选
+
+- 在获得单独授权后评估 per-machine Candidate G layout calibration。校准只能
+  保存本机 profile 与环境 metadata，不能引入无校验绝对坐标 fallback。
+- 逐项迁移 `medex_legacy_compat.ahk` 尚存的 montage、caption/advance 和 cover
+  actions；每项都需独立 window guard、现场验证和可停止的人工回退。
+- 仅在有稳定公开接口或充分被动证据时评估新的 Viewer provider；不得用协议
+  猜测替换现有 validated provider。
+- 是否需要 installer、更新支持或更正式集成，必须作为独立产品阶段评估；
+  当前 portable release 不扩展这些职责。
+
+## 长期交付策略
+
+- 模块化 `src/` 是源码真相；`release/report_assistant.ahk` 是可复现生成物。
+- 普通用户交付 portable single EXE，配置保存在
+  `%LOCALAPPDATA%\MedExReportAssistant\config.ini`。
+- Source、Windows runtime 和用户现场观察是不同证据层；静态测试不能替代
+  AHK/UIA/MedEx 现场验收。
+- 每个可交付版本同步维护中文用户说明、维护说明、CHANGELOG 和 release
+  checklist。
 
 ## 长期安全边界
 
-- 不对外发布未经验证的临床工作流自动化。
-- 不替代人工审核和临床判断。
-- 不自动最终提交、审核或发送报告。
-- 不把患者信息或报告正文写入 diagnostics。
+- 不访问数据库，不绕过权限，不自动审核或提交报告。
+- 不提交患者信息、医院敏感信息、真实用户配置、截图、凭据或临床日志。
+- Clipboard 必须事务性恢复；报告失败不得误用旧测量值。
+- Window、PID、native control、geometry 或 popup 证据不唯一时停止，不猜测。
+- 不自动终止、替换、备份、清理或回滚其他 EXE。
+- 不静默删除用户配置、模板、legacy 脚本或人工工作流。

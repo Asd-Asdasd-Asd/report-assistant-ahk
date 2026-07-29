@@ -1,6 +1,6 @@
 # 项目状态与交接
 
-更新时间：2026-07-27
+更新时间：2026-07-29
 当前版本以 `src/app_metadata.ahk` 为唯一真源，并显示在 EXE“关于麦旋风…”和发布目录 `版本信息.md`。
 
 ## 当前 mainline
@@ -49,8 +49,8 @@
 - `删除全部标注` field path：`CleanupState=OK`、command invoked、无 confirmation、复查 `NOT_ANNOTATED`，foreground/mouse 均保持不变。
 - 长短轴 workflow 已在 Windows 完成端到端验证并由用户确认通过。
 - Config-only measurement target：无 UIA、无 warmup timer、无周期轮询的启动缓存和按次 runtime mapping 已通过当前工作站复验。
-- 多台机器的箭头、长度和 3D SUV 各连续测试 10 次通过；native control-set resolver 不再依赖按钮间距、outer-frame snapshot 或面板原点。2026-07-28 原工作站的合法完整按钮组曾被额外 owner/frame 校验错误阻拦；冗余否决已移除并等待该机正式 EXE 复验。
-- 主图区激活产生额外同进程顶层窗口的机器上，owner-family resolver 已恢复唯一目标；独立清除快捷键现场验证成功。
+- 多台机器的箭头、长度和 3D SUV 各连续测试 10 次通过；native control-set resolver 不再依赖按钮间距、outer-frame snapshot 或面板原点。原工作站的合法完整按钮组曾被额外 owner/frame 校验错误阻拦；冗余否决移除后的按钮修复已获现场确认。
+- 主图区激活产生额外同进程顶层窗口的机器上，owner-family resolver 已恢复唯一目标，独立清除快捷键曾完成现场验证。当前 hidden-owner 修复已通过静态回归；仍需用 `781433d` 对 SUVMax、尺寸和清除链做最终 Windows field validation。
 - 单修饰键、Viewer-only 无修饰字母/数字、Win modifier 设置持久化、F12 pulse 仍需随 v0.6.2 EXE 做最终 Windows smoke test。
 
 ### 自动测试覆盖
@@ -60,7 +60,7 @@
 - CF_HTML offsets、Candidate G pure rules、dispatcher safety、single-instance/build integration。
 - icon generation inputs与 Windows Ahk2Exe `/icon` wiring。
 - measurement result/parser、sentinel + clipboard sequence freshness、single restore owner、provider dynamic popup/command identity 和 privacy-safe field harness。
-- Viewer command schema、三按钮坐标映射、设置读写、hotkey registration 和 generated-release integration。
+- Viewer command schema、native control group identity/uniqueness、设置读写、hotkey registration 和 generated-release integration。
 
 当前完整 Python suite 为 271 tests；Windows AHK harness 仍是 compiled/runtime 行为的最终依据，macOS 静态测试不能替代。
 

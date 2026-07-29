@@ -1,199 +1,52 @@
-# Color Reset 性能优化检查点
+# Candidate G 后续性能与校准边界
 
-## 目标与边界
+Candidate G 的既有性能步骤已经完成并由当前 source、tests、architecture 和
+Git 历史固化。本文件只保留尚未实施的 per-machine calibration 边界。
 
-用户真实操作是：
+## 已冻结的当前约束
 
-```text
-;red
-→ 立即输入。或；
-```
+- `relativeMousePixelValidated` 是 production default；`uiaInvoke` 仅作显式
+  comparison/rollback，二者不得自动 fallback。
+- `;fzg` 使用模板派生的 no-reset caret relocation，不重新加入 Color Reset、
+  固定 `Left 5` 或额外 settle。
+- Clipboard restore 只有一个 `finally` owner；fast failure 也必须满足
+  minimum paste-to-restore interval。
+- Arrow/black 各最多点击一次；popup signature、foreground、geometry、
+  resolution、DPI 和 scaling 仍是硬门槛。
+- Exact MedEx version 仅作 diagnostics metadata，不代表其他环境已获支持。
+- Windows field validation 是最终 acceptance surface；macOS 静态测试不能证明
+  UIA、鼠标、焦点、颜色或 clipboard runtime 行为。
 
-标点必须在 insertion color 已变黑之后到达。主要指标不是函数总耗时，而是：
+## Per-machine layout calibration
 
-```text
-TriggerToBlackClickMs = BlackClickSentMs - HotstringTriggeredMs
-```
-
-black click 后的 clipboard restoration、logging、structured-result completion 和其他 cleanup 不属于用户可见 critical path，但 clipboard restoration 仍是 mandatory，并必须由 `finally` 保护。
-
-立即优化保留：exact UIA `Name="检查所见"`、geometry validation、多候选时才做 corroboration、arrow/black client-bounds checks、两次 click 各最多一次、四点 signature、immediate first sample、first failure 后才等待 20 ms 的 second sample、no fallback、mouse restoration 和显式 `uiaInvoke` rollback implementation。
-
-## 目标执行顺序
-
-```text
-hotstring trigger
-→ CF_HTML clipboard setup
-→ Ctrl+V
-→ minimal initial paste settle
-→ Candidate G localization and interaction
-→ black click
-──────── critical path complete
-→ enforce minimum safe paste-to-clipboard-restore interval if required
-→ restore original clipboard in finally
-→ diagnostics/result completion
-```
-
-不能把该计划概括为“把 200/100/100 ms 改成 50 ms”。Windows 曾观察到过早恢复 `ClipboardAll` 会让 MedEx 粘贴用户原剪贴板。新实现必须记录 `pasteSentAt`：
+只有获得单独授权后才实施。目标流程：
 
 ```text
-elapsed = now - pasteSentAt
-if elapsed < SafeMinPasteToRestoreMs:
-    wait SafeMinPasteToRestoreMs - elapsed
+UIA 定位“检查所见”
+→ 用户确认 arrow center
+→ 打开 popup
+→ 用户确认 black center
+→ 采集 popup signature
+→ 保存本机 profile 与环境 metadata
+→ 在非临床环境执行受控验证
 ```
 
-Candidate G 成功执行的时间可自然贡献于安全间隔；fast failure 可能很快，因此也必须受剩余时间保护。`SafeMinPasteToRestoreMs=300` 已由 Step 3 Windows success/fast-failure field testing 批准。
+Profile 至少包含：
 
-## 计划 timing fields
+- semantic anchor name；
+- arrow/black relative offsets；
+- popup signature；
+- DPI、scaling、resolution 和可选 monitor identity；
+- calibration timestamp；
+- 仅作信息的 MedEx version。
 
-- `HotstringTriggeredMs`
-- `PasteCommandSentMs`
-- `ColorResetStartedMs`
-- `ArrowClickSentMs`
-- `BlackClickSentMs`
-- `ClipboardRestoreStartedMs`
-- `ClipboardRestoreCompletedMs`
-- `FunctionReturnedMs`
-- derived `TriggerToBlackClickMs`
-- derived `PasteToClipboardRestoreMs`
+不得保存 HWND、患者内容或无校验绝对 screen coordinates。环境、signature 或
+geometry 漂移后旧 profile 必须失效，而不是继续点击。
 
-这些字段先进入现有 field/performance context；不创建第二个 internal/minimal release artifact。Logging policy 不变：production success 无 heavy log，production failure 仅 lightweight privacy-safe line，field mode 提供详细 timing、geometry、UIA 和 pixel diagnostics。
+## 继续或停止条件
 
-## 有序实施与停止点
-
-### Step 0 — Documentation synchronization
-
-当前任务。只同步文档，不改 production code、generated release 或 raw field evidence。完成后提交一个 documentation-only commit。
-
-### Step 1 — Baseline critical-path diagnostics
-
-实现上述 timestamps 和 derived metrics，但不改变 transaction ordering、waits、Candidate G checks 或 hotstring semantics。
-
-Implementation status：2026-07-20 Windows baseline field test 已通过，等待 Step 1 独立提交；Step 2 尚未开始。
-
-Windows baseline（MedEx 0.0.1.0、1920×1080、100%、DPI 96）：
-
-| Run | TriggerToBlackClickMs | PasteToClipboardRestoreMs | ClipboardRestoreMs | ColorResetCoreMs | TotalHotstringMs |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 1 | 906 | 312 | 421 | 485 | 906 |
-| 2 | 797 | 312 | 422 | 359 | 797 |
-| 3 | 766 | 313 | 422 | 359 | 781 |
-
-三次均为 `RED_TEXT_OK` / `RELATIVE_MOUSE_CHAIN_OK`，九个关键 timestamps 全部为数值且顺序正确，derived durations 与原始 timestamps 差值一致。现场确认 red marker、clipboard restoration、immediate black punctuation 均正确，无 wrong paste；field harness 和 generated release 不再报告五个 Candidate G `#Warn`。
-
-Windows pass criteria：正常 `;red` 行为不变；得到可信的 `TriggerToBlackClickMs` 和 `PasteToClipboardRestoreMs`；红字、clipboard restoration、black reset 和 immediate punctuation 均正确。
-
-- Pass：提交 Step 1，进入 Step 2。
-- Timing 缺失/顺序为负：不提交，修正 instrumentation 后重测。
-- 功能回归：停止优化，恢复 baseline behavior，只保留不改变时序的 diagnostics 修订。
-
-可接受的简短回报：
-
-```text
-Step 1 passed
-TriggerToBlackClickMs=...
-PasteToClipboardRestoreMs=...
-No functional failures
-```
-
-### Step 2 — Hotstring scope and foreground-guard cleanup
-
-用 shared `#HotIf`/foreground predicate 限制 `;red`、`;fwj`、`;fjd`、`;fzg`、`;cmx` 仅在 MedEx 前景窗口触发。全局 pause/exit 必须继续在 MedEx 外和 suspended 状态工作。
-
-Implementation status：2026-07-20 Windows scope/foreground field test 已通过，等待 Step 2 独立提交；Step 3 尚未开始。
-
-Windows 验收使用 generated release SHA-256 `1ede185566caf4c9f25d744fe567df45cd9ed679bd8daa522ecfd71edc2bc010`。五个 report hotstrings 在 MedEx 内保持正常，在无关应用中均不扩展且不改变 clipboard；pause/exit 保持全局。arrow 与 black click 前切换窗口均 fail closed，没有 coordinate click 落入新窗口。
-
-在 entry guard 建立后，移除 Candidate G interaction path 中冗余的重复 `WinGetProcessName`；仍在 arrow click 和 black click 前检查 original target HWND 仍为 active。
-
-Windows pass criteria：五个 report hotstrings 在 MedEx 正常；在无关应用不触发、不改 clipboard；切换窗口时两次 coordinate click 都 fail closed；pause/exit 保持全局。
-
-- Pass：提交 Step 2，进入 Step 3。
-- Hotstring 漏触发：修正 predicate/window ownership，不放宽为 global。
-- 错误应用仍触发：停止并修正 entry guard，不进入 transaction reorder。
-- Click 可落入已切换窗口：恢复/加强 HWND guard 后重测。
-
-### Step 3 — Move clipboard restoration after Color Reset
-
-在 shared orchestration 中让 Candidate G localization 和 black click 发生在 clipboard restore 之前；restore 仍位于 `finally`。使用 `pasteSentAt` 和待现场确定的 `SafeMinPasteToRestoreMs`，只等待不足的剩余间隔。
-
-Implementation status：`SafeMinPasteToRestoreMs=300` 与 elapsed-time recheck loop 已通过 86 项自动测试和 Windows success/fast-failure field test；Step 3 已由 `6c2e2dc` 独立提交。
-
-2026-07-20 preliminary field result：success path 三次 `TriggerToBlackClickMs=625/484/500`；三次 restore 成功，black click 与 restore start 记录在同一 tick。fast-failure 两次 restore 与 fail-closed behavior 正确，但 `PasteToClipboardRestoreMs=297`，证明单次 remaining Sleep 会受 Windows timer 提前返回影响。这批结果只作为 recheck-loop 修订依据，不构成 pass。
-
-2026-07-20 10:15 final field result（artifact SHA-256=`e199466dd78012f5d7b8737406590203eef8ff3e04fd4022e34d88110cb6fbf1`）：success path 三次 `TriggerToBlackClickMs=625/500/515`，平均约 547 ms，较 Step 1 平均约缩短 276 ms；`BlackClickToClipboardRestoreMs=0/0/0`，三次 restore 均成功。fast-failure 三次 `PasteToClipboardRestoreMs=312/313/313`、`ClipboardRestoreSafetyWaitMs=109/94/110`；均为 `COLOR_RESET_WRONG_PROCESS`、无 arrow/black click、clipboard restore 成功，failure feedback 在 restore completed 后开始。人工确认 red marker 未被 sentinel 替换、原 clipboard 恢复、success 后立即输入标点为黑色。Step 3 pass，批准 `SafeMinPasteToRestoreMs=300`。
-
-Windows 必测：成功 Candidate G path，以及故意制造的 fast-failure path。
-
-Pass criteria：
-
-- red marker 不被原 clipboard 替换；
-- 原 clipboard 最终恢复；
-- successful black click 明显提前；
-- fast failure 不破坏 paste 或 clipboard state；
-- successful reset 后立即输入的标点为黑色。
-
-Decision rules：
-
-- 全部通过：提交 Step 3，记录批准的 `SafeMinPasteToRestoreMs` 和 measurements，进入 Step 4。
-- Success 正确、fast failure 粘贴原 clipboard：不提交；增加或重新测定 minimum interval，只改该参数/保护逻辑后重测两条路径。
-- Clipboard 未恢复：不提交；先修复 `finally` ownership/exception path。
-- Black click 未明显提前：保留 correctness，检查 initial paste settle 与 orchestration 是否仍在 critical path；不得删除 signature/geometry 来换时间。
-- Immediate punctuation 仍为红色：停止；核对 click/focus/insertion state，不进入 Step 4。
-
-可接受的失败回报：
-
-```text
-Step 3 failed
-Success path okay
-Fast-failure path pasted original clipboard
-```
-
-### Step 4 — Remove redundant `;fzg` `Sleep 50`
-
-独立提交将：
-
-```text
-CF_HTML paste and clipboard restoration
-→ Sleep 50
-→ Left 4
-```
-
-改为：
-
-```text
-CF_HTML paste and clipboard restoration
-→ Left 4
-```
-
-不得改为 `Left 5`，不得与 Step 3 合并。
-
-Implementation status：production 已删除 50 ms settle；独立 harness 使用 F9=`SettleDelayMs=50` control、F10=`SettleDelayMs=0` candidate。2026-07-20 五组单变量 A/B 与 generated-release validation 均通过；Step 4 已由 `5193403` 独立提交。
-
-2026-07-20 final field result（artifact SHA-256=`4de7f53a2498a2eda5ba4df8035339051b3d99653b5b004df0647a7517a936aa`）：F9 control `ElapsedMs=485/516/469/469/515`，平均约 491 ms；F10 candidate `ElapsedMs=437/422/422/422/438`，平均约 428 ms，平均缩短约 63 ms。十次均 paste/clipboard restore 成功、`ColorResetResult=NOT_RUN`、`CursorRestoreRequestedCount=4`、`CursorRestoreCommandSent=true`。人工确认 caret=`|（见图）`、clipboard 恢复、immediate punctuation 为黑色；generated release 的十次 normal `;fzg` 与一次 normal `;red` smoke test 全部通过。Step 4 pass。
-
-- Caret=`|（见图）` 且 immediate typing 为黑色：提交 Step 4。
-- Caret 错位或输入颜色异常：不提交，恢复 `Sleep 50`，记录它仍是必要 editor-settle interval。
-
-### Step 5 — Remove exact MedEx-version hard gate
-
-将 exact MedEx version 从 execution gate 改为 diagnostics-only metadata；semantic localization、geometry、signature 和 foreground checks 仍决定是否安全执行。
-
-Implementation status：runtime 与 calibration validators 已移除 exact-version gate，保留 `CalibratedMedExVersion=0.0.1.0` provenance 和 MATCH/MISMATCH/UNKNOWN diagnostics；89 项自动测试通过。2026-07-20 Windows G1 `Ctrl+Alt+F6` 与 G2 `Ctrl+Alt+F11` 使用 `9.9.9.9` metadata override 验收通过：actual version 保持 `0.0.1.0`，override 记录为 `MISMATCH`，G1 row probe 无 black click，G2 完整 interaction chain、人工 immediate-black 确认和 generated-release smoke test 均正常。验收 artifact SHA-256=`02f04601e2a1bb1501374c95e9d70f9961d96d87079713ecce366893988b8bae`；Step 5 pass，提交前不进入 Step 6。
-
-- 新旧已测试版本 checks/interaction 均正确：提交 Step 5。
-- UI/layout 改变导致 checks 失败：保持 fail closed；不得用删除 geometry/signature 绕过。
-
-此步骤不宣称支持任意 resolution、DPI、scaling 或 layout。
-
-### Step 6 — Per-machine layout calibration
-
-仅在 latency work 稳定并获得单独授权后实现。目标用户流程：UIA 定位 `检查所见` → 用户确认 arrow center → 打开 popup → 用户确认 black center → 本地保存 offsets、signature 和环境 metadata → runtime 加载 local profile。
-
-建议 profile fields：anchor name、arrow offset、black offset、popup signature、DPI、scaling、resolution、可选 monitor identity、calibration timestamp，以及仅作信息的 MedEx version。用户体验应为一到两个 guided confirmation steps，不暴露 developer harness。
-
-## Windows-result continuation contract
-
-收到只包含 step、metrics 和简短现象的现场回报时，先按本文件对应 step 分类，再执行明确的 commit/revise/stop 动作；不要要求用户重述 architecture、clipboard race、Candidate G safety checks 或既往 A/B 理由。
-
-如果回报缺少决定安全性的关键项，只询问缺失的具体观察，例如 fast-failure 是否粘贴原 clipboard，而不是重新发整套测试说明。
+- Calibration 和 controlled interaction 均通过，且 clipboard、mouse、
+  foreground、caret 和后续输入颜色正确，才可讨论接入 production。
+- Popup signature、geometry、foreground 或 profile identity 不唯一时停止。
+- 不得通过删除 signature、geometry 或 at-most-once checks 换取速度。
+- 现场结果缺少决定安全性的观察时，只补充缺失项，不重开已完成的历史步骤。

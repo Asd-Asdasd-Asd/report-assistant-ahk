@@ -1,6 +1,8 @@
 # 2026-07-15 Color Reset V1 生产基线验证
 
-本文件固化 `debug/field-result-2026-07-15/` 的结论。原始 clipboard、result 和 log artifacts 保持原样，不在本文中改写或规范化。
+本文件保留 2026-07-15 Windows 现场验证的有效结论。一次性 clipboard、
+result 和 log artifacts 已在后续文档清理中删除；需要追溯原始记录时使用
+Git 历史。
 
 ## Validated environment
 

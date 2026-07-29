@@ -1,120 +1,60 @@
-# MedEx 颜色复位 Windows 现场调试
+# MedEx Candidate G Windows 现场工具
 
-`medex_color_reset_field_debug.ahk` 是现场验证脚本，不是生产入口，也不注册 `;red`、`;fzg` 或其他 production hotstrings。F12 不粘贴报告文字并保留显式 `uiaInvoke` comparison；F11 调用与 production `;red` 相同的 `RunRedInsertion()`，显式使用 `relativeMousePixelValidated` 并输出 Step 1 critical-path timing。两者都不修改正常用户配置。
+`debug/` 下三个 AHK 文件只用于非临床现场诊断，不是 production 入口，不读取
+或修改正常用户配置。测试时不要同时运行 generated release 与 debug script。
 
-## UIA 依赖
+它们共用 repository-pinned `src/Lib/UIA.ahk` 和 production Candidate G
+逻辑；不得在 `debug/` 维护第二份实现。
 
-本实现 pin Descolada UIA-v2 v1.1.3。production 和 field debug 共用：
+## `medex_color_reset_field_debug.ahk`
 
-```text
-src\Lib\UIA.ahk
-debug\medex_color_reset_field_debug.ahk
-```
+- `Ctrl+Alt+F12`：只运行 color-reset diagnostic，不粘贴报告文字。
+- `Ctrl+Alt+F11`：执行与 production `;red` 相同的完整 paste/reset timing。
+- `Ctrl+Alt+F10`：故意使用错误 process allowlist，验证 click 前 fast failure。
 
-Field script 使用 explicit relative include，production source 使用 `src/Lib` standard library lookup。目标工作站无需系统级安装 UIA-v2，也不要同时 include 另一份 global library。
-
-- Repository: `https://github.com/Descolada/UIA-v2`
-- Pinned release: `v1.1.3`
-
-如果 repository-pinned dependency 缺失，AHK 会在启动时明确报告 include failure；不要把缺失依赖降级成 optional include。运行中 UIA 初始化失败仍返回：
-
-```text
-COLOR_RESET_UIA_UNAVAILABLE
-```
-
-不得为了绕过该结果而加入 blind clicks。
-
-## Dedicated hotkeys
-
-```text
-Ctrl+Alt+F12
-Ctrl+Alt+F11
-```
-
-Step 3 另提供 `Ctrl+Alt+F10` fast-failure test。它会先发送同一 red CF_HTML paste，再用故意不匹配的 process allowlist 让 Candidate G 在任何 coordinate click 前 fail closed。F10 不把 diagnostic 写回 clipboard，以便操作者验证原 sentinel 已恢复；完整结果只追加到 `%TEMP%\MedExAHK\medex_production_timing_debug.txt`。
-
-脚本不会显示 MsgBox、ToolTip 或 TrayTip。F12/F11 自动把完整结果复制到 clipboard；F10 保留 restored clipboard。结果默认追加写入：
+输出：
 
 ```text
 %TEMP%\MedExAHK\medex_color_reset_field_debug.txt
-```
-
-最小 development log 写入：
-
-```text
 %TEMP%\MedExAHK\medex_color_reset_field_debug.log
+%TEMP%\MedExAHK\medex_production_timing_debug.txt
 ```
 
-两者都不得包含 patient information、report text、clipboard text 或 pasted phrase。
+## `medex_candidate_g_calibration.ahk`
 
-`AUTOMATION_CHAIN_OK` 只表示 candidate selection、menu click、black-item lookup 和 Invoke 自动化链路完成。输出仍为 `FINAL_COLOR_PENDING_VISUAL_VALIDATION`；只有操作者随后输入无害字符并确认黑色，才能单独记录最终视觉验证成功。
+- `F8`：记录用户指向的 arrow center。
+- `F9`：记录用户指向的 black center。
+- `F10`：closed-pixel probe，不点击 black。
+- `F11`：用户手工打开 popup 后采样 open signature。
+- `F12`：执行一次受控 Candidate G reset。
+- `F7`：验证 closed-signature gate。
+- `Ctrl+Alt+F6`：用 mismatch metadata 验证版本不作为 execution gate。
 
-F12 是 reset-only field diagnostic；F11 是完整 Candidate G `;red` success timing；F10 是 Step 3 controlled fast failure。测试时不得同时运行 generated release 与本 debug script。
-
-## 可调 field-test overrides
-
-只编辑脚本顶部以下 constants：
-
-- `DEBUG_COLOR_ARROW_OFFSET_X`
-- `DEBUG_COLOR_ARROW_OFFSET_Y`
-- `DEBUG_COLOR_RESET_STRATEGY`
-- `DEBUG_MENU_LOOKUP_STRATEGY`
-- `DEBUG_MENU_OPEN_TIMEOUT_MS`
-- `DEBUG_MENU_POLL_INTERVAL_MS`
-- `DEBUG_USE_CACHED_ANCHOR_SNAPSHOT`
-- `DEBUG_ENABLE_FONT_ANCHOR_RETRY`
-- `DEBUG_ALLOW_PROVISIONAL_PROCESS`
-- `DEBUG_CONFIRMED_PROCESS_NAME`
-
-现有 `medex_color_reset_field_debug.ahk` 继续固定测试 `uiaInvoke`，作为 comparison/rollback。Candidate G 使用独立 `medex_candidate_g_calibration.ahk`：F8–F11 用于 G1 calibration，F12 经 production dispatcher 显式调用 `relativeMousePixelValidated`。Windows G2、caret-order A/B 与最终 generated-release 验证通过后，正常 release 的颜色复位默认 strategy 已提升为后续 production mainline；两种 strategy 之间没有 automatic fallback。
-
-Candidate G2 F12 只在 1920×1080、100%、DPI 96 profile 匹配、toolbar row 唯一、arrow/black points 有效、foreground 未变化且 popup 四点 signature 匹配时发送一次 black click。MedEx version 仅作为 calibration provenance 和 match-state metadata。结果复制到 clipboard 并写入 `%TEMP%\MedExAHK\candidate_g_calibration.txt`；不显示 modal 或 non-modal UI。
-
-同一脚本的 F7 是 closed-popup safety gate：它故意不点击 arrow，只验证关闭状态 signature 必须失败且 black click 不可达。F7 只用于现场安全验证，不是 production fallback 或 interaction strategy。
-
-Step 5 在 calibration harness 中增加 `Ctrl+Alt+F6`：它用 `9.9.9.9` 覆盖 profile-validation version metadata，执行与 F10 相同的 closed pixel/row probe，不点击 black。F10 保持 actual-version control。
-
-`medex_candidate_g2_test.ahk` 是独立 G2 production-path test build，注册 `;red`、`;fzg` 和 reset-only F12，并为每次操作追加 privacy-safe 行到 `%TEMP%\MedExAHK\candidate_g2_test.txt`。它必须单独运行；不得同时运行 generated release、calibration harness 或 legacy script。
-
-Step 5 在该 G2 harness 中增加 `Ctrl+Alt+F11`：使用 `candidateGMedExVersionMetadataOverride=9.9.9.9` 运行完整 production interaction chain；F12 是 actual-version control。覆盖值只改变 diagnostics，不改变真实 environment 或 safety gates。
-
-同一 test build 保留历史 `Ctrl+Alt+F8` G2 reset-path，并提供 Step 4 单变量 A/B：`Ctrl+Alt+F9` 为 no-reset、50 ms、`Left 4` control；`Ctrl+Alt+F10` 为 no-reset、0 ms、`Left 4` candidate。F9/F10 只改变 `SettleDelayMs`，结果写入 `%TEMP%\MedExAHK\candidate_g2_test.txt`；不得使用 `Left 5`。
-
-2026-07-16 历史 A/B 结果确认 F9 50 ms control 连续 6 次正确，production 因而采用 no-reset caret-relocation workflow；F8 继续保留为历史对照。2026-07-20 Step 4 在同一 editor state 完成五组 F9/F10：50 ms 与 0 ms 均保持正确 caret、clipboard 和黑色输入，随后 generated release 也通过；`medex_color_reset_field_debug.ahk` 不用于本轮 `;fzg` caret validation。
-
-## Minor layout recalibration
-
-在 MedEx 小版本只改变工具栏局部间距时，先用 Accessibility Insights 记录目标字号 `Text` rectangle，再用 Window Spy/现场观察记录颜色箭头目标点。计算：
-
-```text
-ColorArrowOffsetX = targetScreenX - fontRect.r
-ColorArrowOffsetY = targetScreenY - Round((fontRect.t + fontRect.b) / 2)
-```
-
-只修改 field-debug 顶部两个 override 并在 non-clinical context 复测。验证通过后，再把相同值写入 `MedExColorResetLayoutProfile` 的新 profile/release；不要改 resolver，也不要加入 absolute-coordinate fallback。
-
-## 安全限制
-
-- 不在 finalized patient report 中测试。
-- 使用经过批准的 non-clinical test context。
-- F12 不插入 test text；F11 会运行真实 `;red` shared workflow 并插入红色 marker。两者都只能在 approved non-clinical context 使用。
-- 如果鼠标移动、窗口失焦或菜单行为异常，立即停止重复测试并退出脚本。
-
-## Candidate G1 calibration
-
-`medex_candidate_g_calibration.ahk` 是独立 calibration harness。不要与 generated release、legacy 或 `medex_color_reset_field_debug.ahk` 同时运行。
-
-- `F8`：鼠标置于实际 color arrow center，记录 arrow offset。
-- `F9`：手工打开 popup、鼠标置于 black swatch center，记录 black offset；脚本不会点击。
-- `F10`：popup closed 状态读取 pixel probe grid。
-- `F11`：解析并验证 toolbar row，最多点击 arrow 一次，在 0/20/40/80 ms 读取 probe grid。
-
-F11 不执行 popup UIA lookup、`000000` search、Invoke 或 black click。estimated `(320,0)` 和 `(6,83)` 只用于 supported baseline 的 G1 measurement，不是 production constants。
-
-输出位置：
+输出：
 
 ```text
 %TEMP%\MedExAHK\candidate_g_calibration.txt
 ```
 
-脚本不显示 `MsgBox`、`ToolTip` 或 `TrayTip`，不保存 screenshot、报告文字或 clipboard content。
+## `medex_candidate_g2_test.ahk`
+
+- `F12`：actual-version Candidate G production-chain control。
+- `Ctrl+Alt+F11`：version-mismatch metadata override control。
+- `Ctrl+Alt+F8`：历史 reset-path 对照，仅用于诊断现有行为。
+- `Ctrl+Alt+F9/F10`：`;fzg` no-reset caret timing A/B；两者都保持模板派生的
+  `Left 4` 等价行为，不得改成 `Left 5`。
+
+输出：
+
+```text
+%TEMP%\MedExAHK\candidate_g2_test.txt
+```
+
+## 安全限制
+
+- 只在已批准的非临床 MedEx 测试区域执行。
+- 不在脚本中写入 patient data、报告文字、clipboard payload 或真实配置。
+- Arrow 和 black 各最多点击一次；signature 失败时 black click 不可达。
+- 不增加 blind click、自动 fallback、第二次 arrow click 或 focus-stealing UI。
+- 操作者必须另行确认最终文字颜色、caret、clipboard、mouse 和 foreground。
+- Structured success 只能证明自动化链已执行，不能代替视觉验收。
