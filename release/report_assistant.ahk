@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.2
-; Source revision: dc92acbe6f11f1d440af750a4598e6e1a94a8411
-; Generated at: 2026-07-30 07:45:45 UTC
+; Source revision: 01d033c28dfdf8d8984e2bc36f596ba929c8c230
+; Generated at: 2026-07-30 07:56:42 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.2.0
 ;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.2"
     static Channel := "internal-test"
     static BuildDate := "2026-07-30"
-    static SourceRevision := "dc92acbe6f11f1d440af750a4598e6e1a94a8411"
+    static SourceRevision := "01d033c28dfdf8d8984e2bc36f596ba929c8c230"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -10912,6 +10912,12 @@ BuildMxNMMeasurementTargetPlan(viewerExe, configPaths := 0) {
             safePointResult.minimumClearance
         plan.minimumRequiredClearance :=
             safePointResult.minimumRequiredClearance
+        viewerToolPlan := BuildMxNMViewerToolCommandPlan(
+            viewerExe,
+            configPaths
+        )
+        if viewerToolPlan.ok
+            plan.viewerToolPlan := viewerToolPlan
         plan.ok := true
         plan.code := MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION
         return plan
@@ -10936,7 +10942,8 @@ MakeMxNMMeasurementTargetPlan() {
         mainGeometry: 0,
         logicalPoint: 0,
         minimumLogicalClearance: 0,
-        minimumRequiredClearance: 0
+        minimumRequiredClearance: 0,
+        viewerToolPlan: 0
     }
 }
 
@@ -10962,9 +10969,16 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
             viewerExe,
             plan.viewerProcessPath
         )
-        runtimeTarget := ResolveMxNMRuntimeImageTarget(
+        toolAnchor := ResolveMxNMMeasurementToolAnchor(
             plan,
             viewerWindows
+        )
+        result.runtimeToolAnchorResolved := toolAnchor.ok
+        result.runtimeToolAnchorHwnd := toolAnchor.frameHwnd
+        runtimeTarget := ResolveMxNMRuntimeImageTarget(
+            plan,
+            viewerWindows,
+            toolAnchor.frameHwnd
         )
         result.runtimeFrameCandidateCount :=
             runtimeTarget.candidateCount
@@ -11003,7 +11017,36 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
     }
 }
 
-ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
+ResolveMxNMMeasurementToolAnchor(plan, viewerWindows) {
+    failure := {
+        ok: false,
+        frameHwnd: 0,
+        panelHwnd: 0
+    }
+    if !IsObject(plan)
+        || !plan.HasOwnProp("viewerToolPlan")
+        || !IsObject(plan.viewerToolPlan)
+        || !plan.viewerToolPlan.ok {
+        return failure
+    }
+    controlSet := ResolveMxNMViewerToolControlSet(
+        plan.viewerToolPlan,
+        viewerWindows
+    )
+    if !controlSet.ok || !controlSet.frameHwnd
+        return failure
+    return {
+        ok: true,
+        frameHwnd: controlSet.frameHwnd,
+        panelHwnd: controlSet.panelHwnd
+    }
+}
+
+ResolveMxNMRuntimeImageTarget(
+    plan,
+    viewerWindows,
+    preferredFrameHwnd := 0
+) {
     failure := {
         ok: false,
         candidateCount: 0,
@@ -11023,6 +11066,10 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         viewerWindows
     )
     for candidateFrame in runtimeFrames {
+        if preferredFrameHwnd
+            && candidateFrame.hwnd != preferredFrameHwnd {
+            continue
+        }
         mappedImage := MapMxNMLogicalImageRectToRuntime(
             plan.mainGeometry,
             candidateFrame
@@ -11052,6 +11099,21 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         })
     }
     failure.candidateCount := candidates.Length
+    if preferredFrameHwnd {
+        if candidates.Length != 1
+            return failure
+        return {
+            ok: true,
+            candidateCount: 1,
+            ownerFamilyCount: CountMxNMRuntimeOwnerFamily(
+                viewerWindows,
+                preferredFrameHwnd
+            ),
+            frame: candidates[1].frame,
+            imageRect: candidates[1].imageRect,
+            screenPoint: candidates[1].screenPoint
+        }
+    }
     selected := SelectMxNMRuntimeImageTargetByOwnerFamily(
         candidates,
         viewerWindows
@@ -11243,6 +11305,8 @@ MakeMxNMMeasurementTargetResult() {
         runtimeFrameResolved: false,
         runtimeFrameCandidateCount: 0,
         runtimeFrameOwnerFamilyCount: 0,
+        runtimeToolAnchorResolved: false,
+        runtimeToolAnchorHwnd: 0,
         mappedImageRectResolved: false,
         layoutReady: false,
         layoutModelCount: 0,
