@@ -6,12 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-07-30
+
 ### Added
 
+- Added a privacy-safe Viewer context receiver diagnostic that compares manual
+  and automatic image points, probes bounded same-process HWND candidates
+  without invoking a menu command, and copies its report to the clipboard.
 - Added a separate `Package Release.cmd` workflow that reads generated version
   metadata, packages an exact five-file allowlist into a visible
   `麦旋风-v<version>.zip`, validates ZIP contents and CRC, writes SHA256, and
   transactionally retires only older managed distribution artifacts.
+
+### Changed
+
+- Viewer measurement targeting now keeps strict config geometry as the primary
+  path and uses a shared owner-family image-surface resolver only when the
+  primary path cannot identify one runtime frame.
+- The runtime fallback prefers a structurally valid foreground image window or
+  a unique significantly largest image client, while excluding the native tool
+  panel, action root, buttons, small windows, and ambiguous large surfaces.
+
+### Fixed
+
+- Fixed `POPUP_NOT_CREATED` and “未找到可清除的对象” on Viewer installations
+  where the prior tool-anchor fallback mapped the configured image point into
+  the narrow native button panel instead of the actual image window.
+- Fixed the standalone diagnostic builder so it waits for GUI-based Ahk2Exe
+  completion and surfaces validation/compiler output.
 
 ## [0.6.2] - 2026-07-27
 
