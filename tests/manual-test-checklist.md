@@ -30,6 +30,18 @@
   `{{suvmax}}` 与 `{{size}}`。
 - [ ] 保存后执行完整 Reload；外部修改冲突时拒绝覆盖用户配置。
 
+### 报告正文读取诊断
+
+- [ ] 光标/选区诊断只信任 active caret 或实际变化的 selection；固定返回的
+  inactive caret 和 `0/0` selection 不得作为 production fallback。
+- [ ] 只使用非临床测试文字启动
+  `tests/windows/report_editor_text_content_field.ahk`，聚焦“检查所见”正文框后
+  按 `Ctrl+Alt+F8`。
+- [ ] 确认提示 `TEXT_AND_VALUE_CAPTURED`，将剪贴板结果粘贴到临时文本文件，
+  对比 `TextPattern.DocumentRange` 与 `ValuePattern.Value` 哪一个等于可见正文。
+- [ ] 该诊断会有意覆盖剪贴板，结果包含完整测试正文；不得对患者报告运行或
+  回传患者信息。
+
 ## Candidate G 与剪贴板
 
 - [ ] 只在 MedEx `0.0.1.0`、1920×1080、100% scaling、DPI 96 的已验证
