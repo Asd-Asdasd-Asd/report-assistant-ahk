@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.2
-; Source revision: 0a1e95f7c617f5930d7cbf7dfb00c4ac1103d3d3
-; Generated at: 2026-07-28 09:43:13 UTC
+; Source revision: dc92acbe6f11f1d440af750a4598e6e1a94a8411
+; Generated at: 2026-07-30 07:45:45 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.2.0
 ;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.6.2"
     static Channel := "internal-test"
-    static BuildDate := "2026-07-28"
-    static SourceRevision := "0a1e95f7c617f5930d7cbf7dfb00c4ac1103d3d3"
+    static BuildDate := "2026-07-30"
+    static SourceRevision := "dc92acbe6f11f1d440af750a4598e6e1a94a8411"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -10301,6 +10301,25 @@ CloneContextMeasurementOptions(options := 0) {
 }
 
 ResolveContextMeasurementViewer(viewerExe, options := 0) {
+    expectedViewerHwnd := MeasurementOption(
+        options,
+        "expectedViewerHwnd",
+        0
+    )
+    expectedViewerPid := MeasurementOption(
+        options,
+        "expectedViewerPid",
+        0
+    )
+    if expectedViewerHwnd {
+        expectedViewer := ResolveExpectedContextMeasurementViewer(
+            viewerExe,
+            expectedViewerHwnd,
+            expectedViewerPid
+        )
+        return expectedViewer
+    }
+
     screenPoint := GetContextMeasurementConfiguredScreenPoint(options)
     if IsContextMeasurementPoint(screenPoint)
         && ContextMeasurementPointInsideVirtualScreen(screenPoint) {
@@ -10349,6 +10368,47 @@ ResolveContextMeasurementViewer(viewerExe, options := 0) {
     return {
         ok: true,
         hwnd: hwnd,
+        pid: pid,
+        failureReason: MeasurementFailureReason.NONE
+    }
+}
+
+ResolveExpectedContextMeasurementViewer(
+    viewerExe,
+    expectedViewerHwnd,
+    expectedViewerPid := 0
+) {
+    if !WinExist("ahk_id " expectedViewerHwnd) {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_NOT_FOUND
+        }
+    }
+    try processName := WinGetProcessName(
+        "ahk_id " expectedViewerHwnd
+    )
+    catch {
+        processName := ""
+    }
+    try pid := WinGetPID("ahk_id " expectedViewerHwnd)
+    catch {
+        pid := 0
+    }
+    if StrLower(processName) != StrLower(viewerExe)
+        || !pid
+        || (expectedViewerPid && pid != expectedViewerPid) {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_TARGET_CHANGED
+        }
+    }
+    return {
+        ok: true,
+        hwnd: expectedViewerHwnd,
         pid: pid,
         failureReason: MeasurementFailureReason.NONE
     }
@@ -10921,7 +10981,7 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         result.imageRect := runtimeTarget.imageRect
         result.screenPoint := runtimeTarget.screenPoint
 
-        actionWindowResult := ResolveMxNMActionWindowFromPoint(
+        actionWindowResult := ResolveMxNMActionWindow(
             viewerExe,
             result.screenPoint,
             runtimeTarget.frame.hwnd
@@ -10976,11 +11036,13 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         )
         if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
             continue
-        rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
-            screenPoint
-        )
-        if !rootOwnerHwnd
-            || rootOwnerHwnd != candidateFrame.hwnd {
+        ; The command is posted to this owner HWND, not sent as a physical
+        ; screen click. A covering or differently nested window at this point
+        ; must not veto an otherwise valid Viewer-owned client coordinate.
+        if !MxNMPointInsideRuntimeFrameClient(
+            screenPoint,
+            candidateFrame
+        ) {
             continue
         }
         candidates.Push({
@@ -11126,19 +11188,13 @@ CountMxNMRuntimeOwnerFamily(viewerWindows, frameHwnd) {
     return count
 }
 
-ResolveMxNMRootOwnerFromPoint(screenPoint) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try pointHwnd := DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch
-        pointHwnd := 0
-    if !pointHwnd
-        return 0
-    return ResolveMxNMRootOwnerHwnd(pointHwnd)
+MxNMPointInsideRuntimeFrameClient(point, frame) {
+    return IsObject(point)
+        && IsObject(frame)
+        && point.x >= frame.clientX
+        && point.x < frame.clientX + frame.clientWidth
+        && point.y >= frame.clientY
+        && point.y < frame.clientY + frame.clientHeight
 }
 
 ResolveMxNMRootOwnerHwnd(hwnd) {
@@ -11435,48 +11491,16 @@ MxNMPointInsideRect(point, rect) {
         && point.y < rect.bottom
 }
 
-ResolveMxNMActionWindowFromPoint(
+ResolveMxNMActionWindow(
     viewerExe,
     screenPoint,
     runtimeFrameHwnd
 ) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try pointHwnd := DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch {
-        pointHwnd := 0
-    }
-    if !pointHwnd {
-        return {
-            ok: false,
-            code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
-        }
-    }
-    try rootHwnd := DllCall(
-        "User32\GetAncestor",
-        "Ptr", pointHwnd,
-        "UInt", 2,
-        "Ptr"
-    )
-    catch {
-        rootHwnd := 0
-    }
-    if !rootHwnd
-        rootHwnd := pointHwnd
-    try rootOwnerHwnd := DllCall(
-        "User32\GetAncestor",
-        "Ptr", pointHwnd,
-        "UInt", 3,
-        "Ptr"
-    )
-    catch
-        rootOwnerHwnd := 0
-    if !rootOwnerHwnd
-        rootOwnerHwnd := rootHwnd
+    ; Keep the action bound to the owner selected from the Viewer process
+    ; family. Desktop hit-testing would inspect the current z-order even though
+    ; the later right-click messages target this HWND directly.
+    rootHwnd := runtimeFrameHwnd
+    rootOwnerHwnd := ResolveMxNMRootOwnerHwnd(rootHwnd)
 
     try processName := WinGetProcessName("ahk_id " rootHwnd)
     catch {
