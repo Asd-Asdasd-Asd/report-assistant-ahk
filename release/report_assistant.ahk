@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.2
-; Source revision: e1012201e81e4b4249e0f5833ddefac01377ab83
-; Generated at: 2026-07-30 09:08:24 UTC
+; Source revision: ddad69f7910ee78251c2f886a71a60f63aeba348
+; Generated at: 2026-07-30 09:17:09 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.2.0
 ;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.2"
     static Channel := "internal-test"
     static BuildDate := "2026-07-30"
-    static SourceRevision := "e1012201e81e4b4249e0f5833ddefac01377ab83"
+    static SourceRevision := "ddad69f7910ee78251c2f886a71a60f63aeba348"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11180,20 +11180,17 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
     )
     readyCode := "READY"
     if !mappedImage.ok {
-        mappedImage := {
-            ok: true,
-            rect: {
-                left: actionFrame.clientX,
-                top: actionFrame.clientY,
-                right: actionFrame.clientX
-                    + actionFrame.clientWidth,
-                bottom: actionFrame.clientY
-                    + actionFrame.clientHeight,
-                width: actionFrame.clientWidth,
-                height: actionFrame.clientHeight
-            }
+        mappedImage :=
+            MapMxNMClippedImageRectToRuntimeClient(
+                plan.mainGeometry,
+                actionFrame
+            )
+        if !mappedImage.ok {
+            failure.fallbackCode :=
+                "ANCHOR_CLIPPED_MAPPING_FAILED"
+            return failure
         }
-        readyCode := "READY_ACTION_CLIENT_RECT"
+        readyCode := "READY_CLIPPED_CONFIG_CLIENT"
     }
     screenPoint := MapMxNMLogicalPointToRuntimeRect(
         plan.logicalPoint,
@@ -11219,6 +11216,74 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         imageRect: mappedImage.rect,
         screenPoint: screenPoint,
         fallbackCode: readyCode
+    }
+}
+
+MapMxNMClippedImageRectToRuntimeClient(
+    mainGeometry,
+    runtimeFrame
+) {
+    failure := {
+        ok: false,
+        rect: 0
+    }
+    if !IsObject(mainGeometry)
+        || !IsObject(runtimeFrame)
+        || !mainGeometry.frameSizeResolved
+        || !mainGeometry.imagePositionResolved
+        || !mainGeometry.imageSizeResolved
+        || mainGeometry.frameWidth <= 0
+        || mainGeometry.frameHeight <= 0
+        || runtimeFrame.clientWidth <= 0
+        || runtimeFrame.clientHeight <= 0 {
+        return failure
+    }
+    logicalLeft := Max(0, mainGeometry.imageX)
+    logicalTop := Max(0, mainGeometry.imageY)
+    logicalRight := Min(
+        mainGeometry.frameWidth,
+        mainGeometry.imageX + mainGeometry.imageWidth
+    )
+    logicalBottom := Min(
+        mainGeometry.frameHeight,
+        mainGeometry.imageY + mainGeometry.imageHeight
+    )
+    if logicalRight <= logicalLeft
+        || logicalBottom <= logicalTop {
+        return failure
+    }
+    mappedLeft := runtimeFrame.clientX + Round(
+        logicalLeft
+        * runtimeFrame.clientWidth
+        / mainGeometry.frameWidth
+    )
+    mappedTop := runtimeFrame.clientY + Round(
+        logicalTop
+        * runtimeFrame.clientHeight
+        / mainGeometry.frameHeight
+    )
+    mappedRight := runtimeFrame.clientX + Round(
+        logicalRight
+        * runtimeFrame.clientWidth
+        / mainGeometry.frameWidth
+    )
+    mappedBottom := runtimeFrame.clientY + Round(
+        logicalBottom
+        * runtimeFrame.clientHeight
+        / mainGeometry.frameHeight
+    )
+    if mappedRight <= mappedLeft || mappedBottom <= mappedTop
+        return failure
+    return {
+        ok: true,
+        rect: {
+            left: mappedLeft,
+            top: mappedTop,
+            right: mappedRight,
+            bottom: mappedBottom,
+            width: mappedRight - mappedLeft,
+            height: mappedBottom - mappedTop
+        }
     }
 }
 
