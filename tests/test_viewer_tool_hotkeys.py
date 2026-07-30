@@ -79,6 +79,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "EnumerateMxNMViewerToolControlCandidates",
             "candidate.parentHwnd",
             "MxNMViewerToolGetRootOwnerHwnd",
+            "actionRootHwnd",
             "ValidateMxNMViewerToolControlLayout",
             "validGroups.Length != 1",
         ):
@@ -236,6 +237,11 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             handler,
         )
         self.assertIn("MxNMViewerClearFailureMessage(result)", handler)
+        self.assertIn(
+            "MxNMAnnotationCleanupCode.COMMAND_FAILED",
+            hotkeys,
+        )
+        self.assertIn("result.failureReason", hotkeys)
         self.assertIn(
             "TARGET_CLIENT_POINT_INVALID",
             hotkeys,

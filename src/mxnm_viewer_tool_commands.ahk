@@ -442,6 +442,7 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         ok: false,
         code: MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE,
         frameHwnd: 0,
+        actionRootHwnd: 0,
         panelHwnd: 0,
         candidateCount: 0,
         controls: Map()
@@ -508,10 +509,23 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         ) {
             continue
         }
+        actionRootHwnd := 0
+        rootsMatch := true
+        for _, control in controls {
+            if !actionRootHwnd
+                actionRootHwnd := control.rootHwnd
+            else if control.rootHwnd != actionRootHwnd {
+                rootsMatch := false
+                break
+            }
+        }
+        if !rootsMatch || !actionRootHwnd
+            continue
         validGroups.Push({
             frameHwnd: MxNMViewerToolGetRootOwnerHwnd(
                 group.parentHwnd
             ),
+            actionRootHwnd: actionRootHwnd,
             panelHwnd: group.parentHwnd,
             controls: controls
         })
@@ -526,6 +540,7 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         ok: true,
         code: MxNMViewerToolCode.READY,
         frameHwnd: validGroups[1].frameHwnd,
+        actionRootHwnd: validGroups[1].actionRootHwnd,
         panelHwnd: validGroups[1].panelHwnd,
         candidateCount: candidates.Length,
         controls: validGroups[1].controls

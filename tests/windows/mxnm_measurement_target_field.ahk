@@ -166,6 +166,8 @@ FormatMxNMMeasurementTargetFieldOutput(
                 target.runtimeToolAnchorResolved
             ),
         "RuntimeToolAnchorHwnd=" target.runtimeToolAnchorHwnd,
+        "RuntimeToolAnchorUsed=" .
+            MxNMTargetFieldBoolean(target.runtimeToolAnchorUsed),
         "MappedImageRectResolved=" .
             MxNMTargetFieldBoolean(target.mappedImageRectResolved),
         "LayoutReady=" MxNMTargetFieldBoolean(target.layoutReady),

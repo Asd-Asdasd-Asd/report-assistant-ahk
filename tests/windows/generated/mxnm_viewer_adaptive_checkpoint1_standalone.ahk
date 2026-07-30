@@ -1043,6 +1043,7 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         ok: false,
         code: MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE,
         frameHwnd: 0,
+        actionRootHwnd: 0,
         panelHwnd: 0,
         candidateCount: 0,
         controls: Map()
@@ -1109,10 +1110,23 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         ) {
             continue
         }
+        actionRootHwnd := 0
+        rootsMatch := true
+        for _, control in controls {
+            if !actionRootHwnd
+                actionRootHwnd := control.rootHwnd
+            else if control.rootHwnd != actionRootHwnd {
+                rootsMatch := false
+                break
+            }
+        }
+        if !rootsMatch || !actionRootHwnd
+            continue
         validGroups.Push({
             frameHwnd: MxNMViewerToolGetRootOwnerHwnd(
                 group.parentHwnd
             ),
+            actionRootHwnd: actionRootHwnd,
             panelHwnd: group.parentHwnd,
             controls: controls
         })
@@ -1127,6 +1141,7 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         ok: true,
         code: MxNMViewerToolCode.READY,
         frameHwnd: validGroups[1].frameHwnd,
+        actionRootHwnd: validGroups[1].actionRootHwnd,
         panelHwnd: validGroups[1].panelHwnd,
         candidateCount: candidates.Length,
         controls: validGroups[1].controls
@@ -1596,9 +1611,17 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         result.runtimeToolAnchorHwnd := toolAnchor.frameHwnd
         runtimeTarget := ResolveMxNMRuntimeImageTarget(
             plan,
-            viewerWindows,
-            toolAnchor.frameHwnd
+            viewerWindows
         )
+        if !runtimeTarget.ok && toolAnchor.ok {
+            runtimeTarget := ResolveMxNMRuntimeImageTarget(
+                plan,
+                viewerWindows,
+                toolAnchor.frameHwnd,
+                false
+            )
+            result.runtimeToolAnchorUsed := runtimeTarget.ok
+        }
         result.runtimeFrameCandidateCount :=
             runtimeTarget.candidateCount
         result.runtimeFrameOwnerFamilyCount :=
@@ -1614,11 +1637,18 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         result.imageRect := runtimeTarget.imageRect
         result.screenPoint := runtimeTarget.screenPoint
 
-        actionWindowResult := ResolveMxNMActionWindow(
-            viewerExe,
-            result.screenPoint,
-            runtimeTarget.frame.hwnd
-        )
+        actionWindowResult := result.runtimeToolAnchorUsed
+            ? ResolveMxNMActionWindowFromAnchor(
+                viewerExe,
+                result.screenPoint,
+                runtimeTarget.frame.hwnd,
+                toolAnchor.actionRootHwnd
+            )
+            : ResolveMxNMActionWindowFromPoint(
+                viewerExe,
+                result.screenPoint,
+                runtimeTarget.frame.hwnd
+            )
         if !actionWindowResult.ok {
             result.code := actionWindowResult.code
             return result
@@ -1640,6 +1670,7 @@ ResolveMxNMMeasurementToolAnchor(plan, viewerWindows) {
     failure := {
         ok: false,
         frameHwnd: 0,
+        actionRootHwnd: 0,
         panelHwnd: 0
     }
     if !IsObject(plan)
@@ -1652,11 +1683,15 @@ ResolveMxNMMeasurementToolAnchor(plan, viewerWindows) {
         plan.viewerToolPlan,
         viewerWindows
     )
-    if !controlSet.ok || !controlSet.frameHwnd
+    if !controlSet.ok
+        || !controlSet.frameHwnd
+        || !controlSet.actionRootHwnd {
         return failure
+    }
     return {
         ok: true,
         frameHwnd: controlSet.frameHwnd,
+        actionRootHwnd: controlSet.actionRootHwnd,
         panelHwnd: controlSet.panelHwnd
     }
 }
@@ -1664,7 +1699,8 @@ ResolveMxNMMeasurementToolAnchor(plan, viewerWindows) {
 ResolveMxNMRuntimeImageTarget(
     plan,
     viewerWindows,
-    preferredFrameHwnd := 0
+    preferredFrameHwnd := 0,
+    requireDesktopOwnerMatch := true
 ) {
     failure := {
         ok: false,
@@ -1702,10 +1738,15 @@ ResolveMxNMRuntimeImageTarget(
         )
         if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
             continue
-        ; The command is posted to this owner HWND, not sent as a physical
-        ; screen click. A covering or differently nested window at this point
-        ; must not veto an otherwise valid Viewer-owned client coordinate.
-        if !MxNMPointInsideRuntimeFrameClient(
+        if requireDesktopOwnerMatch {
+            rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
+                screenPoint
+            )
+            if !rootOwnerHwnd
+                || rootOwnerHwnd != candidateFrame.hwnd {
+                continue
+            }
+        } else if !MxNMPointInsideRuntimeFrameClient(
             screenPoint,
             candidateFrame
         ) {
@@ -1878,6 +1919,21 @@ MxNMPointInsideRuntimeFrameClient(point, frame) {
         && point.y < frame.clientY + frame.clientHeight
 }
 
+ResolveMxNMRootOwnerFromPoint(screenPoint) {
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try pointHwnd := DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch
+        pointHwnd := 0
+    if !pointHwnd
+        return 0
+    return ResolveMxNMRootOwnerHwnd(pointHwnd)
+}
+
 ResolveMxNMRootOwnerHwnd(hwnd) {
     if !hwnd
         return 0
@@ -1926,6 +1982,7 @@ MakeMxNMMeasurementTargetResult() {
         runtimeFrameOwnerFamilyCount: 0,
         runtimeToolAnchorResolved: false,
         runtimeToolAnchorHwnd: 0,
+        runtimeToolAnchorUsed: false,
         mappedImageRectResolved: false,
         layoutReady: false,
         layoutModelCount: 0,
@@ -2174,17 +2231,73 @@ MxNMPointInsideRect(point, rect) {
         && point.y < rect.bottom
 }
 
-ResolveMxNMActionWindow(
+ResolveMxNMActionWindowFromPoint(
     viewerExe,
     screenPoint,
     runtimeFrameHwnd
 ) {
-    ; Keep the action bound to the owner selected from the Viewer process
-    ; family. Desktop hit-testing would inspect the current z-order even though
-    ; the later right-click messages target this HWND directly.
-    rootHwnd := runtimeFrameHwnd
-    rootOwnerHwnd := ResolveMxNMRootOwnerHwnd(rootHwnd)
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try pointHwnd := DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch {
+        pointHwnd := 0
+    }
+    if !pointHwnd {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
+        }
+    }
+    try rootHwnd := DllCall(
+        "User32\GetAncestor",
+        "Ptr", pointHwnd,
+        "UInt", 2,
+        "Ptr"
+    )
+    catch {
+        rootHwnd := 0
+    }
+    if !rootHwnd
+        rootHwnd := pointHwnd
+    rootOwnerHwnd := ResolveMxNMRootOwnerHwnd(pointHwnd)
+    if !rootOwnerHwnd
+        rootOwnerHwnd := rootHwnd
 
+    return ValidateMxNMActionWindow(
+        viewerExe,
+        screenPoint,
+        runtimeFrameHwnd,
+        rootHwnd,
+        rootOwnerHwnd
+    )
+}
+
+ResolveMxNMActionWindowFromAnchor(
+    viewerExe,
+    screenPoint,
+    runtimeFrameHwnd,
+    actionRootHwnd
+) {
+    return ValidateMxNMActionWindow(
+        viewerExe,
+        screenPoint,
+        runtimeFrameHwnd,
+        actionRootHwnd,
+        ResolveMxNMRootOwnerHwnd(actionRootHwnd)
+    )
+}
+
+ValidateMxNMActionWindow(
+    viewerExe,
+    screenPoint,
+    runtimeFrameHwnd,
+    rootHwnd,
+    rootOwnerHwnd
+) {
     try processName := WinGetProcessName("ahk_id " rootHwnd)
     catch {
         processName := ""

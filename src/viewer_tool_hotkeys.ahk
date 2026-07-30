@@ -218,6 +218,10 @@ MxNMViewerClearFailureMessage(result) {
         return "Viewer 图像坐标转换失败，未执行清除"
     if code = MxNMAnnotationCleanupCode.TARGET_CHANGED
         return "Viewer 已变化，未执行清除"
+    if code = MxNMAnnotationCleanupCode.COMMAND_FAILED
+        return "Viewer 右键菜单命令失败（"
+            . result.failureReason
+            . "）"
     if code = MxNMAnnotationCleanupCode.CONFIRMATION_REQUIRED
         return "清除需要人工确认，未继续执行"
     if code = MxNMAnnotationCleanupCode.CLEANUP_NOT_VERIFIED
