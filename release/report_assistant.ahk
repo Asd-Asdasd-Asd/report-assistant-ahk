@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.2
-; Source revision: ddad69f7910ee78251c2f886a71a60f63aeba348
-; Generated at: 2026-07-30 09:17:09 UTC
+; Source revision: 17a00567ad0387341d69e3a2f995d49b506bd05f
+; Generated at: 2026-07-30 10:08:36 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.2.0
 ;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.2"
     static Channel := "internal-test"
     static BuildDate := "2026-07-30"
-    static SourceRevision := "ddad69f7910ee78251c2f886a71a60f63aeba348"
+    static SourceRevision := "17a00567ad0387341d69e3a2f995d49b506bd05f"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -10965,6 +10965,9 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
             result.configCode := MxNMConfigGeometryCode.VIEWER_NOT_FOUND
             return result
         }
+        try foregroundHwnd := WinExist("A")
+        catch
+            foregroundHwnd := 0
         viewerWindows := CaptureMxNMViewerWindowGeometry(
             viewerExe,
             plan.viewerProcessPath
@@ -10984,7 +10987,8 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
                 ResolveMxNMRuntimeImageTargetFromToolAnchor(
                     plan,
                     viewerWindows,
-                    toolAnchor
+                    toolAnchor,
+                    foregroundHwnd
                 )
             result.runtimeToolAnchorFallbackCode :=
                 runtimeTarget.fallbackCode
@@ -11006,11 +11010,13 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         result.screenPoint := runtimeTarget.screenPoint
 
         actionWindowResult := result.runtimeToolAnchorUsed
+            && runtimeTarget.HasOwnProp("actionHwnd")
+            && runtimeTarget.actionHwnd
             ? ResolveMxNMActionWindowFromAnchor(
                 viewerExe,
                 result.screenPoint,
                 runtimeTarget.frame.hwnd,
-                toolAnchor.actionRootHwnd
+                runtimeTarget.actionHwnd
             )
             : ResolveMxNMActionWindowFromPoint(
                 viewerExe,
@@ -11134,7 +11140,8 @@ ResolveMxNMRuntimeImageTarget(
 ResolveMxNMRuntimeImageTargetFromToolAnchor(
     plan,
     viewerWindows,
-    toolAnchor
+    toolAnchor,
+    foregroundHwnd := 0
 ) {
     failure := {
         ok: false,
@@ -11143,6 +11150,7 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         frame: 0,
         imageRect: 0,
         screenPoint: 0,
+        actionHwnd: 0,
         fallbackCode: "ANCHOR_INVALID"
     }
     if !IsObject(plan)
@@ -11155,42 +11163,45 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         return failure
     }
     framePid := MxNMTargetWindowPid(toolAnchor.frameHwnd)
-    actionPid := MxNMTargetWindowPid(toolAnchor.actionRootHwnd)
     if !framePid
-        || actionPid != framePid
-        || ResolveMxNMRootOwnerHwnd(
-            toolAnchor.actionRootHwnd
-        ) != toolAnchor.frameHwnd {
+        || MxNMTargetWindowPid(toolAnchor.actionRootHwnd)
+            != framePid
+        || MxNMTargetWindowPid(toolAnchor.panelHwnd)
+            != framePid {
         failure.fallbackCode := "ANCHOR_IDENTITY_INVALID"
         return failure
     }
     ownerFrame := CaptureMxNMRuntimeOwnerFrame(
         toolAnchor.frameHwnd
     )
-    actionFrame := CaptureMxNMRuntimeOwnerFrame(
-        toolAnchor.actionRootHwnd
-    )
-    if !IsObject(ownerFrame) || !IsObject(actionFrame) {
+    if !IsObject(ownerFrame) {
         failure.fallbackCode := "ANCHOR_FRAME_INVALID"
         return failure
     }
-    mappedImage := MapMxNMLogicalImageRectToRuntime(
-        plan.mainGeometry,
-        actionFrame
+    surfaceResult := ResolveMxNMRuntimeImageSurfaceFromToolAnchor(
+        viewerWindows,
+        toolAnchor,
+        ownerFrame,
+        foregroundHwnd
     )
-    readyCode := "READY"
-    if !mappedImage.ok {
-        mappedImage :=
-            MapMxNMClippedImageRectToRuntimeClient(
-                plan.mainGeometry,
-                actionFrame
-            )
-        if !mappedImage.ok {
-            failure.fallbackCode :=
-                "ANCHOR_CLIPPED_MAPPING_FAILED"
-            return failure
+    failure.candidateCount := surfaceResult.candidateCount
+    if !surfaceResult.ok {
+        failure.fallbackCode := surfaceResult.code
+        return failure
+    }
+    actionFrame := surfaceResult.frame
+    mappedImage := {
+        ok: true,
+        rect: {
+            left: actionFrame.clientX,
+            top: actionFrame.clientY,
+            right: actionFrame.clientX
+                + actionFrame.clientWidth,
+            bottom: actionFrame.clientY
+                + actionFrame.clientHeight,
+            width: actionFrame.clientWidth,
+            height: actionFrame.clientHeight
         }
-        readyCode := "READY_CLIPPED_CONFIG_CLIENT"
     }
     screenPoint := MapMxNMLogicalPointToRuntimeRect(
         plan.logicalPoint,
@@ -11207,7 +11218,7 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
     }
     return {
         ok: true,
-        candidateCount: 1,
+        candidateCount: surfaceResult.candidateCount,
         ownerFamilyCount: CountMxNMRuntimeOwnerFamily(
             viewerWindows,
             toolAnchor.frameHwnd
@@ -11215,76 +11226,115 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         frame: ownerFrame,
         imageRect: mappedImage.rect,
         screenPoint: screenPoint,
-        fallbackCode: readyCode
+        actionHwnd: actionFrame.hwnd,
+        fallbackCode: surfaceResult.code
     }
 }
 
-MapMxNMClippedImageRectToRuntimeClient(
-    mainGeometry,
-    runtimeFrame
+ResolveMxNMRuntimeImageSurfaceFromToolAnchor(
+    viewerWindows,
+    toolAnchor,
+    ownerFrame,
+    foregroundHwnd := 0
 ) {
     failure := {
         ok: false,
-        rect: 0
+        code: "IMAGE_SURFACE_NOT_UNIQUE",
+        candidateCount: 0,
+        frame: 0
     }
-    if !IsObject(mainGeometry)
-        || !IsObject(runtimeFrame)
-        || !mainGeometry.frameSizeResolved
-        || !mainGeometry.imagePositionResolved
-        || !mainGeometry.imageSizeResolved
-        || mainGeometry.frameWidth <= 0
-        || mainGeometry.frameHeight <= 0
-        || runtimeFrame.clientWidth <= 0
-        || runtimeFrame.clientHeight <= 0 {
+    if !IsObject(viewerWindows)
+        || !IsObject(toolAnchor)
+        || !IsObject(ownerFrame)
+        || ownerFrame.clientWidth <= 0
+        || ownerFrame.clientHeight <= 0 {
         return failure
     }
-    logicalLeft := Max(0, mainGeometry.imageX)
-    logicalTop := Max(0, mainGeometry.imageY)
-    logicalRight := Min(
-        mainGeometry.frameWidth,
-        mainGeometry.imageX + mainGeometry.imageWidth
-    )
-    logicalBottom := Min(
-        mainGeometry.frameHeight,
-        mainGeometry.imageY + mainGeometry.imageHeight
-    )
-    if logicalRight <= logicalLeft
-        || logicalBottom <= logicalTop {
-        return failure
+    ownerArea := ownerFrame.clientWidth * ownerFrame.clientHeight
+    minimumArea := Max(40000, Round(ownerArea * 0.10))
+    candidates := []
+    foregroundCandidate := 0
+    for viewerWindow in viewerWindows {
+        hwnd := viewerWindow.hwnd
+        if !hwnd
+            || hwnd = toolAnchor.frameHwnd
+            || hwnd = toolAnchor.actionRootHwnd
+            || hwnd = toolAnchor.panelHwnd
+            || MxNMTargetWindowPid(hwnd)
+                != MxNMTargetWindowPid(toolAnchor.frameHwnd)
+            || ResolveMxNMRootOwnerHwnd(hwnd)
+                != toolAnchor.frameHwnd
+            || MxNMTargetParentHwnd(hwnd)
+                != toolAnchor.frameHwnd
+            || StrLower(MxNMViewerToolWindowClass(hwnd))
+                != "#32770"
+            || !DllCall(
+                "User32\IsWindowVisible",
+                "Ptr", hwnd,
+                "Int"
+            )
+            || !DllCall(
+                "User32\IsWindowEnabled",
+                "Ptr", hwnd,
+                "Int"
+            )
+            || viewerWindow.clientWidth < 200
+            || viewerWindow.clientHeight < 200 {
+            continue
+        }
+        area := viewerWindow.clientWidth
+            * viewerWindow.clientHeight
+        if area < minimumArea
+            continue
+        candidate := {
+            frame: viewerWindow,
+            area: area
+        }
+        candidates.Push(candidate)
+        if hwnd = foregroundHwnd
+            foregroundCandidate := candidate
     }
-    mappedLeft := runtimeFrame.clientX + Round(
-        logicalLeft
-        * runtimeFrame.clientWidth
-        / mainGeometry.frameWidth
-    )
-    mappedTop := runtimeFrame.clientY + Round(
-        logicalTop
-        * runtimeFrame.clientHeight
-        / mainGeometry.frameHeight
-    )
-    mappedRight := runtimeFrame.clientX + Round(
-        logicalRight
-        * runtimeFrame.clientWidth
-        / mainGeometry.frameWidth
-    )
-    mappedBottom := runtimeFrame.clientY + Round(
-        logicalBottom
-        * runtimeFrame.clientHeight
-        / mainGeometry.frameHeight
-    )
-    if mappedRight <= mappedLeft || mappedBottom <= mappedTop
-        return failure
-    return {
-        ok: true,
-        rect: {
-            left: mappedLeft,
-            top: mappedTop,
-            right: mappedRight,
-            bottom: mappedBottom,
-            width: mappedRight - mappedLeft,
-            height: mappedBottom - mappedTop
+    failure.candidateCount := candidates.Length
+    if IsObject(foregroundCandidate) {
+        return {
+            ok: true,
+            code: "READY_FOREGROUND_IMAGE_CLIENT",
+            candidateCount: candidates.Length,
+            frame: foregroundCandidate.frame
         }
     }
+    if candidates.Length = 0
+        return failure
+    best := candidates[1]
+    secondArea := 0
+    for candidate in candidates {
+        if candidate.area > best.area {
+            secondArea := best.area
+            best := candidate
+        } else if candidate.frame.hwnd != best.frame.hwnd {
+            secondArea := Max(secondArea, candidate.area)
+        }
+    }
+    if secondArea > 0 && best.area < secondArea * 1.25 {
+        failure.code := "IMAGE_SURFACE_NOT_UNIQUE"
+        return failure
+    }
+    return {
+        ok: true,
+        code: "READY_LARGEST_IMAGE_CLIENT",
+        candidateCount: candidates.Length,
+        frame: best.frame
+    }
+}
+
+MxNMTargetParentHwnd(hwnd) {
+    try return DllCall(
+        "User32\GetParent",
+        "Ptr", hwnd,
+        "Ptr"
+    )
+    catch
+        return 0
 }
 
 BuildMxNMRuntimeOwnerFrameCandidates(viewerWindows) {
