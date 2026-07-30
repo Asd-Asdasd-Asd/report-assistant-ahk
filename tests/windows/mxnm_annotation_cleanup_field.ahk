@@ -6,6 +6,7 @@
 #Include ..\..\src\measurement_parser.ahk
 #Include ..\..\src\measurement_clipboard.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
+#Include ..\..\src\mxnm_viewer_tool_commands.ahk
 #Include ..\..\src\context_measurement_provider.ahk
 #Include ..\..\src\mxnm_measurement_target_resolver.ahk
 #Include ..\..\src\mxnm_measurement_provider.ahk

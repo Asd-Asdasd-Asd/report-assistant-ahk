@@ -89,6 +89,7 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "BuildMxNMRuntimeOwnerFrameCandidates",
             "CaptureMxNMRuntimeOwnerFrame",
             "MxNMPointInsideRuntimeFrameClient",
+            "ResolveMxNMMeasurementToolAnchor",
             "ResolveMxNMActionWindow",
             "GetAncestor",
         ):
@@ -100,6 +101,11 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         runtime_resolver = resolver.split(
             "ResolveMxNMRuntimeImageTarget(", 1
         )[1].split("IsReusableMxNMMeasurementTargetPlan", 1)[0]
+        self.assertIn("preferredFrameHwnd", runtime_resolver)
+        self.assertIn(
+            "candidateFrame.hwnd != preferredFrameHwnd",
+            runtime_resolver,
+        )
         self.assertIn(
             "MxNMPointInsideRuntimeFrameClient",
             runtime_resolver,
@@ -123,6 +129,26 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("clientPoint: clientPoint", action_resolver)
         self.assertIn("actionClientPoint", resolver)
         self.assertNotIn("WindowFromPoint", resolver)
+
+    def test_runtime_target_reuses_validated_native_tool_group(self) -> None:
+        resolver = source("src/mxnm_measurement_target_resolver.ahk")
+        build_plan = resolver.split(
+            "BuildMxNMMeasurementTargetPlan(", 1
+        )[1].split("\n}\n\nMakeMxNMMeasurementTargetPlan", 1)[0]
+        self.assertIn("BuildMxNMViewerToolCommandPlan(", build_plan)
+        self.assertIn("plan.viewerToolPlan := viewerToolPlan", build_plan)
+
+        resolve = resolver.split(
+            "ResolveMxNMMeasurementTargetFromPlan(", 1
+        )[1].split("\n}\n\nResolveMxNMMeasurementToolAnchor", 1)[0]
+        self.assertIn("ResolveMxNMMeasurementToolAnchor(", resolve)
+        self.assertIn("toolAnchor.frameHwnd", resolve)
+
+        anchor = resolver.split(
+            "ResolveMxNMMeasurementToolAnchor(", 2
+        )[-1].split("\n}\n\nResolveMxNMRuntimeImageTarget", 1)[0]
+        self.assertIn("ResolveMxNMViewerToolControlSet(", anchor)
+        self.assertIn("controlSet.frameHwnd", anchor)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")
@@ -172,6 +198,14 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             self.assertIn(phrase, regression)
         self.assertIn("^!F10::PreviewMxNMMeasurementTarget()", field)
         self.assertIn("^!F11::RunMxNMAutomaticTargetSuvMax()", field)
+        self.assertIn(
+            "#Include ..\\..\\src\\mxnm_viewer_tool_commands.ahk",
+            regression,
+        )
+        self.assertIn(
+            "#Include ..\\..\\src\\mxnm_viewer_tool_commands.ahk",
+            field,
+        )
         self.assertIn(
             'Map("imageScreenPoint", target.screenPoint)',
             field,
