@@ -63,6 +63,8 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             target.runtimeToolAnchorResolved
         result.context["targetRuntimeToolAnchorUsed"] :=
             target.runtimeToolAnchorUsed
+        result.context["targetRuntimeToolAnchorFallbackCode"] :=
+            target.runtimeToolAnchorFallbackCode
         if !target.ok {
             result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE

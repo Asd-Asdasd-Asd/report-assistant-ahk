@@ -86,6 +86,7 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "MxNMPointClearanceAcrossLayouts",
             "minimumRequiredClearance",
             "ResolveMxNMRuntimeImageTarget",
+            "ResolveMxNMRuntimeImageTargetFromToolAnchor",
             "BuildMxNMRuntimeOwnerFrameCandidates",
             "CaptureMxNMRuntimeOwnerFrame",
             "MxNMPointInsideRuntimeFrameClient",
@@ -101,30 +102,22 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("* 0.05", resolver)
         self.assertIn("* 0.01", resolver)
         runtime_resolver = resolver.split(
-            "ResolveMxNMRuntimeImageTarget(", 1
-        )[1].split("IsReusableMxNMMeasurementTargetPlan", 1)[0]
-        self.assertIn("preferredFrameHwnd", runtime_resolver)
-        self.assertIn(
-            "candidateFrame.hwnd != preferredFrameHwnd",
-            runtime_resolver,
-        )
-        self.assertIn(
-            "MxNMPointInsideRuntimeFrameClient",
-            runtime_resolver,
-        )
-        self.assertIn("requireDesktopOwnerMatch", runtime_resolver)
+            "\nResolveMxNMRuntimeImageTarget(", 1
+        )[1].split(
+            "\nResolveMxNMRuntimeImageTargetFromToolAnchor(", 1
+        )[0]
+        self.assertNotIn("preferredFrameHwnd", runtime_resolver)
         self.assertIn("ResolveMxNMRootOwnerFromPoint", runtime_resolver)
-        self.assertIn("WindowFromPoint", runtime_resolver)
         self.assertIn(
             "SelectMxNMRuntimeImageTargetByOwnerFamily",
             runtime_resolver,
         )
-        self.assertIn("CountMxNMRuntimeOwnerFamily", runtime_resolver)
-        self.assertIn("bestCount != 1", runtime_resolver)
-        self.assertIn("bestScore < 2", runtime_resolver)
-        self.assertIn("ResolveMxNMRootOwnerHwnd", runtime_resolver)
-        self.assertIn("GetWindowThreadProcessId", runtime_resolver)
-        self.assertIn("GetWindowRect", runtime_resolver)
+        self.assertIn("CountMxNMRuntimeOwnerFamily", resolver)
+        self.assertIn("bestCount != 1", resolver)
+        self.assertIn("bestScore < 2", resolver)
+        self.assertIn("ResolveMxNMRootOwnerHwnd", resolver)
+        self.assertIn("GetWindowThreadProcessId", resolver)
+        self.assertIn("GetWindowRect", resolver)
         action_resolver = resolver.split(
             "ValidateMxNMActionWindow(", 2
         )[-1]
@@ -153,6 +146,10 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("result.runtimeToolAnchorUsed := runtimeTarget.ok", resolve)
         self.assertIn("ResolveMxNMActionWindowFromPoint(", resolve)
         self.assertIn("ResolveMxNMActionWindowFromAnchor(", resolve)
+        self.assertIn(
+            "ResolveMxNMRuntimeImageTargetFromToolAnchor(",
+            resolve,
+        )
 
         anchor = resolver.split(
             "ResolveMxNMMeasurementToolAnchor(", 2
@@ -160,6 +157,32 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("ResolveMxNMViewerToolControlSet(", anchor)
         self.assertIn("controlSet.frameHwnd", anchor)
         self.assertIn("controlSet.actionRootHwnd", anchor)
+
+        fallback_target = resolver.split(
+            "\nResolveMxNMRuntimeImageTargetFromToolAnchor(", 1
+        )[1].split(
+            "\n}\n\nBuildMxNMRuntimeOwnerFrameCandidates", 1
+        )[0]
+        self.assertIn("toolAnchor.actionRootHwnd", fallback_target)
+        self.assertIn("actionFrame", fallback_target)
+        self.assertIn(
+            "MapMxNMLogicalImageRectToRuntime(\n"
+            "        plan.mainGeometry,\n"
+            "        actionFrame",
+            fallback_target,
+        )
+        self.assertIn(
+            "MxNMPointInsideRuntimeFrameClient",
+            fallback_target,
+        )
+        for fallback_code in (
+            "ANCHOR_INVALID",
+            "ANCHOR_IDENTITY_INVALID",
+            "ANCHOR_FRAME_INVALID",
+            "ANCHOR_MAPPING_FAILED",
+            "ANCHOR_POINT_OUT_OF_BOUNDS",
+        ):
+            self.assertIn(fallback_code, fallback_target)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")

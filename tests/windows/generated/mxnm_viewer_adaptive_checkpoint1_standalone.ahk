@@ -1614,12 +1614,14 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
             viewerWindows
         )
         if !runtimeTarget.ok && toolAnchor.ok {
-            runtimeTarget := ResolveMxNMRuntimeImageTarget(
-                plan,
-                viewerWindows,
-                toolAnchor.frameHwnd,
-                false
-            )
+            runtimeTarget :=
+                ResolveMxNMRuntimeImageTargetFromToolAnchor(
+                    plan,
+                    viewerWindows,
+                    toolAnchor
+                )
+            result.runtimeToolAnchorFallbackCode :=
+                runtimeTarget.fallbackCode
             result.runtimeToolAnchorUsed := runtimeTarget.ok
         }
         result.runtimeFrameCandidateCount :=
@@ -1698,9 +1700,7 @@ ResolveMxNMMeasurementToolAnchor(plan, viewerWindows) {
 
 ResolveMxNMRuntimeImageTarget(
     plan,
-    viewerWindows,
-    preferredFrameHwnd := 0,
-    requireDesktopOwnerMatch := true
+    viewerWindows
 ) {
     failure := {
         ok: false,
@@ -1721,10 +1721,6 @@ ResolveMxNMRuntimeImageTarget(
         viewerWindows
     )
     for candidateFrame in runtimeFrames {
-        if preferredFrameHwnd
-            && candidateFrame.hwnd != preferredFrameHwnd {
-            continue
-        }
         mappedImage := MapMxNMLogicalImageRectToRuntime(
             plan.mainGeometry,
             candidateFrame
@@ -1738,18 +1734,11 @@ ResolveMxNMRuntimeImageTarget(
         )
         if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
             continue
-        if requireDesktopOwnerMatch {
-            rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
-                screenPoint
-            )
-            if !rootOwnerHwnd
-                || rootOwnerHwnd != candidateFrame.hwnd {
-                continue
-            }
-        } else if !MxNMPointInsideRuntimeFrameClient(
-            screenPoint,
-            candidateFrame
-        ) {
+        rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
+            screenPoint
+        )
+        if !rootOwnerHwnd
+            || rootOwnerHwnd != candidateFrame.hwnd {
             continue
         }
         candidates.Push({
@@ -1759,21 +1748,6 @@ ResolveMxNMRuntimeImageTarget(
         })
     }
     failure.candidateCount := candidates.Length
-    if preferredFrameHwnd {
-        if candidates.Length != 1
-            return failure
-        return {
-            ok: true,
-            candidateCount: 1,
-            ownerFamilyCount: CountMxNMRuntimeOwnerFamily(
-                viewerWindows,
-                preferredFrameHwnd
-            ),
-            frame: candidates[1].frame,
-            imageRect: candidates[1].imageRect,
-            screenPoint: candidates[1].screenPoint
-        }
-    }
     selected := SelectMxNMRuntimeImageTargetByOwnerFamily(
         candidates,
         viewerWindows
@@ -1788,6 +1762,84 @@ ResolveMxNMRuntimeImageTarget(
         frame: selected.candidate.frame,
         imageRect: selected.candidate.imageRect,
         screenPoint: selected.candidate.screenPoint
+    }
+}
+
+ResolveMxNMRuntimeImageTargetFromToolAnchor(
+    plan,
+    viewerWindows,
+    toolAnchor
+) {
+    failure := {
+        ok: false,
+        candidateCount: 0,
+        ownerFamilyCount: 0,
+        frame: 0,
+        imageRect: 0,
+        screenPoint: 0,
+        fallbackCode: "ANCHOR_INVALID"
+    }
+    if !IsObject(plan)
+        || !IsObject(plan.mainGeometry)
+        || !IsObject(plan.logicalPoint)
+        || !IsObject(toolAnchor)
+        || !toolAnchor.ok
+        || !toolAnchor.frameHwnd
+        || !toolAnchor.actionRootHwnd {
+        return failure
+    }
+    framePid := MxNMTargetWindowPid(toolAnchor.frameHwnd)
+    actionPid := MxNMTargetWindowPid(toolAnchor.actionRootHwnd)
+    if !framePid
+        || actionPid != framePid
+        || ResolveMxNMRootOwnerHwnd(
+            toolAnchor.actionRootHwnd
+        ) != toolAnchor.frameHwnd {
+        failure.fallbackCode := "ANCHOR_IDENTITY_INVALID"
+        return failure
+    }
+    ownerFrame := CaptureMxNMRuntimeOwnerFrame(
+        toolAnchor.frameHwnd
+    )
+    actionFrame := CaptureMxNMRuntimeOwnerFrame(
+        toolAnchor.actionRootHwnd
+    )
+    if !IsObject(ownerFrame) || !IsObject(actionFrame) {
+        failure.fallbackCode := "ANCHOR_FRAME_INVALID"
+        return failure
+    }
+    mappedImage := MapMxNMLogicalImageRectToRuntime(
+        plan.mainGeometry,
+        actionFrame
+    )
+    if !mappedImage.ok {
+        failure.fallbackCode := "ANCHOR_MAPPING_FAILED"
+        return failure
+    }
+    screenPoint := MapMxNMLogicalPointToRuntimeRect(
+        plan.logicalPoint,
+        plan.mainGeometry,
+        mappedImage.rect
+    )
+    if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
+        || !MxNMPointInsideRuntimeFrameClient(
+            screenPoint,
+            actionFrame
+        ) {
+        failure.fallbackCode := "ANCHOR_POINT_OUT_OF_BOUNDS"
+        return failure
+    }
+    return {
+        ok: true,
+        candidateCount: 1,
+        ownerFamilyCount: CountMxNMRuntimeOwnerFamily(
+            viewerWindows,
+            toolAnchor.frameHwnd
+        ),
+        frame: ownerFrame,
+        imageRect: mappedImage.rect,
+        screenPoint: screenPoint,
+        fallbackCode: "READY"
     }
 }
 
@@ -1983,6 +2035,7 @@ MakeMxNMMeasurementTargetResult() {
         runtimeToolAnchorResolved: false,
         runtimeToolAnchorHwnd: 0,
         runtimeToolAnchorUsed: false,
+        runtimeToolAnchorFallbackCode: "",
         mappedImageRectResolved: false,
         layoutReady: false,
         layoutModelCount: 0,

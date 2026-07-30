@@ -243,6 +243,10 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         )
         self.assertIn("result.failureReason", hotkeys)
         self.assertIn(
+            "targetRuntimeToolAnchorFallbackCode",
+            hotkeys,
+        )
+        self.assertIn(
             "TARGET_CLIENT_POINT_INVALID",
             hotkeys,
         )
