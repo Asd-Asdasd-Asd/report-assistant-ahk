@@ -179,10 +179,17 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ANCHOR_INVALID",
             "ANCHOR_IDENTITY_INVALID",
             "ANCHOR_FRAME_INVALID",
-            "ANCHOR_MAPPING_FAILED",
             "ANCHOR_POINT_OUT_OF_BOUNDS",
+            "READY_ACTION_CLIENT_RECT",
         ):
             self.assertIn(fallback_code, fallback_target)
+        for field in (
+            "actionFrame.clientX",
+            "actionFrame.clientY",
+            "actionFrame.clientWidth",
+            "actionFrame.clientHeight",
+        ):
+            self.assertIn(field, fallback_target)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")

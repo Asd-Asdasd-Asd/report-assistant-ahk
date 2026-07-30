@@ -1812,9 +1812,22 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         plan.mainGeometry,
         actionFrame
     )
+    readyCode := "READY"
     if !mappedImage.ok {
-        failure.fallbackCode := "ANCHOR_MAPPING_FAILED"
-        return failure
+        mappedImage := {
+            ok: true,
+            rect: {
+                left: actionFrame.clientX,
+                top: actionFrame.clientY,
+                right: actionFrame.clientX
+                    + actionFrame.clientWidth,
+                bottom: actionFrame.clientY
+                    + actionFrame.clientHeight,
+                width: actionFrame.clientWidth,
+                height: actionFrame.clientHeight
+            }
+        }
+        readyCode := "READY_ACTION_CLIENT_RECT"
     }
     screenPoint := MapMxNMLogicalPointToRuntimeRect(
         plan.logicalPoint,
@@ -1839,7 +1852,7 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         frame: ownerFrame,
         imageRect: mappedImage.rect,
         screenPoint: screenPoint,
-        fallbackCode: "READY"
+        fallbackCode: readyCode
     }
 }
 
