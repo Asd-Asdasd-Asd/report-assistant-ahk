@@ -87,6 +87,7 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "minimumRequiredClearance",
             "ResolveMxNMRuntimeImageTarget",
             "ResolveMxNMRuntimeImageTargetFromToolAnchor",
+            "ResolveMxNMRuntimeImageSurfaceFromToolAnchor",
             "BuildMxNMRuntimeOwnerFrameCandidates",
             "CaptureMxNMRuntimeOwnerFrame",
             "MxNMPointInsideRuntimeFrameClient",
@@ -150,6 +151,8 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ResolveMxNMRuntimeImageTargetFromToolAnchor(",
             resolve,
         )
+        self.assertIn("foregroundHwnd := WinExist(\"A\")", resolve)
+        self.assertIn("runtimeTarget.actionHwnd", resolve)
 
         anchor = resolver.split(
             "ResolveMxNMMeasurementToolAnchor(", 2
@@ -166,9 +169,7 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("toolAnchor.actionRootHwnd", fallback_target)
         self.assertIn("actionFrame", fallback_target)
         self.assertIn(
-            "MapMxNMLogicalImageRectToRuntime(\n"
-            "        plan.mainGeometry,\n"
-            "        actionFrame",
+            "ResolveMxNMRuntimeImageSurfaceFromToolAnchor(",
             fallback_target,
         )
         self.assertIn(
@@ -180,33 +181,28 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ANCHOR_IDENTITY_INVALID",
             "ANCHOR_FRAME_INVALID",
             "ANCHOR_POINT_OUT_OF_BOUNDS",
-            "ANCHOR_CLIPPED_MAPPING_FAILED",
-            "READY_CLIPPED_CONFIG_CLIENT",
+            "READY_FOREGROUND_IMAGE_CLIENT",
+            "READY_LARGEST_IMAGE_CLIENT",
+            "IMAGE_SURFACE_NOT_UNIQUE",
         ):
             self.assertIn(fallback_code, fallback_target)
-        self.assertIn(
-            "MapMxNMClippedImageRectToRuntimeClient(",
-            fallback_target,
-        )
 
-        clipped_mapping = resolver.split(
-            "\nMapMxNMClippedImageRectToRuntimeClient(", 1
+        surface_mapping = resolver.split(
+            "\nResolveMxNMRuntimeImageSurfaceFromToolAnchor(", 1
         )[1].split(
             "\n}\n\nBuildMxNMRuntimeOwnerFrameCandidates", 1
         )[0]
-        for field in (
-            "mainGeometry.imageX",
-            "mainGeometry.imageY",
-            "mainGeometry.imageWidth",
-            "mainGeometry.imageHeight",
-            "runtimeFrame.clientX",
-            "runtimeFrame.clientY",
-            "runtimeFrame.clientWidth",
-            "runtimeFrame.clientHeight",
-        ):
-            self.assertIn(field, clipped_mapping)
-        self.assertIn("Max(0, mainGeometry.imageX)", clipped_mapping)
-        self.assertIn("Min(", clipped_mapping)
+        self.assertIn("hwnd = toolAnchor.actionRootHwnd", surface_mapping)
+        self.assertIn("hwnd = toolAnchor.panelHwnd", surface_mapping)
+        self.assertIn('!= "#32770"', surface_mapping)
+        self.assertIn("MxNMTargetParentHwnd(hwnd)", surface_mapping)
+        self.assertIn("viewerWindow.clientWidth < 200", surface_mapping)
+        self.assertIn("ownerArea * 0.10", surface_mapping)
+        self.assertIn("best.area < secondArea * 1.25", surface_mapping)
+        self.assertNotIn(
+            "MapMxNMClippedImageRectToRuntimeClient",
+            resolver,
+        )
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")
