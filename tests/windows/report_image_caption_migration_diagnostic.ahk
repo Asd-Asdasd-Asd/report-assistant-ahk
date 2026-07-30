@@ -51,6 +51,8 @@ StartReportCaptionDiagnostic() {
         "windowPid", foregroundPid,
         "window", SnapshotReportCaptionWindow(foregroundHwnd),
         "monitors", SnapshotReportCaptionMonitors(foregroundHwnd),
+        "processWindows",
+            SnapshotReportCaptionProcessWindows(foregroundPid),
         "source", SnapshotReportCaptionSource(
             foregroundHwnd,
             foregroundPid
@@ -272,7 +274,17 @@ SnapshotReportCaptionPoint(
         "y", mouseY,
         "windowHwnd", expectedHwnd,
         "windowPid", expectedPid,
-        "windowContainsPoint", false,
+        "sourceWindowContainsPoint", false,
+        "pointHwnd", 0,
+        "targetWindowHwnd", 0,
+        "targetWindowPid", 0,
+        "targetProcessMatches", false,
+        "targetRootOwnerResolved", false,
+        "targetWindowContainsPoint", false,
+        "targetWindow", 0,
+        "targetMonitors", 0,
+        "targetClientPoint", "UNKNOWN",
+        "targetClientRatio", "UNKNOWN",
         "nativeChain", [],
         "uiaElementCaptured", false,
         "uiaElement", 0,
@@ -283,13 +295,74 @@ SnapshotReportCaptionPoint(
         "candidates", [],
         "exceptionType", ""
     )
-    windowRect := GetReportCaptionWindowRect(expectedHwnd)
-    result["windowContainsPoint"] :=
-        IsObject(windowRect)
-        && mouseX >= windowRect.l
-        && mouseX < windowRect.r
-        && mouseY >= windowRect.t
-        && mouseY < windowRect.b
+    sourceWindowRect := GetReportCaptionWindowRect(expectedHwnd)
+    result["sourceWindowContainsPoint"] :=
+        ReportCaptionRectContainsPoint(
+            sourceWindowRect,
+            mouseX,
+            mouseY
+        )
+
+    result["pointHwnd"] :=
+        ReportCaptionWindowFromPoint(mouseX, mouseY)
+    if result["pointHwnd"] {
+        result["targetWindowHwnd"] :=
+            DllCall(
+                "user32.dll\GetAncestor",
+                "ptr",
+                result["pointHwnd"],
+                "uint",
+                3,
+                "ptr"
+            )
+        if !result["targetWindowHwnd"]
+            result["targetWindowHwnd"] := result["pointHwnd"]
+        result["targetRootOwnerResolved"] := true
+        try result["targetWindowPid"] :=
+            WinGetPID(
+                "ahk_id " result["targetWindowHwnd"]
+            )
+        result["targetProcessMatches"] :=
+            result["targetWindowPid"] = expectedPid
+        result["targetWindow"] :=
+            SnapshotReportCaptionWindow(
+                result["targetWindowHwnd"]
+            )
+        result["targetMonitors"] :=
+            SnapshotReportCaptionMonitors(
+                result["targetWindowHwnd"]
+            )
+        targetWindowRect :=
+            GetReportCaptionWindowRect(
+                result["targetWindowHwnd"]
+            )
+        result["targetWindowContainsPoint"] :=
+            ReportCaptionRectContainsPoint(
+                targetWindowRect,
+                mouseX,
+                mouseY
+            )
+        targetClientRect :=
+            GetReportCaptionClientRectScreen(
+                result["targetWindowHwnd"]
+            )
+        if IsObject(targetClientRect) {
+            clientWidth :=
+                targetClientRect.r - targetClientRect.l
+            clientHeight :=
+                targetClientRect.b - targetClientRect.t
+            clientX := mouseX - targetClientRect.l
+            clientY := mouseY - targetClientRect.t
+            result["targetClientPoint"] :=
+                clientX "," clientY
+            if clientWidth > 0 && clientHeight > 0 {
+                result["targetClientRatio"] :=
+                    Round(clientX / clientWidth, 6)
+                    . ","
+                    . Round(clientY / clientHeight, 6)
+            }
+        }
+    }
     result["nativeChain"] :=
         CollectReportCaptionNativePointChain(
             mouseX,
@@ -324,9 +397,9 @@ SnapshotReportCaptionPoint(
         result["exceptionType"] := Type(pointError)
     }
 
-    if collectCandidates
+    if collectCandidates && result["targetWindowHwnd"]
         CollectReportCaptionWindowCandidates(
-            expectedHwnd,
+            result["targetWindowHwnd"],
             expectedPid,
             result
         )
@@ -614,6 +687,44 @@ SnapshotReportCaptionWindow(hwnd) {
     return snapshot
 }
 
+SnapshotReportCaptionProcessWindows(expectedPid) {
+    snapshots := []
+    try windows := WinGetList("ahk_pid " expectedPid)
+    catch
+        return snapshots
+    for hwnd in windows {
+        visible := false
+        try visible :=
+            DllCall(
+                "user32.dll\IsWindowVisible",
+                "ptr",
+                hwnd,
+                "int"
+            ) != 0
+        if !visible
+            continue
+        rootOwner := 0
+        try rootOwner :=
+            DllCall(
+                "user32.dll\GetAncestor",
+                "ptr",
+                hwnd,
+                "uint",
+                3,
+                "ptr"
+            )
+        if rootOwner && rootOwner != hwnd
+            continue
+        snapshot := SnapshotReportCaptionWindow(hwnd)
+        monitorSnapshot :=
+            SnapshotReportCaptionMonitors(hwnd)
+        snapshot["monitorIndex"] :=
+            monitorSnapshot["windowMonitor"]
+        snapshots.Push(snapshot)
+    }
+    return snapshots
+}
+
 SnapshotReportCaptionMonitors(windowHwnd) {
     result := Map(
         "virtualScreen",
@@ -704,6 +815,24 @@ GetReportCaptionClientRectScreen(hwnd) {
     }
 }
 
+ReportCaptionWindowFromPoint(mouseX, mouseY) {
+    pointValue := mouseY << 32 | (mouseX & 0xFFFFFFFF)
+    return DllCall(
+        "user32.dll\WindowFromPoint",
+        "int64",
+        pointValue,
+        "ptr"
+    )
+}
+
+ReportCaptionRectContainsPoint(rectangle, mouseX, mouseY) {
+    return IsObject(rectangle)
+        && mouseX >= rectangle.l
+        && mouseX < rectangle.r
+        && mouseY >= rectangle.t
+        && mouseY < rectangle.b
+}
+
 ReportCaptionDiagnosticWindowStillActive(session) {
     if WinExist("A") != session["windowHwnd"]
         return false
@@ -725,7 +854,7 @@ CopyReportCaptionDiagnosticFailure(code, session) {
 FormatReportCaptionDiagnostic(session, state) {
     report :=
         "Test=ReportImageCaptionMigrationDiagnostic`r`n"
-        . "DiagnosticVersion=1.0`r`n"
+        . "DiagnosticVersion=1.1`r`n"
         . "State=" state "`r`n"
         . "Privacy=NO_RAW_NAME_VALUE_TEXT_TITLE_OR_URL_OUTPUT`r`n"
         . "SelectionPayloadPersisted=false`r`n"
@@ -734,12 +863,28 @@ FormatReportCaptionDiagnostic(session, state) {
         . "PasteSent=false`r`n"
         . "ElapsedMs=" (A_TickCount - session["startedAt"])
         . "`r`n`r`n"
-        . FormatReportCaptionWindowSection(session["window"])
+        . "[SourceWindow]`r`n"
+        . FormatReportCaptionWindowFields(session["window"])
         . "`r`n`r`n"
-        . FormatReportCaptionMonitorSection(session["monitors"])
+        . FormatReportCaptionMonitorSection(
+            session["monitors"],
+            "SourceMonitors"
+        )
+        . "`r`n`r`n"
+        . FormatReportCaptionProcessWindowsSection(
+            session["processWindows"]
+        )
         . "`r`n`r`n"
         . FormatReportCaptionSourceSection(session["source"])
 
+    if IsObject(session["captionPoint"])
+        && IsObject(session["imagePoint"]) {
+        report .= "`r`nCaptionImageTargetSame="
+            . ReportCaptionDiagnosticBoolean(
+                session["captionPoint"]["targetWindowHwnd"]
+                    = session["imagePoint"]["targetWindowHwnd"]
+            )
+    }
     if IsObject(session["captionPoint"])
         report .= "`r`n`r`n"
             . FormatReportCaptionPointSection(
@@ -755,7 +900,11 @@ FormatReportCaptionDiagnostic(session, state) {
 
 FormatReportCaptionWindowSection(snapshot) {
     return "[Window]`r`n"
-        . "Hwnd=" snapshot["hwnd"] "`r`n"
+        . FormatReportCaptionWindowFields(snapshot)
+}
+
+FormatReportCaptionWindowFields(snapshot) {
+    return "Hwnd=" snapshot["hwnd"] "`r`n"
         . "Pid=" snapshot["pid"] "`r`n"
         . "ProcessName=" snapshot["processName"] "`r`n"
         . "ClassName=" snapshot["className"] "`r`n"
@@ -770,8 +919,8 @@ FormatReportCaptionWindowSection(snapshot) {
         . "ExStyle=" snapshot["exStyle"]
 }
 
-FormatReportCaptionMonitorSection(monitors) {
-    report := "[Monitors]`r`n"
+FormatReportCaptionMonitorSection(monitors, label := "Monitors") {
+    report := "[" label "]`r`n"
         . "VirtualScreen=" monitors["virtualScreen"] "`r`n"
         . "PrimaryMonitor=" monitors["primaryMonitor"] "`r`n"
         . "WindowMonitor=" monitors["windowMonitor"] "`r`n"
@@ -780,6 +929,17 @@ FormatReportCaptionMonitorSection(monitors) {
         report .= "`r`nMonitor=" item["index"]
             . " Rect=" item["rect"]
             . " WorkRect=" item["workRect"]
+    }
+    return report
+}
+
+FormatReportCaptionProcessWindowsSection(windows) {
+    report := "[SameProcessTopLevelWindows]`r`n"
+        . "Count=" windows.Length
+    for index, snapshot in windows {
+        report .= "`r`n`r`nWindow=" index "`r`n"
+            . FormatReportCaptionWindowFields(snapshot)
+            . "`r`nMonitorIndex=" snapshot["monitorIndex"]
     }
     return report
 }
@@ -847,10 +1007,30 @@ FormatReportCaptionSourceSection(source) {
 FormatReportCaptionPointSection(point) {
     report := "[" point["label"] "]`r`n"
         . "Point=" point["x"] "," point["y"] "`r`n"
-        . "WindowContainsPoint="
+        . "SourceWindowContainsPoint="
         . ReportCaptionDiagnosticBoolean(
-            point["windowContainsPoint"]
+            point["sourceWindowContainsPoint"]
         ) "`r`n"
+        . "PointHwnd=" point["pointHwnd"] "`r`n"
+        . "TargetWindowHwnd="
+        . point["targetWindowHwnd"] "`r`n"
+        . "TargetWindowPid=" point["targetWindowPid"] "`r`n"
+        . "TargetProcessMatches="
+        . ReportCaptionDiagnosticBoolean(
+            point["targetProcessMatches"]
+        ) "`r`n"
+        . "TargetRootOwnerResolved="
+        . ReportCaptionDiagnosticBoolean(
+            point["targetRootOwnerResolved"]
+        ) "`r`n"
+        . "TargetWindowContainsPoint="
+        . ReportCaptionDiagnosticBoolean(
+            point["targetWindowContainsPoint"]
+        ) "`r`n"
+        . "TargetClientPoint="
+        . point["targetClientPoint"] "`r`n"
+        . "TargetClientRatio="
+        . point["targetClientRatio"] "`r`n"
         . "UiaElementCaptured="
         . ReportCaptionDiagnosticBoolean(
             point["uiaElementCaptured"]
@@ -860,6 +1040,19 @@ FormatReportCaptionPointSection(point) {
             point["smallestElementCaptured"]
         ) "`r`n"
         . "ExceptionType=" point["exceptionType"]
+
+    if IsObject(point["targetWindow"])
+        report .= "`r`n`r`n["
+            . point["label"] ".TargetWindow]`r`n"
+            . FormatReportCaptionWindowFields(
+                point["targetWindow"]
+            )
+    if IsObject(point["targetMonitors"])
+        report .= "`r`n`r`n"
+            . FormatReportCaptionMonitorSection(
+                point["targetMonitors"],
+                point["label"] ".TargetMonitors"
+            )
 
     if IsObject(point["uiaElement"])
         report .= "`r`n`r`n["

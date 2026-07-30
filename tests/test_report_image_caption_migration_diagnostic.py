@@ -29,11 +29,32 @@ class ReportImageCaptionMigrationDiagnosticTests(unittest.TestCase):
             '"CAPTION_INPUT"',
             '"IMAGE_WHEEL"',
             "SnapshotReportCaptionWindow(",
+            "SnapshotReportCaptionProcessWindows(",
             "SnapshotReportCaptionMonitors(",
+            "ReportCaptionWindowFromPoint(",
             "CollectReportCaptionNativePointChain(",
             "CollectReportCaptionUiaParentChain(",
         ):
             self.assertIn(required, self.source)
+
+    def test_point_capture_resolves_target_root_owner_independently(self) -> None:
+        for required in (
+            '"sourceWindowContainsPoint"',
+            '"targetWindowHwnd"',
+            '"targetWindowPid"',
+            '"targetProcessMatches"',
+            '"targetClientPoint"',
+            '"targetClientRatio"',
+            "CaptionImageTargetSame=",
+            '"user32.dll\\GetAncestor"',
+            "result[\"targetWindowHwnd\"]",
+        ):
+            self.assertIn(required, self.source)
+        self.assertIn(
+            "CollectReportCaptionWindowCandidates(\n"
+            '            result["targetWindowHwnd"],',
+            self.source,
+        )
 
     def test_selection_probe_discards_payload_and_restores_clipboard(self) -> None:
         self.assertIn('SendInput("^c")', self.source)

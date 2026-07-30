@@ -132,5 +132,7 @@
   激活其他窗口或写出 copied payload。
 - [ ] 输出不得包含窗口标题、URL、accessible Name/Value、选中文字、报告正文
   或患者信息；`图像描述`/`保存` 仅作为固定 exact-query 常量。
+- [ ] 诊断必须区分前台 source window 与鼠标 point 所在 target root-owner；
+  caption/image point 的候选扫描不得错误复用 source HWND。
 - [ ] 正式迁移完成并通过 Windows field validation 前，
   `Shift+Alt+S` ownership 继续属于 compatibility。
