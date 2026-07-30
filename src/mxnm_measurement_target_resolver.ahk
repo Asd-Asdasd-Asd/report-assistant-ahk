@@ -341,20 +341,17 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
     )
     readyCode := "READY"
     if !mappedImage.ok {
-        mappedImage := {
-            ok: true,
-            rect: {
-                left: actionFrame.clientX,
-                top: actionFrame.clientY,
-                right: actionFrame.clientX
-                    + actionFrame.clientWidth,
-                bottom: actionFrame.clientY
-                    + actionFrame.clientHeight,
-                width: actionFrame.clientWidth,
-                height: actionFrame.clientHeight
-            }
+        mappedImage :=
+            MapMxNMClippedImageRectToRuntimeClient(
+                plan.mainGeometry,
+                actionFrame
+            )
+        if !mappedImage.ok {
+            failure.fallbackCode :=
+                "ANCHOR_CLIPPED_MAPPING_FAILED"
+            return failure
         }
-        readyCode := "READY_ACTION_CLIENT_RECT"
+        readyCode := "READY_CLIPPED_CONFIG_CLIENT"
     }
     screenPoint := MapMxNMLogicalPointToRuntimeRect(
         plan.logicalPoint,
@@ -380,6 +377,74 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         imageRect: mappedImage.rect,
         screenPoint: screenPoint,
         fallbackCode: readyCode
+    }
+}
+
+MapMxNMClippedImageRectToRuntimeClient(
+    mainGeometry,
+    runtimeFrame
+) {
+    failure := {
+        ok: false,
+        rect: 0
+    }
+    if !IsObject(mainGeometry)
+        || !IsObject(runtimeFrame)
+        || !mainGeometry.frameSizeResolved
+        || !mainGeometry.imagePositionResolved
+        || !mainGeometry.imageSizeResolved
+        || mainGeometry.frameWidth <= 0
+        || mainGeometry.frameHeight <= 0
+        || runtimeFrame.clientWidth <= 0
+        || runtimeFrame.clientHeight <= 0 {
+        return failure
+    }
+    logicalLeft := Max(0, mainGeometry.imageX)
+    logicalTop := Max(0, mainGeometry.imageY)
+    logicalRight := Min(
+        mainGeometry.frameWidth,
+        mainGeometry.imageX + mainGeometry.imageWidth
+    )
+    logicalBottom := Min(
+        mainGeometry.frameHeight,
+        mainGeometry.imageY + mainGeometry.imageHeight
+    )
+    if logicalRight <= logicalLeft
+        || logicalBottom <= logicalTop {
+        return failure
+    }
+    mappedLeft := runtimeFrame.clientX + Round(
+        logicalLeft
+        * runtimeFrame.clientWidth
+        / mainGeometry.frameWidth
+    )
+    mappedTop := runtimeFrame.clientY + Round(
+        logicalTop
+        * runtimeFrame.clientHeight
+        / mainGeometry.frameHeight
+    )
+    mappedRight := runtimeFrame.clientX + Round(
+        logicalRight
+        * runtimeFrame.clientWidth
+        / mainGeometry.frameWidth
+    )
+    mappedBottom := runtimeFrame.clientY + Round(
+        logicalBottom
+        * runtimeFrame.clientHeight
+        / mainGeometry.frameHeight
+    )
+    if mappedRight <= mappedLeft || mappedBottom <= mappedTop
+        return failure
+    return {
+        ok: true,
+        rect: {
+            left: mappedLeft,
+            top: mappedTop,
+            right: mappedRight,
+            bottom: mappedBottom,
+            width: mappedRight - mappedLeft,
+            height: mappedBottom - mappedTop
+        }
     }
 }
 

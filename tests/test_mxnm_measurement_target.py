@@ -180,16 +180,33 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ANCHOR_IDENTITY_INVALID",
             "ANCHOR_FRAME_INVALID",
             "ANCHOR_POINT_OUT_OF_BOUNDS",
-            "READY_ACTION_CLIENT_RECT",
+            "ANCHOR_CLIPPED_MAPPING_FAILED",
+            "READY_CLIPPED_CONFIG_CLIENT",
         ):
             self.assertIn(fallback_code, fallback_target)
+        self.assertIn(
+            "MapMxNMClippedImageRectToRuntimeClient(",
+            fallback_target,
+        )
+
+        clipped_mapping = resolver.split(
+            "\nMapMxNMClippedImageRectToRuntimeClient(", 1
+        )[1].split(
+            "\n}\n\nBuildMxNMRuntimeOwnerFrameCandidates", 1
+        )[0]
         for field in (
-            "actionFrame.clientX",
-            "actionFrame.clientY",
-            "actionFrame.clientWidth",
-            "actionFrame.clientHeight",
+            "mainGeometry.imageX",
+            "mainGeometry.imageY",
+            "mainGeometry.imageWidth",
+            "mainGeometry.imageHeight",
+            "runtimeFrame.clientX",
+            "runtimeFrame.clientY",
+            "runtimeFrame.clientWidth",
+            "runtimeFrame.clientHeight",
         ):
-            self.assertIn(field, fallback_target)
+            self.assertIn(field, clipped_mapping)
+        self.assertIn("Max(0, mainGeometry.imageX)", clipped_mapping)
+        self.assertIn("Min(", clipped_mapping)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")
