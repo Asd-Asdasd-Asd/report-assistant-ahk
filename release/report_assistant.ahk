@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.6.2
-; Source revision: f5b55a7f014b61f240d28f3bc67bb365cc2ae0a9
-; Generated at: 2026-07-30 08:25:36 UTC
+; Source revision: e1012201e81e4b4249e0f5833ddefac01377ab83
+; Generated at: 2026-07-30 09:08:24 UTC
 ;@Ahk2Exe-SetFileVersion 0.6.2.0
 ;@Ahk2Exe-SetProductVersion 0.6.2
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.6.2"
     static Channel := "internal-test"
     static BuildDate := "2026-07-30"
-    static SourceRevision := "f5b55a7f014b61f240d28f3bc67bb365cc2ae0a9"
+    static SourceRevision := "e1012201e81e4b4249e0f5833ddefac01377ab83"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11178,9 +11178,22 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         plan.mainGeometry,
         actionFrame
     )
+    readyCode := "READY"
     if !mappedImage.ok {
-        failure.fallbackCode := "ANCHOR_MAPPING_FAILED"
-        return failure
+        mappedImage := {
+            ok: true,
+            rect: {
+                left: actionFrame.clientX,
+                top: actionFrame.clientY,
+                right: actionFrame.clientX
+                    + actionFrame.clientWidth,
+                bottom: actionFrame.clientY
+                    + actionFrame.clientHeight,
+                width: actionFrame.clientWidth,
+                height: actionFrame.clientHeight
+            }
+        }
+        readyCode := "READY_ACTION_CLIENT_RECT"
     }
     screenPoint := MapMxNMLogicalPointToRuntimeRect(
         plan.logicalPoint,
@@ -11205,7 +11218,7 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         frame: ownerFrame,
         imageRect: mappedImage.rect,
         screenPoint: screenPoint,
-        fallbackCode: "READY"
+        fallbackCode: readyCode
     }
 }
 
