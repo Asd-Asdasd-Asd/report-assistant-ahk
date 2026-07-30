@@ -35,12 +35,13 @@
 - [ ] 光标/选区诊断只信任 active caret 或实际变化的 selection；固定返回的
   inactive caret 和 `0/0` selection 不得作为 production fallback。
 - [ ] 只使用非临床测试文字启动
-  `tests/windows/report_editor_text_content_field.ahk`，聚焦“检查所见”正文框后
-  按 `Ctrl+Alt+F8`。
-- [ ] 确认提示 `TEXT_AND_VALUE_CAPTURED`，将剪贴板结果粘贴到临时文本文件，
-  对比 `TextPattern.DocumentRange` 与 `ValuePattern.Value` 哪一个等于可见正文。
-- [ ] 该诊断会有意覆盖剪贴板，结果包含完整测试正文；不得对患者报告运行或
-  回传患者信息。
+  `tests/windows/report_editor_edit_structure_field.ahk`，聚焦“检查所见”正文框，
+  将鼠标停在正文编辑区域内后按 `Ctrl+Alt+F8`；程序不得移动或点击鼠标。
+- [ ] 确认提示 `STRUCTURE_CAPTURED`，将剪贴板结果回传；结果只能包含
+  control type、矩形、层级、焦点和 Pattern availability，不得读取或输出
+  Name、Value、URL、报告正文或患者信息。
+- [ ] 只有结构诊断定位到独立、唯一且矩形合理的 editor element，才允许另建
+  显式 field harness 验证全选、复制、剪贴板恢复及 foreground guard。
 
 ## Candidate G 与剪贴板
 
