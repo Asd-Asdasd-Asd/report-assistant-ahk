@@ -22,7 +22,7 @@
 | Shift+Alt+B | Body montage，参数 `8.5/8/0.8` | 固定坐标、无 window guard、部分路径不恢复鼠标 |
 | Shift+Alt+H | Head montage，参数 `4/11/1.2` | 同上 |
 | Shift+Alt+L | Lung montage，参数 `7.5/23/0.9`，含 lung-window reset | 同上；遗漏 reset 会改变图像表现 |
-| Shift+Alt+S | 复制选中文字、粘贴 caption、移动到图像、WheelDown、恢复鼠标 | 不恢复旧 clipboard；持续按住修饰键重复触发仍有限制 |
+| Shift+Alt+S | 首次复制选中文字并粘贴 caption；随后可不重新选字，把同一句连续写入多张图片；每次 WheelDown 并恢复鼠标 | 有意保留最后 caption、不恢复旧 clipboard；持续按住修饰键重复触发仍有限制 |
 | Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续 |
 | XButton1 | 一秒 ToolTip notification | 历史测试项，不作为迁移目标 |
 

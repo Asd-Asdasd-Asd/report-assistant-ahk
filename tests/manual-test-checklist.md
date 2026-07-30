@@ -136,3 +136,15 @@
   caption/image point 的候选扫描不得错误复用 source HWND。
 - [ ] 正式迁移完成并通过 Windows field validation 前，
   `Shift+Alt+S` ownership 继续属于 compatibility。
+- [ ] 正式实现首次从报告编辑 source 触发时，fresh copy 会替换内存 caption
+  cache，并把该 caption 留在系统 clipboard。
+- [ ] 首次粘贴并翻到下一张后，不重新选择文字；在已绑定 target 窗口再次触发，
+  能复用 cache 粘贴同一句并再翻一张。
+- [ ] 在 source 窗口触发但 copy 未更新时必须 fail closed，不得静默复用旧
+  cache；在任意其他窗口触发也不得复用。
+- [ ] 新选中的 source 文字会替换旧 cache；显式清除、脚本 reload/exit 或绑定
+  source/target 失效后，不得继续粘贴旧 caption。
+- [ ] 连续复用前重新验证精确 target HWND/PID/root-owner 和完整结构签名；同
+  PID 的另一个窗口不得获得 reuse 权限。
+- [ ] 每次成功操作只粘贴一次、滚轮一次并恢复鼠标；clipboard 有意保留当前
+  caption，不要求恢复触发前内容。

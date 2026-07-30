@@ -9,6 +9,11 @@ Legacy `Shift+Alt+S` 跨两个同进程窗口完成一个高频循环：
 3. 在该目标窗口上方图像区域发送一次 `WheelDown`；
 4. 恢复原鼠标位置；foreground 与 legacy 一样停留在目标窗口。
 
+Legacy 还包含一个需要保留的业务语义：首次粘贴后，系统 clipboard 继续保留
+该 caption。此时编辑器选区已经消失，用户无需重新选择文字，仍可在图像窗口
+再次触发快捷键，把同一句 caption 连续写入多张图片。这是 feature，不是复制
+失败后的偶然行为。
+
 旧实现的 `2821,1363` 与 `2884,704` 是虚拟桌面绝对坐标。它们来自窗口位于
 右侧副屏时的既定布局，不能作为新实现的身份或几何依据。
 
@@ -20,9 +25,11 @@ Legacy `Shift+Alt+S` 跨两个同进程窗口完成一个高频循环：
    或经过结构验证的同 PID 顶层窗口解析 target。复制前要求 source 保持前台，
    点击后则要求 target 成为前台。两个窗口分别记录 class、PID、root owner、
    client rect、DPI 和 monitor。
-2. **Source selection capture**：只在已验证目标窗口发送一次 `Ctrl+C`，要求
-   clipboard sequence/内容确实更新；使用共享 clipboard transaction，完成
-   paste 后恢复用户原 clipboard。
+2. **Caption capture/reuse state**：从已验证 source 窗口触发时发送一次
+   `Ctrl+C`，要求 clipboard sequence/内容确实更新，并用完整 clipboard
+   payload 替换内存 caption cache；从已经绑定的 target HWND 触发时不再发送
+   `Ctrl+C`，而是复用 cache。caption 有意留在系统 clipboard，不恢复触发前
+   clipboard。
 3. **Caption target resolver**：优先使用唯一、visible/enabled、矩形合理的
    `Edit`/TextEdit/Value element；若供应商只暴露自绘区域，则使用固定静态锚点
    与 target client rect 推导区域内点，不使用屏幕绝对坐标。
@@ -34,7 +41,11 @@ Legacy `Shift+Alt+S` 跨两个同进程窗口完成一个高频循环：
 
 ## 失败边界
 
-- source copy 未更新 clipboard：不点击、不粘贴、不滚轮；
+- source 前台触发但 copy 未更新 clipboard：不复用旧 cache，不点击、不粘贴、
+  不滚轮；
+- target 前台触发但不是 cache 已绑定且重新验证通过的精确 HWND/PID/root-owner：
+  不复用；
+- cache 不存在、已显式清除，或其 source/target binding 已失效：不复用；
 - copy 前 source window、PID 或 foreground 改变：立即停止；
 - caption click 后 target 未成为前台，或 target PID/root-owner 改变：立即停止；
 - caption target 缺失、重复、disabled、offscreen 或越界：立即停止；
@@ -131,17 +142,36 @@ caption 不能通过 Value/TextEdit 写入。由 exact `图像描述` 与 `保�
 
 ### Transaction
 
-完整顺序固定为：
+实现维护一个仅存在于当前进程内存的 caption cache。它不得写入日志、配置或
+磁盘，也不得输出 payload；新 source capture 覆盖旧 cache。退出/重载、显式
+结束本轮快速标图，或绑定的 source/target 失效时必须清除 cache。正式功能需
+提供一个明确的“清除快速标图 caption”入口，防止同一窗口跨检查继续复用旧句子。
 
-1. 保存 mouse 与完整 clipboard；
+从 source 窗口首次触发时，顺序固定为：
+
+1. 保存 mouse；记录当前 source HWND/PID；
 2. source 前台下发送一次 `Ctrl+C`，要求 fresh non-empty clipboard；
-3. 解析唯一 target 和 caption/image points；
-4. 点击 caption point，验证 target 成为前台；
-5. 粘贴一次并等待最小安全 settle；
-6. 移到 image point，发送一次 `WheelDown`；
-7. `finally` 恢复 mouse 和原 clipboard。
+3. 将新的完整 clipboard payload 写入内存 cache，并绑定 source 与唯一 target；
+4. 解析 caption/image points；
+5. 点击 caption point，验证 target 成为前台；
+6. 从 cache 写回 clipboard，粘贴一次并等待最小安全 settle；
+7. 移到 image point，发送一次 `WheelDown`；
+8. `finally` 只恢复 mouse；系统 clipboard 有意保留当前 caption。
+
+从已绑定 target 窗口连续触发时，顺序固定为：
+
+1. 不发送 `Ctrl+C`，重新验证前台正是 cache 绑定的 target
+   HWND/PID/root-owner，且完整 target signature 仍成立；
+2. 从 cache 写回 clipboard，避免用户中途复制的其他内容被误粘贴；
+3. 重新解析 caption/image points，点击、粘贴一次并 `WheelDown` 一次；
+4. `finally` 只恢复 mouse；系统 clipboard 继续保留当前 caption。
+
+在 source 窗口触发时，无论是否已有 cache，fresh copy 失败都必须 fail closed，
+不得偷偷降级为 reuse。其他窗口触发同样不得复用。这样既保留“一句话连续标多张
+图片”，又不会把真正的复制失败当成用户意图。
 
 paste 已发送后若 wheel 失败，返回 partial success，不重贴、不补偿滚轮，也不
-撤销 caption。只有 Windows field harness 对 source copy、target ambiguity、
-foreground switch、paste、wheel、clipboard restore 和 mouse restore 全部验收
-后，才把 `Shift+Alt+S` ownership 从 compatibility 移交给麦旋风。
+撤销 caption。只有 Windows field harness 对新 capture、同 caption 连续 reuse、
+cache 清除/失效、source copy failure、target ambiguity、foreground switch、
+paste、wheel、clipboard retention 和 mouse restore 全部验收后，才把
+`Shift+Alt+S` ownership 从 compatibility 移交给麦旋风。
