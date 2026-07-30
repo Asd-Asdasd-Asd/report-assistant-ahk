@@ -323,6 +323,19 @@ class MeasurementCaptureTests(unittest.TestCase):
     def test_geometry_is_owned_by_one_resolver_and_fails_closed(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
         self.assertIn("ResolveContextMeasurementImagePoint(", provider)
+        self.assertIn("ResolveExpectedContextMeasurementViewer(", provider)
+        resolver = provider.split(
+            "ResolveContextMeasurementViewer(viewerExe, options := 0) {",
+            1,
+        )[1].split(
+            "\n}\n\nResolveExpectedContextMeasurementViewer(",
+            1,
+        )[0]
+        self.assertLess(
+            resolver.index("ResolveExpectedContextMeasurementViewer("),
+            resolver.index("ResolveContextMeasurementViewerFromPoint("),
+        )
+        self.assertIn("return expectedViewer", resolver)
         self.assertIn("ResolveContextMeasurementViewerFromPoint(", provider)
         self.assertIn('"User32\\WindowFromPoint"', provider)
         self.assertIn('"User32\\GetAncestor"', provider)

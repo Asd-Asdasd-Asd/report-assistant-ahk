@@ -88,9 +88,8 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ResolveMxNMRuntimeImageTarget",
             "BuildMxNMRuntimeOwnerFrameCandidates",
             "CaptureMxNMRuntimeOwnerFrame",
-            "ResolveMxNMRootOwnerFromPoint",
-            "ResolveMxNMActionWindowFromPoint",
-            "WindowFromPoint",
+            "MxNMPointInsideRuntimeFrameClient",
+            "ResolveMxNMActionWindow",
             "GetAncestor",
         ):
             self.assertIn(symbol, resolver)
@@ -101,7 +100,11 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         runtime_resolver = resolver.split(
             "ResolveMxNMRuntimeImageTarget(", 1
         )[1].split("IsReusableMxNMMeasurementTargetPlan", 1)[0]
-        self.assertIn("rootOwnerHwnd != candidateFrame.hwnd", runtime_resolver)
+        self.assertIn(
+            "MxNMPointInsideRuntimeFrameClient",
+            runtime_resolver,
+        )
+        self.assertNotIn("WindowFromPoint", runtime_resolver)
         self.assertIn(
             "SelectMxNMRuntimeImageTargetByOwnerFamily",
             runtime_resolver,
@@ -113,12 +116,13 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("GetWindowThreadProcessId", runtime_resolver)
         self.assertIn("GetWindowRect", runtime_resolver)
         action_resolver = resolver.split(
-            "ResolveMxNMActionWindowFromPoint(", 2
+            "ResolveMxNMActionWindow(", 2
         )[-1]
         self.assertIn("rootOwnerHwnd != runtimeFrameHwnd", action_resolver)
         self.assertIn("MxNMTargetScreenToClient", action_resolver)
         self.assertIn("clientPoint: clientPoint", action_resolver)
         self.assertIn("actionClientPoint", resolver)
+        self.assertNotIn("WindowFromPoint", resolver)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")

@@ -142,7 +142,7 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
         result.imageRect := runtimeTarget.imageRect
         result.screenPoint := runtimeTarget.screenPoint
 
-        actionWindowResult := ResolveMxNMActionWindowFromPoint(
+        actionWindowResult := ResolveMxNMActionWindow(
             viewerExe,
             result.screenPoint,
             runtimeTarget.frame.hwnd
@@ -197,11 +197,13 @@ ResolveMxNMRuntimeImageTarget(plan, viewerWindows) {
         )
         if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
             continue
-        rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
-            screenPoint
-        )
-        if !rootOwnerHwnd
-            || rootOwnerHwnd != candidateFrame.hwnd {
+        ; The command is posted to this owner HWND, not sent as a physical
+        ; screen click. A covering or differently nested window at this point
+        ; must not veto an otherwise valid Viewer-owned client coordinate.
+        if !MxNMPointInsideRuntimeFrameClient(
+            screenPoint,
+            candidateFrame
+        ) {
             continue
         }
         candidates.Push({
@@ -347,19 +349,13 @@ CountMxNMRuntimeOwnerFamily(viewerWindows, frameHwnd) {
     return count
 }
 
-ResolveMxNMRootOwnerFromPoint(screenPoint) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try pointHwnd := DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch
-        pointHwnd := 0
-    if !pointHwnd
-        return 0
-    return ResolveMxNMRootOwnerHwnd(pointHwnd)
+MxNMPointInsideRuntimeFrameClient(point, frame) {
+    return IsObject(point)
+        && IsObject(frame)
+        && point.x >= frame.clientX
+        && point.x < frame.clientX + frame.clientWidth
+        && point.y >= frame.clientY
+        && point.y < frame.clientY + frame.clientHeight
 }
 
 ResolveMxNMRootOwnerHwnd(hwnd) {
@@ -656,48 +652,16 @@ MxNMPointInsideRect(point, rect) {
         && point.y < rect.bottom
 }
 
-ResolveMxNMActionWindowFromPoint(
+ResolveMxNMActionWindow(
     viewerExe,
     screenPoint,
     runtimeFrameHwnd
 ) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try pointHwnd := DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch {
-        pointHwnd := 0
-    }
-    if !pointHwnd {
-        return {
-            ok: false,
-            code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
-        }
-    }
-    try rootHwnd := DllCall(
-        "User32\GetAncestor",
-        "Ptr", pointHwnd,
-        "UInt", 2,
-        "Ptr"
-    )
-    catch {
-        rootHwnd := 0
-    }
-    if !rootHwnd
-        rootHwnd := pointHwnd
-    try rootOwnerHwnd := DllCall(
-        "User32\GetAncestor",
-        "Ptr", pointHwnd,
-        "UInt", 3,
-        "Ptr"
-    )
-    catch
-        rootOwnerHwnd := 0
-    if !rootOwnerHwnd
-        rootOwnerHwnd := rootHwnd
+    ; Keep the action bound to the owner selected from the Viewer process
+    ; family. Desktop hit-testing would inspect the current z-order even though
+    ; the later right-click messages target this HWND directly.
+    rootHwnd := runtimeFrameHwnd
+    rootOwnerHwnd := ResolveMxNMRootOwnerHwnd(rootHwnd)
 
     try processName := WinGetProcessName("ahk_id " rootHwnd)
     catch {

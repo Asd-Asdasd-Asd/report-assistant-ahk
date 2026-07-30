@@ -226,6 +226,25 @@ CloneContextMeasurementOptions(options := 0) {
 }
 
 ResolveContextMeasurementViewer(viewerExe, options := 0) {
+    expectedViewerHwnd := MeasurementOption(
+        options,
+        "expectedViewerHwnd",
+        0
+    )
+    expectedViewerPid := MeasurementOption(
+        options,
+        "expectedViewerPid",
+        0
+    )
+    if expectedViewerHwnd {
+        expectedViewer := ResolveExpectedContextMeasurementViewer(
+            viewerExe,
+            expectedViewerHwnd,
+            expectedViewerPid
+        )
+        return expectedViewer
+    }
+
     screenPoint := GetContextMeasurementConfiguredScreenPoint(options)
     if IsContextMeasurementPoint(screenPoint)
         && ContextMeasurementPointInsideVirtualScreen(screenPoint) {
@@ -274,6 +293,47 @@ ResolveContextMeasurementViewer(viewerExe, options := 0) {
     return {
         ok: true,
         hwnd: hwnd,
+        pid: pid,
+        failureReason: MeasurementFailureReason.NONE
+    }
+}
+
+ResolveExpectedContextMeasurementViewer(
+    viewerExe,
+    expectedViewerHwnd,
+    expectedViewerPid := 0
+) {
+    if !WinExist("ahk_id " expectedViewerHwnd) {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_NOT_FOUND
+        }
+    }
+    try processName := WinGetProcessName(
+        "ahk_id " expectedViewerHwnd
+    )
+    catch {
+        processName := ""
+    }
+    try pid := WinGetPID("ahk_id " expectedViewerHwnd)
+    catch {
+        pid := 0
+    }
+    if StrLower(processName) != StrLower(viewerExe)
+        || !pid
+        || (expectedViewerPid && pid != expectedViewerPid) {
+        return {
+            ok: false,
+            hwnd: 0,
+            pid: 0,
+            failureReason: MeasurementFailureReason.VIEWER_TARGET_CHANGED
+        }
+    }
+    return {
+        ok: true,
+        hwnd: expectedViewerHwnd,
         pid: pid,
         failureReason: MeasurementFailureReason.NONE
     }
