@@ -67,9 +67,17 @@
 - [ ] 重新编译后的第一次颜色下拉操作若已选中黑色但菜单未关闭，记录一次现场结果；不得用 blind retry 掩盖，后续操作应恢复正常。
 - [ ] 在目标 DPI、display scaling、resolution 和 MedEx version 上完成最终 smoke test。
 
-## 发布
+## 正式打包与发布
 
-- [ ] ZIP 只包含 `publish/` 中需要分发的内容，不包含 build scripts、source、user config、logs 或 Git metadata。
+- [ ] Windows/MedEx 验收通过后双击根目录 `Package Release.cmd`。
+- [ ] 打包器拒绝 `UNSTAMPED`、`-dirty` 或“未标记”构建。
+- [ ] `..\report-assistant-build\dist\` 中受管发布文件只保留本次
+      `麦旋风-v<版本>.zip` 和对应 SHA256；无关文件未被删除。
+- [ ] ZIP 顶层目录名称包含版本号。
+- [ ] ZIP 只包含 `麦旋风.exe`、`版本信息.md`、`更新说明.md`、
+      `首次使用.md` 和 `配置指南.md`。
+- [ ] ZIP 不包含诊断工具、checkpoint、build scripts、source、
+      user config、logs 或 Git metadata。
 - [ ] ZIP 先复制到本机并完整解压，不从共享盘或压缩包内直接运行。
 - [ ] 用户说明统一使用“麦旋风”；需要展示当前版本时与 `AppMetadata.Version` 一致。
 - [ ] `更新说明.md` 写明完整文件夹替换、自动配置升级和问题留存方法。

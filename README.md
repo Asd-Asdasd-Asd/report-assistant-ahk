@@ -96,7 +96,16 @@ checkout 内任何文件，因此构建后可直接 `git pull`。构建会 overl
 3. 运行 `git diff --check`。
 4. 从 clean commit 在 Windows 双击 `Build EXE.cmd`。
 5. 按 `docs/internal/release-checklist.md` 和 `tests/manual-test-checklist.md` 完成 Windows/MedEx 验收。
-6. 只压缩并分发 `..\report-assistant-build\publish\` 的内容。
+6. Windows/MedEx 验收通过后，双击根目录 `Package Release.cmd`。
+7. 只分发自动生成的版本化 ZIP：
+
+```text
+..\report-assistant-build\dist\麦旋风-v<版本>.zip
+```
+
+`publish/` 保持固定名称并作为当前构建工作区；打包器只从中复制
+`麦旋风.exe` 和四份发布文档，不会包含诊断工具、源码、日志或其他
+遗留文件。新 ZIP 验证成功后，`dist/` 中旧的受管版本包才会被清理。
 
 当前已知延期：重新编译后的首次颜色下拉操作，偶尔会正确选中黑色但菜单仍留在屏幕上；之后的操作通常正常。本问题暂不通过额外盲点或重复点击规避，发布验收时应单独记录。
 

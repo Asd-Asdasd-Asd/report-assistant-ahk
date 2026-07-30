@@ -48,11 +48,23 @@ EXE，同步 `assets/publish/` 中的发布资源，最后把产物安全提升�
 ```
 
 构建过程不写入 checkout，完成后 `git status` 应保持不变，可以直接
-`git pull`。构建成功后先测试 EXE，再压缩外部 `publish/` 的内容用于内部
-发布。不要分发仓库根目录或构建脚本；此流程不会创建 installer 或
-automatic updater。
+`git pull`。构建成功后先测试 EXE。验收通过后双击根目录
+`Package Release.cmd`，由它生成：
+
+```text
+..\report-assistant-build\dist\麦旋风-v<版本>.zip
+```
+
+只分发这个版本化 ZIP。不要手工压缩 `publish/`，也不要分发仓库根目录
+或构建脚本；此流程不会创建 installer 或 automatic updater。
 
 静态资源使用 overlay 同步：构建只复制 `assets/publish/` 中当前存在的文件，不审核或删除 `publish/` 中的其他文档、图标。若静态资源被删除或重命名，正式发布前应手工清空 `publish/`，再从 clean commit 重新构建。
+
+`publish/` 始终是固定名称的当前构建工作区。`Package Release.cmd` 使用
+干净的临时 staging，只复制 `麦旋风.exe`、`版本信息.md`、`更新说明.md`、
+`首次使用.md` 和 `配置指南.md`。ZIP 验证成功后才清理 `dist/` 中旧的
+`麦旋风-v*.zip` 与对应 SHA256；失败时恢复上一份。诊断工具和 checkpoint
+位于各自独立目录，不属于打包白名单。
 
 每个 v0.5+ internal release 还必须：
 
