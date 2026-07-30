@@ -71,6 +71,10 @@ class MxNMContextMenuDiagnosticBuildTests(unittest.TestCase):
         self.assertIn("build_mxnm_context_menu_diagnostic.py", powershell)
         self.assertIn("MxNM-Viewer-Context-Diagnostic.exe", powershell)
         self.assertIn("'/Validate'", powershell)
+        self.assertIn("Start-Process", powershell)
+        self.assertIn("-Wait", powershell)
+        self.assertIn("AutoHotkey validation error", powershell)
+        self.assertIn("Ahk2Exe error output", powershell)
         self.assertIn("Get-FileHash", powershell)
         self.assertNotIn("build_release.py", powershell)
         self.assertIn(

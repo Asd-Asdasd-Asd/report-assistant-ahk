@@ -196,7 +196,7 @@ BuildMxNMContextMenuReceiverDiagnostic(manualPoint, foregroundBefore) {
 }
 
 FormatMxNMContextDiagnosticTarget(target) {
-    return
+    return (
         "TargetOk=" MxNMContextDiagnosticBool(target.ok) "`r`n" .
         "TargetCode=" target.code "`r`n" .
         "TargetConfigCode=" target.configCode "`r`n" .
@@ -224,6 +224,7 @@ FormatMxNMContextDiagnosticTarget(target) {
             MxNMContextDiagnosticPoint(
                 target.actionClientPoint
             ) "`r`n"
+    )
 }
 
 FormatMxNMContextDiagnosticPointChain(
@@ -472,7 +473,7 @@ MxNMContextDiagnosticCandidateBefore(left, right) {
 
 FormatMxNMContextDiagnosticCandidate(index, candidate) {
     prefix := "Candidate." index "."
-    return
+    return (
         prefix "Hwnd=" candidate.hwnd "`r`n" .
         prefix "Sources=" candidate.sources "`r`n" .
         prefix "Class=" candidate.className "`r`n" .
@@ -487,6 +488,7 @@ FormatMxNMContextDiagnosticCandidate(index, candidate) {
         prefix "ClientRect=" .
             MxNMContextDiagnosticRect(candidate.clientRect) "`r`n" .
         prefix "ClientArea=" candidate.area "`r`n"
+    )
 }
 
 ProbeMxNMContextDiagnosticCandidate(
@@ -810,7 +812,8 @@ MxNMContextDiagnosticPoint(point) {
 MxNMContextDiagnosticRect(rect) {
     if !IsObject(rect)
         return ""
-    return
+    return (
         rect.left "," rect.top "," .
         rect.right "," rect.bottom
+    )
 }
