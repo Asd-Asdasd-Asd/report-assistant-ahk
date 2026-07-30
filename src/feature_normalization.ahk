@@ -61,6 +61,11 @@ ValidateViewerToolHotkeySettings(settings) {
         }
     ]
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
+    seen[
+        NormalizeHotkeyChord(
+            ReportImageCaptionDefaults.HotkeyChord
+        )
+    ] := true
     if settings.GlobalHjklArrows {
         for definition in GlobalHjklArrowHotkeyDefinitions()
             seen[NormalizeHotkeyChord(definition.Chord)] := true

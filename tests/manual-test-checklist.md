@@ -119,11 +119,12 @@
 - [ ] `medex_legacy_compat.ahk` 不注册报告 hotstrings、RAlt+H/J/K/L、
   Viewer screenshot、SUV/Arrow 复按状态机或 snapshot save。
 - [ ] Compatibility 只保留当前仍未迁移的固定坐标动作，并使用独立 tray tooltip。
-- [ ] Shift+Alt+S 不与新项目 clipboard transaction 并发。
+- [ ] 测试前退出仍含旧 Shift+Alt+S 的 compatibility 运行实例；本 branch 的
+  `medex_legacy_compat.ahk` 已不再注册该快捷键。
 - [ ] 新项目的暂停/退出不控制 compatibility；停止测试时分别退出两个进程。
 - [ ] 不删除或覆盖用户的旧脚本、`red_not.clip`、配置或人工回退路径。
 
-### Shift+Alt+S caption + advance 迁移诊断
+### Shift+Alt+S caption + advance
 
 - [ ] 使用非临床测试文字运行
   `tests/windows/report_image_caption_migration_diagnostic.ahk`，按说明依次采集
@@ -134,9 +135,8 @@
   或患者信息；`图像描述`/`保存` 仅作为固定 exact-query 常量。
 - [ ] 诊断必须区分前台 source window 与鼠标 point 所在 target root-owner；
   caption/image point 的候选扫描不得错误复用 source HWND。
-- [ ] 正式迁移完成并通过 Windows field validation 前，
-  `Shift+Alt+S` ownership 继续属于 compatibility。
-- [ ] 正式实现首次从报告编辑 source 触发时，fresh copy 会替换内存 caption
+- [ ] `Shift+Alt+S` 只在允许的 MedEx 进程前台注册；普通程序中不触发、不吞键。
+- [ ] 首次从报告编辑 source 触发时，fresh copy 会替换内存 caption
   cache，并把该 caption 留在系统 clipboard。
 - [ ] 首次粘贴并翻到下一张后，不重新选择文字；在已绑定 target 窗口再次触发，
   能复用 cache 粘贴同一句并再翻一张。
@@ -148,3 +148,9 @@
   PID 的另一个窗口不得获得 reuse 权限。
 - [ ] 每次成功操作只粘贴一次、滚轮一次并恢复鼠标；clipboard 有意保留当前
   caption，不要求恢复触发前内容。
+- [ ] target 位于右侧副屏时完成以上流程；若可安排，再把 target 放到主屏，
+  确认程序能显式激活被 source 遮挡的唯一 target 后完成同样流程。
+- [ ] caption 已粘贴但滚轮前人为切走窗口时，只报告部分成功，不再次粘贴、
+  不补偿滚轮、不撤销 caption。
+- [ ] 托盘“清除快速标图 caption”后，在 target 前台再次触发会提示重新选择；
+  Reload/exit 后同样不能继续复用。

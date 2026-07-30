@@ -30,11 +30,16 @@ class LegacyCompatTests(unittest.TestCase):
             "+!b::",
             "+!h::",
             "+!l::",
-            "+!s::",
             "^#+c::",
         )
         for hotkey in retained_hotkeys:
             self.assertIn(hotkey, compat)
+
+    def test_caption_advance_is_owned_by_production(self) -> None:
+        compat = source("legacy/medex_legacy_compat.ahk")
+        production = source("src/report_image_caption.ahk")
+        self.assertNotIn("+!s::", compat)
+        self.assertIn('static HotkeyChord := "+!s"', production)
 
     def test_retired_legacy_viewer_actions_are_absent(self) -> None:
         compat = source("legacy/medex_legacy_compat.ahk")

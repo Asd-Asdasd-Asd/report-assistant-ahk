@@ -1,6 +1,11 @@
 RegisterConfiguredFeatures(LoadFeatureSettings())
 
 RegisterConfiguredFeatures(settings) {
+    RegisterHotkeyDefinitions(
+        ReportImageCaptionHotkeyDefinitions(),
+        ReservedApplicationHotkeyChords(),
+        ReportImageCaptionForegroundActive
+    )
     if settings.GlobalHjklArrows {
         RegisterHotkeyDefinitions(
             GlobalHjklArrowHotkeyDefinitions(),

@@ -1,6 +1,7 @@
 class ReportAssistantTrayDefaults {
     static SettingsItemName := "设置…"
     static AboutItemName := "关于麦旋风…"
+    static ClearCaptionItemName := "清除快速标图 caption"
     static ReloadItemName := "重新加载配置"
     static ExitItemName := "E&xit"
 }
@@ -15,6 +16,11 @@ ConfigureReportAssistantTrayMenu() {
         ReportAssistantTrayDefaults.ExitItemName,
         ReportAssistantTrayDefaults.AboutItemName,
         ShowReportAssistantAbout
+    )
+    A_TrayMenu.Insert(
+        ReportAssistantTrayDefaults.ExitItemName,
+        ReportAssistantTrayDefaults.ClearCaptionItemName,
+        ClearReportImageCaptionCache
     )
     A_TrayMenu.Insert(
         ReportAssistantTrayDefaults.ExitItemName,

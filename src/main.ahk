@@ -46,6 +46,7 @@
 #Include hotkey_registration.ahk
 #Include global_hjkl_arrows.ahk
 #Include viewer_tool_hotkeys.ahk
+#Include report_image_caption.ahk
 #Include features.ahk
 #Include settings_ui.ahk
 #Include tray_menu.ahk

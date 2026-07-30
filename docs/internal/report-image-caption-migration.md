@@ -52,8 +52,9 @@ Legacy 还包含一个需要保留的业务语义：首次粘贴后，系统 cli
 - image target 缺失、重复或不属于同一 owner family：不滚轮；
 - paste 成功但 advance 失败：保留已粘贴 caption，明确报告部分成功；
 - 禁止 blind retry、第二 transport、自动点击“保存”或自动提交报告；
-- 迁移验证完成前，ownership 继续属于
-  `legacy/medex_legacy_compat.ahk`。
+- `feat/report-image-caption-0.7.0` 测试 branch 已把 ownership 移交给 production
+  module，并从 compatibility 删除重复入口；正式 `0.7.0` 仍以 Windows field
+  validation 为准。
 
 ## 一次性现场诊断
 
@@ -153,7 +154,7 @@ caption 不能通过 Value/TextEdit 写入。由 exact `图像描述` 与 `保�
 2. source 前台下发送一次 `Ctrl+C`，要求 fresh non-empty clipboard；
 3. 将新的完整 clipboard payload 写入内存 cache，并绑定 source 与唯一 target；
 4. 解析 caption/image points；
-5. 点击 caption point，验证 target 成为前台；
+5. 显式激活唯一 target，重新验证 caption point 后点击；
 6. 从 cache 写回 clipboard，粘贴一次并等待最小安全 settle；
 7. 移到 image point，发送一次 `WheelDown`；
 8. `finally` 只恢复 mouse；系统 clipboard 有意保留当前 caption。
@@ -174,4 +175,4 @@ paste 已发送后若 wheel 失败，返回 partial success，不重贴、不补
 撤销 caption。只有 Windows field harness 对新 capture、同 caption 连续 reuse、
 cache 清除/失效、source copy failure、target ambiguity、foreground switch、
 paste、wheel、clipboard retention 和 mouse restore 全部验收后，才把
-`Shift+Alt+S` ownership 从 compatibility 移交给麦旋风。
+`0.7.0-beta.1` 提升为正式 `0.7.0`。

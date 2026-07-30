@@ -98,18 +98,6 @@ A_IconTip := "MedEx Legacy Compatibility"
     return
 }
 
-+!s::
-{
-    CoordMode "Mouse", "Screen"
-    MouseGetPos &xpos, &ypos
-    SendInput("^c")
-    MouseClick "left", 2821, 1363
-    SendInput("^v")
-    MouseMove 2884, 704
-    SendInput("{WheelDown}")
-    MouseMove xpos, ypos
-}
-
 ^#+c::
 {
     CoordMode "Mouse", "Screen"

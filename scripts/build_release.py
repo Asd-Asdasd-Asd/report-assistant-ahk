@@ -62,6 +62,7 @@ ORDER = [
     "hotkey_registration.ahk",
     "global_hjkl_arrows.ahk",
     "viewer_tool_hotkeys.ahk",
+    "report_image_caption.ahk",
     "features.ahk",
     "settings_ui.ahk",
     "tray_menu.ahk",

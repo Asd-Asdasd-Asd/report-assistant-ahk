@@ -77,9 +77,21 @@ class FeatureHotkeyTests(unittest.TestCase):
         bootstrap = source("src/features.ahk")
         self.assertEqual(bootstrap.count("LoadFeatureSettings()"), 1)
         self.assertIn("if settings.GlobalHjklArrows", bootstrap)
+        global_block = bootstrap.split(
+            "if settings.GlobalHjklArrows", 1
+        )[1].split(
+            "RegisterHotkeyDefinitions(\n        ViewerToolHotkeyDefinitions", 1
+        )[0]
         self.assertLess(
-            bootstrap.index("if settings.GlobalHjklArrows"),
-            bootstrap.index("RegisterHotkeyDefinitions("),
+            global_block.index("{"),
+            global_block.index("RegisterHotkeyDefinitions("),
+        )
+
+    def test_caption_chord_is_reserved_from_configurable_viewer_tools(self) -> None:
+        normalization = source("src/feature_normalization.ahk")
+        self.assertIn(
+            "ReportImageCaptionDefaults.HotkeyChord",
+            normalization,
         )
 
     def test_global_hjkl_arrows_preserve_legacy_global_mappings(self) -> None:

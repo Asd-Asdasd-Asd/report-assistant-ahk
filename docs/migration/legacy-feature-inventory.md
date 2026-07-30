@@ -14,6 +14,7 @@
 | 清除全部标注 | Context-menu cleaner；失败不撤销已写入报告 |
 | SUVMax 与尺寸读取 | 严格区分 `FOUND`、`NOT_ANNOTATED`、automation failure；不复用旧 clipboard 值 |
 | 红字与后续黑字 | CF_HTML + Candidate G；只支持已验证 profile，其他环境 fail closed |
+| Shift+Alt+S 快速标图 | 唯一同 PID target signature；首次 fresh copy，随后只在绑定 target 前台复用；有意保留 caption clipboard 并恢复鼠标 |
 
 ## Compatibility 仍保留
 
@@ -22,7 +23,6 @@
 | Shift+Alt+B | Body montage，参数 `8.5/8/0.8` | 固定坐标、无 window guard、部分路径不恢复鼠标 |
 | Shift+Alt+H | Head montage，参数 `4/11/1.2` | 同上 |
 | Shift+Alt+L | Lung montage，参数 `7.5/23/0.9`，含 lung-window reset | 同上；遗漏 reset 会改变图像表现 |
-| Shift+Alt+S | 首次复制选中文字并粘贴 caption；随后可不重新选字，把同一句连续写入多张图片；每次 WheelDown 并恢复鼠标 | 有意保留最后 caption、不恢复旧 clipboard；持续按住修饰键重复触发仍有限制 |
 | Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续 |
 | XButton1 | 一秒 ToolTip notification | 历史测试项，不作为迁移目标 |
 
@@ -44,7 +44,8 @@
 - 两个 AHK 进程不共享 suspend state、配置、clipboard lock 或 mouse lock。
 - 麦旋风的暂停/退出不控制 compatibility。
 - Compatibility 仍可能在错误前台窗口执行固定坐标动作。
-- Shift+Alt+S 不得与麦旋风 CF_HTML/measurement clipboard transaction 并发。
+- 旧 compatibility 运行实例若尚未重启，可能仍注册 Shift+Alt+S；测试新版本前
+  必须退出旧实例并启动本 branch 的新版脚本。
 - 原始 legacy hotstrings 与当前报告 hotstrings 同名，不能并行注册。
 - 用户配置、旧脚本和 `red_not.clip` 副本属于用户数据，不得自动覆盖或删除。
 

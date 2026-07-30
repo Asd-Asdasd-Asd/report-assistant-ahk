@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Structural regression tests for report-image caption + advance."""
+
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def source(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+class ReportImageCaptionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.module = source("src/report_image_caption.ahk")
+
+    def body(self, start: str, end: str) -> str:
+        return self.module.split(start, 1)[1].split(end, 1)[0]
+
+    def test_fixed_legacy_chord_is_owned_by_the_new_feature(self) -> None:
+        features = source("src/features.ahk")
+        compat = source("legacy/medex_legacy_compat.ahk")
+        self.assertIn('static HotkeyChord := "+!s"', self.module)
+        self.assertIn("ReportImageCaptionHotkeyDefinitions()", features)
+        self.assertIn("ReportImageCaptionForegroundActive", features)
+        self.assertNotIn("+!s::", compat)
+
+    def test_source_capture_requires_fresh_nonempty_clipboard(self) -> None:
+        capture = self.body(
+            "\nCaptureFreshReportImageCaption(sourceHwnd) {\n",
+            "\nResolveReportImageCaptionTarget(",
+        )
+        self.assertIn('A_Clipboard := ""', capture)
+        self.assertEqual(capture.count('SendInput "^c"'), 1)
+        self.assertIn("ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds)", capture)
+        self.assertIn('Trim(copiedText, " `t`r`n") = ""', capture)
+        self.assertIn("payload := ClipboardAll()", capture)
+        self.assertNotIn("savedClipboard", capture)
+
+    def test_reuse_is_only_selected_for_the_exact_bound_target(self) -> None:
+        invoke = self.body(
+            "static Invoke(foregroundHwnd := 0)",
+            "static InvokeCapture(sourceHwnd)",
+        )
+        reuse = self.body(
+            "static InvokeReuse(targetHwnd, cache)",
+            "CaptureFreshReportImageCaption(",
+        )
+        self.assertIn(
+            "REPORT_IMAGE_CAPTION_CACHE.targetHwnd\n"
+            "                    = foregroundHwnd",
+            invoke,
+        )
+        self.assertIn("ClearReportImageCaptionCache(false)", invoke)
+        self.assertIn("ReportImageCaptionCacheBindingValid", reuse)
+        self.assertIn("ResolveBoundReportImageCaptionTarget", reuse)
+        self.assertNotIn('SendInput "^c"', reuse)
+
+    def test_target_resolution_uses_unique_structure_not_display_position(self) -> None:
+        resolver = self.body(
+            "ResolveReportImageCaptionTarget(sourceHwnd, sourcePid)",
+            "ResolveBoundReportImageCaptionTarget(",
+        )
+        candidate = self.body(
+            "BuildReportImageCaptionTargetCandidate(hwnd, expectedPid)",
+            "\nResolveReportImageCaptionPane(\n",
+        )
+        self.assertIn("if matches.Length != 1", resolver)
+        self.assertIn('Name: "图像描述"', candidate)
+        self.assertIn('Name: "保存"', candidate)
+        self.assertIn("descriptionElements.Length != 1", candidate)
+        self.assertIn("saveElements.Length != 1", candidate)
+        for forbidden in (
+            "MonitorGet",
+            "MonitorGetPrimary",
+            "WinGetTitle",
+            "2821",
+            "2884",
+        ):
+            self.assertNotIn(forbidden, self.module)
+
+    def test_caption_and_image_points_are_revalidated_in_target_owner(self) -> None:
+        candidate = self.body(
+            "BuildReportImageCaptionTargetCandidate(hwnd, expectedPid)",
+            "\nResolveReportImageCaptionPane(\n",
+        )
+        pane = self.body(
+            "\nResolveReportImageCaptionPane(\n",
+            "\nResolveReportImageCaptionImageDocument(\n",
+        )
+        image = self.body(
+            "\nResolveReportImageCaptionImageDocument(\n",
+            "\nExecuteReportImageCaptionAction(",
+        )
+        self.assertIn("ResolveReportImageCaptionPane", candidate)
+        self.assertIn('FindElements({Type: "Pane"})', pane)
+        self.assertIn("if matches.Length != 1", pane)
+        self.assertIn('FindElements({Type: "Document"})', image)
+        self.assertIn("documentRect.b >= descriptionRect.t", image)
+        self.assertIn("if matches.Length != 1", image)
+        self.assertIn("ReportImageCaptionRootOwner(pointHwnd) = targetHwnd", self.module)
+
+    def test_action_keeps_caption_clipboard_and_restores_only_mouse(self) -> None:
+        action = self.body(
+            "ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd)",
+            "\nSetReportImageCaptionClipboard(payload)",
+        )
+        self.assertIn('WinActivate "ahk_id " target.hwnd', action)
+        self.assertIn("ReportImageCaptionPaneAtPoint", action)
+        self.assertEqual(action.count('SendInput "^v"'), 1)
+        self.assertEqual(action.count('SendInput "{WheelDown}"'), 1)
+        self.assertIn("finally {\n        MouseMove originalX, originalY, 0", action)
+        self.assertNotIn("savedClipboard", action)
+        self.assertNotIn("A_Clipboard :=", action)
+        self.assertIn("SetReportImageCaptionClipboard(cache.payload)", action)
+
+    def test_cache_has_explicit_tray_reset_and_no_persistence(self) -> None:
+        tray = source("src/tray_menu.ahk")
+        clear = self.body(
+            "ClearReportImageCaptionCache(showFeedback := true, *)",
+            "ReportImageCaptionUiaRoot(",
+        )
+        self.assertIn('static ClearCaptionItemName := "清除快速标图 caption"', tray)
+        self.assertIn("ClearReportImageCaptionCache", tray)
+        self.assertIn("REPORT_IMAGE_CAPTION_CACHE.payload := \"\"", clear)
+        for forbidden in ("FileAppend", "IniWrite", "OutputDebug"):
+            self.assertNotIn(forbidden, self.module)
+
+    def test_release_builder_orders_feature_before_registration(self) -> None:
+        builder = source("scripts/build_release.py")
+        main = source("src/main.ahk")
+        self.assertIn("#Include report_image_caption.ahk", main)
+        self.assertLess(
+            builder.index('"report_image_caption.ahk"'),
+            builder.index('"features.ahk"'),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
