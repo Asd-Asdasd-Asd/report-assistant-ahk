@@ -56,9 +56,9 @@ Legacy 还包含一个需要保留的业务语义：首次粘贴后，系统 cli
 - image target 缺失、重复或不属于同一 owner family：不滚轮；
 - paste 成功但 advance 失败：保留已粘贴 caption，明确报告部分成功；
 - 禁止 blind retry、第二 transport、自动点击“保存”或自动提交报告；
-- `feat/report-image-caption-0.7.0` 测试 branch 已把 ownership 移交给 production
-  module，并从 compatibility 删除重复入口；正式 `0.7.0` 仍以 Windows field
-  validation 为准。
+- `feat/report-image-caption-0.7.0` 已把 ownership 移交给 production module，
+  并从 compatibility 删除重复入口；工作机验收通过后版本提升为 `0.7.0`，
+  tag 仍等待发布后的多机器验证。
 
 ## 一次性现场诊断
 
@@ -182,7 +182,7 @@ points。只要 source/target binding 和 client rect 未变化，从 target 连
 图片”，又不会把真正的复制失败当成用户意图。
 
 paste 已发送后若 wheel 失败，返回 partial success，不重贴、不补偿滚轮，也不
-撤销 caption。只有 Windows field harness 对新 capture、同 caption 连续 reuse、
-cache 清除/失效、source copy failure、target ambiguity、foreground switch、
-paste、wheel、clipboard retention 和 mouse restore 全部验收后，才把
-`0.7.0-beta.1` 提升为正式 `0.7.0`。
+撤销 caption。工作机已验收新 capture、同 caption 连续 reuse、key-down 触发、
+保持修饰键连续操作、paste、wheel、clipboard retention 和 mouse restore，
+因此版本提升为 `0.7.0`。发布后继续验证多机器 target resolution、cache 失效
+和 Viewer 右键链；全部通过后再创建正式 tag。
