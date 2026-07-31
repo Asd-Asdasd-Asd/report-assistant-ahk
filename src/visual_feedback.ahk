@@ -130,3 +130,219 @@ ShowReportAssistantDispatchPulse(targetHwnd, durationMs := 90) {
         durationMs
     )
 }
+
+class ReportImageCaptionTransferFeedback {
+    static CardWindow := 0
+    static HighlightWindow := 0
+    static CurrentToken := 0
+    static DurationMs := 200
+    static FrameMs := 16
+    static CardWidth := 34
+    static CardHeight := 22
+    static MinimumScale := 0.48
+
+    static Show(origin, destination, highlightRect) {
+        this.Hide()
+        if !IsObject(origin)
+            || !IsObject(destination)
+            || !IsObject(highlightRect)
+            || highlightRect.r <= highlightRect.l
+            || highlightRect.b <= highlightRect.t {
+            return false
+        }
+
+        this.CurrentToken += 1
+        token := this.CurrentToken
+        try {
+            card := Gui(
+                "+AlwaysOnTop -Caption +ToolWindow -DPIScale"
+                    . " +E0x20 +E0x08000000"
+            )
+            card.BackColor := "EDF5FF"
+            card.MarginX := 0
+            card.MarginY := 0
+            card.SetFont("s11 Bold c2F6B9A", "Segoe UI")
+            card.Add(
+                "Text",
+                "x0 y-2 w" this.CardWidth
+                    . " h" this.CardHeight
+                    . " Center BackgroundTrans",
+                "≡"
+            )
+            card.Show(
+                "NoActivate Hide x" Round(origin.x - this.CardWidth / 2)
+                    . " y" Round(origin.y - this.CardHeight / 2)
+                    . " w" this.CardWidth
+                    . " h" this.CardHeight
+            )
+            this.RoundWindow(card.Hwnd, this.CardWidth, this.CardHeight, 6)
+            try WinSetTransparent(232, "ahk_id " card.Hwnd)
+            this.ExcludeFromCapture(card.Hwnd)
+            card.Show("NoActivate")
+
+            highlight := Gui(
+                "+AlwaysOnTop -Caption +ToolWindow -DPIScale"
+                    . " +E0x20 +E0x08000000"
+            )
+            highlight.BackColor := "69A7FF"
+            highlight.Show(
+                "NoActivate Hide x" Round(highlightRect.l)
+                    . " y" Round(highlightRect.t)
+                    . " w" Round(highlightRect.r - highlightRect.l)
+                    . " h" Round(highlightRect.b - highlightRect.t)
+            )
+            try WinSetTransparent(18, "ahk_id " highlight.Hwnd)
+            this.RoundWindow(
+                highlight.Hwnd,
+                Round(highlightRect.r - highlightRect.l),
+                Round(highlightRect.b - highlightRect.t),
+                8
+            )
+            this.ExcludeFromCapture(highlight.Hwnd)
+            highlight.Show("NoActivate")
+            ; Keep the text card above the translucent destination highlight.
+            card.Show("NoActivate")
+
+            this.CardWindow := card
+            this.HighlightWindow := highlight
+            state := {
+                token: token,
+                startedAt: A_TickCount,
+                origin: origin,
+                destination: destination,
+                card: card,
+                highlight: highlight
+            }
+            this.Advance(state)
+            return true
+        } catch {
+            this.Hide()
+            return false
+        }
+    }
+
+    static Advance(state) {
+        if state.token != this.CurrentToken
+            return
+        elapsed := Max(0, A_TickCount - state.startedAt)
+        progress := Min(1, elapsed / this.DurationMs)
+        eased := progress * progress * (3 - 2 * progress)
+
+        deltaX := state.destination.x - state.origin.x
+        deltaY := state.destination.y - state.origin.y
+        distance := Sqrt(deltaX * deltaX + deltaY * deltaY)
+        arcHeight := Min(76, Max(18, distance * 0.045))
+        curveX := (state.origin.x + state.destination.x) / 2
+        curveY := (state.origin.y + state.destination.y) / 2 - arcHeight
+        inverse := 1 - eased
+        centerX := inverse * inverse * state.origin.x
+            + 2 * inverse * eased * curveX
+            + eased * eased * state.destination.x
+        centerY := inverse * inverse * state.origin.y
+            + 2 * inverse * eased * curveY
+            + eased * eased * state.destination.y
+
+        arrival := progress <= 0.7
+            ? 0
+            : (progress - 0.7) / 0.3
+        scale := (1 + 0.08 * Sin(progress * ACos(-1)))
+            * (1 - (1 - this.MinimumScale) * arrival * arrival)
+        width := Max(12, Round(this.CardWidth * scale))
+        height := Max(8, Round(this.CardHeight * scale))
+        cardX := Round(centerX - width / 2)
+        cardY := Round(centerY - height / 2)
+        try {
+            state.card.Show(
+                "NoActivate x" cardX
+                    . " y" cardY
+                    . " w" width
+                    . " h" height
+            )
+            this.RoundWindow(
+                state.card.Hwnd,
+                width,
+                height,
+                Max(3, Round(6 * scale))
+            )
+            cardOpacity := progress < 0.78
+                ? 232
+                : Round(232 * (1 - (progress - 0.78) / 0.22))
+            WinSetTransparent(
+                Max(0, cardOpacity),
+                "ahk_id " state.card.Hwnd
+            )
+
+            highlightProgress := progress < 0.56
+                ? progress / 0.56
+                : (progress - 0.56) / 0.44
+            highlightOpacity := progress < 0.56
+                ? Round(18 + 20 * highlightProgress)
+                : Round(
+                    38 * (1 - highlightProgress)
+                        + 62 * Sin(highlightProgress * ACos(-1))
+                )
+            WinSetTransparent(
+                Max(0, highlightOpacity),
+                "ahk_id " state.highlight.Hwnd
+            )
+        } catch {
+            this.Hide()
+            return
+        }
+
+        if progress >= 1 {
+            this.HideIfCurrent(state.token)
+            return
+        }
+        SetTimer(
+            ReportImageCaptionTransferFeedback.Advance.Bind(state),
+            -this.FrameMs
+        )
+    }
+
+    static RoundWindow(hwnd, width, height, radius) {
+        try WinSetRegion(
+            "0-0 W" Max(1, width)
+                . " H" Max(1, height)
+                . " R" Max(1, radius) "-" Max(1, radius),
+            "ahk_id " hwnd
+        )
+    }
+
+    static ExcludeFromCapture(hwnd) {
+        try DllCall(
+            "User32\SetWindowDisplayAffinity",
+            "Ptr", hwnd,
+            "UInt", 0x00000011,
+            "Int"
+        )
+    }
+
+    static HideIfCurrent(token) {
+        if this.CurrentToken = token
+            this.Hide()
+    }
+
+    static Hide() {
+        if IsObject(this.CardWindow) {
+            try this.CardWindow.Destroy()
+        }
+        if IsObject(this.HighlightWindow) {
+            try this.HighlightWindow.Destroy()
+        }
+        this.CardWindow := 0
+        this.HighlightWindow := 0
+    }
+}
+
+ShowReportImageCaptionTransferFeedback(
+    origin,
+    destination,
+    highlightRect
+) {
+    return ReportImageCaptionTransferFeedback.Show(
+        origin,
+        destination,
+        highlightRect
+    )
+}

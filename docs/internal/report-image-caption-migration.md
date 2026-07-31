@@ -219,3 +219,10 @@ renderer transport，留给独立 experiment。当前 DevTools 已确认图片�
 `opener`，不包含主编辑 renderer，并且只注册 Electron remote 内部回调事件；不得
 猜测 `ipcRenderer.sendTo` 的目标、channel 或 payload。完整分析见
 `docs/technical-investigations/2026-07-medex-devtools-runtime.md`。
+
+保存点击派发后，production 在既有 200 ms settle 内启动非激活、鼠标穿透的视觉
+反馈：一张带三条文字线的轻量卡片从 source 选区附近（鼠标不在 source 时退回
+source client 中心）沿二次曲线缓入缓出，接近 caption point 时缩小并淡出；同一
+时间 caption 输入区域执行一次低透明度高亮。overlay 使用 token 取代旧动画，
+不进入 clipboard、保存、翻页或结果判断逻辑；其含义仅为“保存点击已经派发”，
+不声称后端保存成功。

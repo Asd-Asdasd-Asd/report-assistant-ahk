@@ -199,6 +199,7 @@ class ReportImageCaptionProvider {
             ),
             captionPoint: target.captionPoint,
             savePoint: target.savePoint,
+            captionHighlightRect: target.captionHighlightRect,
             imagePoint: target.imagePoint
         }
         return ExecuteReportImageCaptionAction(
@@ -312,6 +313,7 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         candidateCount: 0,
         captionPoint: 0,
         savePoint: 0,
+        captionHighlightRect: 0,
         imagePoint: 0
     }
     if !ReportImageCaptionTopLevelWindowEligible(
@@ -319,6 +321,7 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         cache.targetPid
     ) || !cache.HasOwnProp("captionPoint")
         || !cache.HasOwnProp("savePoint")
+        || !cache.HasOwnProp("captionHighlightRect")
         || !cache.HasOwnProp("imagePoint")
         || !cache.HasOwnProp("targetClientRectKey")
         || cache.targetClientRectKey
@@ -333,6 +336,10 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
             targetHwnd,
             cache.savePoint
         )
+        || !ReportImageCaptionRectContainsRect(
+            ReportImageCaptionClientRect(targetHwnd),
+            cache.captionHighlightRect
+        )
         || !ReportImageCaptionPointBelongsToTarget(
             targetHwnd,
             cache.imagePoint
@@ -346,6 +353,7 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         candidateCount: 1,
         captionPoint: cache.captionPoint,
         savePoint: cache.savePoint,
+        captionHighlightRect: cache.captionHighlightRect,
         imagePoint: cache.imagePoint
     }
 }
@@ -373,6 +381,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         candidateCount: 0,
         captionPoint: 0,
         savePoint: 0,
+        captionHighlightRect: 0,
         imagePoint: 0
     }
     try {
@@ -458,6 +467,18 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         if !captionPaneResult.ok
             return failure
         paneRect := captionPaneResult.rect
+        captionHighlightRect := {
+            l: Max(paneRect.l + 6, descriptionRect.r + 6),
+            t: paneRect.t + 4,
+            r: saveRect.l - 6,
+            b: paneRect.b - 4
+        }
+        if !ReportImageCaptionRectContainsRect(
+            paneRect,
+            captionHighlightRect
+        ) {
+            return failure
+        }
 
         imageResult := ResolveReportImageCaptionImagePoint(
             clientRect,
@@ -474,6 +495,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             candidateCount: 1,
             captionPoint: captionPoint,
             savePoint: savePoint,
+            captionHighlightRect: captionHighlightRect,
             imagePoint: imageResult.point
         }
     } catch {
@@ -658,6 +680,16 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
                 1,
                 0
             )
+            feedbackOrigin := ReportImageCaptionFeedbackOrigin(
+                cache,
+                originalX,
+                originalY
+            )
+            try ShowReportImageCaptionTransferFeedback(
+                feedbackOrigin,
+                target.captionPoint,
+                target.captionHighlightRect
+            )
         } catch {
             return MakeReportImageCaptionResult(
                 false,
@@ -730,6 +762,7 @@ ReportImageCaptionCacheBindingValid(cache, foregroundHwnd) {
         || !cache.HasOwnProp("targetClientRectKey")
         || !cache.HasOwnProp("captionPoint")
         || !cache.HasOwnProp("savePoint")
+        || !cache.HasOwnProp("captionHighlightRect")
         || !cache.HasOwnProp("imagePoint") {
         return false
     }
@@ -753,12 +786,30 @@ ReportImageCaptionSourceBindingValid(cache, sourceHwnd) {
         && cache.HasOwnProp("targetClientRectKey")
         && cache.HasOwnProp("captionPoint")
         && cache.HasOwnProp("savePoint")
+        && cache.HasOwnProp("captionHighlightRect")
         && cache.HasOwnProp("imagePoint")
         && sourceHwnd = cache.sourceHwnd
         && ReportImageCaptionWindowPid(sourceHwnd)
             = cache.sourcePid
         && ReportImageCaptionWindowPid(cache.targetHwnd)
             = cache.targetPid
+}
+
+ReportImageCaptionFeedbackOrigin(cache, mouseX, mouseY) {
+    sourceRect := IsObject(cache)
+        && cache.HasOwnProp("sourceHwnd")
+        ? ReportImageCaptionClientRect(cache.sourceHwnd)
+        : 0
+    if IsObject(sourceRect) {
+        mousePoint := {x: mouseX, y: mouseY}
+        if ReportImageCaptionRectContainsPoint(sourceRect, mousePoint)
+            return mousePoint
+        return {
+            x: Round((sourceRect.l + sourceRect.r) / 2),
+            y: Round((sourceRect.t + sourceRect.b) / 2)
+        }
+    }
+    return {x: mouseX, y: mouseY}
 }
 
 ClearReportImageCaptionCache(showFeedback := true, *) {
