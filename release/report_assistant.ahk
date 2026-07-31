@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0-beta.1
-; Source revision: c21378737ecf8a16aa858f147b8347d472280c09
-; Generated at: 2026-07-31 01:41:30 UTC
+; Source revision: e1882d9cded0f67311ad065742aaec12b17259b9
+; Generated at: 2026-07-31 01:53:28 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0-beta.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0-beta.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-31"
-    static SourceRevision := "c21378737ecf8a16aa858f147b8347d472280c09"
+    static SourceRevision := "e1882d9cded0f67311ad065742aaec12b17259b9"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11930,13 +11930,49 @@ ResolveMxNMActionWindowFromAnchor(
     runtimeFrameHwnd,
     actionRootHwnd
 ) {
+    pointHwnd := ResolveMxNMWindowFromScreenPoint(screenPoint)
+    if !pointHwnd
+        || !MxNMTargetWindowIsSameOrDescendant(
+            pointHwnd,
+            actionRootHwnd
+        ) {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
+        }
+    }
     return ValidateMxNMActionWindow(
         viewerExe,
         screenPoint,
         runtimeFrameHwnd,
-        actionRootHwnd,
-        ResolveMxNMRootOwnerHwnd(actionRootHwnd)
+        pointHwnd,
+        ResolveMxNMRootOwnerHwnd(pointHwnd)
     )
+}
+
+ResolveMxNMWindowFromScreenPoint(screenPoint) {
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try return DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch
+        return 0
+}
+
+MxNMTargetWindowIsSameOrDescendant(hwnd, ancestorHwnd) {
+    if !hwnd || !ancestorHwnd
+        return false
+    seen := Map()
+    while hwnd && !seen.Has(hwnd) {
+        if hwnd = ancestorHwnd
+            return true
+        seen[hwnd] := true
+        hwnd := MxNMTargetParentHwnd(hwnd)
+    }
+    return false
 }
 
 ValidateMxNMActionWindow(
