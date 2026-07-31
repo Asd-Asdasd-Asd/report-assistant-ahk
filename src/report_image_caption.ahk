@@ -468,10 +468,10 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             return failure
         paneRect := captionPaneResult.rect
         captionHighlightRect := {
-            l: Max(paneRect.l + 6, descriptionRect.r + 6),
-            t: paneRect.t + 4,
-            r: saveRect.l - 6,
-            b: paneRect.b - 4
+            l: Max(paneRect.l + 8, captionPoint.x - 160),
+            t: Max(paneRect.t + 6, captionPoint.y - 18),
+            r: Min(saveRect.l - 8, captionPoint.x + 160),
+            b: Min(paneRect.b - 6, captionPoint.y + 18)
         }
         if !ReportImageCaptionRectContainsRect(
             paneRect,

@@ -134,6 +134,7 @@ ShowReportAssistantDispatchPulse(targetHwnd, durationMs := 90) {
 class ReportImageCaptionTransferFeedback {
     static CardWindow := 0
     static HighlightWindow := 0
+    static CurrentState := 0
     static CurrentToken := 0
     static DurationMs := 200
     static FrameMs := 16
@@ -213,7 +214,12 @@ class ReportImageCaptionTransferFeedback {
                 card: card,
                 highlight: highlight
             }
-            this.Advance(state)
+            this.CurrentState := state
+            SetTimer(
+                ReportImageCaptionTransferFeedbackCleanupTimer,
+                -(this.DurationMs + 250)
+            )
+            this.AdvanceCurrent()
             return true
         } catch {
             this.Hide()
@@ -221,7 +227,10 @@ class ReportImageCaptionTransferFeedback {
         }
     }
 
-    static Advance(state) {
+    static AdvanceCurrent() {
+        state := this.CurrentState
+        if !IsObject(state)
+            return
         if state.token != this.CurrentToken
             return
         elapsed := Max(0, A_TickCount - state.startedAt)
@@ -295,7 +304,7 @@ class ReportImageCaptionTransferFeedback {
             return
         }
         SetTimer(
-            ReportImageCaptionTransferFeedback.Advance.Bind(state),
+            ReportImageCaptionTransferFeedbackTimer,
             -this.FrameMs
         )
     }
@@ -324,6 +333,8 @@ class ReportImageCaptionTransferFeedback {
     }
 
     static Hide() {
+        try SetTimer(ReportImageCaptionTransferFeedbackTimer, 0)
+        try SetTimer(ReportImageCaptionTransferFeedbackCleanupTimer, 0)
         if IsObject(this.CardWindow) {
             try this.CardWindow.Destroy()
         }
@@ -332,7 +343,19 @@ class ReportImageCaptionTransferFeedback {
         }
         this.CardWindow := 0
         this.HighlightWindow := 0
+        this.CurrentState := 0
     }
+}
+
+ReportImageCaptionTransferFeedbackTimer(*) {
+    try ReportImageCaptionTransferFeedback.AdvanceCurrent()
+    catch {
+        ReportImageCaptionTransferFeedback.Hide()
+    }
+}
+
+ReportImageCaptionTransferFeedbackCleanupTimer(*) {
+    ReportImageCaptionTransferFeedback.Hide()
 }
 
 ShowReportImageCaptionTransferFeedback(

@@ -33,7 +33,7 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
 
     def test_motion_uses_easing_arc_scale_absorption_and_highlight(self) -> None:
         body = self.feedback.split(
-            "static Advance(state)", 1
+            "static AdvanceCurrent()", 1
         )[1].split("\n    static RoundWindow", 1)[0]
         self.assertIn("progress * progress * (3 - 2 * progress)", body)
         self.assertIn("curveY", body)
@@ -43,6 +43,11 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
         self.assertIn("highlightOpacity", body)
         self.assertIn("WinSetTransparent(", body)
         self.assertIn("SetTimer(", body)
+        self.assertIn("ReportImageCaptionTransferFeedbackTimer", body)
+        self.assertNotIn("Advance.Bind(state)", body)
+        self.assertIn(
+            "ReportImageCaptionTransferFeedbackCleanupTimer", self.feedback
+        )
 
     def test_save_dispatch_starts_feedback_inside_existing_wait(self) -> None:
         action = self.caption.split(
@@ -67,8 +72,8 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
 
     def test_caption_highlight_rect_is_derived_and_cached(self) -> None:
         self.assertIn("captionHighlightRect := {", self.caption)
-        self.assertIn("l: Max(paneRect.l + 6, descriptionRect.r + 6)", self.caption)
-        self.assertIn("r: saveRect.l - 6", self.caption)
+        self.assertIn("l: Max(paneRect.l + 8, captionPoint.x - 160)", self.caption)
+        self.assertIn("r: Min(saveRect.l - 8, captionPoint.x + 160)", self.caption)
         self.assertGreaterEqual(
             self.caption.count('HasOwnProp("captionHighlightRect")'),
             3,
