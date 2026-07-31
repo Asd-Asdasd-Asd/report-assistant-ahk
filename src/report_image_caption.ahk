@@ -2,7 +2,7 @@ class ReportImageCaptionDefaults {
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
-    static PasteSettleMs := 20
+    static PasteSettleMs := 80
     static MinCaptionGapPx := 120
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
@@ -609,8 +609,10 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
             )
         }
 
-        try SendInput "^v"
-        catch {
+        try {
+            SendInput "^a"
+            SendInput "^v"
+        } catch {
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.PASTE_FAILED

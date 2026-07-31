@@ -225,12 +225,17 @@ class ReportImageCaptionTests(unittest.TestCase):
             action,
         )
         self.assertEqual(action.count('SendInput "^v"'), 1)
+        self.assertEqual(action.count('SendInput "^a"'), 1)
+        self.assertLess(
+            action.index('SendInput "^a"'),
+            action.index('SendInput "^v"'),
+        )
         self.assertEqual(action.count('SendInput "{WheelDown}"'), 1)
         self.assertIn(
             "target.captionPoint.y,\n            1,\n            0",
             action,
         )
-        self.assertIn("static PasteSettleMs := 20", self.module)
+        self.assertIn("static PasteSettleMs := 80", self.module)
         self.assertIn("finally {\n        MouseMove originalX, originalY, 0", action)
         self.assertNotIn("savedClipboard", action)
         self.assertNotIn("A_Clipboard :=", action)
