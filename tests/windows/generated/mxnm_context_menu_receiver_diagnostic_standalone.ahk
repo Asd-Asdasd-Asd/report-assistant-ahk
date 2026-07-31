@@ -1824,18 +1824,13 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         return failure
     }
     actionFrame := surfaceResult.frame
-    mappedImage := {
-        ok: true,
-        rect: {
-            left: actionFrame.clientX,
-            top: actionFrame.clientY,
-            right: actionFrame.clientX
-                + actionFrame.clientWidth,
-            bottom: actionFrame.clientY
-                + actionFrame.clientHeight,
-            width: actionFrame.clientWidth,
-            height: actionFrame.clientHeight
-        }
+    mappedImage := MapMxNMLogicalImageRectToRuntime(
+        plan.mainGeometry,
+        actionFrame
+    )
+    if !mappedImage.ok {
+        failure.fallbackCode := "ANCHOR_IMAGE_MAPPING_INVALID"
+        return failure
     }
     screenPoint := MapMxNMLogicalPointToRuntimeRect(
         plan.logicalPoint,

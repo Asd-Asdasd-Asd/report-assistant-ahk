@@ -194,6 +194,11 @@ target unavailable。此前成对日志已经证明旧 measurement resolver 因�
 3A 通过只证明当前多顶层窗口问题已解决；不同机器若仍存在右键接收 ancestor
 差异，再继续执行下面的自动 receiver 与用户自校验范围。
 
+Tool-anchor fallback 选出 image receiver 后，仍须把 Vendor
+`ShowImagePosX/Y/Width/Height` 映射到该 receiver 的 runtime frame。完整
+client rect 同时包含标题区、工具按钮和其他非图像区域，不能直接作为
+`imageRect`。
+
 第二轮主图区证据确认人工图像点仍命中 `#32770` 图像 HWND，且
 `rootOwnerHwnd` 正确回到与工具面板相同的 outer Viewer。为消除清除链路与
 测量链路之间的重复解析，target resolver 在完成 point HWND、root owner、

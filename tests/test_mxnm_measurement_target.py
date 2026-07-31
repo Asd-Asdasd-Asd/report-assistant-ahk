@@ -176,10 +176,17 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "MxNMPointInsideRuntimeFrameClient",
             fallback_target,
         )
+        self.assertIn(
+            "MapMxNMLogicalImageRectToRuntime("
+            "\n        plan.mainGeometry,"
+            "\n        actionFrame",
+            fallback_target,
+        )
         for fallback_code in (
             "ANCHOR_INVALID",
             "ANCHOR_IDENTITY_INVALID",
             "ANCHOR_FRAME_INVALID",
+            "ANCHOR_IMAGE_MAPPING_INVALID",
             "ANCHOR_POINT_OUT_OF_BOUNDS",
             "READY_FOREGROUND_IMAGE_CLIENT",
             "READY_LARGEST_IMAGE_CLIENT",
