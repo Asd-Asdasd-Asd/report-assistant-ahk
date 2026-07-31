@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 0f5787733b410fb673465b9609fa8497e657a6fb
-; Generated at: 2026-07-31 03:17:42 UTC
+; Source revision: 897e0301d2e44c176ab9d11f087d0cf76e844feb
+; Generated at: 2026-07-31 12:32:39 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-07-31"
-    static SourceRevision := "0f5787733b410fb673465b9609fa8497e657a6fb"
+    static SourceRevision := "897e0301d2e44c176ab9d11f087d0cf76e844feb"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -20190,14 +20190,13 @@ class ReportImageCaptionDefaults {
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
+    static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
+    static ExplicitSaveSettleMs := 200
     static MinCaptionGapPx := 120
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
-    static MinImageWidthRatio := 0.2
-    static MinImageHeightRatio := 0.3
-    static MinImageAreaRatio := 0.1
-    static MinImageCaptionOverlapRatio := 0.5
+    static MinImageRegionHeightRatio := 0.5
 }
 
 class ReportImageCaptionCode {
@@ -20213,6 +20212,7 @@ class ReportImageCaptionCode {
     static CLIPBOARD_WRITE_FAILED := "CLIPBOARD_WRITE_FAILED"
     static TARGET_ACTIVATION_FAILED := "TARGET_ACTIVATION_FAILED"
     static PASTE_FAILED := "PASTE_FAILED"
+    static SAVE_DISPATCH_FAILED := "SAVE_DISPATCH_FAILED"
     static PARTIAL_SUCCESS := "PARTIAL_SUCCESS"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
@@ -20386,6 +20386,7 @@ class ReportImageCaptionProvider {
                 ReportImageCaptionClientRect(target.hwnd)
             ),
             captionPoint: target.captionPoint,
+            savePoint: target.savePoint,
             imagePoint: target.imagePoint
         }
         return ExecuteReportImageCaptionAction(
@@ -20498,12 +20499,14 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         pid: cache.targetPid,
         candidateCount: 0,
         captionPoint: 0,
+        savePoint: 0,
         imagePoint: 0
     }
     if !ReportImageCaptionTopLevelWindowEligible(
         targetHwnd,
         cache.targetPid
     ) || !cache.HasOwnProp("captionPoint")
+        || !cache.HasOwnProp("savePoint")
         || !cache.HasOwnProp("imagePoint")
         || !cache.HasOwnProp("targetClientRectKey")
         || cache.targetClientRectKey
@@ -20513,6 +20516,10 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         || !ReportImageCaptionPointBelongsToTarget(
             targetHwnd,
             cache.captionPoint
+        )
+        || !ReportImageCaptionPointBelongsToTarget(
+            targetHwnd,
+            cache.savePoint
         )
         || !ReportImageCaptionPointBelongsToTarget(
             targetHwnd,
@@ -20526,6 +20533,7 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         pid: cache.targetPid,
         candidateCount: 1,
         captionPoint: cache.captionPoint,
+        savePoint: cache.savePoint,
         imagePoint: cache.imagePoint
     }
 }
@@ -20552,6 +20560,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         pid: expectedPid,
         candidateCount: 0,
         captionPoint: 0,
+        savePoint: 0,
         imagePoint: 0
     }
     try {
@@ -20622,6 +20631,10 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             ),
             y: Round((saveRect.t + saveRect.b) / 2)
         }
+        savePoint := {
+            x: Round((saveRect.l + saveRect.r) / 2),
+            y: Round((saveRect.t + saveRect.b) / 2)
+        }
         captionPaneResult := ResolveReportImageCaptionPane(
             root,
             captionPoint,
@@ -20634,12 +20647,10 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             return failure
         paneRect := captionPaneResult.rect
 
-        imageResult := ResolveReportImageCaptionImageDocument(
-            root,
+        imageResult := ResolveReportImageCaptionImagePoint(
             clientRect,
             paneRect,
-            descriptionRect,
-            expectedPid
+            descriptionRect
         )
         if !imageResult.ok
             return failure
@@ -20650,6 +20661,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             pid: expectedPid,
             candidateCount: 1,
             captionPoint: captionPoint,
+            savePoint: savePoint,
             imagePoint: imageResult.point
         }
     } catch {
@@ -20702,72 +20714,37 @@ ResolveReportImageCaptionPane(
     return {ok: true, rect: matches[1], candidateCount: 1}
 }
 
-ResolveReportImageCaptionImageDocument(
-    root,
+ResolveReportImageCaptionImagePoint(
     clientRect,
     captionPaneRect,
-    descriptionRect,
-    expectedPid
+    descriptionRect
 ) {
-    matches := []
-    clientWidth := ReportImageCaptionRectWidth(clientRect)
     clientHeight := ReportImageCaptionRectHeight(clientRect)
-    clientArea := clientWidth * clientHeight
-    try documents := root.FindElements({Type: "Document"})
-    catch
-        documents := []
-
-    for document in documents {
-        if !ReportImageCaptionElementUsable(document, expectedPid)
-            continue
-        try focusable := document.IsKeyboardFocusable = true
-        catch
-            focusable := false
-        if !focusable
-            continue
-        documentRect := ReportImageCaptionElementRect(document)
-        if !IsObject(documentRect)
-            || !ReportImageCaptionRectContainsRect(
-                clientRect,
-                documentRect
-            )
-            || documentRect.b >= descriptionRect.t {
-            continue
-        }
-        documentWidth := ReportImageCaptionRectWidth(documentRect)
-        documentHeight := ReportImageCaptionRectHeight(documentRect)
-        documentArea := documentWidth * documentHeight
-        if documentWidth
-                < clientWidth
-                    * ReportImageCaptionDefaults.MinImageWidthRatio
-            || documentHeight
-                < clientHeight
-                    * ReportImageCaptionDefaults.MinImageHeightRatio
-            || documentArea
-                < clientArea
-                    * ReportImageCaptionDefaults.MinImageAreaRatio {
-            continue
-        }
-        overlapWidth := Max(
-            0,
-            Min(documentRect.r, captionPaneRect.r)
-                - Max(documentRect.l, captionPaneRect.l)
-        )
-        if overlapWidth / documentWidth
-                < ReportImageCaptionDefaults.MinImageCaptionOverlapRatio {
-            continue
-        }
-        matches.Push(documentRect)
+    imageRegionHeight := descriptionRect.t - clientRect.t
+    if imageRegionHeight
+            < clientHeight
+                * ReportImageCaptionDefaults.MinImageRegionHeightRatio {
+        return {ok: false, point: 0, candidateCount: 0}
     }
-    if matches.Length != 1
-        return {ok: false, point: 0, candidateCount: matches.Length}
-    rect := matches[1]
+    point := {
+        x: Round((captionPaneRect.l + captionPaneRect.r) / 2),
+        y: Round(clientRect.t + imageRegionHeight * 0.5)
+    }
+    if !ReportImageCaptionRectContainsPoint(clientRect, point)
+        || !ReportImageCaptionRectContainsPoint(
+            {
+                l: captionPaneRect.l,
+                t: clientRect.t,
+                r: captionPaneRect.r,
+                b: descriptionRect.t
+            },
+            point
+        ) {
+        return {ok: false, point: 0, candidateCount: 0}
+    }
     return {
         ok: true,
-        point: {
-            x: Round((rect.l + rect.r) / 2),
-            y: Round((rect.t + rect.b) / 2)
-        },
+        point: point,
         candidateCount: 1
     }
 }
@@ -20837,8 +20814,11 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
             )
         }
 
-        try SendInput "^v"
-        catch {
+        Sleep ReportImageCaptionDefaults.CaptionFocusSettleMs
+        try {
+            SendInput "^a"
+            SendInput "^v"
+        } catch {
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.PASTE_FAILED
@@ -20846,6 +20826,34 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
         }
         pasteDispatched := true
         Sleep ReportImageCaptionDefaults.PasteSettleMs
+
+        if WinExist("A") != target.hwnd
+            || !ReportImageCaptionPointBelongsToTarget(
+                target.hwnd,
+                target.savePoint
+            ) {
+            return MakeReportImageCaptionResult(
+                false,
+                ReportImageCaptionCode.SAVE_DISPATCH_FAILED,
+                true
+            )
+        }
+        try {
+            MouseClick(
+                "left",
+                target.savePoint.x,
+                target.savePoint.y,
+                1,
+                0
+            )
+        } catch {
+            return MakeReportImageCaptionResult(
+                false,
+                ReportImageCaptionCode.SAVE_DISPATCH_FAILED,
+                true
+            )
+        }
+        Sleep ReportImageCaptionDefaults.ExplicitSaveSettleMs
 
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(
@@ -20909,6 +20917,7 @@ ReportImageCaptionCacheBindingValid(cache, foregroundHwnd) {
         || !cache.HasOwnProp("targetPid")
         || !cache.HasOwnProp("targetClientRectKey")
         || !cache.HasOwnProp("captionPoint")
+        || !cache.HasOwnProp("savePoint")
         || !cache.HasOwnProp("imagePoint") {
         return false
     }
@@ -20931,6 +20940,7 @@ ReportImageCaptionSourceBindingValid(cache, sourceHwnd) {
         && cache.HasOwnProp("targetPid")
         && cache.HasOwnProp("targetClientRectKey")
         && cache.HasOwnProp("captionPoint")
+        && cache.HasOwnProp("savePoint")
         && cache.HasOwnProp("imagePoint")
         && sourceHwnd = cache.sourceHwnd
         && ReportImageCaptionWindowPid(sourceHwnd)
@@ -21103,6 +21113,8 @@ ReportImageCaptionFailureMessage(result) {
         return "报告图像窗口未激活，未执行粘贴"
     if result.code = ReportImageCaptionCode.PASTE_FAILED
         return "caption 粘贴失败"
+    if result.code = ReportImageCaptionCode.SAVE_DISPATCH_FAILED
+        return "caption 已粘贴，但未能触发保存"
     if result.code = ReportImageCaptionCode.PARTIAL_SUCCESS
         return "caption 已粘贴，但未能翻到下一张"
     if result.code = ReportImageCaptionCode.BUSY
