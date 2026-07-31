@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 7a62db47b2ad91811af8e2f6e8493379ada8964f
-; Generated at: 2026-07-31 02:56:24 UTC
+; Source revision: 0f5787733b410fb673465b9609fa8497e657a6fb
+; Generated at: 2026-07-31 03:17:42 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-07-31"
-    static SourceRevision := "7a62db47b2ad91811af8e2f6e8493379ada8964f"
+    static SourceRevision := "0f5787733b410fb673465b9609fa8497e657a6fb"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -16916,6 +16916,11 @@ class FeatureDefaults {
     static Section := "Features"
     static GlobalHjklArrowsKey := "GlobalHjklArrows"
     static GlobalHjklArrowsDefault := "false"
+    static ReportImageCaptionSection := "ReportImageCaptionHotkey"
+    static ReportImageCaptionEnabledKey := "Enabled"
+    static ReportImageCaptionChordKey := "Chord"
+    static ReportImageCaptionEnabledDefault := "true"
+    static ReportImageCaptionChordDefault := "+!s"
     static ViewerToolSection := "ViewerToolHotkeys"
     static ViewerArrowEnabledKey := "ArrowEnabled"
     static ViewerArrowChordKey := "ArrowChord"
@@ -16940,6 +16945,16 @@ class FeatureDefaults {
                 this.Section,
                 this.GlobalHjklArrowsKey,
                 this.GlobalHjklArrowsDefault
+            ),
+            ManagedConfigEntry(
+                this.ReportImageCaptionSection,
+                this.ReportImageCaptionEnabledKey,
+                this.ReportImageCaptionEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ReportImageCaptionSection,
+                this.ReportImageCaptionChordKey,
+                this.ReportImageCaptionChordDefault
             ),
             ManagedConfigEntry(
                 this.ViewerToolSection,
@@ -16998,6 +17013,8 @@ class FeatureDefaults {
 class RawFeatureSettings {
     __New(
         globalHjklArrows,
+        reportImageCaptionEnabled,
+        reportImageCaptionChord,
         viewerArrowEnabled,
         viewerArrowChord,
         viewerLengthEnabled,
@@ -17010,6 +17027,8 @@ class RawFeatureSettings {
         viewerClearChord
     ) {
         this.GlobalHjklArrows := String(globalHjklArrows)
+        this.ReportImageCaptionEnabled := String(reportImageCaptionEnabled)
+        this.ReportImageCaptionChord := String(reportImageCaptionChord)
         this.ViewerArrowEnabled := String(viewerArrowEnabled)
         this.ViewerArrowChord := String(viewerArrowChord)
         this.ViewerLengthEnabled := String(viewerLengthEnabled)
@@ -17026,6 +17045,8 @@ class RawFeatureSettings {
 class FeatureSettings {
     __New(
         globalHjklArrows := false,
+        reportImageCaptionEnabled := true,
+        reportImageCaptionChord := "+!s",
         viewerArrowEnabled := false,
         viewerArrowChord := "",
         viewerLengthEnabled := false,
@@ -17038,6 +17059,8 @@ class FeatureSettings {
         viewerClearChord := ""
     ) {
         this.GlobalHjklArrows := globalHjklArrows = true
+        this.ReportImageCaptionEnabled := reportImageCaptionEnabled = true
+        this.ReportImageCaptionChord := String(reportImageCaptionChord)
         this.ViewerArrowEnabled := viewerArrowEnabled = true
         this.ViewerArrowChord := String(viewerArrowChord)
         this.ViewerLengthEnabled := viewerLengthEnabled = true
@@ -17217,6 +17240,10 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         "",
         "[" FeatureDefaults.Section "]",
         FeatureDefaults.GlobalHjklArrowsKey "=" FeatureDefaults.GlobalHjklArrowsDefault,
+        "",
+        "[" FeatureDefaults.ReportImageCaptionSection "]",
+        FeatureDefaults.ReportImageCaptionEnabledKey "=" FeatureDefaults.ReportImageCaptionEnabledDefault,
+        FeatureDefaults.ReportImageCaptionChordKey "=" FeatureDefaults.ReportImageCaptionChordDefault,
         "",
         "[" FeatureDefaults.ViewerToolSection "]",
         FeatureDefaults.ViewerArrowEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
@@ -18816,7 +18843,7 @@ SaveEditableReportHotstringConfig(
     if !validation.Ok
         return ReportHotstringEditorSaveResult(false, validation.Message)
     if IsObject(featureSettings) {
-        featureValidation := ValidateViewerToolHotkeySettings(
+        featureValidation := ValidateFeatureHotkeySettings(
             featureSettings
         )
         if !featureValidation.Ok {
@@ -18901,9 +18928,9 @@ SaveEditableReportHotstringConfig(
         }
 
         if IsObject(featureSettings) {
-            WriteViewerToolHotkeySettings(tempPath, featureSettings)
+            WriteFeatureHotkeySettings(tempPath, featureSettings)
             savedFeatures := LoadFeatureSettings(tempPath)
-            if !ViewerToolHotkeySettingsMatch(
+            if !FeatureHotkeySettingsMatch(
                 featureSettings,
                 savedFeatures
             ) {
@@ -18937,7 +18964,7 @@ SaveEditableReportHotstringConfig(
             throw Error("Final configuration did not match the edited templates")
         if IsObject(featureSettings) {
             finalFeatures := LoadFeatureSettings(configPath)
-            if !ViewerToolHotkeySettingsMatch(
+            if !FeatureHotkeySettingsMatch(
                 featureSettings,
                 finalFeatures
             ) {
@@ -18977,7 +19004,20 @@ SaveEditableReportHotstringConfig(
     }
 }
 
-WriteViewerToolHotkeySettings(configPath, settings) {
+WriteFeatureHotkeySettings(configPath, settings) {
+    captionSection := FeatureDefaults.ReportImageCaptionSection
+    IniWrite(
+        settings.ReportImageCaptionEnabled ? "true" : "false",
+        configPath,
+        captionSection,
+        FeatureDefaults.ReportImageCaptionEnabledKey
+    )
+    IniWrite(
+        settings.ReportImageCaptionChord,
+        configPath,
+        captionSection,
+        FeatureDefaults.ReportImageCaptionChordKey
+    )
     section := FeatureDefaults.ViewerToolSection
     IniWrite(
         settings.ViewerArrowEnabled ? "true" : "false",
@@ -19454,6 +19494,8 @@ ReportMeasurementContextValue(context, key, defaultValue := 0) {
 LoadRawFeatureSettings(configPath := "") {
     defaults := RawFeatureSettings(
         FeatureDefaults.GlobalHjklArrowsDefault,
+        FeatureDefaults.ReportImageCaptionEnabledDefault,
+        FeatureDefaults.ReportImageCaptionChordDefault,
         FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerArrowChordDefault,
         FeatureDefaults.ViewerToolEnabledDefault,
@@ -19483,6 +19525,18 @@ LoadRawFeatureSettings(configPath := "") {
                 FeatureDefaults.Section,
                 FeatureDefaults.GlobalHjklArrowsKey,
                 FeatureDefaults.GlobalHjklArrowsDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ReportImageCaptionSection,
+                FeatureDefaults.ReportImageCaptionEnabledKey,
+                FeatureDefaults.ReportImageCaptionEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ReportImageCaptionSection,
+                FeatureDefaults.ReportImageCaptionChordKey,
+                FeatureDefaults.ReportImageCaptionChordDefault
             ),
             IniRead(
                 configPath,
@@ -19560,6 +19614,8 @@ LoadFeatureSettings(configPath := "") {
 NormalizeFeatureSettings(raw) {
     return FeatureSettings(
         ParseOptionalFeatureEnabled(raw.GlobalHjklArrows),
+        ParseOptionalFeatureEnabled(raw.ReportImageCaptionEnabled),
+        NormalizeOptionalHotkeyChord(raw.ReportImageCaptionChord),
         ParseOptionalFeatureEnabled(raw.ViewerArrowEnabled),
         NormalizeOptionalHotkeyChord(raw.ViewerArrowChord),
         ParseOptionalFeatureEnabled(raw.ViewerLengthEnabled),
@@ -19582,45 +19638,52 @@ NormalizeOptionalHotkeyChord(value) {
     return Trim(String(value), " `t`r`n")
 }
 
-ValidateViewerToolHotkeySettings(settings) {
+ValidateFeatureHotkeySettings(settings) {
     definitions := [
+        {
+            field: "ReportImageCaptionChord",
+            label: "快速标图",
+            enabled: settings.ReportImageCaptionEnabled,
+            chord: settings.ReportImageCaptionChord,
+            allowBare: false
+        },
         {
             field: "ViewerArrowChord",
             label: "箭头",
             enabled: settings.ViewerArrowEnabled,
-            chord: settings.ViewerArrowChord
+            chord: settings.ViewerArrowChord,
+            allowBare: true
         },
         {
             field: "ViewerLengthChord",
             label: "长度测量",
             enabled: settings.ViewerLengthEnabled,
-            chord: settings.ViewerLengthChord
+            chord: settings.ViewerLengthChord,
+            allowBare: true
         },
         {
             field: "ViewerSuv3DChord",
             label: "3D SUV测量",
             enabled: settings.ViewerSuv3DEnabled,
-            chord: settings.ViewerSuv3DChord
+            chord: settings.ViewerSuv3DChord,
+            allowBare: true
         },
         {
             field: "ViewerCaptureChord",
             label: "截图",
             enabled: settings.ViewerCaptureEnabled,
-            chord: settings.ViewerCaptureChord
+            chord: settings.ViewerCaptureChord,
+            allowBare: true
         },
         {
             field: "ViewerClearChord",
             label: "清除全部标注",
             enabled: settings.ViewerClearEnabled,
-            chord: settings.ViewerClearChord
+            chord: settings.ViewerClearChord,
+            allowBare: true
         }
     ]
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
-    seen[
-        NormalizeHotkeyChord(
-            ReportImageCaptionDefaults.HotkeyChord
-        )
-    ] := true
     if settings.GlobalHjklArrows {
         for definition in GlobalHjklArrowHotkeyDefinitions()
             seen[NormalizeHotkeyChord(definition.Chord)] := true
@@ -19643,13 +19706,18 @@ ValidateViewerToolHotkeySettings(settings) {
                 "启用“" definition.label "”前必须设置快捷键。"
             )
         }
-        if !ViewerToolHotkeyChordIsSafe(chord) {
+        if !ViewerToolHotkeyChordIsSafe(chord)
+            || (!definition.allowBare
+                && ViewerHotkeyChordIsBare(chord)) {
+            requirement := definition.allowBare
+                ? "需要至少一个修饰键；"
+                    . "无修饰时只能使用单个字母或数字，"
+                    . "且仅在 Viewer 前台生效。"
+                : "必须包含至少一个修饰键。"
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键需要至少一个修饰键；"
-                    . "无修饰时只能使用单个字母或数字，"
-                    . "且仅在 Viewer 前台生效。"
+                "“" definition.label "”快捷键" requirement
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -19691,8 +19759,12 @@ MakeViewerToolHotkeyValidation(ok, field := "", message := "") {
     }
 }
 
-ViewerToolHotkeySettingsMatch(expected, actual) {
-    return expected.ViewerArrowEnabled = actual.ViewerArrowEnabled
+FeatureHotkeySettingsMatch(expected, actual) {
+    return expected.ReportImageCaptionEnabled
+            = actual.ReportImageCaptionEnabled
+        && expected.ReportImageCaptionChord
+            = actual.ReportImageCaptionChord
+        && expected.ViewerArrowEnabled = actual.ViewerArrowEnabled
         && expected.ViewerArrowChord = actual.ViewerArrowChord
         && expected.ViewerLengthEnabled = actual.ViewerLengthEnabled
         && expected.ViewerLengthChord = actual.ViewerLengthChord
@@ -20115,8 +20187,6 @@ MxNMViewerToolFailureMessage(code) {
 
 ; --- BEGIN report_image_caption.ahk ---
 class ReportImageCaptionDefaults {
-    static HotkeyChord := "+!s"
-    static TriggerKey := "s"
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
@@ -20149,14 +20219,17 @@ class ReportImageCaptionCode {
 
 global REPORT_IMAGE_CAPTION_CACHE := 0
 
-ReportImageCaptionHotkeyDefinitions() {
+ReportImageCaptionHotkeyDefinitions(settings) {
+    if !settings.ReportImageCaptionEnabled
+        || settings.ReportImageCaptionChord = "" {
+        return []
+    }
+    chord := settings.ReportImageCaptionChord
     return [
         HotkeyDefinition(
             "report-image-caption-advance",
-            ReportImageCaptionDefaults.HotkeyChord,
-            InvokeReportImageCaptionHotkey.Bind(
-                ReportImageCaptionDefaults.HotkeyChord
-            )
+            chord,
+            InvokeReportImageCaptionHotkey.Bind(chord)
         )
     ]
 }
@@ -20193,9 +20266,16 @@ InvokeReportImageCaptionHotkey(chord, *) {
         if !result.ok
             Flash(ReportImageCaptionFailureMessage(result), 1800)
     } finally {
-        try KeyWait ReportImageCaptionDefaults.TriggerKey
+        try KeyWait ReportImageCaptionTriggerKey(chord)
         active := false
     }
+}
+
+ReportImageCaptionTriggerKey(chord) {
+    normalized := Trim(String(chord), " `t`r`n")
+    if RegExMatch(normalized, "^[!+^#]+(.+)$", &match)
+        return match[1]
+    return normalized
 }
 
 class ReportImageCaptionProvider {
@@ -21037,7 +21117,7 @@ RegisterConfiguredFeatures(LoadFeatureSettings())
 
 RegisterConfiguredFeatures(settings) {
     RegisterHotkeyDefinitions(
-        ReportImageCaptionHotkeyDefinitions(),
+        ReportImageCaptionHotkeyDefinitions(settings),
         ReservedApplicationHotkeyChords(),
         ReportImageCaptionForegroundActive
     )
@@ -21225,73 +21305,86 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "允许一个修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
+            "快速标图必须含修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")
         this.Window.Add("Text", "x402 y126 w220", "快捷键")
         this.Window.Add("Text", "x648 y126 w70", "Win")
 
-        this.Window.Add("Text", "x72 y174 w170", "箭头")
-        this.ViewerArrowEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y174 w170", "快速标图")
+        this.ReportImageCaptionEnabledInput := this.Window.Add(
             "CheckBox", "x276 y166 w90 h26", "启用"
         )
-        this.ViewerArrowChordInput := this.Window.Add(
+        this.ReportImageCaptionChordInput := this.Window.Add(
             "Hotkey", "x402 y166 w220 h26"
         )
-        this.ViewerArrowWinInput := this.Window.Add(
+        this.ReportImageCaptionWinInput := this.Window.Add(
             "CheckBox", "x648 y166 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y222 w170", "长度测量")
-        this.ViewerLengthEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y222 w170", "箭头")
+        this.ViewerArrowEnabledInput := this.Window.Add(
             "CheckBox", "x276 y214 w90 h26", "启用"
         )
-        this.ViewerLengthChordInput := this.Window.Add(
+        this.ViewerArrowChordInput := this.Window.Add(
             "Hotkey", "x402 y214 w220 h26"
         )
-        this.ViewerLengthWinInput := this.Window.Add(
+        this.ViewerArrowWinInput := this.Window.Add(
             "CheckBox", "x648 y214 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y270 w170", "3D SUV测量")
-        this.ViewerSuv3DEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y270 w170", "长度测量")
+        this.ViewerLengthEnabledInput := this.Window.Add(
             "CheckBox", "x276 y262 w90 h26", "启用"
         )
-        this.ViewerSuv3DChordInput := this.Window.Add(
+        this.ViewerLengthChordInput := this.Window.Add(
             "Hotkey", "x402 y262 w220 h26"
         )
-        this.ViewerSuv3DWinInput := this.Window.Add(
+        this.ViewerLengthWinInput := this.Window.Add(
             "CheckBox", "x648 y262 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y318 w170", "截图（发送 F12）")
-        this.ViewerCaptureEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y318 w170", "3D SUV测量")
+        this.ViewerSuv3DEnabledInput := this.Window.Add(
             "CheckBox", "x276 y310 w90 h26", "启用"
         )
-        this.ViewerCaptureChordInput := this.Window.Add(
+        this.ViewerSuv3DChordInput := this.Window.Add(
             "Hotkey", "x402 y310 w220 h26"
         )
-        this.ViewerCaptureWinInput := this.Window.Add(
+        this.ViewerSuv3DWinInput := this.Window.Add(
             "CheckBox", "x648 y310 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y366 w170", "清除全部标注")
-        this.ViewerClearEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y366 w170", "截图（发送 F12）")
+        this.ViewerCaptureEnabledInput := this.Window.Add(
             "CheckBox", "x276 y358 w90 h26", "启用"
         )
-        this.ViewerClearChordInput := this.Window.Add(
+        this.ViewerCaptureChordInput := this.Window.Add(
             "Hotkey", "x402 y358 w220 h26"
         )
-        this.ViewerClearWinInput := this.Window.Add(
+        this.ViewerCaptureWinInput := this.Window.Add(
             "CheckBox", "x648 y358 w70 h26", "使用"
         )
+
+        this.Window.Add("Text", "x72 y414 w170", "清除全部标注")
+        this.ViewerClearEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y406 w90 h26", "启用"
+        )
+        this.ViewerClearChordInput := this.Window.Add(
+            "Hotkey", "x402 y406 w220 h26"
+        )
+        this.ViewerClearWinInput := this.Window.Add(
+            "CheckBox", "x648 y406 w70 h26", "使用"
+        )
         for control in [
+            this.ReportImageCaptionEnabledInput,
             this.ViewerArrowEnabledInput,
             this.ViewerLengthEnabledInput,
             this.ViewerSuv3DEnabledInput,
             this.ViewerCaptureEnabledInput,
             this.ViewerClearEnabledInput,
+            this.ReportImageCaptionWinInput,
             this.ViewerArrowWinInput,
             this.ViewerLengthWinInput,
             this.ViewerSuv3DWinInput,
@@ -21301,6 +21394,7 @@ class ReportAssistantSettingsWindow {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
         for control in [
+            this.ReportImageCaptionChordInput,
             this.ViewerArrowChordInput,
             this.ViewerLengthChordInput,
             this.ViewerSuv3DChordInput,
@@ -21309,7 +21403,7 @@ class ReportAssistantSettingsWindow {
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
-        this.LoadViewerToolHotkeyControls()
+        this.LoadFeatureHotkeyControls()
 
         this.Tabs.UseTab(3)
         this.Window.Add(
@@ -21425,9 +21519,19 @@ class ReportAssistantSettingsWindow {
         this.Dirty := true
     }
 
-    LoadViewerToolHotkeyControls() {
+    LoadFeatureHotkeyControls() {
         this.LoadingControls := true
         try {
+            this.ReportImageCaptionEnabledInput.Value :=
+                this.FeatureSettings.ReportImageCaptionEnabled ? 1 : 0
+            this.ReportImageCaptionChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ReportImageCaptionChord
+                )
+            this.ReportImageCaptionWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ReportImageCaptionChord
+                ) ? 1 : 0
             this.ViewerArrowEnabledInput.Value :=
                 this.FeatureSettings.ViewerArrowEnabled ? 1 : 0
             this.ViewerArrowChordInput.Value :=
@@ -21483,9 +21587,14 @@ class ReportAssistantSettingsWindow {
         }
     }
 
-    StoreViewerToolHotkeyControls() {
+    StoreFeatureHotkeyControls() {
         this.FeatureSettings := FeatureSettings(
             this.FeatureSettings.GlobalHjklArrows,
+            this.ReportImageCaptionEnabledInput.Value = 1,
+            MergeViewerHotkeyChord(
+                this.ReportImageCaptionChordInput.Value,
+                this.ReportImageCaptionWinInput.Value = 1
+            ),
             this.ViewerArrowEnabledInput.Value = 1,
             MergeViewerHotkeyChord(
                 this.ViewerArrowChordInput.Value,
@@ -21517,7 +21626,7 @@ class ReportAssistantSettingsWindow {
     OnViewerHotkeyChanged(*) {
         if this.LoadingControls
             return
-        this.StoreViewerToolHotkeyControls()
+        this.StoreFeatureHotkeyControls()
         this.Dirty := true
     }
 
@@ -21614,7 +21723,7 @@ class ReportAssistantSettingsWindow {
 
     OnSave(*) {
         this.StoreEditorToEntry()
-        this.StoreViewerToolHotkeyControls()
+        this.StoreFeatureHotkeyControls()
         validation := ValidateEditableReportHotstringEntries(this.Entries)
         if !validation.Ok {
             if validation.Row > 0
@@ -21626,12 +21735,12 @@ class ReportAssistantSettingsWindow {
             )
             return
         }
-        featureValidation := ValidateViewerToolHotkeySettings(
+        featureValidation := ValidateFeatureHotkeySettings(
             this.FeatureSettings
         )
         if !featureValidation.Ok {
             this.Tabs.Choose(2)
-            this.FocusViewerToolHotkeyValidationError(
+            this.FocusFeatureHotkeyValidationError(
                 featureValidation.Field
             )
             MsgBox(
@@ -21678,8 +21787,10 @@ class ReportAssistantSettingsWindow {
         }
     }
 
-    FocusViewerToolHotkeyValidationError(field) {
-        if field = "ViewerArrowChord"
+    FocusFeatureHotkeyValidationError(field) {
+        if field = "ReportImageCaptionChord"
+            this.ReportImageCaptionChordInput.Focus()
+        else if field = "ViewerArrowChord"
             this.ViewerArrowChordInput.Focus()
         else if field = "ViewerLengthChord"
             this.ViewerLengthChordInput.Focus()
