@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0-beta.1
-; Source revision: e1882d9cded0f67311ad065742aaec12b17259b9
-; Generated at: 2026-07-31 01:53:28 UTC
+; Source revision: 6412f6bb0161d1bca8728246bcdb0bce9e04657f
+; Generated at: 2026-07-31 02:19:24 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0-beta.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0-beta.1"
     static Channel := "internal-test"
     static BuildDate := "2026-07-31"
-    static SourceRevision := "e1882d9cded0f67311ad065742aaec12b17259b9"
+    static SourceRevision := "6412f6bb0161d1bca8728246bcdb0bce9e04657f"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -20116,10 +20116,11 @@ MxNMViewerToolFailureMessage(code) {
 ; --- BEGIN report_image_caption.ahk ---
 class ReportImageCaptionDefaults {
     static HotkeyChord := "+!s"
+    static TriggerKey := "s"
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
-    static PasteSettleMs := 80
+    static PasteSettleMs := 20
     static MinCaptionGapPx := 120
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
@@ -20188,15 +20189,11 @@ InvokeReportImageCaptionHotkey(chord, *) {
 
     active := true
     try {
-        while ViewerHotkeyChordHasPressedComponent(chord)
-            Sleep 10
-        if WinExist("A") != foregroundHwnd
-            return
-
         result := ReportImageCaptionProvider.Invoke(foregroundHwnd)
         if !result.ok
             Flash(ReportImageCaptionFailureMessage(result), 1800)
     } finally {
+        try KeyWait ReportImageCaptionDefaults.TriggerKey
         active := false
     }
 }
@@ -20223,16 +20220,18 @@ class ReportImageCaptionProvider {
 
         this.Busy := true
         try {
-            if IsObject(REPORT_IMAGE_CAPTION_CACHE)
-                && REPORT_IMAGE_CAPTION_CACHE.targetHwnd
+            priorCache := IsObject(REPORT_IMAGE_CAPTION_CACHE)
+                ? REPORT_IMAGE_CAPTION_CACHE
+                : 0
+            if IsObject(priorCache)
+                && priorCache.targetHwnd
                     = foregroundHwnd {
                 return this.InvokeReuse(
                     foregroundHwnd,
-                    REPORT_IMAGE_CAPTION_CACHE
+                    priorCache
                 )
             }
-            ClearReportImageCaptionCache(false)
-            return this.InvokeCapture(foregroundHwnd)
+            return this.InvokeCapture(foregroundHwnd, priorCache)
         } catch {
             return MakeReportImageCaptionResult(
                 false,
@@ -20243,7 +20242,7 @@ class ReportImageCaptionProvider {
         }
     }
 
-    static InvokeCapture(sourceHwnd) {
+    static InvokeCapture(sourceHwnd, priorCache := 0) {
         global REPORT_IMAGE_CAPTION_CACHE
 
         sourcePid := ReportImageCaptionWindowPid(sourceHwnd)
@@ -20260,14 +20259,28 @@ class ReportImageCaptionProvider {
         }
 
         capture := CaptureFreshReportImageCaption(sourceHwnd)
-        if !capture.ok
+        if !capture.ok {
+            ClearReportImageCaptionCache(false)
             return capture
+        }
 
-        target := ResolveReportImageCaptionTarget(
-            sourceHwnd,
-            sourcePid
+        target := ReportImageCaptionSourceBindingValid(
+            priorCache,
+            sourceHwnd
         )
+            ? ResolveCachedReportImageCaptionTarget(
+                priorCache,
+                priorCache.targetHwnd
+            )
+            : {ok: false}
         if !target.ok {
+            target := ResolveReportImageCaptionTarget(
+                sourceHwnd,
+                sourcePid
+            )
+        }
+        if !target.ok {
+            ClearReportImageCaptionCache(false)
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.TARGET_NOT_UNIQUE,
@@ -20276,6 +20289,7 @@ class ReportImageCaptionProvider {
             )
         }
         if WinExist("A") != sourceHwnd {
+            ClearReportImageCaptionCache(false)
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.SOURCE_CHANGED
@@ -20287,7 +20301,12 @@ class ReportImageCaptionProvider {
             sourceHwnd: sourceHwnd,
             sourcePid: sourcePid,
             targetHwnd: target.hwnd,
-            targetPid: target.pid
+            targetPid: target.pid,
+            targetClientRectKey: ReportImageCaptionRectKey(
+                ReportImageCaptionClientRect(target.hwnd)
+            ),
+            captionPoint: target.captionPoint,
+            imagePoint: target.imagePoint
         }
         return ExecuteReportImageCaptionAction(
             REPORT_IMAGE_CAPTION_CACHE,
@@ -20305,9 +20324,9 @@ class ReportImageCaptionProvider {
             )
         }
 
-        target := ResolveBoundReportImageCaptionTarget(
-            targetHwnd,
-            cache.targetPid
+        target := ResolveCachedReportImageCaptionTarget(
+            cache,
+            targetHwnd
         )
         if !target.ok {
             ClearReportImageCaptionCache(false)
@@ -20392,22 +20411,43 @@ ResolveReportImageCaptionTarget(sourceHwnd, sourcePid) {
     return matches[1]
 }
 
-ResolveBoundReportImageCaptionTarget(targetHwnd, expectedPid) {
+ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
+    failure := {
+        ok: false,
+        hwnd: targetHwnd,
+        pid: cache.targetPid,
+        candidateCount: 0,
+        captionPoint: 0,
+        imagePoint: 0
+    }
     if !ReportImageCaptionTopLevelWindowEligible(
         targetHwnd,
-        expectedPid
-    ) {
-        return {
-            ok: false,
-            hwnd: targetHwnd,
-            pid: expectedPid,
-            candidateCount: 0
-        }
+        cache.targetPid
+    ) || !cache.HasOwnProp("captionPoint")
+        || !cache.HasOwnProp("imagePoint")
+        || !cache.HasOwnProp("targetClientRectKey")
+        || cache.targetClientRectKey
+            != ReportImageCaptionRectKey(
+                ReportImageCaptionClientRect(targetHwnd)
+            )
+        || !ReportImageCaptionPointBelongsToTarget(
+            targetHwnd,
+            cache.captionPoint
+        )
+        || !ReportImageCaptionPointBelongsToTarget(
+            targetHwnd,
+            cache.imagePoint
+        ) {
+        return failure
     }
-    return BuildReportImageCaptionTargetCandidate(
-        targetHwnd,
-        expectedPid
-    )
+    return {
+        ok: true,
+        hwnd: targetHwnd,
+        pid: cache.targetPid,
+        candidateCount: 1,
+        captionPoint: cache.captionPoint,
+        imagePoint: cache.imagePoint
+    }
 }
 
 ReportImageCaptionTopLevelWindowEligible(hwnd, expectedPid) {
@@ -20669,22 +20709,24 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
                 ReportImageCaptionCode.CLIPBOARD_WRITE_FAILED
             )
         }
-        try WinActivate "ahk_id " target.hwnd
-        catch {
-            return MakeReportImageCaptionResult(
-                false,
-                ReportImageCaptionCode.TARGET_ACTIVATION_FAILED
-            )
-        }
-        if !WinWaitActive(
-            "ahk_id " target.hwnd,
-            ,
-            ReportImageCaptionDefaults.TargetActivationTimeoutSeconds
-        ) {
-            return MakeReportImageCaptionResult(
-                false,
-                ReportImageCaptionCode.TARGET_ACTIVATION_FAILED
-            )
+        if WinExist("A") != target.hwnd {
+            try WinActivate "ahk_id " target.hwnd
+            catch {
+                return MakeReportImageCaptionResult(
+                    false,
+                    ReportImageCaptionCode.TARGET_ACTIVATION_FAILED
+                )
+            }
+            if !WinWaitActive(
+                "ahk_id " target.hwnd,
+                ,
+                ReportImageCaptionDefaults.TargetActivationTimeoutSeconds
+            ) {
+                return MakeReportImageCaptionResult(
+                    false,
+                    ReportImageCaptionCode.TARGET_ACTIVATION_FAILED
+                )
+            }
         }
         if ReportImageCaptionWindowPid(target.hwnd) != target.pid {
             return MakeReportImageCaptionResult(
@@ -20695,11 +20737,6 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
         if !ReportImageCaptionPointBelongsToTarget(
             target.hwnd,
             target.captionPoint
-        ) || !IsObject(
-            ReportImageCaptionPaneAtPoint(
-                target.captionPoint,
-                target.pid
-            )
         ) {
             return MakeReportImageCaptionResult(
                 false,
@@ -20709,7 +20746,9 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
         MouseClick(
             "left",
             target.captionPoint.x,
-            target.captionPoint.y
+            target.captionPoint.y,
+            1,
+            0
         )
         if WinExist("A") != target.hwnd {
             return MakeReportImageCaptionResult(
@@ -20787,7 +20826,10 @@ ReportImageCaptionCacheBindingValid(cache, foregroundHwnd) {
         || !cache.HasOwnProp("sourceHwnd")
         || !cache.HasOwnProp("sourcePid")
         || !cache.HasOwnProp("targetHwnd")
-        || !cache.HasOwnProp("targetPid") {
+        || !cache.HasOwnProp("targetPid")
+        || !cache.HasOwnProp("targetClientRectKey")
+        || !cache.HasOwnProp("captionPoint")
+        || !cache.HasOwnProp("imagePoint") {
         return false
     }
     if foregroundHwnd != cache.targetHwnd
@@ -20799,6 +20841,22 @@ ReportImageCaptionCacheBindingValid(cache, foregroundHwnd) {
     }
     return ReportImageCaptionWindowPid(cache.sourceHwnd)
         = cache.sourcePid
+}
+
+ReportImageCaptionSourceBindingValid(cache, sourceHwnd) {
+    return IsObject(cache)
+        && cache.HasOwnProp("sourceHwnd")
+        && cache.HasOwnProp("sourcePid")
+        && cache.HasOwnProp("targetHwnd")
+        && cache.HasOwnProp("targetPid")
+        && cache.HasOwnProp("targetClientRectKey")
+        && cache.HasOwnProp("captionPoint")
+        && cache.HasOwnProp("imagePoint")
+        && sourceHwnd = cache.sourceHwnd
+        && ReportImageCaptionWindowPid(sourceHwnd)
+            = cache.sourcePid
+        && ReportImageCaptionWindowPid(cache.targetHwnd)
+            = cache.targetPid
 }
 
 ClearReportImageCaptionCache(showFeedback := true, *) {
@@ -20817,23 +20875,6 @@ ReportImageCaptionUiaRoot(hwnd) {
         try return UIA.ElementFromHandle(hwnd, , false)
     }
     return 0
-}
-
-ReportImageCaptionPaneAtPoint(point, expectedPid) {
-    try element := UIA.SmallestElementFromPoint(point.x, point.y)
-    catch
-        return 0
-    try {
-        if element.Type != UIA.ControlType.Pane
-            || element.ProcessId != expectedPid
-            || element.IsEnabled != true
-            || element.IsOffscreen = true {
-            return 0
-        }
-    } catch {
-        return 0
-    }
-    return element
 }
 
 ReportImageCaptionElementUsable(element, expectedPid) {
@@ -20923,6 +20964,12 @@ ReportImageCaptionRectWidth(rect) {
 
 ReportImageCaptionRectHeight(rect) {
     return Max(0, rect.b - rect.t)
+}
+
+ReportImageCaptionRectKey(rect) {
+    return IsObject(rect)
+        ? rect.l "," rect.t "," rect.r "," rect.b
+        : ""
 }
 
 ReportImageCaptionRectContainsPoint(rect, point) {
