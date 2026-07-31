@@ -194,18 +194,24 @@ class ReportImageCaptionTests(unittest.TestCase):
         )
         pane = self.body(
             "\nResolveReportImageCaptionPane(\n",
-            "\nResolveReportImageCaptionImageDocument(\n",
+            "\nResolveReportImageCaptionImagePoint(\n",
         )
         image = self.body(
-            "\nResolveReportImageCaptionImageDocument(\n",
+            "\nResolveReportImageCaptionImagePoint(\n",
             "\nExecuteReportImageCaptionAction(",
         )
         self.assertIn("ResolveReportImageCaptionPane", candidate)
         self.assertIn('FindElements({Type: "Pane"})', pane)
         self.assertIn("if matches.Length != 1", pane)
-        self.assertIn('FindElements({Type: "Document"})', image)
-        self.assertIn("documentRect.b >= descriptionRect.t", image)
-        self.assertIn("if matches.Length != 1", image)
+        self.assertIn(
+            "(captionPaneRect.l + captionPaneRect.r) / 2",
+            image,
+        )
+        self.assertIn(
+            "clientRect.t + imageRegionHeight * 0.5",
+            image,
+        )
+        self.assertNotIn('FindElements({Type: "Document"})', image)
         self.assertIn("ReportImageCaptionRootOwner(pointHwnd) = targetHwnd", self.module)
 
     def test_action_keeps_caption_clipboard_and_restores_only_mouse(self) -> None:

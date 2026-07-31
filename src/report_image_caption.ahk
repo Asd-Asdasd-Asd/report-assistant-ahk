@@ -6,10 +6,7 @@ class ReportImageCaptionDefaults {
     static MinCaptionGapPx := 120
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
-    static MinImageWidthRatio := 0.2
-    static MinImageHeightRatio := 0.3
-    static MinImageAreaRatio := 0.1
-    static MinImageCaptionOverlapRatio := 0.5
+    static MinImageRegionHeightRatio := 0.5
 }
 
 class ReportImageCaptionCode {
@@ -446,12 +443,10 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             return failure
         paneRect := captionPaneResult.rect
 
-        imageResult := ResolveReportImageCaptionImageDocument(
-            root,
+        imageResult := ResolveReportImageCaptionImagePoint(
             clientRect,
             paneRect,
-            descriptionRect,
-            expectedPid
+            descriptionRect
         )
         if !imageResult.ok
             return failure
@@ -514,72 +509,37 @@ ResolveReportImageCaptionPane(
     return {ok: true, rect: matches[1], candidateCount: 1}
 }
 
-ResolveReportImageCaptionImageDocument(
-    root,
+ResolveReportImageCaptionImagePoint(
     clientRect,
     captionPaneRect,
-    descriptionRect,
-    expectedPid
+    descriptionRect
 ) {
-    matches := []
-    clientWidth := ReportImageCaptionRectWidth(clientRect)
     clientHeight := ReportImageCaptionRectHeight(clientRect)
-    clientArea := clientWidth * clientHeight
-    try documents := root.FindElements({Type: "Document"})
-    catch
-        documents := []
-
-    for document in documents {
-        if !ReportImageCaptionElementUsable(document, expectedPid)
-            continue
-        try focusable := document.IsKeyboardFocusable = true
-        catch
-            focusable := false
-        if !focusable
-            continue
-        documentRect := ReportImageCaptionElementRect(document)
-        if !IsObject(documentRect)
-            || !ReportImageCaptionRectContainsRect(
-                clientRect,
-                documentRect
-            )
-            || documentRect.b >= descriptionRect.t {
-            continue
-        }
-        documentWidth := ReportImageCaptionRectWidth(documentRect)
-        documentHeight := ReportImageCaptionRectHeight(documentRect)
-        documentArea := documentWidth * documentHeight
-        if documentWidth
-                < clientWidth
-                    * ReportImageCaptionDefaults.MinImageWidthRatio
-            || documentHeight
-                < clientHeight
-                    * ReportImageCaptionDefaults.MinImageHeightRatio
-            || documentArea
-                < clientArea
-                    * ReportImageCaptionDefaults.MinImageAreaRatio {
-            continue
-        }
-        overlapWidth := Max(
-            0,
-            Min(documentRect.r, captionPaneRect.r)
-                - Max(documentRect.l, captionPaneRect.l)
-        )
-        if overlapWidth / documentWidth
-                < ReportImageCaptionDefaults.MinImageCaptionOverlapRatio {
-            continue
-        }
-        matches.Push(documentRect)
+    imageRegionHeight := descriptionRect.t - clientRect.t
+    if imageRegionHeight
+            < clientHeight
+                * ReportImageCaptionDefaults.MinImageRegionHeightRatio {
+        return {ok: false, point: 0, candidateCount: 0}
     }
-    if matches.Length != 1
-        return {ok: false, point: 0, candidateCount: matches.Length}
-    rect := matches[1]
+    point := {
+        x: Round((captionPaneRect.l + captionPaneRect.r) / 2),
+        y: Round(clientRect.t + imageRegionHeight * 0.5)
+    }
+    if !ReportImageCaptionRectContainsPoint(clientRect, point)
+        || !ReportImageCaptionRectContainsPoint(
+            {
+                l: captionPaneRect.l,
+                t: clientRect.t,
+                r: captionPaneRect.r,
+                b: descriptionRect.t
+            },
+            point
+        ) {
+        return {ok: false, point: 0, candidateCount: 0}
+    }
     return {
         ok: true,
-        point: {
-            x: Round((rect.l + rect.r) / 2),
-            y: Round((rect.t + rect.b) / 2)
-        },
+        point: point,
         candidateCount: 1
     }
 }

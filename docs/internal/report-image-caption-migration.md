@@ -126,7 +126,6 @@ window-relative geometry 或二者组合，不提前把 fallback 写入 producti
    - `图像描述` Text 恰好一个；
    - `保存` Button 恰好一个；
    - 两者处于窗口下部且横向顺序合理；
-   - 存在位于两锚点上方、面积显著的 image Document；
    - caption、image 和 anchors 均在 candidate client bounds 内。
 3. 只有一个候选通过完整签名时才继续；零个或多个均 fail closed。不得用
    z-order、monitor、title length 或旧坐标打破歧义。
@@ -145,16 +144,18 @@ caption 不能通过 Value/TextEdit 写入。由 exact `图像描述` 与 `保�
 
 ### Image point
 
-从 target 中选择唯一满足以下条件的大型 focusable Document：
+image point 不依赖大型 focusable Document。右侧报告预览 sidebar 折叠后，
+Chromium UIA tree 不再暴露展开态中用于定位图像区的 Document，但底部 caption
+Pane 会随可用图像区域同步扩展。统一规则取 caption Pane 的横向中心，以及
+target client 顶部到 `图像描述` anchor 之间的纵向中心。重新验证
+PID/root-owner/client bounds 后只发送一次 `WheelDown`，不回退到旧绝对坐标。
 
-- 位于 caption anchors 上方；
-- 不属于最右侧报告预览栏；
-- 面积达到 target client 的最低比例；
-- 与 caption Pane 横向区域有合理重叠。
-
-使用该 Document 中心附近的内部点，重新验证 PID/root-owner/client bounds 后
-只发送一次 `WheelDown`。若不能唯一识别 image Document，则停止，不回退到
-旧绝对坐标。
+2026-07-31 的折叠态 field evidence：target client rect 为
+`1920,23,4480,1440`，caption Pane 为 `2140,1322,4429,1438`，
+`图像描述` 为 `2145,1297,2201,1313`，`保存` 为
+`4328,1398,4408,1430`。此时 target 仅暴露两个无关 focusable Document，
+原 Document 规则得到零个 target；统一 Pane 规则计算 image point 约为
+`3285,660`。同一规则在展开态计算约为 `2939,640`。
 
 ### Transaction
 
