@@ -62,6 +62,17 @@ Legacy 还包含一个需要保留的业务语义：首次粘贴后，系统 cli
 
 ## 一次性现场诊断
 
+如果目标机器没有安装 AutoHotkey，先在 Windows 源代码目录运行：
+
+`tools\field-testing\Build Report Image Caption Diagnostic EXE.cmd`
+
+生成文件位于仓库同级构建目录：
+
+`..\report-assistant-build\report-image-caption-diagnostic\publish\MedEx-Report-Image-Caption-Diagnostic.exe`
+
+将该 EXE 单独复制到目标机器即可运行；它不依赖目标机器安装 AutoHotkey，也不
+进入正式 release/publish。
+
 运行
 `tests/windows/report_image_caption_migration_diagnostic.ahk`。该脚本不点击、
 不粘贴、不滚轮，也不输出选中文字、窗口标题、accessible Name/Value、URL 或
