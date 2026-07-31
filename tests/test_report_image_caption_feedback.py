@@ -27,11 +27,15 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
         self.assertIn("+E0x20 +E0x08000000", body)
         self.assertIn('card.Show("NoActivate")', body)
         self.assertIn('"≡"', body)
-        self.assertIn('card.BackColor := "EDF5FF"', body)
-        self.assertIn('highlight.BackColor := "69A7FF"', body)
+        self.assertIn('card.BackColor := "3F4650"', body)
+        self.assertIn('card.SetFont("s13 Bold cF4F5F7"', body)
+        self.assertIn("static CardWidth := 42", body)
+        self.assertIn("static CardHeight := 28", body)
+        self.assertNotIn("HighlightWindow", body)
+        self.assertNotIn("highlight.BackColor", body)
         self.assertIn('"User32\\SetWindowDisplayAffinity"', body)
 
-    def test_motion_uses_easing_arc_scale_absorption_and_highlight(self) -> None:
+    def test_motion_uses_easing_arc_scale_and_absorption(self) -> None:
         body = self.feedback.split(
             "static AdvanceCurrent()", 1
         )[1].split("\n    static RoundWindow", 1)[0]
@@ -40,7 +44,6 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
         self.assertIn("inverse * inverse", body)
         self.assertIn("MinimumScale", body)
         self.assertIn("arrival * arrival", body)
-        self.assertIn("highlightOpacity", body)
         self.assertIn("WinSetTransparent(", body)
         self.assertIn("SetTimer(", body)
         self.assertIn("ReportImageCaptionTransferFeedbackTimer", body)
@@ -70,18 +73,9 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
             action.index('SendInput "{WheelDown}"'),
         )
 
-    def test_caption_highlight_rect_is_derived_and_cached(self) -> None:
-        self.assertIn("captionHighlightRect := {", self.caption)
-        self.assertIn("l: Max(paneRect.l + 8, captionPoint.x - 160)", self.caption)
-        self.assertIn("r: Min(saveRect.l - 8, captionPoint.x + 160)", self.caption)
-        self.assertGreaterEqual(
-            self.caption.count('HasOwnProp("captionHighlightRect")'),
-            3,
-        )
-        self.assertIn(
-            "captionHighlightRect: target.captionHighlightRect",
-            self.caption,
-        )
+    def test_no_unreliable_caption_highlight_geometry_is_retained(self) -> None:
+        self.assertNotIn("captionHighlightRect", self.caption)
+        self.assertNotIn("highlightRect", self.feedback)
 
 
 if __name__ == "__main__":

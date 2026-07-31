@@ -133,22 +133,18 @@ ShowReportAssistantDispatchPulse(targetHwnd, durationMs := 90) {
 
 class ReportImageCaptionTransferFeedback {
     static CardWindow := 0
-    static HighlightWindow := 0
     static CurrentState := 0
     static CurrentToken := 0
     static DurationMs := 200
     static FrameMs := 16
-    static CardWidth := 34
-    static CardHeight := 22
+    static CardWidth := 42
+    static CardHeight := 28
     static MinimumScale := 0.48
 
-    static Show(origin, destination, highlightRect) {
+    static Show(origin, destination) {
         this.Hide()
         if !IsObject(origin)
-            || !IsObject(destination)
-            || !IsObject(highlightRect)
-            || highlightRect.r <= highlightRect.l
-            || highlightRect.b <= highlightRect.t {
+            || !IsObject(destination) {
             return false
         }
 
@@ -159,10 +155,10 @@ class ReportImageCaptionTransferFeedback {
                 "+AlwaysOnTop -Caption +ToolWindow -DPIScale"
                     . " +E0x20 +E0x08000000"
             )
-            card.BackColor := "EDF5FF"
+            card.BackColor := "3F4650"
             card.MarginX := 0
             card.MarginY := 0
-            card.SetFont("s11 Bold c2F6B9A", "Segoe UI")
+            card.SetFont("s13 Bold cF4F5F7", "Segoe UI")
             card.Add(
                 "Text",
                 "x0 y-2 w" this.CardWidth
@@ -181,38 +177,13 @@ class ReportImageCaptionTransferFeedback {
             this.ExcludeFromCapture(card.Hwnd)
             card.Show("NoActivate")
 
-            highlight := Gui(
-                "+AlwaysOnTop -Caption +ToolWindow -DPIScale"
-                    . " +E0x20 +E0x08000000"
-            )
-            highlight.BackColor := "69A7FF"
-            highlight.Show(
-                "NoActivate Hide x" Round(highlightRect.l)
-                    . " y" Round(highlightRect.t)
-                    . " w" Round(highlightRect.r - highlightRect.l)
-                    . " h" Round(highlightRect.b - highlightRect.t)
-            )
-            try WinSetTransparent(18, "ahk_id " highlight.Hwnd)
-            this.RoundWindow(
-                highlight.Hwnd,
-                Round(highlightRect.r - highlightRect.l),
-                Round(highlightRect.b - highlightRect.t),
-                8
-            )
-            this.ExcludeFromCapture(highlight.Hwnd)
-            highlight.Show("NoActivate")
-            ; Keep the text card above the translucent destination highlight.
-            card.Show("NoActivate")
-
             this.CardWindow := card
-            this.HighlightWindow := highlight
             state := {
                 token: token,
                 startedAt: A_TickCount,
                 origin: origin,
                 destination: destination,
-                card: card,
-                highlight: highlight
+                card: card
             }
             this.CurrentState := state
             SetTimer(
@@ -281,19 +252,6 @@ class ReportImageCaptionTransferFeedback {
                 "ahk_id " state.card.Hwnd
             )
 
-            highlightProgress := progress < 0.56
-                ? progress / 0.56
-                : (progress - 0.56) / 0.44
-            highlightOpacity := progress < 0.56
-                ? Round(18 + 20 * highlightProgress)
-                : Round(
-                    38 * (1 - highlightProgress)
-                        + 62 * Sin(highlightProgress * ACos(-1))
-                )
-            WinSetTransparent(
-                Max(0, highlightOpacity),
-                "ahk_id " state.highlight.Hwnd
-            )
         } catch {
             this.Hide()
             return
@@ -338,11 +296,7 @@ class ReportImageCaptionTransferFeedback {
         if IsObject(this.CardWindow) {
             try this.CardWindow.Destroy()
         }
-        if IsObject(this.HighlightWindow) {
-            try this.HighlightWindow.Destroy()
-        }
         this.CardWindow := 0
-        this.HighlightWindow := 0
         this.CurrentState := 0
     }
 }
@@ -360,12 +314,10 @@ ReportImageCaptionTransferFeedbackCleanupTimer(*) {
 
 ShowReportImageCaptionTransferFeedback(
     origin,
-    destination,
-    highlightRect
+    destination
 ) {
     return ReportImageCaptionTransferFeedback.Show(
         origin,
-        destination,
-        highlightRect
+        destination
     )
 }

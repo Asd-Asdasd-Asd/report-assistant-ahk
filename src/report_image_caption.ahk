@@ -199,7 +199,6 @@ class ReportImageCaptionProvider {
             ),
             captionPoint: target.captionPoint,
             savePoint: target.savePoint,
-            captionHighlightRect: target.captionHighlightRect,
             imagePoint: target.imagePoint
         }
         return ExecuteReportImageCaptionAction(
@@ -313,7 +312,6 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         candidateCount: 0,
         captionPoint: 0,
         savePoint: 0,
-        captionHighlightRect: 0,
         imagePoint: 0
     }
     if !ReportImageCaptionTopLevelWindowEligible(
@@ -321,7 +319,6 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         cache.targetPid
     ) || !cache.HasOwnProp("captionPoint")
         || !cache.HasOwnProp("savePoint")
-        || !cache.HasOwnProp("captionHighlightRect")
         || !cache.HasOwnProp("imagePoint")
         || !cache.HasOwnProp("targetClientRectKey")
         || cache.targetClientRectKey
@@ -336,10 +333,6 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
             targetHwnd,
             cache.savePoint
         )
-        || !ReportImageCaptionRectContainsRect(
-            ReportImageCaptionClientRect(targetHwnd),
-            cache.captionHighlightRect
-        )
         || !ReportImageCaptionPointBelongsToTarget(
             targetHwnd,
             cache.imagePoint
@@ -353,7 +346,6 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         candidateCount: 1,
         captionPoint: cache.captionPoint,
         savePoint: cache.savePoint,
-        captionHighlightRect: cache.captionHighlightRect,
         imagePoint: cache.imagePoint
     }
 }
@@ -381,7 +373,6 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         candidateCount: 0,
         captionPoint: 0,
         savePoint: 0,
-        captionHighlightRect: 0,
         imagePoint: 0
     }
     try {
@@ -467,18 +458,6 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         if !captionPaneResult.ok
             return failure
         paneRect := captionPaneResult.rect
-        captionHighlightRect := {
-            l: Max(paneRect.l + 8, captionPoint.x - 160),
-            t: Max(paneRect.t + 6, captionPoint.y - 18),
-            r: Min(saveRect.l - 8, captionPoint.x + 160),
-            b: Min(paneRect.b - 6, captionPoint.y + 18)
-        }
-        if !ReportImageCaptionRectContainsRect(
-            paneRect,
-            captionHighlightRect
-        ) {
-            return failure
-        }
 
         imageResult := ResolveReportImageCaptionImagePoint(
             clientRect,
@@ -495,7 +474,6 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             candidateCount: 1,
             captionPoint: captionPoint,
             savePoint: savePoint,
-            captionHighlightRect: captionHighlightRect,
             imagePoint: imageResult.point
         }
     } catch {
@@ -687,8 +665,7 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
             )
             try ShowReportImageCaptionTransferFeedback(
                 feedbackOrigin,
-                target.captionPoint,
-                target.captionHighlightRect
+                target.captionPoint
             )
         } catch {
             return MakeReportImageCaptionResult(
@@ -762,7 +739,6 @@ ReportImageCaptionCacheBindingValid(cache, foregroundHwnd) {
         || !cache.HasOwnProp("targetClientRectKey")
         || !cache.HasOwnProp("captionPoint")
         || !cache.HasOwnProp("savePoint")
-        || !cache.HasOwnProp("captionHighlightRect")
         || !cache.HasOwnProp("imagePoint") {
         return false
     }
@@ -786,7 +762,6 @@ ReportImageCaptionSourceBindingValid(cache, sourceHwnd) {
         && cache.HasOwnProp("targetClientRectKey")
         && cache.HasOwnProp("captionPoint")
         && cache.HasOwnProp("savePoint")
-        && cache.HasOwnProp("captionHighlightRect")
         && cache.HasOwnProp("imagePoint")
         && sourceHwnd = cache.sourceHwnd
         && ReportImageCaptionWindowPid(sourceHwnd)
