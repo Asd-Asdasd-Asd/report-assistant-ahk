@@ -69,6 +69,12 @@ RTF/HTML conversion wrapper 是独立的文本能力候选，不纳入本次 Zer
 
 “订阅全部 topic”只允许用于脱敏测试检查，而且完整 payload 只能在内存中经过短暂分类和脱敏，不得默认落盘。若无法在保存前可靠剔除敏感内容，本轮实验立即停止。
 
+本节约束只针对 Passive ZeroMQ 支线，仍保持严格的 SUB-only、无注入契约。
+另行建立的 local-command experiment 可以在本机 MedEx 进程内调用已经确认、
+且等价于用户按钮、菜单、文本框或编辑器操作的内部命令；其授权边界见
+`docs/internal/medex-package-findings.md`。两条支线不得共用能够发送 ZeroMQ
+消息的代码路径，也不得把 command experiment 混入本 probe。
+
 ## 分阶段方法
 
 ### Phase 0 — Static topology

@@ -38,6 +38,28 @@ MxNMSoft 有本地 ZMQ/protobuf 线索，但第一轮未确认 `SendLabelText`�
 
 ZeroMQ 保留为 v0.6.0 稳定后的独立被动勘察支线。它只回答现有广播中是否包含可安全复用的运行状态，不以替换 context-menu provider 为默认目标；时间盒、安全边界和 provider 准入条件见 `docs/internal/passive-zmq-exploration.md`。
 
+## Local command experiment boundary
+
+后续可以建立独立 experiment，探索在本机 MedEx 进程内调用已经确认的内部命令。
+如果命令对应用户本来可以操作的按钮、菜单、文本框或编辑器动作，则这种临时的
+进程内调用在工程意义上视为“后台向现有控件发送指令”，不因使用 renderer、
+preload、IPC、DOM 或 editor API 而一概排除。
+
+允许的 experiment 必须同时满足：
+
+- 目标命令的身份和作用已经由静态代码或可重复的运行时证据确认；
+- 只调用用户界面中已有、用户本来有权执行的动作；
+- 不调用未知 command、topic、request 或未确认副作用的接口；
+- 不自行向本机之外发送新增信息；若目标按钮本身包含联网行为，只允许产生与
+  用户直接点击该按钮相同的既有行为，不扩展目的地、payload 或调用次数；
+- 不修改 MedEx 安装文件、bundle、preload、renderer、配置或 vendor DLL；
+- 注入或桥接仅为当前会话的临时实验，不留下持久化补丁；
+- 先在脱敏测试场景验证目标窗口、上下文、调用结果和失败边界，未经单独批准不
+  进入 production 或 release build。
+
+这项授权不等于允许任意代码执行或接口枚举后盲目试调用。若无法证明命令身份、
+等价的用户动作或网络副作用，必须停在只读观察阶段。
+
 ## Next targets
 
 1. `dist/electron/main.js`：抽取 IPC、BrowserWindow、preload、ZMQ、RTF/HTML conversion。

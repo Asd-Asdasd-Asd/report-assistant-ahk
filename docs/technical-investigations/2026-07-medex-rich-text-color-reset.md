@@ -150,6 +150,11 @@ Diagnostics 记录 profile、region/font/optional anchor names 和 rectangles、
 
 继续检查 `resources/app`，识别 TinyMCE、Vue、其他 editor framework 或 Electron IPC，并调查 direct renderer/editor command。概念路线 `executeJavaScript() → editor.setColor("#000000")` 只表示方向，不声明该 API 当前存在。
 
+独立 experiment 允许以临时、非持久化方式进入本机 MedEx 进程，调用已经确认且
+等价于用户可执行编辑器动作的 renderer、IPC、DOM 或 editor command。不得盲调
+未知命令，不得修改 MedEx 文件或配置，也不得产生超出对应 UI 动作本身的额外
+外联。该授权只开放受证据约束的探索，不改变当前 production route。
+
 Candidate G 已完成 G1/G2、caret-order A/B 和 generated-release Windows 验证并提升为 production mainline：UIA 仅定位 semantic `检查所见` toolbar row，arrow/black interaction 使用经过 profile 校准的相对鼠标位置，并在 black click 前执行四点 popup signature guard。详见 `2026-07-medex-color-reset-candidate-g.md`。
 
 ## Investigation conclusion
