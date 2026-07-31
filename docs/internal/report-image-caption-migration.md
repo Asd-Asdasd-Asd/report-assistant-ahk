@@ -170,9 +170,11 @@ PID/root-owner/client bounds 后只发送一次 `WheelDown`，不回退到旧绝
 2. source 前台下发送一次 `Ctrl+C`，要求 fresh non-empty clipboard；
 3. 将新的完整 clipboard payload 写入内存 cache，并绑定 source 与唯一 target；
 4. 解析 caption/image points；
-5. 显式激活唯一 target，重新验证 caption point 后点击；
+5. 显式激活唯一 target，重新验证 caption point 后点击并等待 15 ms，使
+   Chromium 在首次激活与连续复用时都完成 caption 焦点切换；
 6. 从 cache 写回 clipboard，先 `Ctrl+A` 全选当前 caption，再粘贴一次；
-7. 等待 80 ms，使 Chromium 完成当前图片的 caption 更新；
+7. 等待 20 ms 后翻页；这是已通过工作机验收的短 settle，不假定延长等待
+   能代替 MedEx 自身的 caption 提交流程；
 8. 移到 image point，发送一次 `WheelDown`；
 9. `finally` 只恢复 mouse；系统 clipboard 有意保留当前 caption。
 

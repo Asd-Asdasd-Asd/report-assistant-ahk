@@ -235,7 +235,12 @@ class ReportImageCaptionTests(unittest.TestCase):
             "target.captionPoint.y,\n            1,\n            0",
             action,
         )
-        self.assertIn("static PasteSettleMs := 80", self.module)
+        self.assertIn("static CaptionFocusSettleMs := 15", self.module)
+        self.assertIn("static PasteSettleMs := 20", self.module)
+        self.assertLess(
+            action.index("CaptionFocusSettleMs"),
+            action.index('SendInput "^a"'),
+        )
         self.assertIn("finally {\n        MouseMove originalX, originalY, 0", action)
         self.assertNotIn("savedClipboard", action)
         self.assertNotIn("A_Clipboard :=", action)
