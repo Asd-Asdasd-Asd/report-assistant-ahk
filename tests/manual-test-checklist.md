@@ -142,6 +142,8 @@
 - [ ] 诊断必须区分前台 source window 与鼠标 point 所在 target root-owner；
   caption/image point 的候选扫描不得错误复用 source HWND。
 - [ ] `Shift+Alt+S` 只在允许的 MedEx 进程前台注册；普通程序中不触发、不吞键。
+- [ ] `S` key-down 立即开始动作；保持 `Shift+Alt` 不松，逐次按下并抬起
+  `S` 可以连续触发，按住 `S` 本身不得因键盘自动重复而连续粘贴。
 - [ ] 首次从报告编辑 source 触发时，fresh copy 会替换内存 caption
   cache，并把该 caption 留在系统 clipboard。
 - [ ] 首次粘贴并翻到下一张后，不重新选择文字；在已绑定 target 窗口再次触发，
@@ -150,8 +152,11 @@
   cache；在任意其他窗口触发也不得复用。
 - [ ] 新选中的 source 文字会替换旧 cache；显式清除、脚本 reload/exit 或绑定
   source/target 失效后，不得继续粘贴旧 caption。
-- [ ] 连续复用前重新验证精确 target HWND/PID/root-owner 和完整结构签名；同
-  PID 的另一个窗口不得获得 reuse 权限。
+- [ ] 首次确认完整 target signature；连续复用前重新验证精确
+  HWND/PID/root-owner、client rect 和缓存点归属，同 PID 的另一个窗口不得
+  获得 reuse 权限。target client rect 未变化时不重复扫描完整 UIA tree。
+- [ ] 回到同一 source 选择新文字后，fresh copy 可复用稳定 target geometry；
+  target 移动或缩放后缓存失效并重新执行完整 resolver。
 - [ ] 每次成功操作只粘贴一次、滚轮一次并恢复鼠标；clipboard 有意保留当前
   caption，不要求恢复触发前内容。
 - [ ] target 位于右侧副屏时完成以上流程；若可安排，再把 target 放到主屏，

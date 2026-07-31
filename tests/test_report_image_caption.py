@@ -29,6 +29,26 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertIn("ReportImageCaptionForegroundActive", features)
         self.assertNotIn("+!s::", compat)
 
+    def test_hotkey_dispatches_on_key_down_and_releases_only_main_key(self) -> None:
+        handler = self.body(
+            "InvokeReportImageCaptionHotkey(chord, *)",
+            "\nclass ReportImageCaptionProvider",
+        )
+        self.assertIn(
+            "ReportImageCaptionProvider.Invoke(foregroundHwnd)",
+            handler,
+        )
+        self.assertNotIn(
+            "ViewerHotkeyChordHasPressedComponent",
+            handler,
+        )
+        self.assertNotIn("Sleep 10", handler)
+        self.assertIn(
+            "KeyWait ReportImageCaptionDefaults.TriggerKey",
+            handler,
+        )
+        self.assertIn('static TriggerKey := "s"', self.module)
+
     def test_source_capture_requires_fresh_nonempty_clipboard(self) -> None:
         capture = self.body(
             "\nCaptureFreshReportImageCaption(sourceHwnd) {\n",
@@ -51,19 +71,48 @@ class ReportImageCaptionTests(unittest.TestCase):
             "CaptureFreshReportImageCaption(",
         )
         self.assertIn(
-            "REPORT_IMAGE_CAPTION_CACHE.targetHwnd\n"
+            "priorCache.targetHwnd\n"
             "                    = foregroundHwnd",
             invoke,
         )
         self.assertIn("ClearReportImageCaptionCache(false)", invoke)
         self.assertIn("ReportImageCaptionCacheBindingValid", reuse)
-        self.assertIn("ResolveBoundReportImageCaptionTarget", reuse)
+        self.assertIn("ResolveCachedReportImageCaptionTarget", reuse)
         self.assertNotIn('SendInput "^c"', reuse)
+        self.assertNotIn(
+            "BuildReportImageCaptionTargetCandidate",
+            reuse,
+        )
+
+    def test_new_source_caption_reuses_stable_target_geometry(self) -> None:
+        capture = self.body(
+            "static InvokeCapture(sourceHwnd, priorCache := 0)",
+            "static InvokeReuse(targetHwnd, cache)",
+        )
+        cached = self.body(
+            "ResolveCachedReportImageCaptionTarget(cache, targetHwnd)",
+            "\nReportImageCaptionTopLevelWindowEligible(hwnd, expectedPid)",
+        )
+        self.assertIn(
+            "ReportImageCaptionSourceBindingValid(",
+            capture,
+        )
+        self.assertIn(
+            "ResolveCachedReportImageCaptionTarget(",
+            capture,
+        )
+        self.assertIn(
+            "ResolveReportImageCaptionTarget(",
+            capture,
+        )
+        self.assertIn("targetClientRectKey", capture)
+        self.assertIn("targetClientRectKey", cached)
+        self.assertIn("ReportImageCaptionRectKey(", cached)
 
     def test_target_resolution_uses_unique_structure_not_display_position(self) -> None:
         resolver = self.body(
             "ResolveReportImageCaptionTarget(sourceHwnd, sourcePid)",
-            "ResolveBoundReportImageCaptionTarget(",
+            "ResolveCachedReportImageCaptionTarget(",
         )
         candidate = self.body(
             "BuildReportImageCaptionTargetCandidate(hwnd, expectedPid)",
@@ -110,9 +159,17 @@ class ReportImageCaptionTests(unittest.TestCase):
             "\nSetReportImageCaptionClipboard(payload)",
         )
         self.assertIn('WinActivate "ahk_id " target.hwnd', action)
-        self.assertIn("ReportImageCaptionPaneAtPoint", action)
+        self.assertIn(
+            'if WinExist("A") != target.hwnd',
+            action,
+        )
         self.assertEqual(action.count('SendInput "^v"'), 1)
         self.assertEqual(action.count('SendInput "{WheelDown}"'), 1)
+        self.assertIn(
+            "target.captionPoint.y,\n            1,\n            0",
+            action,
+        )
+        self.assertIn("static PasteSettleMs := 20", self.module)
         self.assertIn("finally {\n        MouseMove originalX, originalY, 0", action)
         self.assertNotIn("savedClipboard", action)
         self.assertNotIn("A_Clipboard :=", action)

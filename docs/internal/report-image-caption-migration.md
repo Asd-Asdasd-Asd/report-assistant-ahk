@@ -36,6 +36,10 @@ Legacy 还包含一个需要保留的业务语义：首次粘贴后，系统 cli
 4. **Image advance resolver**：从同一窗口中定位图像 viewport，验证点属于同
    PID/root-owner/client bounds 后只发送一次 `WheelDown`，最后恢复鼠标。
 
+热键在 `S` key-down 时立即进入 transaction，不等待 Shift/Alt 松开。transaction
+结束后只等待 `S` 抬起以阻止主键自动重复；用户可以一直按住 Shift+Alt，逐次
+按下 `S` 连续标图。
+
 主屏或副屏不进入算法。monitor、分辨率、DPI 和 scaling 只用于解释现场差异及
 拒绝未验证布局。
 
@@ -162,10 +166,16 @@ caption 不能通过 Value/TextEdit 写入。由 exact `图像描述` 与 `保�
 从已绑定 target 窗口连续触发时，顺序固定为：
 
 1. 不发送 `Ctrl+C`，重新验证前台正是 cache 绑定的 target
-   HWND/PID/root-owner，且完整 target signature 仍成立；
+   HWND/PID/root-owner，client rect 未变化且两个缓存点仍属于该 target；
 2. 从 cache 写回 clipboard，避免用户中途复制的其他内容被误粘贴；
-3. 重新解析 caption/image points，点击、粘贴一次并 `WheelDown` 一次；
+3. 复核缓存的 caption/image points，点击、粘贴一次并 `WheelDown` 一次；
 4. `finally` 只恢复 mouse；系统 clipboard 继续保留当前 caption。
+
+首次完整 UIA signature 解析后，同时缓存 target client rect 与 caption/image
+points。只要 source/target binding 和 client rect 未变化，从 target 连续复用，
+以及回到同一 source 复制新 caption，都走轻量验证，不重复扫描整个 UIA tree。
+任何窗口尺寸或 binding 变化都会使缓存失效；source 捕获新文字时可重新执行
+完整 resolver，target 前台复用时则 fail closed 并要求重新选择。
 
 在 source 窗口触发时，无论是否已有 cache，fresh copy 失败都必须 fail closed，
 不得偷偷降级为 reuse。其他窗口触发同样不得复用。这样既保留“一句话连续标多张
