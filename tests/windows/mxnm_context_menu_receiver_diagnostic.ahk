@@ -6,7 +6,7 @@
 #Include ..\..\src\mxnm_viewer_tool_commands.ahk
 #Include ..\..\src\mxnm_measurement_target_resolver.ahk
 
-global MXNM_CONTEXT_DIAGNOSTIC_VERSION := "1.0"
+global MXNM_CONTEXT_DIAGNOSTIC_VERSION := "1.1"
 global MXNM_CONTEXT_DIAGNOSTIC_BUSY := false
 
 CoordMode "Mouse", "Screen"
@@ -536,7 +536,9 @@ ProbeMxNMContextDiagnosticCandidate(
             expectedOwner,
             before
         )
-        if result.newWindows.Length > 0
+        if MxNMContextDiagnosticHasKnownCommand(
+            result.newWindows
+        )
             break
         if A_TickCount >= deadline
             break
@@ -562,6 +564,17 @@ ProbeMxNMContextDiagnosticCandidate(
     if result.newWindows.Length > 0
         Sleep 80
     return result
+}
+
+MxNMContextDiagnosticHasKnownCommand(windows) {
+    for window in windows {
+        if window.hasDeleteAll
+            || window.hasSuvMax
+            || window.hasLineAxes {
+            return true
+        }
+    }
+    return false
 }
 
 SnapshotMxNMContextDiagnosticWindows(expectedPid) {

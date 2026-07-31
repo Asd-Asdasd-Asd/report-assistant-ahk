@@ -2458,13 +2458,49 @@ ResolveMxNMActionWindowFromAnchor(
     runtimeFrameHwnd,
     actionRootHwnd
 ) {
+    pointHwnd := ResolveMxNMWindowFromScreenPoint(screenPoint)
+    if !pointHwnd
+        || !MxNMTargetWindowIsSameOrDescendant(
+            pointHwnd,
+            actionRootHwnd
+        ) {
+        return {
+            ok: false,
+            code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
+        }
+    }
     return ValidateMxNMActionWindow(
         viewerExe,
         screenPoint,
         runtimeFrameHwnd,
-        actionRootHwnd,
-        ResolveMxNMRootOwnerHwnd(actionRootHwnd)
+        pointHwnd,
+        ResolveMxNMRootOwnerHwnd(pointHwnd)
     )
+}
+
+ResolveMxNMWindowFromScreenPoint(screenPoint) {
+    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
+        | (Round(screenPoint.x) & 0xFFFFFFFF)
+    try return DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch
+        return 0
+}
+
+MxNMTargetWindowIsSameOrDescendant(hwnd, ancestorHwnd) {
+    if !hwnd || !ancestorHwnd
+        return false
+    seen := Map()
+    while hwnd && !seen.Has(hwnd) {
+        if hwnd = ancestorHwnd
+            return true
+        seen[hwnd] := true
+        hwnd := MxNMTargetParentHwnd(hwnd)
+    }
+    return false
 }
 
 ValidateMxNMActionWindow(
@@ -2580,7 +2616,7 @@ MxNMTargetClientRectScreen(hwnd) {
 ; --- END src/mxnm_measurement_target_resolver.ahk ---
 
 ; --- BEGIN tests/windows/mxnm_context_menu_receiver_diagnostic.ahk ---
-global MXNM_CONTEXT_DIAGNOSTIC_VERSION := "1.0"
+global MXNM_CONTEXT_DIAGNOSTIC_VERSION := "1.1"
 global MXNM_CONTEXT_DIAGNOSTIC_BUSY := false
 
 CoordMode "Mouse", "Screen"
@@ -3110,7 +3146,9 @@ ProbeMxNMContextDiagnosticCandidate(
             expectedOwner,
             before
         )
-        if result.newWindows.Length > 0
+        if MxNMContextDiagnosticHasKnownCommand(
+            result.newWindows
+        )
             break
         if A_TickCount >= deadline
             break
@@ -3136,6 +3174,17 @@ ProbeMxNMContextDiagnosticCandidate(
     if result.newWindows.Length > 0
         Sleep 80
     return result
+}
+
+MxNMContextDiagnosticHasKnownCommand(windows) {
+    for window in windows {
+        if window.hasDeleteAll
+            || window.hasSuvMax
+            || window.hasLineAxes {
+            return true
+        }
+    }
+    return false
 }
 
 SnapshotMxNMContextDiagnosticWindows(expectedPid) {

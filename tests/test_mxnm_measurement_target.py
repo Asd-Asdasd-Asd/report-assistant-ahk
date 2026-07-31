@@ -182,6 +182,27 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "\n        actionFrame",
             fallback_target,
         )
+        anchored_action = resolver.split(
+            "\nResolveMxNMActionWindowFromAnchor(", 1
+        )[1].split(
+            "\n}\n\nValidateMxNMActionWindow", 1
+        )[0]
+        self.assertIn(
+            "ResolveMxNMWindowFromScreenPoint(screenPoint)",
+            anchored_action,
+        )
+        self.assertIn(
+            "MxNMTargetWindowIsSameOrDescendant(",
+            anchored_action,
+        )
+        self.assertIn(
+            "ResolveMxNMRootOwnerHwnd(pointHwnd)",
+            anchored_action,
+        )
+        self.assertNotIn(
+            "ResolveMxNMRootOwnerHwnd(actionRootHwnd)",
+            anchored_action,
+        )
         for fallback_code in (
             "ANCHOR_INVALID",
             "ANCHOR_IDENTITY_INVALID",

@@ -69,6 +69,8 @@
   前台均能解析唯一 target；失败时 popup/clipboard 不可达。
 - [ ] tool-anchor fallback 的 `imageRect` 使用 Vendor `ShowImagePos/Size`
   映射到 resolved image receiver，自动点不得落在 `Static` 标题区或工具按钮。
+- [ ] 自动点命中的同 PID、同 root-owner image child 作为右键 receiver；
+  外层布局窗口只提供映射边界，不替代实际 point HWND 接收右键。
 - [ ] `;fzg` 的 positive、`NOT_ANNOTATED` 和 automation failure 路径分别
   写入数值、留下人工输入锚点或显示无焦点失败提示。
 - [ ] `;cma`/custom `{{size}}` 对 1–3 个正数按数值降序输出，使用 `×` 和逐项

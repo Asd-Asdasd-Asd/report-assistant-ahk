@@ -199,6 +199,10 @@ Tool-anchor fallback 选出 image receiver 后，仍须把 Vendor
 client rect 同时包含标题区、工具按钮和其他非图像区域，不能直接作为
 `imageRect`。
 
+完成映射后，右键 receiver 取安全点实际命中的 window，而不是提供布局边界
+的外层 window。point window 必须位于 resolved image receiver 的 descendant
+chain 内，并继续通过同 PID、同 root owner 与 client bounds 校验。
+
 第二轮主图区证据确认人工图像点仍命中 `#32770` 图像 HWND，且
 `rootOwnerHwnd` 正确回到与工具面板相同的 outer Viewer。为消除清除链路与
 测量链路之间的重复解析，target resolver 在完成 point HWND、root owner、
