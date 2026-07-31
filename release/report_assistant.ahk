@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 51a18aa4417beb2d46c790de654b0459249e57ce
-; Generated at: 2026-07-31 13:04:40 UTC
+; Source revision: bf7e83751b752346acceb50655225f33d2e7fd70
+; Generated at: 2026-07-31 13:09:35 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-07-31"
-    static SourceRevision := "51a18aa4417beb2d46c790de654b0459249e57ce"
+    static SourceRevision := "bf7e83751b752346acceb50655225f33d2e7fd70"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -8399,6 +8399,7 @@ ShowReportAssistantDispatchPulse(targetHwnd, durationMs := 90) {
 class ReportImageCaptionTransferFeedback {
     static CardWindow := 0
     static HighlightWindow := 0
+    static CurrentState := 0
     static CurrentToken := 0
     static DurationMs := 200
     static FrameMs := 16
@@ -8478,7 +8479,12 @@ class ReportImageCaptionTransferFeedback {
                 card: card,
                 highlight: highlight
             }
-            this.Advance(state)
+            this.CurrentState := state
+            SetTimer(
+                ReportImageCaptionTransferFeedbackCleanupTimer,
+                -(this.DurationMs + 250)
+            )
+            this.AdvanceCurrent()
             return true
         } catch {
             this.Hide()
@@ -8486,7 +8492,10 @@ class ReportImageCaptionTransferFeedback {
         }
     }
 
-    static Advance(state) {
+    static AdvanceCurrent() {
+        state := this.CurrentState
+        if !IsObject(state)
+            return
         if state.token != this.CurrentToken
             return
         elapsed := Max(0, A_TickCount - state.startedAt)
@@ -8560,7 +8569,7 @@ class ReportImageCaptionTransferFeedback {
             return
         }
         SetTimer(
-            ReportImageCaptionTransferFeedback.Advance.Bind(state),
+            ReportImageCaptionTransferFeedbackTimer,
             -this.FrameMs
         )
     }
@@ -8589,6 +8598,8 @@ class ReportImageCaptionTransferFeedback {
     }
 
     static Hide() {
+        try SetTimer(ReportImageCaptionTransferFeedbackTimer, 0)
+        try SetTimer(ReportImageCaptionTransferFeedbackCleanupTimer, 0)
         if IsObject(this.CardWindow) {
             try this.CardWindow.Destroy()
         }
@@ -8597,7 +8608,19 @@ class ReportImageCaptionTransferFeedback {
         }
         this.CardWindow := 0
         this.HighlightWindow := 0
+        this.CurrentState := 0
     }
+}
+
+ReportImageCaptionTransferFeedbackTimer(*) {
+    try ReportImageCaptionTransferFeedback.AdvanceCurrent()
+    catch {
+        ReportImageCaptionTransferFeedback.Hide()
+    }
+}
+
+ReportImageCaptionTransferFeedbackCleanupTimer(*) {
+    ReportImageCaptionTransferFeedback.Hide()
 }
 
 ShowReportImageCaptionTransferFeedback(
@@ -20872,10 +20895,10 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             return failure
         paneRect := captionPaneResult.rect
         captionHighlightRect := {
-            l: Max(paneRect.l + 6, descriptionRect.r + 6),
-            t: paneRect.t + 4,
-            r: saveRect.l - 6,
-            b: paneRect.b - 4
+            l: Max(paneRect.l + 8, captionPoint.x - 160),
+            t: Max(paneRect.t + 6, captionPoint.y - 18),
+            r: Min(saveRect.l - 8, captionPoint.x + 160),
+            b: Min(paneRect.b - 6, captionPoint.y + 18)
         }
         if !ReportImageCaptionRectContainsRect(
             paneRect,
