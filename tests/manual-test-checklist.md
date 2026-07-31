@@ -142,6 +142,9 @@
 - [ ] 诊断必须区分前台 source window 与鼠标 point 所在 target root-owner；
   caption/image point 的候选扫描不得错误复用 source HWND。
 - [ ] `Shift+Alt+S` 只在允许的 MedEx 进程前台注册；普通程序中不触发、不吞键。
+- [ ] 设置窗口“快捷键”页显示“快速标图”，默认启用且为 `Shift+Alt+S`；
+  停用后不触发，改成另一组含修饰键的快捷键并保存重载后，新键生效、旧键失效。
+- [ ] 快速标图拒绝无修饰单键，并拒绝与 Viewer 工具或程序保留键重复。
 - [ ] `S` key-down 立即开始动作；保持 `Shift+Alt` 不松，逐次按下并抬起
   `S` 可以连续触发，按住 `S` 本身不得因键盘自动重复而连续粘贴。
 - [ ] 首次从报告编辑 source 触发时，fresh copy 会替换内存 caption

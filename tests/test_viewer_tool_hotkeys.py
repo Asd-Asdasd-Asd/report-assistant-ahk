@@ -169,6 +169,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         ui = source("src/settings_ui.ahk")
         editor = source("src/hotstring_config_editor.ahk")
         for label in (
+            "快速标图",
             "箭头",
             "长度测量",
             "3D SUV测量",
@@ -176,13 +177,13 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "清除全部标注",
         ):
             self.assertIn(label, ui)
-        self.assertEqual(ui.count('"Hotkey"'), 5)
-        self.assertEqual(ui.count('"CheckBox", "x276'), 5)
-        self.assertEqual(ui.count('"CheckBox", "x648'), 5)
-        self.assertEqual(ui.count('w90 h26", "启用"'), 5)
-        self.assertEqual(ui.count('w70 h26", "使用"'), 5)
+        self.assertEqual(ui.count('"Hotkey"'), 6)
+        self.assertEqual(ui.count('"CheckBox", "x276'), 6)
+        self.assertEqual(ui.count('"CheckBox", "x648'), 6)
+        self.assertEqual(ui.count('w90 h26", "启用"'), 6)
+        self.assertEqual(ui.count('w70 h26", "使用"'), 6)
         self.assertNotIn("Limit15", ui)
-        self.assertIn("ValidateViewerToolHotkeySettings(", ui)
+        self.assertIn("ValidateFeatureHotkeySettings(", ui)
         self.assertIn(
             "ViewerToolHotkeyChordIsSafe",
             source("src/feature_normalization.ahk"),
@@ -190,8 +191,11 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn("ViewerHotkeyNativeChord(", ui)
         self.assertIn("ViewerHotkeyUsesWin(", ui)
         self.assertIn("MergeViewerHotkeyChord(", ui)
-        self.assertIn("WriteViewerToolHotkeySettings(", editor)
-        self.assertIn("ViewerToolHotkeySettingsMatch(", editor)
+        self.assertIn("WriteFeatureHotkeySettings(", editor)
+        self.assertIn("FeatureHotkeySettingsMatch(", editor)
+        self.assertIn("ReportImageCaptionEnabledInput", ui)
+        self.assertIn("ReportImageCaptionChordInput", ui)
+        self.assertIn("ReportImageCaptionWinInput", ui)
 
     def test_capture_mapping_is_viewer_only_and_feedback_is_non_textual(self) -> None:
         hotkeys = source("src/viewer_tool_hotkeys.ahk")

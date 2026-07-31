@@ -87,12 +87,15 @@ class FeatureHotkeyTests(unittest.TestCase):
             global_block.index("RegisterHotkeyDefinitions("),
         )
 
-    def test_caption_chord_is_reserved_from_configurable_viewer_tools(self) -> None:
+    def test_caption_chord_participates_in_configurable_conflict_validation(
+        self,
+    ) -> None:
         normalization = source("src/feature_normalization.ahk")
-        self.assertIn(
-            "ReportImageCaptionDefaults.HotkeyChord",
-            normalization,
-        )
+        self.assertIn('field: "ReportImageCaptionChord"', normalization)
+        self.assertIn("settings.ReportImageCaptionEnabled", normalization)
+        self.assertIn("settings.ReportImageCaptionChord", normalization)
+        self.assertIn("allowBare: false", normalization)
+        self.assertNotIn("ReportImageCaptionDefaults.HotkeyChord", normalization)
 
     def test_global_hjkl_arrows_preserve_legacy_global_mappings(self) -> None:
         navigation = source("src/global_hjkl_arrows.ahk")

@@ -2,6 +2,11 @@ class FeatureDefaults {
     static Section := "Features"
     static GlobalHjklArrowsKey := "GlobalHjklArrows"
     static GlobalHjklArrowsDefault := "false"
+    static ReportImageCaptionSection := "ReportImageCaptionHotkey"
+    static ReportImageCaptionEnabledKey := "Enabled"
+    static ReportImageCaptionChordKey := "Chord"
+    static ReportImageCaptionEnabledDefault := "true"
+    static ReportImageCaptionChordDefault := "+!s"
     static ViewerToolSection := "ViewerToolHotkeys"
     static ViewerArrowEnabledKey := "ArrowEnabled"
     static ViewerArrowChordKey := "ArrowChord"
@@ -26,6 +31,16 @@ class FeatureDefaults {
                 this.Section,
                 this.GlobalHjklArrowsKey,
                 this.GlobalHjklArrowsDefault
+            ),
+            ManagedConfigEntry(
+                this.ReportImageCaptionSection,
+                this.ReportImageCaptionEnabledKey,
+                this.ReportImageCaptionEnabledDefault
+            ),
+            ManagedConfigEntry(
+                this.ReportImageCaptionSection,
+                this.ReportImageCaptionChordKey,
+                this.ReportImageCaptionChordDefault
             ),
             ManagedConfigEntry(
                 this.ViewerToolSection,
@@ -84,6 +99,8 @@ class FeatureDefaults {
 class RawFeatureSettings {
     __New(
         globalHjklArrows,
+        reportImageCaptionEnabled,
+        reportImageCaptionChord,
         viewerArrowEnabled,
         viewerArrowChord,
         viewerLengthEnabled,
@@ -96,6 +113,8 @@ class RawFeatureSettings {
         viewerClearChord
     ) {
         this.GlobalHjklArrows := String(globalHjklArrows)
+        this.ReportImageCaptionEnabled := String(reportImageCaptionEnabled)
+        this.ReportImageCaptionChord := String(reportImageCaptionChord)
         this.ViewerArrowEnabled := String(viewerArrowEnabled)
         this.ViewerArrowChord := String(viewerArrowChord)
         this.ViewerLengthEnabled := String(viewerLengthEnabled)
@@ -112,6 +131,8 @@ class RawFeatureSettings {
 class FeatureSettings {
     __New(
         globalHjklArrows := false,
+        reportImageCaptionEnabled := true,
+        reportImageCaptionChord := "+!s",
         viewerArrowEnabled := false,
         viewerArrowChord := "",
         viewerLengthEnabled := false,
@@ -124,6 +145,8 @@ class FeatureSettings {
         viewerClearChord := ""
     ) {
         this.GlobalHjklArrows := globalHjklArrows = true
+        this.ReportImageCaptionEnabled := reportImageCaptionEnabled = true
+        this.ReportImageCaptionChord := String(reportImageCaptionChord)
         this.ViewerArrowEnabled := viewerArrowEnabled = true
         this.ViewerArrowChord := String(viewerArrowChord)
         this.ViewerLengthEnabled := viewerLengthEnabled = true

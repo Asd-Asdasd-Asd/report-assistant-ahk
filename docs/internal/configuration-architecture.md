@@ -45,6 +45,10 @@ SchemaVersion=2
 [Features]
 GlobalHjklArrows=false
 
+[ReportImageCaptionHotkey]
+Enabled=true
+Chord=+!s
+
 [ViewerToolHotkeys]
 ArrowEnabled=false
 ArrowChord=^!1
@@ -167,7 +171,7 @@ Schema 1 migration 是唯一保留 legacy `text`、`red-reset` 和 `red-left4` �
 - 原文件内容仍与窗口打开时一致；
 - builtin 不能删除，custom 只能按 stable Section 明确删除。
 
-保存使用 backup + 同目录临时文件。未修改的 hotstring section、`[Features]`、未知 sections/keys 和注释通过复制原文件保留；只重写 UI 明确修改的 section。Viewer 工具、截图与清除快捷键由设置页事务更新 `[ViewerToolHotkeys]`，允许一个 Ctrl/Alt/Shift/Win 修饰键；无修饰时只接受 Viewer-only 的单个字母或数字，并拒绝 duplicate/reserved chords。临时与 final 均重新读取并比较目标/非目标 sections。成功后调用完整 `Reload()`。
+保存使用 backup + 同目录临时文件。未修改的 hotstring section、`[Features]`、未知 sections/keys 和注释通过复制原文件保留；只重写 UI 明确修改的 section。快速标图由设置页事务更新 `[ReportImageCaptionHotkey]`，且必须包含至少一个修饰键；Viewer 工具、截图与清除快捷键更新 `[ViewerToolHotkeys]`，允许一个 Ctrl/Alt/Shift/Win 修饰键，无修饰时只接受 Viewer-only 的单个字母或数字。所有快捷键统一拒绝 duplicate/reserved chords。临时与 final 均重新读取并比较目标/非目标 sections。成功后调用完整 `Reload()`。
 
 ## Update preservation
 

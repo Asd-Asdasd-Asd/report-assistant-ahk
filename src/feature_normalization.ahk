@@ -5,6 +5,8 @@ LoadFeatureSettings(configPath := "") {
 NormalizeFeatureSettings(raw) {
     return FeatureSettings(
         ParseOptionalFeatureEnabled(raw.GlobalHjklArrows),
+        ParseOptionalFeatureEnabled(raw.ReportImageCaptionEnabled),
+        NormalizeOptionalHotkeyChord(raw.ReportImageCaptionChord),
         ParseOptionalFeatureEnabled(raw.ViewerArrowEnabled),
         NormalizeOptionalHotkeyChord(raw.ViewerArrowChord),
         ParseOptionalFeatureEnabled(raw.ViewerLengthEnabled),
@@ -27,45 +29,52 @@ NormalizeOptionalHotkeyChord(value) {
     return Trim(String(value), " `t`r`n")
 }
 
-ValidateViewerToolHotkeySettings(settings) {
+ValidateFeatureHotkeySettings(settings) {
     definitions := [
+        {
+            field: "ReportImageCaptionChord",
+            label: "快速标图",
+            enabled: settings.ReportImageCaptionEnabled,
+            chord: settings.ReportImageCaptionChord,
+            allowBare: false
+        },
         {
             field: "ViewerArrowChord",
             label: "箭头",
             enabled: settings.ViewerArrowEnabled,
-            chord: settings.ViewerArrowChord
+            chord: settings.ViewerArrowChord,
+            allowBare: true
         },
         {
             field: "ViewerLengthChord",
             label: "长度测量",
             enabled: settings.ViewerLengthEnabled,
-            chord: settings.ViewerLengthChord
+            chord: settings.ViewerLengthChord,
+            allowBare: true
         },
         {
             field: "ViewerSuv3DChord",
             label: "3D SUV测量",
             enabled: settings.ViewerSuv3DEnabled,
-            chord: settings.ViewerSuv3DChord
+            chord: settings.ViewerSuv3DChord,
+            allowBare: true
         },
         {
             field: "ViewerCaptureChord",
             label: "截图",
             enabled: settings.ViewerCaptureEnabled,
-            chord: settings.ViewerCaptureChord
+            chord: settings.ViewerCaptureChord,
+            allowBare: true
         },
         {
             field: "ViewerClearChord",
             label: "清除全部标注",
             enabled: settings.ViewerClearEnabled,
-            chord: settings.ViewerClearChord
+            chord: settings.ViewerClearChord,
+            allowBare: true
         }
     ]
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
-    seen[
-        NormalizeHotkeyChord(
-            ReportImageCaptionDefaults.HotkeyChord
-        )
-    ] := true
     if settings.GlobalHjklArrows {
         for definition in GlobalHjklArrowHotkeyDefinitions()
             seen[NormalizeHotkeyChord(definition.Chord)] := true
@@ -88,13 +97,18 @@ ValidateViewerToolHotkeySettings(settings) {
                 "启用“" definition.label "”前必须设置快捷键。"
             )
         }
-        if !ViewerToolHotkeyChordIsSafe(chord) {
+        if !ViewerToolHotkeyChordIsSafe(chord)
+            || (!definition.allowBare
+                && ViewerHotkeyChordIsBare(chord)) {
+            requirement := definition.allowBare
+                ? "需要至少一个修饰键；"
+                    . "无修饰时只能使用单个字母或数字，"
+                    . "且仅在 Viewer 前台生效。"
+                : "必须包含至少一个修饰键。"
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键需要至少一个修饰键；"
-                    . "无修饰时只能使用单个字母或数字，"
-                    . "且仅在 Viewer 前台生效。"
+                "“" definition.label "”快捷键" requirement
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -136,8 +150,12 @@ MakeViewerToolHotkeyValidation(ok, field := "", message := "") {
     }
 }
 
-ViewerToolHotkeySettingsMatch(expected, actual) {
-    return expected.ViewerArrowEnabled = actual.ViewerArrowEnabled
+FeatureHotkeySettingsMatch(expected, actual) {
+    return expected.ReportImageCaptionEnabled
+            = actual.ReportImageCaptionEnabled
+        && expected.ReportImageCaptionChord
+            = actual.ReportImageCaptionChord
+        && expected.ViewerArrowEnabled = actual.ViewerArrowEnabled
         && expected.ViewerArrowChord = actual.ViewerArrowChord
         && expected.ViewerLengthEnabled = actual.ViewerLengthEnabled
         && expected.ViewerLengthChord = actual.ViewerLengthChord

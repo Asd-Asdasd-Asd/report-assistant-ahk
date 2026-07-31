@@ -38,8 +38,13 @@ class LegacyCompatTests(unittest.TestCase):
     def test_caption_advance_is_owned_by_production(self) -> None:
         compat = source("legacy/medex_legacy_compat.ahk")
         production = source("src/report_image_caption.ahk")
+        model = source("src/feature_model.ahk")
         self.assertNotIn("+!s::", compat)
-        self.assertIn('static HotkeyChord := "+!s"', production)
+        self.assertIn(
+            'static ReportImageCaptionChordDefault := "+!s"',
+            model,
+        )
+        self.assertIn("ReportImageCaptionHotkeyDefinitions(settings)", production)
 
     def test_retired_legacy_viewer_actions_are_absent(self) -> None:
         compat = source("legacy/medex_legacy_compat.ahk")

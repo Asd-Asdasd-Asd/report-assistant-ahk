@@ -1,6 +1,8 @@
 LoadRawFeatureSettings(configPath := "") {
     defaults := RawFeatureSettings(
         FeatureDefaults.GlobalHjklArrowsDefault,
+        FeatureDefaults.ReportImageCaptionEnabledDefault,
+        FeatureDefaults.ReportImageCaptionChordDefault,
         FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerArrowChordDefault,
         FeatureDefaults.ViewerToolEnabledDefault,
@@ -30,6 +32,18 @@ LoadRawFeatureSettings(configPath := "") {
                 FeatureDefaults.Section,
                 FeatureDefaults.GlobalHjklArrowsKey,
                 FeatureDefaults.GlobalHjklArrowsDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ReportImageCaptionSection,
+                FeatureDefaults.ReportImageCaptionEnabledKey,
+                FeatureDefaults.ReportImageCaptionEnabledDefault
+            ),
+            IniRead(
+                configPath,
+                FeatureDefaults.ReportImageCaptionSection,
+                FeatureDefaults.ReportImageCaptionChordKey,
+                FeatureDefaults.ReportImageCaptionChordDefault
             ),
             IniRead(
                 configPath,

@@ -2,7 +2,7 @@ RegisterConfiguredFeatures(LoadFeatureSettings())
 
 RegisterConfiguredFeatures(settings) {
     RegisterHotkeyDefinitions(
-        ReportImageCaptionHotkeyDefinitions(),
+        ReportImageCaptionHotkeyDefinitions(settings),
         ReservedApplicationHotkeyChords(),
         ReportImageCaptionForegroundActive
     )

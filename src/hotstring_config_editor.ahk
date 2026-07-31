@@ -251,7 +251,7 @@ SaveEditableReportHotstringConfig(
     if !validation.Ok
         return ReportHotstringEditorSaveResult(false, validation.Message)
     if IsObject(featureSettings) {
-        featureValidation := ValidateViewerToolHotkeySettings(
+        featureValidation := ValidateFeatureHotkeySettings(
             featureSettings
         )
         if !featureValidation.Ok {
@@ -336,9 +336,9 @@ SaveEditableReportHotstringConfig(
         }
 
         if IsObject(featureSettings) {
-            WriteViewerToolHotkeySettings(tempPath, featureSettings)
+            WriteFeatureHotkeySettings(tempPath, featureSettings)
             savedFeatures := LoadFeatureSettings(tempPath)
-            if !ViewerToolHotkeySettingsMatch(
+            if !FeatureHotkeySettingsMatch(
                 featureSettings,
                 savedFeatures
             ) {
@@ -372,7 +372,7 @@ SaveEditableReportHotstringConfig(
             throw Error("Final configuration did not match the edited templates")
         if IsObject(featureSettings) {
             finalFeatures := LoadFeatureSettings(configPath)
-            if !ViewerToolHotkeySettingsMatch(
+            if !FeatureHotkeySettingsMatch(
                 featureSettings,
                 finalFeatures
             ) {
@@ -412,7 +412,20 @@ SaveEditableReportHotstringConfig(
     }
 }
 
-WriteViewerToolHotkeySettings(configPath, settings) {
+WriteFeatureHotkeySettings(configPath, settings) {
+    captionSection := FeatureDefaults.ReportImageCaptionSection
+    IniWrite(
+        settings.ReportImageCaptionEnabled ? "true" : "false",
+        configPath,
+        captionSection,
+        FeatureDefaults.ReportImageCaptionEnabledKey
+    )
+    IniWrite(
+        settings.ReportImageCaptionChord,
+        configPath,
+        captionSection,
+        FeatureDefaults.ReportImageCaptionChordKey
+    )
     section := FeatureDefaults.ViewerToolSection
     IniWrite(
         settings.ViewerArrowEnabled ? "true" : "false",

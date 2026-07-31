@@ -21,13 +21,63 @@ class ReportImageCaptionTests(unittest.TestCase):
     def body(self, start: str, end: str) -> str:
         return self.module.split(start, 1)[1].split(end, 1)[0]
 
-    def test_fixed_legacy_chord_is_owned_by_the_new_feature(self) -> None:
+    def test_legacy_chord_is_the_configurable_default(self) -> None:
         features = source("src/features.ahk")
+        model = source("src/feature_model.ahk")
         compat = source("legacy/medex_legacy_compat.ahk")
-        self.assertIn('static HotkeyChord := "+!s"', self.module)
-        self.assertIn("ReportImageCaptionHotkeyDefinitions()", features)
+        self.assertIn(
+            'static ReportImageCaptionEnabledDefault := "true"',
+            model,
+        )
+        self.assertIn(
+            'static ReportImageCaptionChordDefault := "+!s"',
+            model,
+        )
+        self.assertIn(
+            "ReportImageCaptionHotkeyDefinitions(settings)",
+            features,
+        )
+        self.assertIn("settings.ReportImageCaptionEnabled", self.module)
+        self.assertIn("settings.ReportImageCaptionChord", self.module)
         self.assertIn("ReportImageCaptionForegroundActive", features)
         self.assertNotIn("+!s::", compat)
+
+    def test_hotkey_config_round_trips_through_the_managed_settings_pipeline(
+        self,
+    ) -> None:
+        model = source("src/feature_model.ahk")
+        loader = source("src/feature_config.ahk")
+        config = source("src/hotstring_config.ahk")
+        editor = source("src/hotstring_config_editor.ahk")
+        normalization = source("src/feature_normalization.ahk")
+        for required in (
+            "ReportImageCaptionSection",
+            "ReportImageCaptionEnabledKey",
+            "ReportImageCaptionChordKey",
+        ):
+            self.assertIn(required, model)
+            self.assertIn(required, loader)
+            self.assertIn(required, config)
+            self.assertIn(required, editor)
+        self.assertIn(
+            "ParseOptionalFeatureEnabled(raw.ReportImageCaptionEnabled)",
+            normalization,
+        )
+        self.assertIn(
+            "NormalizeOptionalHotkeyChord(raw.ReportImageCaptionChord)",
+            normalization,
+        )
+        self.assertIn("FeatureHotkeySettingsMatch(", editor)
+
+    def test_disabled_hotkey_is_not_registered(self) -> None:
+        definitions = self.body(
+            "ReportImageCaptionHotkeyDefinitions(settings)",
+            "\nReportImageCaptionForegroundActive",
+        )
+        self.assertIn("if !settings.ReportImageCaptionEnabled", definitions)
+        self.assertIn("return []", definitions)
+        self.assertIn("chord := settings.ReportImageCaptionChord", definitions)
+        self.assertIn("InvokeReportImageCaptionHotkey.Bind(chord)", definitions)
 
     def test_hotkey_dispatches_on_key_down_and_releases_only_main_key(self) -> None:
         handler = self.body(
@@ -44,10 +94,15 @@ class ReportImageCaptionTests(unittest.TestCase):
         )
         self.assertNotIn("Sleep 10", handler)
         self.assertIn(
-            "KeyWait ReportImageCaptionDefaults.TriggerKey",
+            "KeyWait ReportImageCaptionTriggerKey(chord)",
             handler,
         )
-        self.assertIn('static TriggerKey := "s"', self.module)
+        trigger = self.body(
+            "ReportImageCaptionTriggerKey(chord)",
+            "\nclass ReportImageCaptionProvider",
+        )
+        self.assertIn('"^[!+^#]+(.+)$"', trigger)
+        self.assertIn("return match[1]", trigger)
 
     def test_source_capture_requires_fresh_nonempty_clipboard(self) -> None:
         capture = self.body(

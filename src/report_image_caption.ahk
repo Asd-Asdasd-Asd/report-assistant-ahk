@@ -1,6 +1,4 @@
 class ReportImageCaptionDefaults {
-    static HotkeyChord := "+!s"
-    static TriggerKey := "s"
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
@@ -33,14 +31,17 @@ class ReportImageCaptionCode {
 
 global REPORT_IMAGE_CAPTION_CACHE := 0
 
-ReportImageCaptionHotkeyDefinitions() {
+ReportImageCaptionHotkeyDefinitions(settings) {
+    if !settings.ReportImageCaptionEnabled
+        || settings.ReportImageCaptionChord = "" {
+        return []
+    }
+    chord := settings.ReportImageCaptionChord
     return [
         HotkeyDefinition(
             "report-image-caption-advance",
-            ReportImageCaptionDefaults.HotkeyChord,
-            InvokeReportImageCaptionHotkey.Bind(
-                ReportImageCaptionDefaults.HotkeyChord
-            )
+            chord,
+            InvokeReportImageCaptionHotkey.Bind(chord)
         )
     ]
 }
@@ -77,9 +78,16 @@ InvokeReportImageCaptionHotkey(chord, *) {
         if !result.ok
             Flash(ReportImageCaptionFailureMessage(result), 1800)
     } finally {
-        try KeyWait ReportImageCaptionDefaults.TriggerKey
+        try KeyWait ReportImageCaptionTriggerKey(chord)
         active := false
     }
+}
+
+ReportImageCaptionTriggerKey(chord) {
+    normalized := Trim(String(chord), " `t`r`n")
+    if RegExMatch(normalized, "^[!+^#]+(.+)$", &match)
+        return match[1]
+    return normalized
 }
 
 class ReportImageCaptionProvider {

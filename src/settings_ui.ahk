@@ -156,73 +156,86 @@ class ReportAssistantSettingsWindow {
         this.Tabs.UseTab(2)
         this.Window.Add(
             "Text", "x40 y64 w820 h38",
-            "允许一个修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
+            "快速标图必须含修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
         )
         this.Window.Add("Text", "x72 y126 w170", "功能")
         this.Window.Add("Text", "x276 y126 w90", "状态")
         this.Window.Add("Text", "x402 y126 w220", "快捷键")
         this.Window.Add("Text", "x648 y126 w70", "Win")
 
-        this.Window.Add("Text", "x72 y174 w170", "箭头")
-        this.ViewerArrowEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y174 w170", "快速标图")
+        this.ReportImageCaptionEnabledInput := this.Window.Add(
             "CheckBox", "x276 y166 w90 h26", "启用"
         )
-        this.ViewerArrowChordInput := this.Window.Add(
+        this.ReportImageCaptionChordInput := this.Window.Add(
             "Hotkey", "x402 y166 w220 h26"
         )
-        this.ViewerArrowWinInput := this.Window.Add(
+        this.ReportImageCaptionWinInput := this.Window.Add(
             "CheckBox", "x648 y166 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y222 w170", "长度测量")
-        this.ViewerLengthEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y222 w170", "箭头")
+        this.ViewerArrowEnabledInput := this.Window.Add(
             "CheckBox", "x276 y214 w90 h26", "启用"
         )
-        this.ViewerLengthChordInput := this.Window.Add(
+        this.ViewerArrowChordInput := this.Window.Add(
             "Hotkey", "x402 y214 w220 h26"
         )
-        this.ViewerLengthWinInput := this.Window.Add(
+        this.ViewerArrowWinInput := this.Window.Add(
             "CheckBox", "x648 y214 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y270 w170", "3D SUV测量")
-        this.ViewerSuv3DEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y270 w170", "长度测量")
+        this.ViewerLengthEnabledInput := this.Window.Add(
             "CheckBox", "x276 y262 w90 h26", "启用"
         )
-        this.ViewerSuv3DChordInput := this.Window.Add(
+        this.ViewerLengthChordInput := this.Window.Add(
             "Hotkey", "x402 y262 w220 h26"
         )
-        this.ViewerSuv3DWinInput := this.Window.Add(
+        this.ViewerLengthWinInput := this.Window.Add(
             "CheckBox", "x648 y262 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y318 w170", "截图（发送 F12）")
-        this.ViewerCaptureEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y318 w170", "3D SUV测量")
+        this.ViewerSuv3DEnabledInput := this.Window.Add(
             "CheckBox", "x276 y310 w90 h26", "启用"
         )
-        this.ViewerCaptureChordInput := this.Window.Add(
+        this.ViewerSuv3DChordInput := this.Window.Add(
             "Hotkey", "x402 y310 w220 h26"
         )
-        this.ViewerCaptureWinInput := this.Window.Add(
+        this.ViewerSuv3DWinInput := this.Window.Add(
             "CheckBox", "x648 y310 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y366 w170", "清除全部标注")
-        this.ViewerClearEnabledInput := this.Window.Add(
+        this.Window.Add("Text", "x72 y366 w170", "截图（发送 F12）")
+        this.ViewerCaptureEnabledInput := this.Window.Add(
             "CheckBox", "x276 y358 w90 h26", "启用"
         )
-        this.ViewerClearChordInput := this.Window.Add(
+        this.ViewerCaptureChordInput := this.Window.Add(
             "Hotkey", "x402 y358 w220 h26"
         )
-        this.ViewerClearWinInput := this.Window.Add(
+        this.ViewerCaptureWinInput := this.Window.Add(
             "CheckBox", "x648 y358 w70 h26", "使用"
         )
+
+        this.Window.Add("Text", "x72 y414 w170", "清除全部标注")
+        this.ViewerClearEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y406 w90 h26", "启用"
+        )
+        this.ViewerClearChordInput := this.Window.Add(
+            "Hotkey", "x402 y406 w220 h26"
+        )
+        this.ViewerClearWinInput := this.Window.Add(
+            "CheckBox", "x648 y406 w70 h26", "使用"
+        )
         for control in [
+            this.ReportImageCaptionEnabledInput,
             this.ViewerArrowEnabledInput,
             this.ViewerLengthEnabledInput,
             this.ViewerSuv3DEnabledInput,
             this.ViewerCaptureEnabledInput,
             this.ViewerClearEnabledInput,
+            this.ReportImageCaptionWinInput,
             this.ViewerArrowWinInput,
             this.ViewerLengthWinInput,
             this.ViewerSuv3DWinInput,
@@ -232,6 +245,7 @@ class ReportAssistantSettingsWindow {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
         for control in [
+            this.ReportImageCaptionChordInput,
             this.ViewerArrowChordInput,
             this.ViewerLengthChordInput,
             this.ViewerSuv3DChordInput,
@@ -240,7 +254,7 @@ class ReportAssistantSettingsWindow {
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
-        this.LoadViewerToolHotkeyControls()
+        this.LoadFeatureHotkeyControls()
 
         this.Tabs.UseTab(3)
         this.Window.Add(
@@ -356,9 +370,19 @@ class ReportAssistantSettingsWindow {
         this.Dirty := true
     }
 
-    LoadViewerToolHotkeyControls() {
+    LoadFeatureHotkeyControls() {
         this.LoadingControls := true
         try {
+            this.ReportImageCaptionEnabledInput.Value :=
+                this.FeatureSettings.ReportImageCaptionEnabled ? 1 : 0
+            this.ReportImageCaptionChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.FeatureSettings.ReportImageCaptionChord
+                )
+            this.ReportImageCaptionWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.FeatureSettings.ReportImageCaptionChord
+                ) ? 1 : 0
             this.ViewerArrowEnabledInput.Value :=
                 this.FeatureSettings.ViewerArrowEnabled ? 1 : 0
             this.ViewerArrowChordInput.Value :=
@@ -414,9 +438,14 @@ class ReportAssistantSettingsWindow {
         }
     }
 
-    StoreViewerToolHotkeyControls() {
+    StoreFeatureHotkeyControls() {
         this.FeatureSettings := FeatureSettings(
             this.FeatureSettings.GlobalHjklArrows,
+            this.ReportImageCaptionEnabledInput.Value = 1,
+            MergeViewerHotkeyChord(
+                this.ReportImageCaptionChordInput.Value,
+                this.ReportImageCaptionWinInput.Value = 1
+            ),
             this.ViewerArrowEnabledInput.Value = 1,
             MergeViewerHotkeyChord(
                 this.ViewerArrowChordInput.Value,
@@ -448,7 +477,7 @@ class ReportAssistantSettingsWindow {
     OnViewerHotkeyChanged(*) {
         if this.LoadingControls
             return
-        this.StoreViewerToolHotkeyControls()
+        this.StoreFeatureHotkeyControls()
         this.Dirty := true
     }
 
@@ -545,7 +574,7 @@ class ReportAssistantSettingsWindow {
 
     OnSave(*) {
         this.StoreEditorToEntry()
-        this.StoreViewerToolHotkeyControls()
+        this.StoreFeatureHotkeyControls()
         validation := ValidateEditableReportHotstringEntries(this.Entries)
         if !validation.Ok {
             if validation.Row > 0
@@ -557,12 +586,12 @@ class ReportAssistantSettingsWindow {
             )
             return
         }
-        featureValidation := ValidateViewerToolHotkeySettings(
+        featureValidation := ValidateFeatureHotkeySettings(
             this.FeatureSettings
         )
         if !featureValidation.Ok {
             this.Tabs.Choose(2)
-            this.FocusViewerToolHotkeyValidationError(
+            this.FocusFeatureHotkeyValidationError(
                 featureValidation.Field
             )
             MsgBox(
@@ -609,8 +638,10 @@ class ReportAssistantSettingsWindow {
         }
     }
 
-    FocusViewerToolHotkeyValidationError(field) {
-        if field = "ViewerArrowChord"
+    FocusFeatureHotkeyValidationError(field) {
+        if field = "ReportImageCaptionChord"
+            this.ReportImageCaptionChordInput.Focus()
+        else if field = "ViewerArrowChord"
             this.ViewerArrowChordInput.Focus()
         else if field = "ViewerLengthChord"
             this.ViewerLengthChordInput.Focus()
