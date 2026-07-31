@@ -237,6 +237,7 @@ class ReportImageCaptionTests(unittest.TestCase):
         )
         self.assertIn("static CaptionFocusSettleMs := 15", self.module)
         self.assertIn("static PasteSettleMs := 20", self.module)
+        self.assertIn("static ExplicitSaveSettleMs := 200", self.module)
         self.assertLess(
             action.index("CaptionFocusSettleMs"),
             action.index('SendInput "^a"'),
@@ -245,6 +246,29 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertNotIn("savedClipboard", action)
         self.assertNotIn("A_Clipboard :=", action)
         self.assertIn("SetReportImageCaptionClipboard(cache.payload)", action)
+
+    def test_explicit_save_button_is_dispatched_before_advance(self) -> None:
+        candidate = self.body(
+            "BuildReportImageCaptionTargetCandidate(hwnd, expectedPid)",
+            "\nResolveReportImageCaptionPane(\n",
+        )
+        action = self.body(
+            "ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd)",
+            "\nSetReportImageCaptionClipboard(payload)",
+        )
+        self.assertIn(
+            "x: Round((saveRect.l + saveRect.r) / 2)",
+            candidate,
+        )
+        self.assertIn("savePoint: savePoint", candidate)
+        self.assertIn("target.savePoint.x", action)
+        self.assertIn("target.savePoint.y", action)
+        self.assertIn("ExplicitSaveSettleMs", action)
+        self.assertLess(
+            action.index("target.savePoint.x"),
+            action.index('SendInput "{WheelDown}"'),
+        )
+        self.assertIn("SAVE_DISPATCH_FAILED", action)
 
     def test_cache_has_explicit_tray_reset_and_no_persistence(self) -> None:
         tray = source("src/tray_menu.ahk")

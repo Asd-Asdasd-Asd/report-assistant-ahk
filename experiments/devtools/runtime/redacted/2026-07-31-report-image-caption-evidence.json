@@ -1,5 +1,5 @@
 {
-  "evidence_version": 1,
+  "evidence_version": 2,
   "captured_date": "2026-07-31",
   "privacy": "NO_COOKIE_TOKEN_PHI_INTERNAL_HOST_RAW_BODY_OR_IMAGE_PATH",
   "source_archive_sha256": "575c51ec749ab71701e2d4dcbed81ac85527c7138a4f27265ee5f496dc70eee5",
@@ -75,6 +75,21 @@
     "medex_message_variants": ["Message", "Message2"],
     "mqtt_library_present": true,
     "active_command_probe_performed": false
+  },
+  "renderer_bridge_boundary": {
+    "route": "#/imageReportView",
+    "window_opener_present": false,
+    "parent_and_top_are_self": true,
+    "same_origin_blank_frame_count_observed": 5,
+    "main_report_editor_reachable_from_frame_tree": false,
+    "context_bridge_functions_are_native_proxies": true,
+    "ipc_renderer_send_to_exposed": true,
+    "registered_event_names": [
+      "REMOTE_RENDERER_CALLBACK",
+      "REMOTE_RENDERER_RELEASE_CALLBACK"
+    ],
+    "registered_events_are_application_protocol": false,
+    "cross_renderer_command_probe_performed": false
   },
   "redaction": {
     "session_cookie_values_removed": true,

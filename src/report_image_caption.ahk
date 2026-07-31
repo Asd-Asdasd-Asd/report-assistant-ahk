@@ -4,6 +4,7 @@ class ReportImageCaptionDefaults {
     static TargetActivationTimeoutSeconds := 1
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
+    static ExplicitSaveSettleMs := 200
     static MinCaptionGapPx := 120
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
@@ -23,6 +24,7 @@ class ReportImageCaptionCode {
     static CLIPBOARD_WRITE_FAILED := "CLIPBOARD_WRITE_FAILED"
     static TARGET_ACTIVATION_FAILED := "TARGET_ACTIVATION_FAILED"
     static PASTE_FAILED := "PASTE_FAILED"
+    static SAVE_DISPATCH_FAILED := "SAVE_DISPATCH_FAILED"
     static PARTIAL_SUCCESS := "PARTIAL_SUCCESS"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
@@ -196,6 +198,7 @@ class ReportImageCaptionProvider {
                 ReportImageCaptionClientRect(target.hwnd)
             ),
             captionPoint: target.captionPoint,
+            savePoint: target.savePoint,
             imagePoint: target.imagePoint
         }
         return ExecuteReportImageCaptionAction(
@@ -308,12 +311,14 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         pid: cache.targetPid,
         candidateCount: 0,
         captionPoint: 0,
+        savePoint: 0,
         imagePoint: 0
     }
     if !ReportImageCaptionTopLevelWindowEligible(
         targetHwnd,
         cache.targetPid
     ) || !cache.HasOwnProp("captionPoint")
+        || !cache.HasOwnProp("savePoint")
         || !cache.HasOwnProp("imagePoint")
         || !cache.HasOwnProp("targetClientRectKey")
         || cache.targetClientRectKey
@@ -323,6 +328,10 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         || !ReportImageCaptionPointBelongsToTarget(
             targetHwnd,
             cache.captionPoint
+        )
+        || !ReportImageCaptionPointBelongsToTarget(
+            targetHwnd,
+            cache.savePoint
         )
         || !ReportImageCaptionPointBelongsToTarget(
             targetHwnd,
@@ -336,6 +345,7 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         pid: cache.targetPid,
         candidateCount: 1,
         captionPoint: cache.captionPoint,
+        savePoint: cache.savePoint,
         imagePoint: cache.imagePoint
     }
 }
@@ -362,6 +372,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         pid: expectedPid,
         candidateCount: 0,
         captionPoint: 0,
+        savePoint: 0,
         imagePoint: 0
     }
     try {
@@ -432,6 +443,10 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             ),
             y: Round((saveRect.t + saveRect.b) / 2)
         }
+        savePoint := {
+            x: Round((saveRect.l + saveRect.r) / 2),
+            y: Round((saveRect.t + saveRect.b) / 2)
+        }
         captionPaneResult := ResolveReportImageCaptionPane(
             root,
             captionPoint,
@@ -458,6 +473,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             pid: expectedPid,
             candidateCount: 1,
             captionPoint: captionPoint,
+            savePoint: savePoint,
             imagePoint: imageResult.point
         }
     } catch {
@@ -626,6 +642,34 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(
                 target.hwnd,
+                target.savePoint
+            ) {
+            return MakeReportImageCaptionResult(
+                false,
+                ReportImageCaptionCode.SAVE_DISPATCH_FAILED,
+                true
+            )
+        }
+        try {
+            MouseClick(
+                "left",
+                target.savePoint.x,
+                target.savePoint.y,
+                1,
+                0
+            )
+        } catch {
+            return MakeReportImageCaptionResult(
+                false,
+                ReportImageCaptionCode.SAVE_DISPATCH_FAILED,
+                true
+            )
+        }
+        Sleep ReportImageCaptionDefaults.ExplicitSaveSettleMs
+
+        if WinExist("A") != target.hwnd
+            || !ReportImageCaptionPointBelongsToTarget(
+                target.hwnd,
                 target.imagePoint
             ) {
             return MakeReportImageCaptionResult(
@@ -685,6 +729,7 @@ ReportImageCaptionCacheBindingValid(cache, foregroundHwnd) {
         || !cache.HasOwnProp("targetPid")
         || !cache.HasOwnProp("targetClientRectKey")
         || !cache.HasOwnProp("captionPoint")
+        || !cache.HasOwnProp("savePoint")
         || !cache.HasOwnProp("imagePoint") {
         return false
     }
@@ -707,6 +752,7 @@ ReportImageCaptionSourceBindingValid(cache, sourceHwnd) {
         && cache.HasOwnProp("targetPid")
         && cache.HasOwnProp("targetClientRectKey")
         && cache.HasOwnProp("captionPoint")
+        && cache.HasOwnProp("savePoint")
         && cache.HasOwnProp("imagePoint")
         && sourceHwnd = cache.sourceHwnd
         && ReportImageCaptionWindowPid(sourceHwnd)
@@ -879,6 +925,8 @@ ReportImageCaptionFailureMessage(result) {
         return "报告图像窗口未激活，未执行粘贴"
     if result.code = ReportImageCaptionCode.PASTE_FAILED
         return "caption 粘贴失败"
+    if result.code = ReportImageCaptionCode.SAVE_DISPATCH_FAILED
+        return "caption 已粘贴，但未能触发保存"
     if result.code = ReportImageCaptionCode.PARTIAL_SUCCESS
         return "caption 已粘贴，但未能翻到下一张"
     if result.code = ReportImageCaptionCode.BUSY

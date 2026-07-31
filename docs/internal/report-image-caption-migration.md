@@ -205,6 +205,17 @@ paste 已发送后若 wheel 失败，返回 partial success，不重贴、不补
 2026-07-31 DevTools 证据确认，MedEx 的 `flipImage()` 只在首次操作或距离上次
 翻页超过 500 ms 时调用 `saveDescriptionByMouse()`；500 ms 内仍会切换图片但
 跳过保存。快速连续触发时“caption 可见但未保存”由此产生，不能用调整 20/80 ms
-粘贴 settle 根治。production UI 路径应按上次实际滚轮时间保证至少 550 ms 的
-翻页间隔；内部保存 method 的直接调用留给独立 experiment。完整分析见
+粘贴 settle 根治。
+
+production 现改为从同一套 UIA signature 中同时解析唯一“保存”按钮：粘贴后先
+复核并点击 save point，等待 200 ms，再向 image point 发送一次 `WheelDown`。
+save point 与 caption/image points 一起缓存并逐次校验 target PID、client rect 和
+root-owner；保存入口失效时返回 `SAVE_DISPATCH_FAILED`，不继续翻页。这样通过页面
+原有按钮触发已确认的 `saveDescription()` 业务链，不再把 500 ms 条件保存当作正常
+路径。
+
+无界面直调 `editorInstance`、`saveDescription()`、`nextImg()` 仍缺少经过验证的
+renderer transport，留给独立 experiment。当前 DevTools 已确认图片窗口没有
+`opener`，不包含主编辑 renderer，并且只注册 Electron remote 内部回调事件；不得
+猜测 `ipcRenderer.sendTo` 的目标、channel 或 payload。完整分析见
 `docs/technical-investigations/2026-07-medex-devtools-runtime.md`。

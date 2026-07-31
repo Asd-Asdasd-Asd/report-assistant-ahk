@@ -2,7 +2,8 @@
 
 日期：2026-07-31
 
-状态：静态 bundle + 单机 DevTools 现场证据；production 内部调用尚未实现
+状态：静态 bundle + 单机 DevTools 现场证据；production 已显式触发页面保存入口，
+无界面 renderer 调用留给 experiment
 
 隐私：本文和配套 JSON 不含 Cookie/token 值、患者/用户/检查/图片标识、内网
 主机、正文、原始请求体或图片路径
@@ -22,10 +23,17 @@ MedEx 报告图像页面的 `flipImage(direction)` 有一个 500 ms 保存门槛
 因此用户快速连续触发时，当前 caption 可以已经显示在 UEditor 中，但这一页的
 保存函数没有被调用，随后页面照常切换。现场症状与代码分支完全一致。
 
-当前 production 的可靠 UI 修复方向应是限制相邻 `WheelDown` 的实际发送时间，
-保证超过 MedEx 的 500 ms 门槛。建议保留少量调度裕量，例如 550 ms，并按“上次
-实际翻页时间”计算，而不是简单在每次粘贴后固定等待。直接内部调用保存属于后续
-experiment，不应混入这次时序修复。
+production 不再把 `WheelDown` 自带的条件保存当作唯一提交入口。目标解析已经要求
+窗口中存在唯一、可用且与 caption Pane 同属一个 root-owner 的“保存”按钮；执行时
+在粘贴后显式点击该按钮，等待 200 ms，再发送 `WheelDown`。这等价于用户点击页面
+原有保存入口，复用 `saveDescription()` 的 guard、payload、认证、缓存和错误处理，
+同时绕开 `flipImage()` 的 500 ms 条件分支。
+
+AHK 当前没有把 JavaScript 送入既有 Electron renderer 的已验证 transport，因此
+不能把 DevTools Console 中可见的方法冒充成 production 直调。无界面调用
+`editorInstance`、`saveDescription()` 和 `nextImg()` 仍属于后续 experiment；当前
+production 使用已确认按钮入口，原有 target/PID/root-owner/foreground 校验继续
+保留。
 
 ## DevTools 入口
 
@@ -123,13 +131,41 @@ HTTP 200 只证明传输成功，业务成功仍应由页面已有 `state` 规�
 按 allowlist 逐个确认，只允许与现有按钮、菜单或编辑器动作一一对应的已知命令；
 不得探测删除、上传、签名、文件、进程、ZMQ/MQTT/IPC 等未知调用。
 
+## Renderer 隔离与跨窗口边界
+
+后续只读现场探针确认：
+
+- 报告图像页 route 为 `#/imageReportView`；
+- `window.opener` 不存在，`parent` 和 `top` 都是当前窗口自身；
+- 当前窗口的 5 个 same-origin `blank` frame 均属于自身，其中包含 UEditor iframe，
+  不包含主报告编辑 renderer；
+- `window.nodeApi` 的 42 个入口都由 `contextBridge` 包装为 native proxy，页面侧
+  无法反射真实参数、函数体或固定 IPC channel；
+- 暴露的 `ipcRenderer` 包含 `send`、`invoke`、`sendSync`、`sendTo` 等能力，但当前
+  renderer 只注册了 `REMOTE_RENDERER_CALLBACK` 和
+  `REMOTE_RENDERER_RELEASE_CALLBACK`；二者属于 Electron remote 对象生命周期，
+  不是 MedEx 业务协议；
+- 没有发现可从报告图像 renderer 安全访问主编辑 renderer 的应用级 channel。
+
+因此 production 不得猜测 `webContentsId`、channel 或 payload，也不得调用
+`iframeSend`/`sendTo` 试探。主报告编辑器探索需要独立 experiment：先静态分析
+Electron main/preload，再只读枚举 renderer target，最后才允许对唯一 route 执行
+固定 allowlist 脚本。
+
 ## 后续路线
 
-### Production UI 路径
+### Production 已采用路径
 
-先修复现有快速标图：相邻实际滚轮发送至少间隔 550 ms。仍保留目标窗口、caption
-point、image point、foreground、PID 和 root-owner 校验。这个修复只适配 MedEx 已
-确认的业务节流，不依赖 DevTools 或内部 API。
+目标解析同时生成 caption point、save point 和 image point。每次执行依次完成：
+
+1. 激活并复核唯一报告图像窗口；
+2. `Ctrl+A` 覆盖当前 caption，粘贴 cache；
+3. 复核并点击唯一“保存”按钮；
+4. 等待 200 ms；
+5. 再移动到 image point 发送一次 `WheelDown`。
+
+save point 无效、窗口切换或保存点击未派发时返回明确失败，不继续翻页。该路径不再
+依赖 `flipImage()` 是否经过 500 ms 门槛。
 
 ### Experiment 1：只读定位
 

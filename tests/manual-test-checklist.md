@@ -160,8 +160,10 @@
   获得 reuse 权限。target client rect 未变化时不重复扫描完整 UIA tree。
 - [ ] 回到同一 source 选择新文字后，fresh copy 可复用稳定 target geometry；
   target 移动或缩放后缓存失效并重新执行完整 resolver。
-- [ ] 每次成功操作只粘贴一次、滚轮一次并恢复鼠标；clipboard 有意保留当前
-  caption，不要求恢复触发前内容。
+- [ ] 每次成功操作只粘贴一次、显式点击一次唯一“保存”按钮、滚轮一次并恢复
+  鼠标；clipboard 有意保留当前 caption，不要求恢复触发前内容。
+- [ ] 连续快速触发至少 5 张图片；逐张返回检查 caption 已持久化，不能只在
+  当前 UEditor 中可见。保存点校验失败时必须停止在当前图片，不得继续翻页。
 - [ ] target 位于右侧副屏时完成以上流程；若可安排，再把 target 放到主屏，
   确认程序能显式激活被 source 遮挡的唯一 target 后完成同样流程。
 - [ ] caption 已粘贴但滚轮前人为切走窗口时，只报告部分成功，不再次粘贴、
