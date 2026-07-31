@@ -201,3 +201,10 @@ paste 已发送后若 wheel 失败，返回 partial success，不重贴、不补
 保持修饰键连续操作、paste、wheel、clipboard retention 和 mouse restore，
 因此版本提升为 `0.7.0`。发布后继续验证多机器 target resolution、cache 失效
 和 Viewer 右键链；全部通过后再创建正式 tag。
+
+2026-07-31 DevTools 证据确认，MedEx 的 `flipImage()` 只在首次操作或距离上次
+翻页超过 500 ms 时调用 `saveDescriptionByMouse()`；500 ms 内仍会切换图片但
+跳过保存。快速连续触发时“caption 可见但未保存”由此产生，不能用调整 20/80 ms
+粘贴 settle 根治。production UI 路径应按上次实际滚轮时间保证至少 550 ms 的
+翻页间隔；内部保存 method 的直接调用留给独立 experiment。完整分析见
+`docs/technical-investigations/2026-07-medex-devtools-runtime.md`。

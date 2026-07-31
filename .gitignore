@@ -2,9 +2,11 @@ config.local.ahk
 src/config.local.ahk
 *.clip
 *.log
+*.har
 logs/
 tmp/
 screenshots/
+/experiments/devtools/runtime/raw/
 release/*.exe
 /publish/
 /publish-field/

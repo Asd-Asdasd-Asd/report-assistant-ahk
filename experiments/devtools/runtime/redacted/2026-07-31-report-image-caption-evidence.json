@@ -1,0 +1,89 @@
+{
+  "evidence_version": 1,
+  "captured_date": "2026-07-31",
+  "privacy": "NO_COOKIE_TOKEN_PHI_INTERNAL_HOST_RAW_BODY_OR_IMAGE_PATH",
+  "source_archive_sha256": "575c51ec749ab71701e2d4dcbed81ac85527c7138a4f27265ee5f496dc70eee5",
+  "runtime": {
+    "application": "medexworkstations/0.0.1",
+    "electron": "17.4.11",
+    "chromium": "98.0.4758.141",
+    "platform": "Win32",
+    "language": "zh-CN",
+    "document_script_count": 67,
+    "document_stylesheet_count": 4,
+    "document_iframe_count": 6,
+    "node_require_exposed": false,
+    "node_api_exposed": true,
+    "websocket_exposed": true
+  },
+  "editor": {
+    "kind": "UEditor",
+    "instance_count_observed": 1,
+    "ready": true,
+    "body_content_editable": true,
+    "command_count_observed": 45,
+    "relevant_commands_observed": [
+      "selectall",
+      "undo",
+      "redo",
+      "lineheight"
+    ],
+    "auto_save_config_key_present": true
+  },
+  "caption_save_request": {
+    "path": "/mdap_nm/reportimage/saveDescription",
+    "method": "POST",
+    "content_type": "application/json",
+    "authentication_observed": "SESSION_COOKIE_NAME_ONLY_VALUE_REMOVED",
+    "request_fields": [
+      "pk_nm_reportimage",
+      "imagedescribe",
+      "imagedescribetxt"
+    ],
+    "captured_request_count": 2,
+    "captured_requests_identical": true,
+    "captured_request_start_delta_ms": 84,
+    "captured_statuses": [200, 200],
+    "captured_total_time_ms": [23.096, 21.836],
+    "response_shape": {
+      "fields": ["state", "msg", "total", "results"],
+      "raw_values_removed": true
+    }
+  },
+  "confirmed_client_control_flow": {
+    "flip_method": "flipImage(direction)",
+    "save_before_flip_method": "saveDescriptionByMouse(fileIndex)",
+    "save_transport_method": "saveDescriptionApi(payload, showToast)",
+    "explicit_save_method": "saveDescription()",
+    "blur_save_method": "saveNotToast()",
+    "inter_flip_save_gate_ms": 500,
+    "gate_behavior": "FIRST_FLIP_SAVES; LATER_FLIP_WITHIN_500_MS_SKIPS_SAVE_BUT_STILL_CHANGES_IMAGE",
+    "save_is_awaited_before_index_change": false,
+    "blur_guard": "SKIPS_WHEN_CLICK_STATUS_IS_PREV_OR_NEXT_OR_TOOLBAR_IS_ACTIVE"
+  },
+  "local_bridges_observed": {
+    "node_api_method_count": 42,
+    "privileged_method_categories": [
+      "process",
+      "filesystem",
+      "ipc",
+      "zmq",
+      "dialog",
+      "printing",
+      "window"
+    ],
+    "medex_message_variants": ["Message", "Message2"],
+    "mqtt_library_present": true,
+    "active_command_probe_performed": false
+  },
+  "redaction": {
+    "session_cookie_values_removed": true,
+    "patient_and_user_identifiers_removed": true,
+    "study_and_image_identifiers_removed": true,
+    "report_and_caption_text_removed": true,
+    "internal_hosts_and_resource_paths_removed": true,
+    "raw_har_removed": true,
+    "raw_dom_removed": true,
+    "vendor_bundles_not_committed": true
+  }
+}
