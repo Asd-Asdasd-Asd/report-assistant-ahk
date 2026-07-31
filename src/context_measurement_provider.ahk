@@ -75,6 +75,7 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
         "focusSwitchAttempted", false,
         "mouseMoveAttempted", false,
         "popupHwnd", 0,
+        "popupDiscovery", "",
         "commandControlHwnd", 0,
         "commandRuntimeId", 0,
         "clipboardOwnerHwnd", 0
@@ -132,6 +133,7 @@ ReadCurrentMeasurementWithoutFocusSwitch(spec, options := 0) {
     actionContext := Map(
         "failureReason", MeasurementFailureReason.NONE,
         "popupHwnd", 0,
+        "popupDiscovery", "",
         "commandControlHwnd", 0,
         "commandRuntimeId", 0
     )
@@ -547,7 +549,10 @@ PrepareContextMeasurementCopyCommand(viewer, clientPoint, commandText,
 
 PrepareMxNMContextCommand(viewer, clientPoint, commandText,
     actionContext, options := 0) {
-    existingPopups := SnapshotContextMeasurementPopups()
+    existingPopups := SnapshotContextMeasurementPopups(
+        viewer.pid,
+        commandText
+    )
     lParam := PackContextMeasurementClientPoint(clientPoint)
     rightDownSent := DllCall(
         "User32\PostMessageW",
@@ -580,10 +585,12 @@ PrepareMxNMContextCommand(viewer, clientPoint, commandText,
     if !popupResult.ok {
         actionContext["failureReason"] := popupResult.failureReason
         actionContext["popupHwnd"] := popupResult.popupHwnd
+        actionContext["popupDiscovery"] := popupResult.discovery
         return false
     }
 
     actionContext["popupHwnd"] := popupResult.popupHwnd
+    actionContext["popupDiscovery"] := popupResult.discovery
     actionContext["commandControlHwnd"] := popupResult.controlHwnd
     runtimeId := DllCall(
         "User32\GetDlgCtrlID",
@@ -644,17 +651,104 @@ PackContextMeasurementClientPoint(clientPoint) {
     return ((clientPoint.y & 0xFFFF) << 16) | (clientPoint.x & 0xFFFF)
 }
 
-SnapshotContextMeasurementPopups() {
+SnapshotContextMeasurementPopups(viewerPid := 0, commandText := "") {
     snapshot := Map()
-    try popupWindows := WinGetList(
-        "ahk_class " ContextMeasurementDefaults.PopupClass
-    )
-    catch {
-        popupWindows := []
+    for hwnd in ListContextMeasurementPopupWindows(viewerPid) {
+        snapshot[hwnd] := CaptureContextMeasurementPopupState(
+            hwnd,
+            commandText
+        )
     }
-    for hwnd in popupWindows
-        snapshot[hwnd] := true
     return snapshot
+}
+
+ListContextMeasurementPopupWindows(viewerPid := 0) {
+    detectHiddenBefore := A_DetectHiddenWindows
+    popupWindows := []
+    try {
+        DetectHiddenWindows true
+        try popupWindows := WinGetList(
+            "ahk_class " ContextMeasurementDefaults.PopupClass
+        )
+        catch {
+            popupWindows := []
+        }
+    } finally {
+        DetectHiddenWindows detectHiddenBefore
+    }
+    if !viewerPid
+        return popupWindows
+
+    matches := []
+    for hwnd in popupWindows {
+        try popupPid := WinGetPID("ahk_id " hwnd)
+        catch {
+            popupPid := 0
+        }
+        if popupPid = viewerPid
+            matches.Push(hwnd)
+    }
+    return matches
+}
+
+CaptureContextMeasurementPopupState(popupHwnd, commandText := "") {
+    detectHiddenBefore := A_DetectHiddenWindows
+    controls := []
+    commandControlHwnd := 0
+    try {
+        DetectHiddenWindows true
+        try controls := WinGetControlsHwnd("ahk_id " popupHwnd)
+        catch {
+            controls := []
+        }
+        if commandText != "" {
+            commandControlHwnd := FindContextMeasurementCommandControl(
+                popupHwnd,
+                commandText,
+                false
+            )
+        }
+    } finally {
+        DetectHiddenWindows detectHiddenBefore
+    }
+    rect := GetContextMeasurementWindowRect(popupHwnd)
+    return {
+        visible: DllCall(
+            "User32\IsWindowVisible",
+            "Ptr", popupHwnd,
+            "Int"
+        ) = true,
+        rectKey: IsObject(rect)
+            ? rect.l "," rect.t "," rect.r "," rect.b
+            : "",
+        controlCount: controls.Length,
+        commandControlHwnd: commandControlHwnd
+    }
+}
+
+GetContextMeasurementWindowRect(hwnd) {
+    rectBuffer := Buffer(16, 0)
+    if !DllCall(
+        "User32\GetWindowRect",
+        "Ptr", hwnd,
+        "Ptr", rectBuffer.Ptr,
+        "Int"
+    ) {
+        return 0
+    }
+    return {
+        l: NumGet(rectBuffer, 0, "Int"),
+        t: NumGet(rectBuffer, 4, "Int"),
+        r: NumGet(rectBuffer, 8, "Int"),
+        b: NumGet(rectBuffer, 12, "Int")
+    }
+}
+
+ContextMeasurementPopupStateChanged(before, current) {
+    return before.visible != current.visible
+        || before.rectKey != current.rectKey
+        || before.controlCount != current.controlCount
+        || before.commandControlHwnd != current.commandControlHwnd
 }
 
 WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
@@ -670,35 +764,35 @@ WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
         ContextMeasurementDefaults.PopupPollIntervalMs
     )
     deadline := A_TickCount + Max(0, Integer(timeoutMs))
-    newPopupHwnd := 0
+    candidatePopupHwnd := 0
+    candidateDiscovery := ""
     loop {
-        try popupWindows := WinGetList(
-            "ahk_class " ContextMeasurementDefaults.PopupClass
-        )
-        catch {
-            popupWindows := []
-        }
-        for popupHwnd in popupWindows {
-            if existingPopups.Has(popupHwnd)
-                continue
-            try popupPid := WinGetPID("ahk_id " popupHwnd)
-            catch {
-                popupPid := 0
-            }
-            if popupPid != viewerPid
-                continue
-            newPopupHwnd := popupHwnd
-            controlHwnd := FindContextMeasurementCommandControl(
+        for popupHwnd in ListContextMeasurementPopupWindows(viewerPid) {
+            currentState := CaptureContextMeasurementPopupState(
                 popupHwnd,
                 commandText
             )
-            if controlHwnd {
-                return {
-                    ok: true,
-                    popupHwnd: popupHwnd,
-                    controlHwnd: controlHwnd,
-                    failureReason: MeasurementFailureReason.NONE
+            discovery := "NEW_HANDLE"
+            if existingPopups.Has(popupHwnd) {
+                if !ContextMeasurementPopupStateChanged(
+                    existingPopups[popupHwnd],
+                    currentState
+                ) {
+                    continue
                 }
+                discovery := "STATE_CHANGED"
+            }
+            candidatePopupHwnd := popupHwnd
+            candidateDiscovery := discovery
+            controlHwnd := currentState.commandControlHwnd
+            if !controlHwnd
+                continue
+            return {
+                ok: true,
+                popupHwnd: popupHwnd,
+                controlHwnd: controlHwnd,
+                discovery: discovery,
+                failureReason: MeasurementFailureReason.NONE
             }
         }
         if A_TickCount >= deadline
@@ -707,22 +801,33 @@ WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
     }
     return {
         ok: false,
-        popupHwnd: newPopupHwnd,
+        popupHwnd: candidatePopupHwnd,
         controlHwnd: 0,
-        failureReason: newPopupHwnd
+        discovery: candidateDiscovery,
+        failureReason: candidatePopupHwnd
             ? MeasurementFailureReason.COMMAND_NOT_FOUND
             : MeasurementFailureReason.POPUP_NOT_CREATED
     }
 }
 
-FindContextMeasurementCommandControl(popupHwnd, commandText) {
+FindContextMeasurementCommandControl(
+    popupHwnd,
+    commandText,
+    requireVisible := true
+) {
     try controls := WinGetControlsHwnd("ahk_id " popupHwnd)
     catch {
         controls := []
     }
     for controlHwnd in controls {
-        if !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
+        if requireVisible
+            && !DllCall(
+                "User32\IsWindowVisible",
+                "Ptr", controlHwnd,
+                "Int"
+            ) {
             continue
+        }
         try controlText := ControlGetText(controlHwnd)
         catch {
             controlText := ""
@@ -748,6 +853,7 @@ CloseContextMeasurementPopup(popupHwnd) {
 
 MergeContextMeasurementMetadata(context, actionContext, capture) {
     context["popupHwnd"] := actionContext["popupHwnd"]
+    context["popupDiscovery"] := actionContext["popupDiscovery"]
     context["commandControlHwnd"] := actionContext["commandControlHwnd"]
     context["commandRuntimeId"] := actionContext["commandRuntimeId"]
     context["requestId"] := capture.requestId

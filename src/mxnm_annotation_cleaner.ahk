@@ -48,6 +48,7 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
     actionContext := Map(
         "failureReason", MeasurementFailureReason.NONE,
         "popupHwnd", 0,
+        "popupDiscovery", "",
         "commandControlHwnd", 0,
         "commandRuntimeId", 0
     )
@@ -94,13 +95,17 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             pid: target.actionPid
         }
         dialogSnapshot := SnapshotMxNMViewerDialogs(target.actionPid)
-        if !PrepareMxNMContextCommand(
+        prepared := PrepareMxNMContextCommand(
             viewer,
             clientPoint,
             MxNMAnnotationCleanupDefaults.DeleteAllCommandText,
             actionContext,
             options
-        ) {
+        )
+        result.context["popupHwnd"] := actionContext["popupHwnd"]
+        result.context["popupDiscovery"] :=
+            actionContext["popupDiscovery"]
+        if !prepared {
             result.code := MxNMAnnotationCleanupCode.COMMAND_FAILED
             result.failureReason := actionContext["failureReason"]
             return result

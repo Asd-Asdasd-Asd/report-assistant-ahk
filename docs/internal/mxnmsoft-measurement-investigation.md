@@ -159,7 +159,7 @@ ContextMeasurementProvider
 -> convert the screen point to viewer client coordinates
 -> save ClipboardAll and clear the clipboard or install a unique sentinel
 -> send WM_RBUTTONDOWN and WM_RBUTTONUP directly to the viewer HWND
--> wait for a newly created #32770 popup containing “复制SUVMax值”
+-> wait for a new or state-changed #32770 popup containing “复制SUVMax值”
 -> obtain the command runtime control ID
 -> send WM_COMMAND to that popup
 -> wait for a new clipboard result
@@ -170,6 +170,12 @@ ContextMeasurementProvider
 -> render and execute the current ReportTemplatePlan containing {{suvmax}}
 -> insert the formatted value only when the measurement state is FOUND
 ```
+
+MxNM may reuse a pre-created hidden `#32770` dialog after process restart. The
+transport therefore snapshots same-PID hidden and visible dialogs before the single
+right-click, then accepts only a new handle or a materially changed existing handle
+that contains the exact requested command text. An unchanged stale dialog is not a
+valid response.
 
 The transport must not call `WinActivate`, `WinWaitActive`, `MouseMove`, `MouseClick`, `ControlClick`, or an equivalent focus-changing fallback. Required popup and clipboard waits must be bounded; the report-target guards themselves must not sleep or retry.
 

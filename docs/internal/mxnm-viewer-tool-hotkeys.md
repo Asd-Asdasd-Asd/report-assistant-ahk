@@ -36,7 +36,7 @@ production 因此在 hotkey key-down 后等待主键及所有声明 modifier 完
 
 第五项默认快捷键为 `Ctrl+Alt+5`，默认关闭，作用域与三个工具选择快捷键相同。handler 等待完整 chord 物理释放并复核 foreground HWND 未变化后，调用既有 `MxNMAnnotationCleaner.DeleteAll()`；它不使用标注工具面板上的 `21081`，也不增加任何工具面板坐标。
 
-清除继续复用 production context-menu transport：从 config-only measurement target 取得当前图像点，向 Viewer 投递右键消息，按精确可见文字找到 `删除全部标注`，核验 popup PID 和运行时 control ID，异步执行命令并检测意外 confirmation。独立清除快捷键使用 `COMMAND_ONLY` mode，命令成功投递后不再通过 SUVMax 和直线测量菜单复读结果，因此整个动作只创建一次右键菜单。报告写入后的既有清除仍复核本次使用的 measurement type。失败时只显示短暂视觉提示；不移动鼠标、不切换前台窗口，也不因清除失败改变报告内容。
+清除继续复用 production context-menu transport：从 config-only measurement target 取得当前图像点，向 Viewer 投递右键消息；同 PID 的 `#32770` 可以是本次新建，也可以是本次发生状态变化的预创建 hidden dialog，但必须包含精确文字 `删除全部标注`。随后核验 popup PID 和运行时 control ID，异步执行命令并检测意外 confirmation。未发生变化的旧 dialog 不会被复用。独立清除快捷键使用 `COMMAND_ONLY` mode，命令成功投递后不再通过 SUVMax 和直线测量菜单复读结果，因此整个动作只创建一次右键菜单。报告写入后的既有清除仍复核本次使用的 measurement type。失败时只显示短暂视觉提示；不移动鼠标、不切换前台窗口，也不因清除失败改变报告内容。
 
 清除同样等待主键及所有声明 modifier 完全物理释放，并在 foreground HWND 未变化时只执行一次。等待期间保持 `active` guard，避免长按触发键盘重复而多次发送清除命令；释放后再运行 context-menu transport，也避免把 Ctrl、Alt、Shift 或 Win 的物理按下状态带入 Vendor 菜单处理。
 

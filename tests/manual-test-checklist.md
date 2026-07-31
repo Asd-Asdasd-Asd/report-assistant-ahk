@@ -74,6 +74,8 @@
 - [ ] 报告写入成功后才尝试清除标注；清除失败不回滚报告内容。
 - [ ] `tests/windows/mxnm_annotation_cleanup_field.ahk` 验证一次调用最多打开
   一次菜单，并保持 foreground、mouse 和 clipboard。
+- [ ] Viewer 冷启动和重启后分别验证 SUVMax、尺寸与清除；后台菜单复用已有
+  HWND 且保持 hidden 时，仍须由本次状态变化和精确命令文字识别成功。
 - [ ] Viewer 未运行、多个候选、错误进程、越界 client point、菜单文字不匹配
   或 clipboard 未更新时不使用第二 transport，不复用旧值。
 

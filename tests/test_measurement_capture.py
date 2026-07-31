@@ -215,6 +215,8 @@ class MeasurementCaptureTests(unittest.TestCase):
             "WinGetControlsHwnd",
             "ControlGetText",
             "SnapshotContextMeasurementPopups",
+            "ListContextMeasurementPopupWindows",
+            "ContextMeasurementPopupStateChanged",
             "PrepareContextMeasurementCopyCommand",
             "InvokePreparedContextMeasurementCommand",
         ):
@@ -229,6 +231,47 @@ class MeasurementCaptureTests(unittest.TestCase):
             "Button11",
         ):
             self.assertNotIn(forbidden, provider)
+
+    def test_provider_accepts_reused_hidden_popup_only_after_state_change(
+        self,
+    ) -> None:
+        provider = source("src/context_measurement_provider.ahk")
+        snapshot = provider.split(
+            "SnapshotContextMeasurementPopups(", 1
+        )[1]
+        wait = provider.split(
+            "WaitForContextMeasurementPopup(", 1
+        )[1]
+        self.assertIn("DetectHiddenWindows true", snapshot)
+        self.assertIn(
+            "DetectHiddenWindows detectHiddenBefore",
+            snapshot,
+        )
+        self.assertIn('"STATE_CHANGED"', wait)
+        self.assertIn(
+            "ContextMeasurementPopupStateChanged(",
+            wait,
+        )
+        self.assertIn(
+            "currentState.commandControlHwnd",
+            wait,
+        )
+        self.assertIn(
+            "FindContextMeasurementCommandControl("
+            "\n                popupHwnd,"
+            "\n                commandText,"
+            "\n                false",
+            snapshot,
+        )
+        self.assertIn(
+            'context["popupDiscovery"]',
+            provider,
+        )
+        cleaner = source("src/mxnm_annotation_cleaner.ahk")
+        self.assertIn(
+            'result.context["popupDiscovery"]',
+            cleaner,
+        )
 
     def test_provider_parses_only_after_a_fresh_capture(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
