@@ -21,7 +21,9 @@
 - 在获得单独授权后评估 per-machine Candidate G layout calibration。校准只能
   保存本机 profile 与环境 metadata，不能引入无校验绝对坐标 fallback。
 - 逐项迁移 `medex_legacy_compat.ahk` 尚存的 montage、caption/advance 和 cover
-  actions；每项都需独立 window guard、现场验证和可停止的人工回退。
+  actions；每项都需独立 window guard、现场验证和可停止的人工回退。Montage
+  已完成 Lung 字段测试 0.7，后续从
+  [MxNM montage 迁移交接](mxnm-montage-migration-handoff.md) 的 production 分支清单继续。
 - 仅在有稳定公开接口或充分被动证据时评估新的 Viewer provider；不得用协议
   猜测替换现有 validated provider。
 - 是否需要 installer、更新支持或更正式集成，必须作为独立产品阶段评估；

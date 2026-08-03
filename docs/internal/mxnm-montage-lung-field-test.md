@@ -1,8 +1,19 @@
 # MxNM Lung montage 受控执行测试
 
-该工具验证 montage 迁移所需的四种执行方式：自绘布局相对点击、自绘 Tab
-相对点击、标准 ComboBox/Edit/Button 的 UIA pattern，以及放大倍数输入框获得焦点后
-发送 Enter。它不是 production 快捷键，不注册 `Shift+Alt+B/H/L`。
+该工具验证 montage 迁移所需的执行方式：自绘布局和 Tab 的受校验真实点击、
+ComboBox 的 UIA 展开/定位与真实选项点击、Edit/Button 的 UIA Value/Invoke，以及
+放大倍数输入框获得焦点后发送 Enter。它不是 production 快捷键，不注册
+`Shift+Alt+B/H/L`。
+
+## 现场验证状态
+
+`FieldTestVersion=0.7` 已于 2026-08-03 在当前工作站完成 12/12 步，结果为
+`State=COMPLETE`、`Code=READY`，并由操作者确认 Lung 窗宽和最终 Viewer 表现
+正确。该结论只覆盖当前工作站、当前 Viewer 布局和 Lung 参数，不替代 Body/Head
+及其他环境的现场验收。
+
+正式迁移的参数、控件契约和分支开发顺序见
+[MxNM montage 迁移交接](mxnm-montage-migration-handoff.md)。
 
 ## 安全边界
 

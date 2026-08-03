@@ -51,3 +51,13 @@ tests\windows\generated\mxnm_montage_control_diagnostic_standalone.ahk
 - 第 5 行可能被 Tab 遮住一部分，但其露出区域仍应记录为有效鼠标命中点；
 - 静态探测结果只决定后续采用 UIA、native control 还是受校验的相对点击，不能
   代替 Windows 上实际执行 Body、Head、Lung 的现场验收。
+
+## 已确认的后续结论
+
+2026-08-03 的 Lung 字段测试 0.7 已确认：布局和 Tab 自绘 `Static/Image` 需要
+真实鼠标单击；标准 Edit/Button 可使用 UIA Value/Invoke；ComboBox 可由 UIA
+展开和定位，但最终 ListItem 必须在同 PID `ComboLBox` 上真实单击，单独调用
+`SelectionItem.Select()` 不足以可靠应用窗宽。
+
+完整控件表、参数边界与 production 迁移顺序见
+[MxNM montage 迁移交接](mxnm-montage-migration-handoff.md)。

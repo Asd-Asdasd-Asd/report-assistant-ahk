@@ -20,9 +20,9 @@
 
 | Hotkey | 行为 | 当前风险 |
 | --- | --- | --- |
-| Shift+Alt+B | Body montage，参数 `8.5/8/0.8` | 固定坐标、无 window guard、部分路径不恢复鼠标 |
-| Shift+Alt+H | Head montage，参数 `4/11/1.2` | 同上 |
-| Shift+Alt+L | Lung montage，参数 `7.5/23/0.9`，含 lung-window reset | 同上；遗漏 reset 会改变图像表现 |
+| Shift+Alt+B | Body montage，初始参数 `8.5/8/0.8` | 通用执行契约已有 Lung 证据；Body 数值和 `default` 窗宽仍待分支现场验证 |
+| Shift+Alt+H | Head montage，初始参数 `4/11/1.2` | 通用执行契约已有 Lung 证据；Head 数值和 `default` 窗宽仍待分支现场验证 |
+| Shift+Alt+L | Lung montage，当前参数 `7.5/23/0.9`，含 `lung` 窗宽 | 字段测试 0.7 已在当前工作站通过；production 尚未接入，参数仍允许用户微调 |
 | Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续 |
 | XButton1 | 一秒 ToolTip notification | 历史测试项，不作为迁移目标 |
 
@@ -54,3 +54,6 @@
 每个保留动作只有在明确业务语义、建立 fail-closed window/geometry guard、
 完成目标工作站 runtime 验证并更新 ownership 回归后，才能从
 `medex_legacy_compat.ahk` 移除。
+
+Montage 的已验证 transport、可调参数和分支开发顺序见
+[MxNM montage 迁移交接](../internal/mxnm-montage-migration-handoff.md)。
