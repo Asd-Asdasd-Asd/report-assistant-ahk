@@ -23,7 +23,7 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertNotIn("#Include", generated)
         self.assertIn("class UIA {", generated)
         self.assertIn("Test=MxNMMontageLungFieldTest", generated)
-        self.assertIn("FieldTestVersion=0.4", generated)
+        self.assertIn("FieldTestVersion=0.5", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
 
@@ -96,6 +96,7 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         ):
             self.assertIn(expected, harness)
         self.assertIn("desktop := UIA.GetRootElement()", harness)
+        self.assertIn('Type: "ListItem",\n        cs: 0', harness)
         self.assertIn("UIA.RawViewWalker.TryGetParentElement(current)", harness)
         self.assertIn("UIA.CompareElementsEx(current, combo)", harness)
         self.assertIn('result["optionRawCandidateCount"]', harness)

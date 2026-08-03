@@ -452,7 +452,8 @@ CollectMxNMMontageLungComboOptions(combo, optionName, session) {
         return result
     try candidates := desktop.FindElements({
         Name: optionName,
-        Type: "ListItem"
+        Type: "ListItem",
+        cs: 0
     })
     catch
         return result
@@ -879,7 +880,7 @@ FormatMxNMMontageLungFieldReport(session, state, code) {
     )
     report :=
         "Test=MxNMMontageLungFieldTest`r`n"
-        . "FieldTestVersion=0.4`r`n"
+        . "FieldTestVersion=0.5`r`n"
         . "State=" state "`r`n"
         . "Code=" code "`r`n"
         . "InteractionMode=OPERATOR_STEPPED_ONE_ACTION_PER_HOTKEY`r`n"
