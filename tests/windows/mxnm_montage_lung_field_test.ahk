@@ -415,29 +415,83 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
             throw Error("Option PID mismatch")
         if !option.IsSelectionItemPatternAvailable
             throw Error("SelectionItem unavailable")
-        option.SelectionItemPattern.Select()
-        result["selectionDispatched"] := true
+        optionRect := option.BoundingRectangle
+        optionHwnd := option.NativeWindowHandle
     } catch as mxnmMontageLungSelectionErr {
-        result["code"] := "COMBO_SELECTION_FAILED"
+        result["code"] := "COMBO_OPTION_GEOMETRY_FAILED"
         result["exceptionType"] := Type(mxnmMontageLungSelectionErr)
         try combo.ExpandCollapsePattern.Collapse()
         return result
     }
+    if !IsObject(optionRect)
+        || optionRect.r - optionRect.l < 4
+        || optionRect.b - optionRect.t < 4 {
+        result["code"] := "COMBO_OPTION_RECT_INVALID"
+        try combo.ExpandCollapsePattern.Collapse()
+        return result
+    }
+    optionX := Round((optionRect.l + optionRect.r) / 2)
+    optionY := Round((optionRect.t + optionRect.b) / 2)
+    result["screenPoint"] := optionX "," optionY
+    pointHwnd := MxNMMontageLungWindowFromPoint(optionX, optionY)
+    result["windowFromPoint"] := pointHwnd
+    try pointPid := WinGetPID("ahk_id " pointHwnd)
+    catch {
+        pointPid := 0
+    }
+    if !optionHwnd || pointHwnd != optionHwnd
+        || pointPid != session["viewerPid"] {
+        result["code"] := "COMBO_OPTION_POINT_MISMATCH"
+        try combo.ExpandCollapsePattern.Collapse()
+        return result
+    }
+
+    MouseGetPos &originalMouseX, &originalMouseY
+    try {
+        MouseClick "left", optionX, optionY, 1, 0
+        result["mouseClickSent"] := true
+        result["selectionDispatched"] := true
+        result["selectionTransport"] := "PHYSICAL_OPTION_CLICK"
+    } catch as mxnmMontageLungOptionClickErr {
+        result["code"] := "COMBO_OPTION_PHYSICAL_CLICK_FAILED"
+        result["exceptionType"] := Type(mxnmMontageLungOptionClickErr)
+    } finally {
+        try {
+            MouseMove originalMouseX, originalMouseY, 0
+            result["cursorRestored"] := true
+        }
+        catch {
+        }
+    }
+    if !result["selectionDispatched"]
+        return result
+    if !result["cursorRestored"] {
+        result["code"] := "CURSOR_RESTORE_FAILED"
+        return result
+    }
+
     Sleep 120
     try combo.ExpandCollapsePattern.Collapse()
-    try currentValue := combo.ValuePattern.Value
-    catch {
+    valueDeadline := A_TickCount + 900
+    loop {
+        try currentValue := combo.ValuePattern.Value
+        catch {
+            currentValue := ""
+        }
+        result["valueMatches"] :=
+            StrLower(Trim(currentValue, " `t`r`n"))
+                = StrLower(optionName)
         currentValue := ""
+        if result["valueMatches"] || A_TickCount >= valueDeadline
+            break
+        Sleep 20
     }
-    result["valueMatches"] :=
-        StrLower(Trim(currentValue, " `t`r`n")) = StrLower(optionName)
-    currentValue := ""
     if !result["valueMatches"] {
         result["code"] := "COMBO_VALUE_NOT_CONFIRMED"
         return result
     }
     result["ok"] := true
-    result["code"] := "COMBO_SELECTION_CONFIRMED"
+    result["code"] := "COMBO_PHYSICAL_SELECTION_CONFIRMED"
     return result
 }
 
@@ -814,6 +868,7 @@ NewMxNMMontageLungFieldResult(ok, code) {
         "optionRawCandidateCount", 0,
         "optionCandidateCount", 0,
         "selectionDispatched", false,
+        "selectionTransport", "NOT_APPLICABLE",
         "requestedValue", "NOT_APPLICABLE",
         "setValueDispatched", false,
         "valueMatches", false,
@@ -880,7 +935,7 @@ FormatMxNMMontageLungFieldReport(session, state, code) {
     )
     report :=
         "Test=MxNMMontageLungFieldTest`r`n"
-        . "FieldTestVersion=0.5`r`n"
+        . "FieldTestVersion=0.6`r`n"
         . "State=" state "`r`n"
         . "Code=" code "`r`n"
         . "InteractionMode=OPERATOR_STEPPED_ONE_ACTION_PER_HOTKEY`r`n"
@@ -964,6 +1019,7 @@ FormatMxNMMontageLungFieldStep(step) {
         "optionRawCandidateCount",
         "optionCandidateCount",
         "selectionDispatched",
+        "selectionTransport",
         "requestedValue",
         "setValueDispatched",
         "valueMatches",

@@ -23,7 +23,7 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertNotIn("#Include", generated)
         self.assertIn("class UIA {", generated)
         self.assertIn("Test=MxNMMontageLungFieldTest", generated)
-        self.assertIn("FieldTestVersion=0.5", generated)
+        self.assertIn("FieldTestVersion=0.6", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
 
@@ -89,7 +89,6 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         harness = HARNESS.read_text(encoding="utf-8")
         for expected in (
             "combo.ExpandCollapsePattern.Expand()",
-            "option.SelectionItemPattern.Select()",
             "element.ValuePattern.SetValue(requestedValue)",
             "element.InvokePattern.Invoke()",
             "element.SetFocus()",
@@ -101,6 +100,12 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertIn("UIA.CompareElementsEx(current, combo)", harness)
         self.assertIn('result["optionRawCandidateCount"]', harness)
         self.assertIn('result["optionDesktopQuerySucceeded"]', harness)
+        self.assertIn("optionRect := option.BoundingRectangle", harness)
+        self.assertIn("optionHwnd := option.NativeWindowHandle", harness)
+        self.assertIn('MouseClick "left", optionX, optionY, 1, 0', harness)
+        self.assertIn('"PHYSICAL_OPTION_CLICK"', harness)
+        self.assertIn("COMBO_OPTION_POINT_MISMATCH", harness)
+        self.assertNotIn("option.SelectionItemPattern.Select()", harness)
 
     def test_keyboard_input_is_enter_only(self) -> None:
         harness = HARNESS.read_text(encoding="utf-8")

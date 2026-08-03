@@ -17,6 +17,8 @@
 - ComboBox 展开项属于桌面根下的 `ComboLBox`；选择前从桌面搜索同名项，再要求其
   UIA 父链回到刚展开的 ComboBox，并校验同一 Viewer PID；选项名称使用忽略大小写
   的精确匹配，以兼容 Viewer 实际显示的 `Null`/`NULL` 等形式；
+- UIA `SelectionItem.Select()` 只能改变 ComboBox 值，不能可靠触发 MedEx 应用窗宽；
+  因此最终在唯一 ListItem 中心发送真实鼠标单击并恢复光标，再校验 ComboBox 值；
 - 不用键盘输入数值；
 - 唯一的键盘输入是最后一步的 Enter；
 - 测试会改变当前 Viewer 的布局、图注、窗宽、层厚、当前层和放大倍数，不自动
