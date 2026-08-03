@@ -10,7 +10,11 @@
 - 每按一次 `Ctrl+Alt+Shift+F10` 只执行一个步骤；
 - 每步开始前用 Win32 子窗口和 UIA 两条路径重新解析 Viewer Control ID，合并后仍须唯一；
 - Viewer PID、root owner、前台窗口、control class、可见性或几何不符时停止；
-- 不移动鼠标，不发送物理鼠标按键，不用键盘输入数值；
+- 自绘布局和 Tab 不响应后台窗口消息，因此按动态控件矩形计算坐标后发送真实鼠标
+  单击，并立即把光标移回原位；
+- Tab 点击后必须观察到该页面特有控件出现，否则立即停止；布局选中状态未暴露，仍
+  需操作者目视确认；
+- 不用键盘输入数值；
 - 唯一的键盘输入是最后一步的 Enter；
 - 测试会改变当前 Viewer 的布局、图注、窗宽、层厚、当前层和放大倍数，不自动
   回滚；操作者必须逐步目视确认。
@@ -60,8 +64,10 @@ layout R4C4
 %TEMP%\MedExAHK\mxnm_montage_lung_field_test.txt
 ```
 
-`STATIC_CLICK_DISPATCHED`、`BUTTON_INVOKE_DISPATCHED` 和 `ENTER_DISPATCHED`
-只代表操作已投递；最终 Viewer 是否呈现正确结果仍以操作者目视确认为准。
+`STATIC_CLICK_EFFECT_CONFIRMED` 表示 Tab 点击后已经观察到目标页面特有控件；布局
+步骤的 `STATIC_CLICK_VISUAL_CONFIRMATION_REQUIRED` 仍须操作者目视确认。
+`BUTTON_INVOKE_DISPATCHED` 和 `ENTER_DISPATCHED` 只代表操作已投递；最终 Viewer
+是否呈现正确结果仍以操作者目视确认为准。
 失败报告中的 `win32CandidateCount`、`uiaRawCandidateCount`、
 `uiaCandidateCount` 和 `uiaQuerySucceeded` 用于区分控件是未被 Win32 枚举，还是
 未被 UIA 找到或因进程、窗口层级、可见性与几何边界不符而被拒绝。

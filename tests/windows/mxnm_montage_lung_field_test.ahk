@@ -83,7 +83,7 @@ AdvanceMxNMMontageLungFieldTest() {
         }
         nextStage := stages[session["nextStage"]]
         ShowMxNMMontageLungFieldTip(
-            "步骤 " stageIndex "/" stages.Length " 已投递："
+            "步骤 " stageIndex "/" stages.Length " 已执行："
             . stages[stageIndex].label "`n"
             . "请目视确认 Viewer，再按 Ctrl+Alt+Shift+F10：`n"
             . nextStage.label "`n"
@@ -164,7 +164,9 @@ MxNMMontageLungFieldStages() {
                 21112,
                 "Static",
                 0.881579,
-                0.771014
+                0.771014,
+                0,
+                ""
             )
         },
         {
@@ -174,7 +176,9 @@ MxNMMontageLungFieldStages() {
                 21007,
                 "Static",
                 0.479866,
-                0.5
+                0.5,
+                21155,
+                "ComboBox"
             )
         },
         {
@@ -189,7 +193,9 @@ MxNMMontageLungFieldStages() {
                 21007,
                 "Static",
                 0.869128,
-                0.5
+                0.5,
+                21014,
+                "ComboBox"
             )
         },
         {
@@ -224,7 +230,9 @@ MxNMMontageLungFieldStages() {
                 21007,
                 "Static",
                 0.681208,
-                0.5
+                0.5,
+                21032,
+                "Edit"
             )
         },
         {
@@ -245,6 +253,8 @@ RunMxNMMontageLungStaticClick(
     className,
     xRatio,
     yRatio,
+    effectControlId,
+    effectClassName,
     session
 ) {
     result := NewMxNMMontageLungFieldResult(false, "CONTROL_NOT_UNIQUE")
@@ -277,31 +287,69 @@ RunMxNMMontageLungStaticClick(
         return result
     }
 
-    lParam := ((clientY & 0xFFFF) << 16) | (clientX & 0xFFFF)
-    result["downSent"] := DllCall(
-        "User32\PostMessageW",
-        "Ptr", resolved["hwnd"],
-        "UInt", 0x0201,
-        "UPtr", 0x0001,
-        "Ptr", lParam,
-        "Int"
-    ) = true
-    result["upSent"] := DllCall(
-        "User32\PostMessageW",
-        "Ptr", resolved["hwnd"],
-        "UInt", 0x0202,
-        "UPtr", 0,
-        "Ptr", lParam,
-        "Int"
-    ) = true
-    if !result["downSent"] || !result["upSent"] {
-        result["code"] := "STATIC_CLICK_POST_FAILED"
+    MouseGetPos &originalMouseX, &originalMouseY
+    try {
+        MouseClick "left", screenX, screenY, 1, 0
+        result["mouseClickSent"] := true
+    } catch as mxnmMontageLungPhysicalClickErr {
+        result["code"] := "STATIC_PHYSICAL_CLICK_FAILED"
+        result["exceptionType"] := Type(mxnmMontageLungPhysicalClickErr)
+    } finally {
+        try {
+            MouseMove originalMouseX, originalMouseY, 0
+            result["cursorRestored"] := true
+        }
+        catch {
+        }
+    }
+    if !result["mouseClickSent"]
+        return result
+    if !result["cursorRestored"] {
+        result["code"] := "CURSOR_RESTORE_FAILED"
         return result
     }
-    Sleep 120
+    if effectControlId {
+        result["effectControlId"] := effectControlId
+        effectResult := WaitForMxNMMontageLungControl(
+            session,
+            effectControlId,
+            effectClassName,
+            1500
+        )
+        result["effectObserved"] := effectResult["ok"]
+        result["effectCandidateCount"] := effectResult["candidateCount"]
+        if !result["effectObserved"] {
+            result["code"] := "STATIC_CLICK_NO_EFFECT"
+            return result
+        }
+        result["code"] := "STATIC_CLICK_EFFECT_CONFIRMED"
+    } else {
+        result["code"] := "STATIC_CLICK_VISUAL_CONFIRMATION_REQUIRED"
+    }
     result["ok"] := true
-    result["code"] := "STATIC_CLICK_DISPATCHED"
     return result
+}
+
+WaitForMxNMMontageLungControl(
+    session,
+    controlId,
+    className,
+    timeoutMs
+) {
+    startedAt := A_TickCount
+    lastResult := 0
+    loop {
+        lastResult := ResolveMxNMMontageLungControl(
+            session,
+            controlId,
+            className
+        )
+        if lastResult["ok"]
+            return lastResult
+        if A_TickCount - startedAt >= timeoutMs
+            return lastResult
+        Sleep 50
+    }
 }
 
 RunMxNMMontageLungComboSelection(controlId, optionName, session) {
@@ -697,6 +745,11 @@ NewMxNMMontageLungFieldResult(ok, code) {
         "windowFromPoint", 0,
         "downSent", false,
         "upSent", false,
+        "mouseClickSent", false,
+        "cursorRestored", false,
+        "effectControlId", 0,
+        "effectCandidateCount", 0,
+        "effectObserved", false,
         "requestedOption", "NOT_APPLICABLE",
         "optionCandidateCount", 0,
         "selectionDispatched", false,
@@ -756,15 +809,23 @@ FinishMxNMMontageLungFieldTest(state, code) {
 }
 
 FormatMxNMMontageLungFieldReport(session, state, code) {
+    mouseMovementSent := MxNMMontageLungAnyStepTrue(
+        session,
+        "mouseClickSent"
+    ) || MxNMMontageLungAnyStepTrue(session, "cursorRestored")
+    mouseButtonInputSent := MxNMMontageLungAnyStepTrue(
+        session,
+        "mouseClickSent"
+    )
     report :=
         "Test=MxNMMontageLungFieldTest`r`n"
-        . "FieldTestVersion=0.2`r`n"
+        . "FieldTestVersion=0.3`r`n"
         . "State=" state "`r`n"
         . "Code=" code "`r`n"
         . "InteractionMode=OPERATOR_STEPPED_ONE_ACTION_PER_HOTKEY`r`n"
         . "Profile=LUNG_7.5_23_0.9_LAYOUT_R4_C4`r`n"
-        . "MouseMovementSent=false`r`n"
-        . "MouseButtonInputSent=false`r`n"
+        . "MouseMovementSent=" MxNMMontageLungBoolean(mouseMovementSent) "`r`n"
+        . "MouseButtonInputSent=" MxNMMontageLungBoolean(mouseButtonInputSent) "`r`n"
         . "TextKeyboardInputSent=false`r`n"
         . "KeyboardInputSent=ENTER_ONLY`r`n"
         . "ClipboardPayloadRead=false`r`n"
@@ -783,6 +844,14 @@ FormatMxNMMontageLungFieldReport(session, state, code) {
     return report "`r`n"
 }
 
+MxNMMontageLungAnyStepTrue(session, key) {
+    for step in session["steps"] {
+        if step.Has(key) && step[key]
+            return true
+    }
+    return false
+}
+
 FormatMxNMMontageLungFieldStep(step) {
     report := "Id=" step["id"]
     booleanKeys := Map(
@@ -792,6 +861,9 @@ FormatMxNMMontageLungFieldStep(step) {
         "uiaQuerySucceeded", true,
         "downSent", true,
         "upSent", true,
+        "mouseClickSent", true,
+        "cursorRestored", true,
+        "effectObserved", true,
         "selectionDispatched", true,
         "setValueDispatched", true,
         "valueMatches", true,
@@ -820,6 +892,11 @@ FormatMxNMMontageLungFieldStep(step) {
         "windowFromPoint",
         "downSent",
         "upSent",
+        "mouseClickSent",
+        "cursorRestored",
+        "effectControlId",
+        "effectCandidateCount",
+        "effectObserved",
         "requestedOption",
         "optionCandidateCount",
         "selectionDispatched",

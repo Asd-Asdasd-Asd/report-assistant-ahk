@@ -23,7 +23,7 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertNotIn("#Include", generated)
         self.assertIn("class UIA {", generated)
         self.assertIn("Test=MxNMMontageLungFieldTest", generated)
-        self.assertIn("FieldTestVersion=0.2", generated)
+        self.assertIn("FieldTestVersion=0.3", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
 
@@ -67,15 +67,23 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         ):
             self.assertIn(expected, harness)
 
-    def test_static_clicks_are_bounded_and_do_not_move_mouse(self) -> None:
+    def test_static_clicks_are_bounded_physical_clicks_with_effect_checks(self) -> None:
         harness = HARNESS.read_text(encoding="utf-8")
         self.assertIn('"User32\\WindowFromPoint"', harness)
-        self.assertIn('"User32\\PostMessageW"', harness)
-        self.assertIn('"UInt", 0x0201', harness)
-        self.assertIn('"UInt", 0x0202', harness)
         self.assertIn("POINT_HWND_MISMATCH", harness)
-        self.assertIn("MouseMovementSent=false", harness)
-        self.assertNotRegex(harness, r"(?m)^\s*(MouseClick|Click|MouseMove)\b")
+        self.assertIn('MouseClick "left", screenX, screenY, 1, 0', harness)
+        self.assertIn("MouseMove originalMouseX, originalMouseY, 0", harness)
+        self.assertIn('"MouseMovementSent=" MxNMMontageLungBoolean(', harness)
+        self.assertIn('"MouseButtonInputSent=" MxNMMontageLungBoolean(', harness)
+        self.assertIn("STATIC_CLICK_NO_EFFECT", harness)
+        self.assertIn("STATIC_CLICK_EFFECT_CONFIRMED", harness)
+        self.assertIn("WaitForMxNMMontageLungControl(", harness)
+        for expected_effect in (
+            '0.5,\n                21155,\n                "ComboBox"',
+            '0.5,\n                21014,\n                "ComboBox"',
+            '0.5,\n                21032,\n                "Edit"',
+        ):
+            self.assertIn(expected_effect, harness)
 
     def test_standard_controls_use_uia_patterns(self) -> None:
         harness = HARNESS.read_text(encoding="utf-8")
