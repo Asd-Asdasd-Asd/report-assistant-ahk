@@ -23,7 +23,7 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertNotIn("#Include", generated)
         self.assertIn("class UIA {", generated)
         self.assertIn("Test=MxNMMontageLungFieldTest", generated)
-        self.assertIn("FieldTestVersion=0.3", generated)
+        self.assertIn("FieldTestVersion=0.4", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
 
@@ -95,6 +95,11 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
             "element.SetFocus()",
         ):
             self.assertIn(expected, harness)
+        self.assertIn("desktop := UIA.GetRootElement()", harness)
+        self.assertIn("UIA.RawViewWalker.TryGetParentElement(current)", harness)
+        self.assertIn("UIA.CompareElementsEx(current, combo)", harness)
+        self.assertIn('result["optionRawCandidateCount"]', harness)
+        self.assertIn('result["optionDesktopQuerySucceeded"]', harness)
 
     def test_keyboard_input_is_enter_only(self) -> None:
         harness = HARNESS.read_text(encoding="utf-8")

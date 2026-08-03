@@ -381,19 +381,28 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
         return result
     }
 
-    matches := []
-    deadline := A_TickCount + 900
+    optionSearch := Map(
+        "querySucceeded", false,
+        "rawCount", 0,
+        "matches", []
+    )
+    deadline := A_TickCount + 1500
     loop {
-        try matches := combo.FindElements({
-            Name: optionName,
-            Type: "ListItem"
-        })
-        catch
-            matches := []
-        if matches.Length = 1 || A_TickCount >= deadline
+        optionSearch := CollectMxNMMontageLungComboOptions(
+            combo,
+            optionName,
+            session
+        )
+        if optionSearch["matches"].Length = 1
+            || A_TickCount >= deadline {
             break
+        }
         Sleep 20
     }
+    matches := optionSearch["matches"]
+    result["optionDesktopQuerySucceeded"] :=
+        optionSearch["querySucceeded"]
+    result["optionRawCandidateCount"] := optionSearch["rawCount"]
     result["optionCandidateCount"] := matches.Length
     if matches.Length != 1 {
         result["code"] := "COMBO_OPTION_NOT_UNIQUE"
@@ -430,6 +439,55 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
     result["ok"] := true
     result["code"] := "COMBO_SELECTION_CONFIRMED"
     return result
+}
+
+CollectMxNMMontageLungComboOptions(combo, optionName, session) {
+    result := Map(
+        "querySucceeded", false,
+        "rawCount", 0,
+        "matches", []
+    )
+    try desktop := UIA.GetRootElement()
+    catch
+        return result
+    try candidates := desktop.FindElements({
+        Name: optionName,
+        Type: "ListItem"
+    })
+    catch
+        return result
+    result["querySucceeded"] := true
+    result["rawCount"] := candidates.Length
+    for candidate in candidates {
+        try {
+            if candidate.ProcessId != session["viewerPid"]
+                continue
+            if !candidate.IsEnabled || candidate.IsOffscreen
+                continue
+            if !candidate.IsSelectionItemPatternAvailable
+                continue
+            if !MxNMMontageLungOptionBelongsToCombo(candidate, combo)
+                continue
+            result["matches"].Push(candidate)
+        }
+    }
+    return result
+}
+
+MxNMMontageLungOptionBelongsToCombo(option, combo) {
+    current := option
+    loop 12 {
+        try {
+            if UIA.CompareElementsEx(current, combo)
+                return true
+        }
+        try current := UIA.RawViewWalker.TryGetParentElement(current)
+        catch
+            return false
+        if !IsObject(current)
+            return false
+    }
+    return false
 }
 
 RunMxNMMontageLungEditValue(controlId, requestedValue, session) {
@@ -751,6 +809,8 @@ NewMxNMMontageLungFieldResult(ok, code) {
         "effectCandidateCount", 0,
         "effectObserved", false,
         "requestedOption", "NOT_APPLICABLE",
+        "optionDesktopQuerySucceeded", false,
+        "optionRawCandidateCount", 0,
         "optionCandidateCount", 0,
         "selectionDispatched", false,
         "requestedValue", "NOT_APPLICABLE",
@@ -819,7 +879,7 @@ FormatMxNMMontageLungFieldReport(session, state, code) {
     )
     report :=
         "Test=MxNMMontageLungFieldTest`r`n"
-        . "FieldTestVersion=0.3`r`n"
+        . "FieldTestVersion=0.4`r`n"
         . "State=" state "`r`n"
         . "Code=" code "`r`n"
         . "InteractionMode=OPERATOR_STEPPED_ONE_ACTION_PER_HOTKEY`r`n"
@@ -864,6 +924,7 @@ FormatMxNMMontageLungFieldStep(step) {
         "mouseClickSent", true,
         "cursorRestored", true,
         "effectObserved", true,
+        "optionDesktopQuerySucceeded", true,
         "selectionDispatched", true,
         "setValueDispatched", true,
         "valueMatches", true,
@@ -898,6 +959,8 @@ FormatMxNMMontageLungFieldStep(step) {
         "effectCandidateCount",
         "effectObserved",
         "requestedOption",
+        "optionDesktopQuerySucceeded",
+        "optionRawCandidateCount",
         "optionCandidateCount",
         "selectionDispatched",
         "requestedValue",

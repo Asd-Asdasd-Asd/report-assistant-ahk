@@ -14,6 +14,8 @@
   单击，并立即把光标移回原位；
 - Tab 点击后必须观察到该页面特有控件出现，否则立即停止；布局选中状态未暴露，仍
   需操作者目视确认；
+- ComboBox 展开项属于桌面根下的 `ComboLBox`；选择前从桌面搜索同名项，再要求其
+  UIA 父链回到刚展开的 ComboBox，并校验同一 Viewer PID；
 - 不用键盘输入数值；
 - 唯一的键盘输入是最后一步的 Enter；
 - 测试会改变当前 Viewer 的布局、图注、窗宽、层厚、当前层和放大倍数，不自动
@@ -71,3 +73,5 @@ layout R4C4
 失败报告中的 `win32CandidateCount`、`uiaRawCandidateCount`、
 `uiaCandidateCount` 和 `uiaQuerySucceeded` 用于区分控件是未被 Win32 枚举，还是
 未被 UIA 找到或因进程、窗口层级、可见性与几何边界不符而被拒绝。
+下拉项失败时，`optionRawCandidateCount` 表示桌面同名候选数，
+`optionCandidateCount` 表示经 ComboBox 父链关联后保留的候选数。
