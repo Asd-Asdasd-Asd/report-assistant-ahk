@@ -19,6 +19,9 @@
   的精确匹配，以兼容 Viewer 实际显示的 `Null`/`NULL` 等形式；
 - UIA `SelectionItem.Select()` 只能改变 ComboBox 值，不能可靠触发 MedEx 应用窗宽；
   因此最终在唯一 ListItem 中心发送真实鼠标单击并恢复光标，再校验 ComboBox 值；
+- ListItem 是虚拟 UIA 元素，其 `NativeWindowHandle` 不要求等于命中窗口；命中窗口
+  必须属于同一 Viewer PID 且类名为 `ComboLBox`，并继续要求 ListItem 的 UIA 父链
+  回到目标 ComboBox；
 - 不用键盘输入数值；
 - 唯一的键盘输入是最后一步的 Enter；
 - 测试会改变当前 Viewer 的布局、图注、窗宽、层厚、当前层和放大倍数，不自动

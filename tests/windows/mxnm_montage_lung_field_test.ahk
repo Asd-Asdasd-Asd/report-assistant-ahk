@@ -417,6 +417,7 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
             throw Error("SelectionItem unavailable")
         optionRect := option.BoundingRectangle
         optionHwnd := option.NativeWindowHandle
+        result["optionNativeHwnd"] := optionHwnd
     } catch as mxnmMontageLungSelectionErr {
         result["code"] := "COMBO_OPTION_GEOMETRY_FAILED"
         result["exceptionType"] := Type(mxnmMontageLungSelectionErr)
@@ -439,8 +440,13 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
     catch {
         pointPid := 0
     }
-    if !optionHwnd || pointHwnd != optionHwnd
-        || pointPid != session["viewerPid"] {
+    try pointClass := WinGetClass("ahk_id " pointHwnd)
+    catch {
+        pointClass := ""
+    }
+    result["optionPointClass"] := pointClass = "" ? "UNKNOWN" : pointClass
+    if !pointHwnd || pointPid != session["viewerPid"]
+        || StrLower(pointClass) != "combolbox" {
         result["code"] := "COMBO_OPTION_POINT_MISMATCH"
         try combo.ExpandCollapsePattern.Collapse()
         return result
@@ -867,6 +873,8 @@ NewMxNMMontageLungFieldResult(ok, code) {
         "optionDesktopQuerySucceeded", false,
         "optionRawCandidateCount", 0,
         "optionCandidateCount", 0,
+        "optionNativeHwnd", 0,
+        "optionPointClass", "NOT_APPLICABLE",
         "selectionDispatched", false,
         "selectionTransport", "NOT_APPLICABLE",
         "requestedValue", "NOT_APPLICABLE",
@@ -935,7 +943,7 @@ FormatMxNMMontageLungFieldReport(session, state, code) {
     )
     report :=
         "Test=MxNMMontageLungFieldTest`r`n"
-        . "FieldTestVersion=0.6`r`n"
+        . "FieldTestVersion=0.7`r`n"
         . "State=" state "`r`n"
         . "Code=" code "`r`n"
         . "InteractionMode=OPERATOR_STEPPED_ONE_ACTION_PER_HOTKEY`r`n"
@@ -1018,6 +1026,8 @@ FormatMxNMMontageLungFieldStep(step) {
         "optionDesktopQuerySucceeded",
         "optionRawCandidateCount",
         "optionCandidateCount",
+        "optionNativeHwnd",
+        "optionPointClass",
         "selectionDispatched",
         "selectionTransport",
         "requestedValue",

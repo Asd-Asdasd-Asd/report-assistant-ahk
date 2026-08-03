@@ -23,7 +23,7 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertNotIn("#Include", generated)
         self.assertIn("class UIA {", generated)
         self.assertIn("Test=MxNMMontageLungFieldTest", generated)
-        self.assertIn("FieldTestVersion=0.6", generated)
+        self.assertIn("FieldTestVersion=0.7", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
 
@@ -102,9 +102,12 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertIn('result["optionDesktopQuerySucceeded"]', harness)
         self.assertIn("optionRect := option.BoundingRectangle", harness)
         self.assertIn("optionHwnd := option.NativeWindowHandle", harness)
+        self.assertIn('result["optionNativeHwnd"] := optionHwnd', harness)
         self.assertIn('MouseClick "left", optionX, optionY, 1, 0', harness)
         self.assertIn('"PHYSICAL_OPTION_CLICK"', harness)
         self.assertIn("COMBO_OPTION_POINT_MISMATCH", harness)
+        self.assertIn('StrLower(pointClass) != "combolbox"', harness)
+        self.assertNotIn("pointHwnd != optionHwnd", harness)
         self.assertNotIn("option.SelectionItemPattern.Select()", harness)
 
     def test_keyboard_input_is_enter_only(self) -> None:
