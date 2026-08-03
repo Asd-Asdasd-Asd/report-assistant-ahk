@@ -23,7 +23,7 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         self.assertNotIn("#Include", generated)
         self.assertIn("class UIA {", generated)
         self.assertIn("Test=MxNMMontageLungFieldTest", generated)
-        self.assertIn("FieldTestVersion=0.1", generated)
+        self.assertIn("FieldTestVersion=0.2", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
 
@@ -100,6 +100,12 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
         harness = HARNESS.read_text(encoding="utf-8")
         self.assertIn("EnumChildWindows", harness)
         self.assertIn("GetDlgCtrlID", harness)
+        self.assertIn("UIA.ElementFromHandle(session[\"viewerRootOwner\"])", harness)
+        self.assertIn("AutomationId: String(controlId)", harness)
+        self.assertIn("element.NativeWindowHandle", harness)
+        self.assertIn('result["win32CandidateCount"]', harness)
+        self.assertIn('result["uiaCandidateCount"]', harness)
+        self.assertIn("candidatesByHwnd := Map()", harness)
         self.assertIn("candidates.Length != 1", harness)
         self.assertIn('StrLower(processName) != "medexnmfusion.exe"', harness)
         self.assertIn(
@@ -113,6 +119,16 @@ class MxNMMontageLungFieldTestTests(unittest.TestCase):
             harness,
             r"(?m)^[ \t]*catch[ \t]+\w+[ \t]*:=",
         )
+        for forbidden_name in (
+            "stageError",
+            "elementError",
+            "expandError",
+            "selectionError",
+            "valueError",
+            "invokeError",
+            "focusError",
+        ):
+            self.assertNotIn(f"catch as {forbidden_name}", harness)
 
     def test_control_ready_does_not_mark_action_success(self) -> None:
         harness = HARNESS.read_text(encoding="utf-8")

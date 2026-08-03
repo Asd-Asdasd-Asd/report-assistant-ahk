@@ -51,12 +51,12 @@ AdvanceMxNMMontageLungFieldTest() {
         MouseGetPos &mouseBeforeX, &mouseBeforeY
         startedAt := A_TickCount
         try result := stages[stageIndex].handler.Call(session)
-        catch as stageError {
+        catch as mxnmMontageLungStageErr {
             result := NewMxNMMontageLungFieldResult(
                 false,
                 "UNEXPECTED_STAGE_ERROR"
             )
-            result["exceptionType"] := Type(stageError)
+            result["exceptionType"] := Type(mxnmMontageLungStageErr)
         }
         result["id"] := stages[stageIndex].id
         result["stage"] := stageIndex
@@ -316,9 +316,9 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
     if !resolved["ok"]
         return result
     try combo := UIA.ElementFromHandle(resolved["hwnd"])
-    catch as elementError {
+    catch as mxnmMontageLungComboElementErr {
         result["code"] := "COMBO_UIA_ELEMENT_FAILED"
-        result["exceptionType"] := Type(elementError)
+        result["exceptionType"] := Type(mxnmMontageLungComboElementErr)
         return result
     }
     try {
@@ -327,9 +327,9 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
         if !combo.IsExpandCollapsePatternAvailable
             throw Error("ExpandCollapse unavailable")
         combo.ExpandCollapsePattern.Expand()
-    } catch as expandError {
+    } catch as mxnmMontageLungExpandErr {
         result["code"] := "COMBO_EXPAND_FAILED"
-        result["exceptionType"] := Type(expandError)
+        result["exceptionType"] := Type(mxnmMontageLungExpandErr)
         return result
     }
 
@@ -360,9 +360,9 @@ RunMxNMMontageLungComboSelection(controlId, optionName, session) {
             throw Error("SelectionItem unavailable")
         option.SelectionItemPattern.Select()
         result["selectionDispatched"] := true
-    } catch as selectionError {
+    } catch as mxnmMontageLungSelectionErr {
         result["code"] := "COMBO_SELECTION_FAILED"
-        result["exceptionType"] := Type(selectionError)
+        result["exceptionType"] := Type(mxnmMontageLungSelectionErr)
         try combo.ExpandCollapsePattern.Collapse()
         return result
     }
@@ -392,9 +392,9 @@ RunMxNMMontageLungEditValue(controlId, requestedValue, session) {
     if !resolved["ok"]
         return result
     try element := UIA.ElementFromHandle(resolved["hwnd"])
-    catch as elementError {
+    catch as mxnmMontageLungEditElementErr {
         result["code"] := "EDIT_UIA_ELEMENT_FAILED"
-        result["exceptionType"] := Type(elementError)
+        result["exceptionType"] := Type(mxnmMontageLungEditElementErr)
         return result
     }
     try {
@@ -408,9 +408,9 @@ RunMxNMMontageLungEditValue(controlId, requestedValue, session) {
         observedValue := element.ValuePattern.Value
         result["valueMatches"] := String(observedValue) = requestedValue
         observedValue := ""
-    } catch as valueError {
+    } catch as mxnmMontageLungSetValueErr {
         result["code"] := "EDIT_SET_VALUE_FAILED"
-        result["exceptionType"] := Type(valueError)
+        result["exceptionType"] := Type(mxnmMontageLungSetValueErr)
         return result
     }
     if !result["valueMatches"] {
@@ -429,9 +429,9 @@ RunMxNMMontageLungButtonInvoke(controlId, session) {
     if !resolved["ok"]
         return result
     try element := UIA.ElementFromHandle(resolved["hwnd"])
-    catch as elementError {
+    catch as mxnmMontageLungButtonElementErr {
         result["code"] := "BUTTON_UIA_ELEMENT_FAILED"
-        result["exceptionType"] := Type(elementError)
+        result["exceptionType"] := Type(mxnmMontageLungButtonElementErr)
         return result
     }
     try {
@@ -441,9 +441,9 @@ RunMxNMMontageLungButtonInvoke(controlId, session) {
             throw Error("Invoke unavailable")
         element.InvokePattern.Invoke()
         result["invokeDispatched"] := true
-    } catch as invokeError {
+    } catch as mxnmMontageLungInvokeErr {
         result["code"] := "BUTTON_INVOKE_FAILED"
-        result["exceptionType"] := Type(invokeError)
+        result["exceptionType"] := Type(mxnmMontageLungInvokeErr)
         return result
     }
     Sleep 120
@@ -459,15 +459,15 @@ RunMxNMMontageLungEnterCommit(session) {
     if !resolved["ok"]
         return result
     try element := UIA.ElementFromHandle(resolved["hwnd"])
-    catch as elementError {
+    catch as mxnmMontageLungZoomElementErr {
         result["code"] := "ZOOM_UIA_ELEMENT_FAILED"
-        result["exceptionType"] := Type(elementError)
+        result["exceptionType"] := Type(mxnmMontageLungZoomElementErr)
         return result
     }
     try element.SetFocus()
-    catch as focusError {
+    catch as mxnmMontageLungFocusErr {
         result["code"] := "ZOOM_FOCUS_FAILED"
-        result["exceptionType"] := Type(focusError)
+        result["exceptionType"] := Type(mxnmMontageLungFocusErr)
         return result
     }
     try focused := UIA.GetFocusedElement()
@@ -508,18 +508,22 @@ ResolveMxNMMontageLungControl(session, controlId, className) {
         "controlId", controlId,
         "expectedClass", className,
         "candidateCount", 0,
+        "win32CandidateCount", 0,
+        "uiaRawCandidateCount", 0,
+        "uiaCandidateCount", 0,
+        "uiaQuerySucceeded", false,
         "hwnd", 0,
         "parentHwnd", 0,
         "rect", "UNKNOWN",
         "rectObject", 0
     )
-    candidates := []
+    win32Candidates := []
     callback := CallbackCreate(
         CollectMxNMMontageLungControl.Bind(
             session,
             controlId,
             className,
-            candidates
+            win32Candidates
         ),
         "Fast",
         2
@@ -532,6 +536,25 @@ ResolveMxNMMontageLungControl(session, controlId, className) {
         "Int"
     )
     finally CallbackFree(callback)
+    result["win32CandidateCount"] := win32Candidates.Length
+
+    uiaResult := CollectMxNMMontageLungUiaControls(
+        session,
+        controlId,
+        className
+    )
+    result["uiaQuerySucceeded"] := uiaResult["querySucceeded"]
+    result["uiaRawCandidateCount"] := uiaResult["rawCount"]
+    result["uiaCandidateCount"] := uiaResult["candidates"].Length
+
+    candidatesByHwnd := Map()
+    for candidate in win32Candidates
+        candidatesByHwnd[candidate.hwnd] := candidate
+    for candidate in uiaResult["candidates"]
+        candidatesByHwnd[candidate.hwnd] := candidate
+    candidates := []
+    for _, candidate in candidatesByHwnd
+        candidates.Push(candidate)
     result["candidateCount"] := candidates.Length
     if candidates.Length != 1
         return result
@@ -542,6 +565,60 @@ ResolveMxNMMontageLungControl(session, controlId, className) {
     result["rectObject"] := candidate.rect
     result["ok"] := true
     result["code"] := "CONTROL_READY"
+    return result
+}
+
+CollectMxNMMontageLungUiaControls(session, controlId, className) {
+    result := Map(
+        "querySucceeded", false,
+        "rawCount", 0,
+        "candidates", []
+    )
+    try rootElement := UIA.ElementFromHandle(session["viewerRootOwner"])
+    catch
+        return result
+    try elements := rootElement.FindElements({
+        AutomationId: String(controlId)
+    })
+    catch
+        return result
+    result["querySucceeded"] := true
+    result["rawCount"] := elements.Length
+    viewerRect := GetMxNMMontageLungWindowRect(session["viewerRootOwner"])
+    if !IsObject(viewerRect)
+        return result
+    for element in elements {
+        try {
+            if element.ProcessId != session["viewerPid"]
+                continue
+            if StrLower(element.ClassName) != StrLower(className)
+                continue
+            if !element.IsEnabled || element.IsOffscreen
+                continue
+            hwnd := element.NativeWindowHandle
+            if !hwnd
+                continue
+            if MxNMMontageLungRootOwner(hwnd)
+                != session["viewerRootOwner"] {
+                continue
+            }
+            rect := GetMxNMMontageLungWindowRect(hwnd)
+            if !IsObject(rect)
+                || !MxNMMontageLungRectInside(rect, viewerRect) {
+                continue
+            }
+            parentHwnd := DllCall(
+                "User32\GetParent",
+                "Ptr", hwnd,
+                "Ptr"
+            )
+            result["candidates"].Push({
+                hwnd: hwnd,
+                parentHwnd: parentHwnd,
+                rect: rect
+            })
+        }
+    }
     return result
 }
 
@@ -608,6 +685,10 @@ NewMxNMMontageLungFieldResult(ok, code) {
         "controlId", 0,
         "expectedClass", "UNKNOWN",
         "candidateCount", 0,
+        "win32CandidateCount", 0,
+        "uiaRawCandidateCount", 0,
+        "uiaCandidateCount", 0,
+        "uiaQuerySucceeded", false,
         "hwnd", 0,
         "parentHwnd", 0,
         "rect", "UNKNOWN",
@@ -677,7 +758,7 @@ FinishMxNMMontageLungFieldTest(state, code) {
 FormatMxNMMontageLungFieldReport(session, state, code) {
     report :=
         "Test=MxNMMontageLungFieldTest`r`n"
-        . "FieldTestVersion=0.1`r`n"
+        . "FieldTestVersion=0.2`r`n"
         . "State=" state "`r`n"
         . "Code=" code "`r`n"
         . "InteractionMode=OPERATOR_STEPPED_ONE_ACTION_PER_HOTKEY`r`n"
@@ -708,6 +789,7 @@ FormatMxNMMontageLungFieldStep(step) {
         "ok", true,
         "mouseUnchanged", true,
         "foregroundStillValid", true,
+        "uiaQuerySucceeded", true,
         "downSent", true,
         "upSent", true,
         "selectionDispatched", true,
@@ -726,6 +808,10 @@ FormatMxNMMontageLungFieldStep(step) {
         "controlId",
         "expectedClass",
         "candidateCount",
+        "win32CandidateCount",
+        "uiaRawCandidateCount",
+        "uiaCandidateCount",
+        "uiaQuerySucceeded",
         "hwnd",
         "parentHwnd",
         "rect",
