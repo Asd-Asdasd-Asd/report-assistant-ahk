@@ -88,6 +88,11 @@ class MxNMMontageControlDiagnosticTests(unittest.TestCase):
         ):
             self.assertIn(required, harness)
 
+    def test_catch_assignment_uses_a_block(self) -> None:
+        harness = HARNESS.read_text(encoding="utf-8")
+        self.assertIn('catch {\n        processName := ""\n    }', harness)
+        self.assertNotRegex(harness, r"(?m)^\s*catch\s+\w+\s*:=")
+
 
 if __name__ == "__main__":
     unittest.main()

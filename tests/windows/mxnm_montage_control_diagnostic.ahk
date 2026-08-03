@@ -106,7 +106,9 @@ StartMxNMMontageDiagnostic() {
         return
     }
     try processName := WinGetProcessName("ahk_id " viewerHwnd)
-    catch processName := ""
+    catch {
+        processName := ""
+    }
     if StrLower(processName) != "medexnmfusion.exe" {
         ShowMxNMMontageDiagnosticTip(
             "前台窗口不是 MedExNMFusion.exe，诊断未开始。"
