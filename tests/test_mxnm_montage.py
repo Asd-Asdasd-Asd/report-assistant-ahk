@@ -39,7 +39,7 @@ class MxNMMontageTests(unittest.TestCase):
         resolver = module.split(
             "MxNMMontageResolveControl(session, controlId, className) {", 1
         )[1].split("MxNMMontageCollectUiaControls(session, controlId, className) {", 1)[0]
-        self.assertIn('"User32\\\\EnumChildWindows"', resolver)
+        self.assertIn('"User32\\EnumChildWindows"', resolver)
         self.assertIn("candidatesByHwnd", resolver)
         self.assertNotIn("uia :=", resolver)
         self.assertIn("MxNMMontageCollectUiaControls", module)

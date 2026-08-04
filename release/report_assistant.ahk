@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 63c0cf6302f9cfe7fc56928710e47326805a195b-dirty
-; Generated at: 2026-08-04 09:48:43 UTC
+; Source revision: 0a0581493b1880714f53c33bea70571312d742a6-dirty
+; Generated at: 2026-08-04 09:53:15 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-04"
-    static SourceRevision := "63c0cf6302f9cfe7fc56928710e47326805a195b-dirty"
+    static SourceRevision := "0a0581493b1880714f53c33bea70571312d742a6-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18670,7 +18670,7 @@ MxNMMontageCommitZoom(session) {
 MxNMMontageResolveControl(session, controlId, className) {
     win32 := []
     callback := CallbackCreate(MxNMMontageCollectNativeControl.Bind(session, controlId, className, win32), "Fast", 2)
-    try DllCall("User32\\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
+    try DllCall("User32\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
     finally CallbackFree(callback)
     uiaCandidates := MxNMMontageCollectUiaControls(
         session,
@@ -18722,9 +18722,9 @@ MxNMMontageCollectNativeControl(session, controlId, className, candidates, hwnd,
     if !hwnd
         return true
     try {
-        if DllCall("User32\\GetDlgCtrlID", "Ptr", hwnd, "Int") != controlId || StrLower(WinGetClass("ahk_id " hwnd)) != StrLower(className) || WinGetPID("ahk_id " hwnd) != session.viewerPid
+        if DllCall("User32\GetDlgCtrlID", "Ptr", hwnd, "Int") != controlId || StrLower(WinGetClass("ahk_id " hwnd)) != StrLower(className) || WinGetPID("ahk_id " hwnd) != session.viewerPid
             return true
-        if !DllCall("User32\\IsWindowVisible", "Ptr", hwnd, "Int") || !DllCall("User32\\IsWindowEnabled", "Ptr", hwnd, "Int") || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
+        if !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int") || !DllCall("User32\IsWindowEnabled", "Ptr", hwnd, "Int") || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
             return true
         rect := MxNMMontageWindowRect(hwnd), viewerRect := MxNMMontageWindowRect(session.viewerRootOwner)
         if IsObject(rect) && IsObject(viewerRect) && MxNMMontageRectInside(rect, viewerRect)
@@ -18777,11 +18777,11 @@ MxNMMontageWindowRect(hwnd) {
 }
 
 MxNMMontageWindowFromPoint(x, y) {
-    return DllCall("User32\\WindowFromPoint", "Int64", y << 32 | (x & 0xFFFFFFFF), "Ptr")
+    return DllCall("User32\WindowFromPoint", "Int64", y << 32 | (x & 0xFFFFFFFF), "Ptr")
 }
 
 MxNMMontageRootOwner(hwnd) {
-    root := DllCall("User32\\GetAncestor", "Ptr", hwnd, "UInt", 3, "Ptr")
+    root := DllCall("User32\GetAncestor", "Ptr", hwnd, "UInt", 3, "Ptr")
     return root ? root : hwnd
 }
 

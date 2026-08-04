@@ -347,7 +347,7 @@ MxNMMontageCommitZoom(session) {
 MxNMMontageResolveControl(session, controlId, className) {
     win32 := []
     callback := CallbackCreate(MxNMMontageCollectNativeControl.Bind(session, controlId, className, win32), "Fast", 2)
-    try DllCall("User32\\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
+    try DllCall("User32\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
     finally CallbackFree(callback)
     uiaCandidates := MxNMMontageCollectUiaControls(
         session,
@@ -399,9 +399,9 @@ MxNMMontageCollectNativeControl(session, controlId, className, candidates, hwnd,
     if !hwnd
         return true
     try {
-        if DllCall("User32\\GetDlgCtrlID", "Ptr", hwnd, "Int") != controlId || StrLower(WinGetClass("ahk_id " hwnd)) != StrLower(className) || WinGetPID("ahk_id " hwnd) != session.viewerPid
+        if DllCall("User32\GetDlgCtrlID", "Ptr", hwnd, "Int") != controlId || StrLower(WinGetClass("ahk_id " hwnd)) != StrLower(className) || WinGetPID("ahk_id " hwnd) != session.viewerPid
             return true
-        if !DllCall("User32\\IsWindowVisible", "Ptr", hwnd, "Int") || !DllCall("User32\\IsWindowEnabled", "Ptr", hwnd, "Int") || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
+        if !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int") || !DllCall("User32\IsWindowEnabled", "Ptr", hwnd, "Int") || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
             return true
         rect := MxNMMontageWindowRect(hwnd), viewerRect := MxNMMontageWindowRect(session.viewerRootOwner)
         if IsObject(rect) && IsObject(viewerRect) && MxNMMontageRectInside(rect, viewerRect)
@@ -454,11 +454,11 @@ MxNMMontageWindowRect(hwnd) {
 }
 
 MxNMMontageWindowFromPoint(x, y) {
-    return DllCall("User32\\WindowFromPoint", "Int64", y << 32 | (x & 0xFFFFFFFF), "Ptr")
+    return DllCall("User32\WindowFromPoint", "Int64", y << 32 | (x & 0xFFFFFFFF), "Ptr")
 }
 
 MxNMMontageRootOwner(hwnd) {
-    root := DllCall("User32\\GetAncestor", "Ptr", hwnd, "UInt", 3, "Ptr")
+    root := DllCall("User32\GetAncestor", "Ptr", hwnd, "UInt", 3, "Ptr")
     return root ? root : hwnd
 }
 
