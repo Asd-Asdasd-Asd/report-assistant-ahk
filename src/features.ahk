@@ -4,9 +4,13 @@ RegisterConfiguredFeatures(
 )
 
 RegisterConfiguredFeatures(settings, montageSettings := 0) {
+    montageValidation := IsObject(montageSettings)
+        ? ValidateMxNMMontageSettings(montageSettings, settings)
+        : MakeViewerToolHotkeyValidation(false)
     if IsObject(montageSettings)
         && montageSettings.ok
-        && montageSettings.enabled {
+        && montageSettings.enabled
+        && montageValidation.Ok {
         RegisterHotkeyDefinitions(
             MxNMMontageHotkeyDefinitions(montageSettings),
             ReservedApplicationHotkeyChords(),

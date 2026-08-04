@@ -15,14 +15,12 @@
 | SUVMax 与尺寸读取 | 严格区分 `FOUND`、`NOT_ANNOTATED`、automation failure；不复用旧 clipboard 值 |
 | 红字与后续黑字 | CF_HTML + Candidate G；只支持已验证 profile，其他环境 fail closed |
 | Shift+Alt+S 快速标图 | 唯一同 PID target signature；首次 fresh copy，随后只在绑定 target 前台复用；有意保留 caption clipboard 并恢复鼠标 |
+| Body/Head/Lung Montage（Beta） | production 独占；设置页可启用并修改三组快捷键及 5×4 布局行列；compatibility 不再注册 |
 
 ## Compatibility 仍保留
 
 | Hotkey | 行为 | 当前风险 |
 | --- | --- | --- |
-| Shift+Alt+B | Body montage，初始参数 `8.5/8/0.8` | 通用执行契约已有 Lung 证据；Body 数值和 `default` 窗宽仍待分支现场验证 |
-| Shift+Alt+H | Head montage，初始参数 `4/11/1.2` | 通用执行契约已有 Lung 证据；Head 数值和 `default` 窗宽仍待分支现场验证 |
-| Shift+Alt+L | Lung montage，当前参数 `7.5/23/0.9`，含 `lung` 窗宽 | 字段测试 0.7 已在当前工作站通过；production 尚未接入，参数仍允许用户微调 |
 | Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续 |
 | XButton1 | 一秒 ToolTip notification | 历史测试项，不作为迁移目标 |
 
@@ -43,7 +41,7 @@
 
 - 两个 AHK 进程不共享 suspend state、配置、clipboard lock 或 mouse lock。
 - 麦旋风的暂停/退出不控制 compatibility。
-- Compatibility 仍可能在错误前台窗口执行固定坐标动作。
+- Compatibility 剩余动作仍可能在错误前台窗口执行固定坐标动作。
 - 旧 compatibility 运行实例若尚未重启，可能仍注册 Shift+Alt+S；测试新版本前
   必须退出旧实例并启动本 branch 的新版脚本。
 - 原始 legacy hotstrings 与当前报告 hotstrings 同名，不能并行注册。

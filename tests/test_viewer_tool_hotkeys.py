@@ -177,11 +177,11 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "清除全部标注",
         ):
             self.assertIn(label, ui)
-        self.assertEqual(ui.count('"Hotkey"'), 6)
-        self.assertEqual(ui.count('"CheckBox", "x276'), 6)
-        self.assertEqual(ui.count('"CheckBox", "x648'), 6)
+        self.assertEqual(ui.count('"Hotkey"'), 9)
+        self.assertEqual(ui.count('"CheckBox", "x276'), 7)
+        self.assertEqual(ui.count('"CheckBox", "x648'), 9)
         self.assertEqual(ui.count('w90 h26", "启用"'), 6)
-        self.assertEqual(ui.count('w70 h26", "使用"'), 6)
+        self.assertEqual(ui.count('w70 h26", "使用"'), 9)
         self.assertNotIn("Limit15", ui)
         self.assertIn("ValidateFeatureHotkeySettings(", ui)
         self.assertIn(

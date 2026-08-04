@@ -245,7 +245,8 @@ SaveEditableReportHotstringConfig(
     originalText,
     modifiedSectionKeys,
     configPath := "",
-    featureSettings := 0
+    featureSettings := 0,
+    montageSettings := 0
 ) {
     validation := ValidateEditableReportHotstringEntries(entries)
     if !validation.Ok
@@ -258,6 +259,18 @@ SaveEditableReportHotstringConfig(
             return ReportHotstringEditorSaveResult(
                 false,
                 featureValidation.Message
+            )
+        }
+    }
+    if IsObject(montageSettings) {
+        montageValidation := ValidateMxNMMontageSettings(
+            montageSettings,
+            featureSettings
+        )
+        if !montageValidation.Ok {
+            return ReportHotstringEditorSaveResult(
+                false,
+                montageValidation.Message
             )
         }
     }
@@ -347,6 +360,18 @@ SaveEditableReportHotstringConfig(
                 )
             }
         }
+        if IsObject(montageSettings) {
+            WriteMxNMMontageSettings(tempPath, montageSettings)
+            savedMontage := LoadMxNMMontageSettings(tempPath)
+            if !MxNMMontageSettingsMatch(
+                montageSettings,
+                savedMontage
+            ) {
+                throw Error(
+                    "Saved Montage settings did not match settings"
+                )
+            }
+        }
 
         savedLoad := LoadEditableReportHotstringConfig(tempPath)
         if !savedLoad.Ok
@@ -378,6 +403,17 @@ SaveEditableReportHotstringConfig(
             ) {
                 throw Error(
                     "Final viewer tool hotkeys did not match settings"
+                )
+            }
+        }
+        if IsObject(montageSettings) {
+            finalMontage := LoadMxNMMontageSettings(configPath)
+            if !MxNMMontageSettingsMatch(
+                montageSettings,
+                finalMontage
+            ) {
+                throw Error(
+                    "Final Montage settings did not match settings"
                 )
             }
         }
@@ -486,6 +522,46 @@ WriteFeatureHotkeySettings(configPath, settings) {
         configPath,
         section,
         FeatureDefaults.ViewerClearChordKey
+    )
+}
+
+WriteMxNMMontageSettings(configPath, settings) {
+    section := MxNMMontageDefaults.Section
+    IniWrite(
+        settings.enabled ? "true" : "false",
+        configPath,
+        section,
+        MxNMMontageDefaults.EnabledKey
+    )
+    IniWrite(
+        settings.layoutRow,
+        configPath,
+        section,
+        MxNMMontageDefaults.LayoutRowKey
+    )
+    IniWrite(
+        settings.layoutColumn,
+        configPath,
+        section,
+        MxNMMontageDefaults.LayoutColumnKey
+    )
+    IniWrite(
+        settings.chords["body"],
+        configPath,
+        section,
+        MxNMMontageDefaults.BodyChordKey
+    )
+    IniWrite(
+        settings.chords["head"],
+        configPath,
+        section,
+        MxNMMontageDefaults.HeadChordKey
+    )
+    IniWrite(
+        settings.chords["lung"],
+        configPath,
+        section,
+        MxNMMontageDefaults.LungChordKey
     )
 }
 

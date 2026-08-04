@@ -213,15 +213,13 @@ git log -4 --oneline
 git switch -c feature/mxnm-montage
 ```
 
-## 分支开发顺序
+## 当前交付状态
 
-1. 冻结 profile schema 和用户可调参数，不注册新 hotkey。
-2. 从字段测试提取通用 resolver/transport，并为每个失败码补静态测试。
-3. 先接 Lung profile，保留逐步 harness 与 production executor 的契约对照。
-4. 在当前工作站做 Lung 一键端到端验证；确认鼠标恢复、窗宽实际应用和失败即停。
-5. 接 Body/Head，并分别确认 `default` 窗宽和微调后的三个数值。
-6. 更新 hotkey ownership：production 注册后，compatibility 不再注册同一组快捷键。
-7. 生成 release source，跑完整测试，再在 Windows 编译产物上做三项 smoke test。
+- Body、Head、Lung production 一键链已在目标工作站通过；
+- 最终 profile 为 Body `8.5/8/0.7`、Head `4/11/1.2`、Lung `8/23/0.85`；
+- compatibility 已移除 `Shift+Alt+B/H/L`；
+- 设置 UI 以 Beta 标识提供总开关、三组快捷键及 1–5 行、1–4 列配置；
+- R4C4 保持现场验证点，其余行列采用同一控件内的网格步距计算，仍需按 Beta 边界现场确认。
 
 ## 完成条件
 

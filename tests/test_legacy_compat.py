@@ -27,13 +27,19 @@ class LegacyCompatTests(unittest.TestCase):
         compat = source("legacy/medex_legacy_compat.ahk")
         retained_hotkeys = (
             "~XButton1::",
-            "+!b::",
-            "+!h::",
-            "+!l::",
             "^#+c::",
         )
         for hotkey in retained_hotkeys:
             self.assertIn(hotkey, compat)
+
+    def test_montage_hotkeys_are_owned_by_production(self) -> None:
+        compat = source("legacy/medex_legacy_compat.ahk")
+        production = source("src/mxnm_montage.ahk")
+        for hotkey in ("+!b::", "+!h::", "+!l::"):
+            self.assertNotIn(hotkey, compat)
+        for profile in ("montage-body", "montage-head", "montage-lung"):
+            self.assertIn(profile, production)
+        self.assertIn("MontageHotkeys 接管", compat)
 
     def test_caption_advance_is_owned_by_production(self) -> None:
         compat = source("legacy/medex_legacy_compat.ahk")

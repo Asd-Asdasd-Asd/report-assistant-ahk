@@ -5,15 +5,24 @@ class MxNMMontageDefaults {
     static EnabledKey := "Enabled"
     static LayoutRowKey := "LayoutRow"
     static LayoutColumnKey := "LayoutColumn"
+    static BodyChordKey := "BodyChord"
+    static HeadChordKey := "HeadChord"
+    static LungChordKey := "LungChord"
     static EnabledDefault := "false"
     static LayoutRowDefault := "4"
     static LayoutColumnDefault := "4"
+    static BodyChordDefault := "+!b"
+    static HeadChordDefault := "+!h"
+    static LungChordDefault := "+!l"
 
     static ManagedConfigDefaults() {
         defaults := [
             ManagedConfigEntry(this.Section, this.EnabledKey, this.EnabledDefault),
             ManagedConfigEntry(this.Section, this.LayoutRowKey, this.LayoutRowDefault),
-            ManagedConfigEntry(this.Section, this.LayoutColumnKey, this.LayoutColumnDefault)
+            ManagedConfigEntry(this.Section, this.LayoutColumnKey, this.LayoutColumnDefault),
+            ManagedConfigEntry(this.Section, this.BodyChordKey, this.BodyChordDefault),
+            ManagedConfigEntry(this.Section, this.HeadChordKey, this.HeadChordDefault),
+            ManagedConfigEntry(this.Section, this.LungChordKey, this.LungChordDefault)
         ]
         for profile in MxNMMontageProfileDefaults() {
             defaults.Push(ManagedConfigEntry(this.Section, profile.ThicknessKey, profile.Thickness))
@@ -42,7 +51,7 @@ MxNMMontageProfileDefaults() {
 }
 
 LoadMxNMMontageSettings(configPath := "") {
-    settings := {ok: false, enabled: false, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, profiles: Map()}
+    settings := {ok: false, enabled: false, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, chords: Map(), profiles: Map()}
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
         catch
@@ -56,6 +65,9 @@ LoadMxNMMontageSettings(configPath := "") {
         settings.enabled := ParseOptionalFeatureEnabled(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.EnabledKey, MxNMMontageDefaults.EnabledDefault))
         settings.layoutRow := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutRowKey, MxNMMontageDefaults.LayoutRowDefault), 1, 5)
         settings.layoutColumn := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutColumnKey, MxNMMontageDefaults.LayoutColumnDefault), 1, 4)
+        settings.chords["body"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.BodyChordKey, MxNMMontageDefaults.BodyChordDefault))
+        settings.chords["head"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.HeadChordKey, MxNMMontageDefaults.HeadChordDefault))
+        settings.chords["lung"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LungChordKey, MxNMMontageDefaults.LungChordDefault))
         if !settings.layoutRow || !settings.layoutColumn {
             settings.code := "CONFIG_LAYOUT_INVALID"
             return settings
@@ -95,22 +107,93 @@ MxNMMontageDecimal(value, minimum, maximum) {
     return numeric >= minimum && numeric <= maximum ? String(numeric) : ""
 }
 
+ValidateMxNMMontageSettings(settings, featureSettings := 0) {
+    if !IsObject(settings) || !settings.ok {
+        return MakeViewerToolHotkeyValidation(
+            false, "MontageConfig", "Montage Beta 配置无法读取。"
+        )
+    }
+    if settings.layoutRow < 1 || settings.layoutRow > 5 {
+        return MakeViewerToolHotkeyValidation(
+            false, "MontageLayoutRow", "Montage 布局行数必须为 1–5。"
+        )
+    }
+    if settings.layoutColumn < 1 || settings.layoutColumn > 4 {
+        return MakeViewerToolHotkeyValidation(
+            false, "MontageLayoutColumn", "Montage 布局列数必须为 1–4。"
+        )
+    }
+    if !settings.enabled
+        return MakeViewerToolHotkeyValidation(true)
+
+    seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
+    if IsObject(featureSettings) {
+        for definition in [
+            {enabled: featureSettings.ReportImageCaptionEnabled, chord: featureSettings.ReportImageCaptionChord},
+            {enabled: featureSettings.ViewerArrowEnabled, chord: featureSettings.ViewerArrowChord},
+            {enabled: featureSettings.ViewerLengthEnabled, chord: featureSettings.ViewerLengthChord},
+            {enabled: featureSettings.ViewerSuv3DEnabled, chord: featureSettings.ViewerSuv3DChord},
+            {enabled: featureSettings.ViewerCaptureEnabled, chord: featureSettings.ViewerCaptureChord},
+            {enabled: featureSettings.ViewerClearEnabled, chord: featureSettings.ViewerClearChord}
+        ] {
+            if definition.enabled
+                seen[NormalizeHotkeyChord(definition.chord)] := true
+        }
+    }
+    for definition in [
+        {id: "body", field: "MontageBodyChord", label: "Body 排版"},
+        {id: "head", field: "MontageHeadChord", label: "Head 排版"},
+        {id: "lung", field: "MontageLungChord", label: "Lung 排版"}
+    ] {
+        chord := NormalizeOptionalHotkeyChord(settings.chords[definition.id])
+        if chord = "" || InStr(chord, Chr(13)) || InStr(chord, Chr(10))
+            return MakeViewerToolHotkeyValidation(
+                false, definition.field,
+                "启用 Montage Beta 前必须设置“" definition.label "”快捷键。"
+            )
+        if !ViewerToolHotkeyChordIsSafe(chord)
+            return MakeViewerToolHotkeyValidation(
+                false, definition.field,
+                "“" definition.label "”快捷键格式无效。"
+            )
+        chordKey := NormalizeHotkeyChord(chord)
+        if seen.Has(chordKey)
+            return MakeViewerToolHotkeyValidation(
+                false, definition.field,
+                "“" definition.label "”快捷键与其他功能重复。"
+            )
+        seen[chordKey] := true
+    }
+    return MakeViewerToolHotkeyValidation(true)
+}
+
+MxNMMontageSettingsMatch(expected, actual) {
+    if !IsObject(expected) || !IsObject(actual)
+        return false
+    return expected.enabled = actual.enabled
+        && expected.layoutRow = actual.layoutRow
+        && expected.layoutColumn = actual.layoutColumn
+        && expected.chords["body"] = actual.chords["body"]
+        && expected.chords["head"] = actual.chords["head"]
+        && expected.chords["lung"] = actual.chords["lung"]
+}
+
 MxNMMontageHotkeyDefinitions(settings) {
     return [
-        HotkeyDefinition("montage-body", "+!b", InvokeMxNMMontageHotkey.Bind("body", settings)),
-        HotkeyDefinition("montage-head", "+!h", InvokeMxNMMontageHotkey.Bind("head", settings)),
-        HotkeyDefinition("montage-lung", "+!l", InvokeMxNMMontageHotkey.Bind("lung", settings))
+        HotkeyDefinition("montage-body", settings.chords["body"], InvokeMxNMMontageHotkey.Bind("body", settings.chords["body"], settings)),
+        HotkeyDefinition("montage-head", settings.chords["head"], InvokeMxNMMontageHotkey.Bind("head", settings.chords["head"], settings)),
+        HotkeyDefinition("montage-lung", settings.chords["lung"], InvokeMxNMMontageHotkey.Bind("lung", settings.chords["lung"], settings))
     ]
 }
 
-InvokeMxNMMontageHotkey(profileId, settings, *) {
+InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
     static busy := false
     if busy || !settings.ok || !settings.profiles.Has(profileId)
         return
     busy := true
     try {
         viewerHwnd := WinExist("A")
-        if !MxNMMontageWaitForHotkeyRelease(profileId) {
+        if !MxNMMontageWaitForHotkeyRelease(chord) {
             result := MxNMMontageResult(false, "HOTKEY_RELEASE_TIMEOUT")
         } else {
             result := MxNMMontageRun(profileId, settings, viewerHwnd)
@@ -124,26 +207,31 @@ InvokeMxNMMontageHotkey(profileId, settings, *) {
     }
 }
 
-MxNMMontageWaitForHotkeyRelease(profileId) {
-    keyByProfile := Map("body", "b", "head", "h", "lung", "l")
-    if !keyByProfile.Has(profileId)
-        return false
-    return KeyWait(keyByProfile[profileId], "T2")
-        && KeyWait("Alt", "T2")
-        && KeyWait("Shift", "T2")
+MxNMMontageWaitForHotkeyRelease(chord) {
+    deadline := A_TickCount + 2000
+    while ViewerHotkeyChordHasPressedComponent(chord) {
+        if A_TickCount >= deadline
+            return false
+        Sleep 10
+    }
+    return true
 }
 
 MxNMMontageRun(profileId, settings, viewerHwnd) {
-    if settings.layoutRow != 4 || settings.layoutColumn != 4
-        return MxNMMontageResult(false, "LAYOUT_PROFILE_UNVALIDATED")
     if !settings.profiles.Has(profileId)
         return MxNMMontageResult(false, "PROFILE_UNKNOWN")
     session := MxNMMontageCreateSession(viewerHwnd)
     if !session.ok
         return session
     profile := settings.profiles[profileId]
+    layoutPoint := MxNMMontageLayoutPoint(
+        settings.layoutRow,
+        settings.layoutColumn
+    )
+    if !layoutPoint.ok
+        return MxNMMontageResult(false, "LAYOUT_PROFILE_INVALID")
     steps := [
-        MxNMMontageStaticClick.Bind(21112, "Static", .881579, .771014, 0, ""),
+        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, ""),
         MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox"),
         MxNMMontageComboSelect.Bind(21155, "null"),
         MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox"),
@@ -166,6 +254,18 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
             Sleep MxNMMontageTiming.LayoutSettleMs
     }
     return MxNMMontageResult(true, "READY")
+}
+
+MxNMMontageLayoutPoint(row, column) {
+    if row < 1 || row > 5 || column < 1 || column > 4
+        return {ok: false, xRatio: 0, yRatio: 0}
+    ; Calibrated from the same control-local grid used by field test 0.7.
+    ; R4C4 remains exactly 0.881579,0.771014.
+    return {
+        ok: true,
+        xRatio: 0.131579 + (column - 1) * 0.25,
+        yRatio: 0.171014 + (row - 1) * 0.20
+    }
 }
 
 MxNMMontageCreateSession(viewerHwnd) {
@@ -508,7 +608,7 @@ MxNMMontageResult(ok, code) {
 
 MxNMMontageFailureMessage(code) {
     messages := Map(
-        "LAYOUT_PROFILE_UNVALIDATED", "Montage 仅已验证布局 4×4；未执行。",
+        "LAYOUT_PROFILE_INVALID", "Montage 布局行列无效；未执行。",
         "VIEWER_NOT_MEDEX", "请在 MedExNMFusion Viewer 前台执行 Montage。",
         "VIEWER_FOREGROUND_CHANGED", "Viewer 前台已变化，Montage 已停止。",
         "HOTKEY_RELEASE_TIMEOUT", "请松开 Montage 快捷键后重试。",

@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: a7b0a16129fd835b40ac1f98ba5b1bdb2f186b2c-dirty
-; Generated at: 2026-08-04 10:37:13 UTC
+; Source revision: d2ed67e3baf055c66e4f3157cabc7e32aa1b81e7-dirty
+; Generated at: 2026-08-04 10:51:53 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-04"
-    static SourceRevision := "a7b0a16129fd835b40ac1f98ba5b1bdb2f186b2c-dirty"
+    static SourceRevision := "d2ed67e3baf055c66e4f3157cabc7e32aa1b81e7-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18328,15 +18328,24 @@ class MxNMMontageDefaults {
     static EnabledKey := "Enabled"
     static LayoutRowKey := "LayoutRow"
     static LayoutColumnKey := "LayoutColumn"
+    static BodyChordKey := "BodyChord"
+    static HeadChordKey := "HeadChord"
+    static LungChordKey := "LungChord"
     static EnabledDefault := "false"
     static LayoutRowDefault := "4"
     static LayoutColumnDefault := "4"
+    static BodyChordDefault := "+!b"
+    static HeadChordDefault := "+!h"
+    static LungChordDefault := "+!l"
 
     static ManagedConfigDefaults() {
         defaults := [
             ManagedConfigEntry(this.Section, this.EnabledKey, this.EnabledDefault),
             ManagedConfigEntry(this.Section, this.LayoutRowKey, this.LayoutRowDefault),
-            ManagedConfigEntry(this.Section, this.LayoutColumnKey, this.LayoutColumnDefault)
+            ManagedConfigEntry(this.Section, this.LayoutColumnKey, this.LayoutColumnDefault),
+            ManagedConfigEntry(this.Section, this.BodyChordKey, this.BodyChordDefault),
+            ManagedConfigEntry(this.Section, this.HeadChordKey, this.HeadChordDefault),
+            ManagedConfigEntry(this.Section, this.LungChordKey, this.LungChordDefault)
         ]
         for profile in MxNMMontageProfileDefaults() {
             defaults.Push(ManagedConfigEntry(this.Section, profile.ThicknessKey, profile.Thickness))
@@ -18365,7 +18374,7 @@ MxNMMontageProfileDefaults() {
 }
 
 LoadMxNMMontageSettings(configPath := "") {
-    settings := {ok: false, enabled: false, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, profiles: Map()}
+    settings := {ok: false, enabled: false, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, chords: Map(), profiles: Map()}
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
         catch
@@ -18379,6 +18388,9 @@ LoadMxNMMontageSettings(configPath := "") {
         settings.enabled := ParseOptionalFeatureEnabled(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.EnabledKey, MxNMMontageDefaults.EnabledDefault))
         settings.layoutRow := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutRowKey, MxNMMontageDefaults.LayoutRowDefault), 1, 5)
         settings.layoutColumn := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutColumnKey, MxNMMontageDefaults.LayoutColumnDefault), 1, 4)
+        settings.chords["body"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.BodyChordKey, MxNMMontageDefaults.BodyChordDefault))
+        settings.chords["head"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.HeadChordKey, MxNMMontageDefaults.HeadChordDefault))
+        settings.chords["lung"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LungChordKey, MxNMMontageDefaults.LungChordDefault))
         if !settings.layoutRow || !settings.layoutColumn {
             settings.code := "CONFIG_LAYOUT_INVALID"
             return settings
@@ -18418,22 +18430,93 @@ MxNMMontageDecimal(value, minimum, maximum) {
     return numeric >= minimum && numeric <= maximum ? String(numeric) : ""
 }
 
+ValidateMxNMMontageSettings(settings, featureSettings := 0) {
+    if !IsObject(settings) || !settings.ok {
+        return MakeViewerToolHotkeyValidation(
+            false, "MontageConfig", "Montage Beta 配置无法读取。"
+        )
+    }
+    if settings.layoutRow < 1 || settings.layoutRow > 5 {
+        return MakeViewerToolHotkeyValidation(
+            false, "MontageLayoutRow", "Montage 布局行数必须为 1–5。"
+        )
+    }
+    if settings.layoutColumn < 1 || settings.layoutColumn > 4 {
+        return MakeViewerToolHotkeyValidation(
+            false, "MontageLayoutColumn", "Montage 布局列数必须为 1–4。"
+        )
+    }
+    if !settings.enabled
+        return MakeViewerToolHotkeyValidation(true)
+
+    seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
+    if IsObject(featureSettings) {
+        for definition in [
+            {enabled: featureSettings.ReportImageCaptionEnabled, chord: featureSettings.ReportImageCaptionChord},
+            {enabled: featureSettings.ViewerArrowEnabled, chord: featureSettings.ViewerArrowChord},
+            {enabled: featureSettings.ViewerLengthEnabled, chord: featureSettings.ViewerLengthChord},
+            {enabled: featureSettings.ViewerSuv3DEnabled, chord: featureSettings.ViewerSuv3DChord},
+            {enabled: featureSettings.ViewerCaptureEnabled, chord: featureSettings.ViewerCaptureChord},
+            {enabled: featureSettings.ViewerClearEnabled, chord: featureSettings.ViewerClearChord}
+        ] {
+            if definition.enabled
+                seen[NormalizeHotkeyChord(definition.chord)] := true
+        }
+    }
+    for definition in [
+        {id: "body", field: "MontageBodyChord", label: "Body 排版"},
+        {id: "head", field: "MontageHeadChord", label: "Head 排版"},
+        {id: "lung", field: "MontageLungChord", label: "Lung 排版"}
+    ] {
+        chord := NormalizeOptionalHotkeyChord(settings.chords[definition.id])
+        if chord = "" || InStr(chord, Chr(13)) || InStr(chord, Chr(10))
+            return MakeViewerToolHotkeyValidation(
+                false, definition.field,
+                "启用 Montage Beta 前必须设置“" definition.label "”快捷键。"
+            )
+        if !ViewerToolHotkeyChordIsSafe(chord)
+            return MakeViewerToolHotkeyValidation(
+                false, definition.field,
+                "“" definition.label "”快捷键格式无效。"
+            )
+        chordKey := NormalizeHotkeyChord(chord)
+        if seen.Has(chordKey)
+            return MakeViewerToolHotkeyValidation(
+                false, definition.field,
+                "“" definition.label "”快捷键与其他功能重复。"
+            )
+        seen[chordKey] := true
+    }
+    return MakeViewerToolHotkeyValidation(true)
+}
+
+MxNMMontageSettingsMatch(expected, actual) {
+    if !IsObject(expected) || !IsObject(actual)
+        return false
+    return expected.enabled = actual.enabled
+        && expected.layoutRow = actual.layoutRow
+        && expected.layoutColumn = actual.layoutColumn
+        && expected.chords["body"] = actual.chords["body"]
+        && expected.chords["head"] = actual.chords["head"]
+        && expected.chords["lung"] = actual.chords["lung"]
+}
+
 MxNMMontageHotkeyDefinitions(settings) {
     return [
-        HotkeyDefinition("montage-body", "+!b", InvokeMxNMMontageHotkey.Bind("body", settings)),
-        HotkeyDefinition("montage-head", "+!h", InvokeMxNMMontageHotkey.Bind("head", settings)),
-        HotkeyDefinition("montage-lung", "+!l", InvokeMxNMMontageHotkey.Bind("lung", settings))
+        HotkeyDefinition("montage-body", settings.chords["body"], InvokeMxNMMontageHotkey.Bind("body", settings.chords["body"], settings)),
+        HotkeyDefinition("montage-head", settings.chords["head"], InvokeMxNMMontageHotkey.Bind("head", settings.chords["head"], settings)),
+        HotkeyDefinition("montage-lung", settings.chords["lung"], InvokeMxNMMontageHotkey.Bind("lung", settings.chords["lung"], settings))
     ]
 }
 
-InvokeMxNMMontageHotkey(profileId, settings, *) {
+InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
     static busy := false
     if busy || !settings.ok || !settings.profiles.Has(profileId)
         return
     busy := true
     try {
         viewerHwnd := WinExist("A")
-        if !MxNMMontageWaitForHotkeyRelease(profileId) {
+        if !MxNMMontageWaitForHotkeyRelease(chord) {
             result := MxNMMontageResult(false, "HOTKEY_RELEASE_TIMEOUT")
         } else {
             result := MxNMMontageRun(profileId, settings, viewerHwnd)
@@ -18447,26 +18530,31 @@ InvokeMxNMMontageHotkey(profileId, settings, *) {
     }
 }
 
-MxNMMontageWaitForHotkeyRelease(profileId) {
-    keyByProfile := Map("body", "b", "head", "h", "lung", "l")
-    if !keyByProfile.Has(profileId)
-        return false
-    return KeyWait(keyByProfile[profileId], "T2")
-        && KeyWait("Alt", "T2")
-        && KeyWait("Shift", "T2")
+MxNMMontageWaitForHotkeyRelease(chord) {
+    deadline := A_TickCount + 2000
+    while ViewerHotkeyChordHasPressedComponent(chord) {
+        if A_TickCount >= deadline
+            return false
+        Sleep 10
+    }
+    return true
 }
 
 MxNMMontageRun(profileId, settings, viewerHwnd) {
-    if settings.layoutRow != 4 || settings.layoutColumn != 4
-        return MxNMMontageResult(false, "LAYOUT_PROFILE_UNVALIDATED")
     if !settings.profiles.Has(profileId)
         return MxNMMontageResult(false, "PROFILE_UNKNOWN")
     session := MxNMMontageCreateSession(viewerHwnd)
     if !session.ok
         return session
     profile := settings.profiles[profileId]
+    layoutPoint := MxNMMontageLayoutPoint(
+        settings.layoutRow,
+        settings.layoutColumn
+    )
+    if !layoutPoint.ok
+        return MxNMMontageResult(false, "LAYOUT_PROFILE_INVALID")
     steps := [
-        MxNMMontageStaticClick.Bind(21112, "Static", .881579, .771014, 0, ""),
+        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, ""),
         MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox"),
         MxNMMontageComboSelect.Bind(21155, "null"),
         MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox"),
@@ -18489,6 +18577,18 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
             Sleep MxNMMontageTiming.LayoutSettleMs
     }
     return MxNMMontageResult(true, "READY")
+}
+
+MxNMMontageLayoutPoint(row, column) {
+    if row < 1 || row > 5 || column < 1 || column > 4
+        return {ok: false, xRatio: 0, yRatio: 0}
+    ; Calibrated from the same control-local grid used by field test 0.7.
+    ; R4C4 remains exactly 0.881579,0.771014.
+    return {
+        ok: true,
+        xRatio: 0.131579 + (column - 1) * 0.25,
+        yRatio: 0.171014 + (row - 1) * 0.20
+    }
 }
 
 MxNMMontageCreateSession(viewerHwnd) {
@@ -18831,7 +18931,7 @@ MxNMMontageResult(ok, code) {
 
 MxNMMontageFailureMessage(code) {
     messages := Map(
-        "LAYOUT_PROFILE_UNVALIDATED", "Montage 仅已验证布局 4×4；未执行。",
+        "LAYOUT_PROFILE_INVALID", "Montage 布局行列无效；未执行。",
         "VIEWER_NOT_MEDEX", "请在 MedExNMFusion Viewer 前台执行 Montage。",
         "VIEWER_FOREGROUND_CHANGED", "Viewer 前台已变化，Montage 已停止。",
         "HOTKEY_RELEASE_TIMEOUT", "请松开 Montage 快捷键后重试。",
@@ -19554,7 +19654,8 @@ SaveEditableReportHotstringConfig(
     originalText,
     modifiedSectionKeys,
     configPath := "",
-    featureSettings := 0
+    featureSettings := 0,
+    montageSettings := 0
 ) {
     validation := ValidateEditableReportHotstringEntries(entries)
     if !validation.Ok
@@ -19567,6 +19668,18 @@ SaveEditableReportHotstringConfig(
             return ReportHotstringEditorSaveResult(
                 false,
                 featureValidation.Message
+            )
+        }
+    }
+    if IsObject(montageSettings) {
+        montageValidation := ValidateMxNMMontageSettings(
+            montageSettings,
+            featureSettings
+        )
+        if !montageValidation.Ok {
+            return ReportHotstringEditorSaveResult(
+                false,
+                montageValidation.Message
             )
         }
     }
@@ -19656,6 +19769,18 @@ SaveEditableReportHotstringConfig(
                 )
             }
         }
+        if IsObject(montageSettings) {
+            WriteMxNMMontageSettings(tempPath, montageSettings)
+            savedMontage := LoadMxNMMontageSettings(tempPath)
+            if !MxNMMontageSettingsMatch(
+                montageSettings,
+                savedMontage
+            ) {
+                throw Error(
+                    "Saved Montage settings did not match settings"
+                )
+            }
+        }
 
         savedLoad := LoadEditableReportHotstringConfig(tempPath)
         if !savedLoad.Ok
@@ -19687,6 +19812,17 @@ SaveEditableReportHotstringConfig(
             ) {
                 throw Error(
                     "Final viewer tool hotkeys did not match settings"
+                )
+            }
+        }
+        if IsObject(montageSettings) {
+            finalMontage := LoadMxNMMontageSettings(configPath)
+            if !MxNMMontageSettingsMatch(
+                montageSettings,
+                finalMontage
+            ) {
+                throw Error(
+                    "Final Montage settings did not match settings"
                 )
             }
         }
@@ -19795,6 +19931,46 @@ WriteFeatureHotkeySettings(configPath, settings) {
         configPath,
         section,
         FeatureDefaults.ViewerClearChordKey
+    )
+}
+
+WriteMxNMMontageSettings(configPath, settings) {
+    section := MxNMMontageDefaults.Section
+    IniWrite(
+        settings.enabled ? "true" : "false",
+        configPath,
+        section,
+        MxNMMontageDefaults.EnabledKey
+    )
+    IniWrite(
+        settings.layoutRow,
+        configPath,
+        section,
+        MxNMMontageDefaults.LayoutRowKey
+    )
+    IniWrite(
+        settings.layoutColumn,
+        configPath,
+        section,
+        MxNMMontageDefaults.LayoutColumnKey
+    )
+    IniWrite(
+        settings.chords["body"],
+        configPath,
+        section,
+        MxNMMontageDefaults.BodyChordKey
+    )
+    IniWrite(
+        settings.chords["head"],
+        configPath,
+        section,
+        MxNMMontageDefaults.HeadChordKey
+    )
+    IniWrite(
+        settings.chords["lung"],
+        configPath,
+        section,
+        MxNMMontageDefaults.LungChordKey
     )
 }
 
@@ -21876,9 +22052,13 @@ RegisterConfiguredFeatures(
 )
 
 RegisterConfiguredFeatures(settings, montageSettings := 0) {
+    montageValidation := IsObject(montageSettings)
+        ? ValidateMxNMMontageSettings(montageSettings, settings)
+        : MakeViewerToolHotkeyValidation(false)
     if IsObject(montageSettings)
         && montageSettings.ok
-        && montageSettings.enabled {
+        && montageSettings.enabled
+        && montageValidation.Ok {
         RegisterHotkeyDefinitions(
             MxNMMontageHotkeyDefinitions(montageSettings),
             ReservedApplicationHotkeyChords(),
@@ -21986,6 +22166,7 @@ class ReportAssistantSettingsWindow {
         this.OriginalText := loadResult.OriginalText
         this.Entries := loadResult.Entries
         this.FeatureSettings := LoadFeatureSettings(this.ConfigPath)
+        this.MontageSettings := LoadMxNMMontageSettings(this.ConfigPath)
         this.OriginalSections := Map()
         for entry in this.Entries
             this.OriginalSections[StrLower(entry.Section)] := true
@@ -22003,7 +22184,7 @@ class ReportAssistantSettingsWindow {
         this.Window.OnEvent("Escape", this.OnClose.Bind(this))
 
         this.Tabs := this.Window.Add(
-            "Tab3", "x12 y12 w876 h570",
+            "Tab3", "x12 y12 w876 h690",
             ["报告模板", "快捷键", "其他"]
         )
 
@@ -22146,6 +22327,50 @@ class ReportAssistantSettingsWindow {
         this.ViewerClearWinInput := this.Window.Add(
             "CheckBox", "x648 y406 w70 h26", "使用"
         )
+
+        this.Window.Add(
+            "Text", "x72 y456 w170", "Montage 排版（Beta）"
+        )
+        this.MontageEnabledInput := this.Window.Add(
+            "CheckBox", "x276 y448 w110 h26", "启用全部"
+        )
+
+        this.Window.Add("Text", "x72 y504 w170", "Body 排版（Beta）")
+        this.MontageBodyChordInput := this.Window.Add(
+            "Hotkey", "x402 y496 w220 h26"
+        )
+        this.MontageBodyWinInput := this.Window.Add(
+            "CheckBox", "x648 y496 w70 h26", "使用"
+        )
+
+        this.Window.Add("Text", "x72 y552 w170", "Head 排版（Beta）")
+        this.MontageHeadChordInput := this.Window.Add(
+            "Hotkey", "x402 y544 w220 h26"
+        )
+        this.MontageHeadWinInput := this.Window.Add(
+            "CheckBox", "x648 y544 w70 h26", "使用"
+        )
+
+        this.Window.Add("Text", "x72 y600 w170", "Lung 排版（Beta）")
+        this.MontageLungChordInput := this.Window.Add(
+            "Hotkey", "x402 y592 w220 h26"
+        )
+        this.MontageLungWinInput := this.Window.Add(
+            "CheckBox", "x648 y592 w70 h26", "使用"
+        )
+
+        this.Window.Add("Text", "x72 y648 w170", "图片布局位置（Beta）")
+        this.Window.Add("Text", "x276 y648 w28", "行")
+        this.MontageLayoutRowInput := this.Window.Add(
+            "DropDownList", "x308 y640 w70", ["1", "2", "3", "4", "5"]
+        )
+        this.Window.Add("Text", "x402 y648 w28", "列")
+        this.MontageLayoutColumnInput := this.Window.Add(
+            "DropDownList", "x434 y640 w70", ["1", "2", "3", "4"]
+        )
+        this.Window.Add(
+            "Text", "x520 y648 w300", "默认第 4 行、第 4 列；第 5 行可能被遮挡。"
+        )
         for control in [
             this.ReportImageCaptionEnabledInput,
             this.ViewerArrowEnabledInput,
@@ -22158,7 +22383,11 @@ class ReportAssistantSettingsWindow {
             this.ViewerLengthWinInput,
             this.ViewerSuv3DWinInput,
             this.ViewerCaptureWinInput,
-            this.ViewerClearWinInput
+            this.ViewerClearWinInput,
+            this.MontageEnabledInput,
+            this.MontageBodyWinInput,
+            this.MontageHeadWinInput,
+            this.MontageLungWinInput
         ] {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -22168,11 +22397,17 @@ class ReportAssistantSettingsWindow {
             this.ViewerLengthChordInput,
             this.ViewerSuv3DChordInput,
             this.ViewerCaptureChordInput,
-            this.ViewerClearChordInput
+            this.ViewerClearChordInput,
+            this.MontageBodyChordInput,
+            this.MontageHeadChordInput,
+            this.MontageLungChordInput,
+            this.MontageLayoutRowInput,
+            this.MontageLayoutColumnInput
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
         this.LoadFeatureHotkeyControls()
+        this.LoadMontageHotkeyControls()
 
         this.Tabs.UseTab(3)
         this.Window.Add(
@@ -22181,11 +22416,11 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs.UseTab()
         this.SaveButton := this.Window.Add(
-            "Button", "x688 y598 w90 h30 Default", "保存"
+            "Button", "x688 y716 w90 h30 Default", "保存"
         )
         this.SaveButton.OnEvent("Click", this.OnSave.Bind(this))
         this.CancelButton := this.Window.Add(
-            "Button", "x786 y598 w90 h30", "取消"
+            "Button", "x786 y716 w90 h30", "取消"
         )
         this.CancelButton.OnEvent("Click", this.OnClose.Bind(this))
 
@@ -22195,7 +22430,7 @@ class ReportAssistantSettingsWindow {
     }
 
     Activate() {
-        this.Window.Show("w900 h640")
+        this.Window.Show("w900 h760")
         try WinActivate("ahk_id " this.Window.Hwnd)
     }
 
@@ -22392,10 +22627,72 @@ class ReportAssistantSettingsWindow {
         )
     }
 
+    LoadMontageHotkeyControls() {
+        this.LoadingControls := true
+        try {
+            this.MontageEnabledInput.Value :=
+                this.MontageSettings.enabled ? 1 : 0
+            this.MontageBodyChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.MontageSettings.chords["body"]
+                )
+            this.MontageBodyWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.MontageSettings.chords["body"]
+                ) ? 1 : 0
+            this.MontageHeadChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.MontageSettings.chords["head"]
+                )
+            this.MontageHeadWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.MontageSettings.chords["head"]
+                ) ? 1 : 0
+            this.MontageLungChordInput.Value :=
+                ViewerHotkeyNativeChord(
+                    this.MontageSettings.chords["lung"]
+                )
+            this.MontageLungWinInput.Value :=
+                ViewerHotkeyUsesWin(
+                    this.MontageSettings.chords["lung"]
+                ) ? 1 : 0
+            this.MontageLayoutRowInput.Choose(
+                this.MontageSettings.layoutRow
+            )
+            this.MontageLayoutColumnInput.Choose(
+                this.MontageSettings.layoutColumn
+            )
+        } finally {
+            this.LoadingControls := false
+        }
+    }
+
+    StoreMontageHotkeyControls() {
+        this.MontageSettings.enabled :=
+            this.MontageEnabledInput.Value = 1
+        this.MontageSettings.layoutRow :=
+            this.MontageLayoutRowInput.Value
+        this.MontageSettings.layoutColumn :=
+            this.MontageLayoutColumnInput.Value
+        this.MontageSettings.chords["body"] := MergeViewerHotkeyChord(
+            this.MontageBodyChordInput.Value,
+            this.MontageBodyWinInput.Value = 1
+        )
+        this.MontageSettings.chords["head"] := MergeViewerHotkeyChord(
+            this.MontageHeadChordInput.Value,
+            this.MontageHeadWinInput.Value = 1
+        )
+        this.MontageSettings.chords["lung"] := MergeViewerHotkeyChord(
+            this.MontageLungChordInput.Value,
+            this.MontageLungWinInput.Value = 1
+        )
+    }
+
     OnViewerHotkeyChanged(*) {
         if this.LoadingControls
             return
         this.StoreFeatureHotkeyControls()
+        this.StoreMontageHotkeyControls()
         this.Dirty := true
     }
 
@@ -22493,6 +22790,7 @@ class ReportAssistantSettingsWindow {
     OnSave(*) {
         this.StoreEditorToEntry()
         this.StoreFeatureHotkeyControls()
+        this.StoreMontageHotkeyControls()
         validation := ValidateEditableReportHotstringEntries(this.Entries)
         if !validation.Ok {
             if validation.Row > 0
@@ -22519,6 +22817,22 @@ class ReportAssistantSettingsWindow {
             )
             return
         }
+        montageValidation := ValidateMxNMMontageSettings(
+            this.MontageSettings,
+            this.FeatureSettings
+        )
+        if !montageValidation.Ok {
+            this.Tabs.Choose(2)
+            this.FocusMontageValidationError(
+                montageValidation.Field
+            )
+            MsgBox(
+                montageValidation.Message,
+                ReportAssistantSettingsDefaults.WindowTitle,
+                "Icon!"
+            )
+            return
+        }
 
         if !this.Dirty {
             this.DestroyWindow()
@@ -22531,7 +22845,8 @@ class ReportAssistantSettingsWindow {
             this.OriginalText,
             this.ModifiedSectionKeys,
             this.ConfigPath,
-            this.FeatureSettings
+            this.FeatureSettings,
+            this.MontageSettings
         )
         if !saveResult.Ok {
             MsgBox(
@@ -22569,6 +22884,21 @@ class ReportAssistantSettingsWindow {
             this.ViewerCaptureChordInput.Focus()
         else if field = "ViewerClearChord"
             this.ViewerClearChordInput.Focus()
+    }
+
+    FocusMontageValidationError(field) {
+        if field = "MontageBodyChord"
+            this.MontageBodyChordInput.Focus()
+        else if field = "MontageHeadChord"
+            this.MontageHeadChordInput.Focus()
+        else if field = "MontageLungChord"
+            this.MontageLungChordInput.Focus()
+        else if field = "MontageLayoutRow"
+            this.MontageLayoutRowInput.Focus()
+        else if field = "MontageLayoutColumn"
+            this.MontageLayoutColumnInput.Focus()
+        else
+            this.MontageEnabledInput.Focus()
     }
 
     FocusValidationError(validation) {

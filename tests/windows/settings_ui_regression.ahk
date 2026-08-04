@@ -10,6 +10,7 @@
 #Include ..\..\src\template_renderer.ahk
 #Include ..\..\src\hotstring_normalization.ahk
 #Include ..\..\src\config_reconciliation.ahk
+#Include ..\..\src\mxnm_montage.ahk
 #Include ..\..\src\hotstring_config_migration.ahk
 #Include ..\..\src\hotstring_config_editor.ahk
 #Include ..\..\src\feature_config.ahk
@@ -26,6 +27,7 @@ RunSettingsUiRegression() {
     TestSettingsTemplateElementInsertion()
     TestSettingsDeletePersistence()
     TestViewerHotkeyWinModifier()
+    TestMxNMMontageSettingsPersistence()
     MsgBox "Settings UI regression passed.", "MedEx test", "Iconi"
     ExitApp 0
 }
@@ -67,6 +69,53 @@ TestViewerHotkeyWinModifier() {
         !ViewerToolHotkeyChordIsSafe("F7"),
         "unsupported bare multi-character key was accepted"
     )
+}
+
+TestMxNMMontageSettingsPersistence() {
+    point := MxNMMontageLayoutPoint(4, 4)
+    AssertSettingsTest(point.ok, "R4C4 layout point was rejected")
+    AssertSettingsTest(
+        Abs(point.xRatio - 0.881579) < 0.000001,
+        "R4C4 x ratio changed"
+    )
+    AssertSettingsTest(
+        Abs(point.yRatio - 0.771014) < 0.000001,
+        "R4C4 y ratio changed"
+    )
+
+    testDirectory := A_Temp "\MedExMontageSettings-" A_TickCount
+    DirCreate testDirectory
+    configPath := testDirectory "\config.ini"
+    try {
+        FileAppend SettingsTestConfigText(), configPath, "UTF-16"
+        loaded := LoadEditableReportHotstringConfig(configPath)
+        montage := LoadMxNMMontageSettings(configPath)
+        AssertSettingsTest(loaded.Ok, "Montage test config did not load")
+        AssertSettingsTest(montage.ok, "Montage defaults did not load")
+        montage.enabled := true
+        montage.layoutRow := 3
+        montage.layoutColumn := 2
+        montage.chords["body"] := "^!b"
+        montage.chords["head"] := "^!h"
+        montage.chords["lung"] := "^!l"
+        saved := SaveEditableReportHotstringConfig(
+            loaded.Entries,
+            [],
+            loaded.OriginalText,
+            Map(),
+            configPath,
+            0,
+            montage
+        )
+        AssertSettingsTest(saved.Ok, "Montage settings save failed")
+        reloaded := LoadMxNMMontageSettings(configPath)
+        AssertSettingsTest(
+            MxNMMontageSettingsMatch(montage, reloaded),
+            "Montage settings did not round-trip"
+        )
+    } finally {
+        try DirDelete testDirectory, true
+    }
 }
 
 TestReportHotstringTextCodec() {

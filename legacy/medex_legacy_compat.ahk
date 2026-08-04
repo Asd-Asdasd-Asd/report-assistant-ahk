@@ -12,6 +12,7 @@
 ;   Ctrl+Win+Shift+S Viewer 截图
 ;   Ctrl+Win+Shift+M SUV/清除复按状态机
 ;   Ctrl+Win+Shift+A Arrow/清除复按状态机
+;   Shift+Alt+B/H/L Montage（由 EXE 的 MontageHotkeys 接管）
 ;
 ; 以下固定坐标和固定数值从 legacy/karabiner.ahk 保守复制，尚未增加窗口校验。
 ; 启用前必须在目标工作站确认；不得与原始 legacy scripts 同时运行。
@@ -22,80 +23,6 @@ A_IconTip := "MedEx Legacy Compatibility"
 {
     ToolTip "你按下了第一个侧键（XButton1）"
     SetTimer () => ToolTip(), -1000
-}
-
-+!b::
-{
-    CoordMode "Mouse", "Screen"
-    Sleep 000
-    MouseClick "left", 2208, 556
-    MouseClick "left", 2073, 628
-    MouseClick "left", 2152, 1100
-    MouseClick "left", 2031, 1202
-    MouseClick "left", 2188, 628
-    MouseClick "left", 2030, 720, 2
-    SendText("8.5")
-    MouseClick "left", 2171, 719
-    MouseClick "left", 2057, 806, 2
-    SendText("8")
-    MouseClick "left", 2175, 801
-    MouseClick "left", 2133, 623
-    MouseClick "left", 2129, 836, 2
-    SendText("0.8")
-    Send "{Enter}"
-    ToolTip "OK"
-    SetTimer () => ToolTip(), -1000
-    return
-}
-
-+!h::
-{
-    CoordMode "Mouse", "Screen"
-    Sleep 000
-    MouseClick "left", 2208, 556
-    MouseClick "left", 2073, 628
-    MouseClick "left", 2152, 1100
-    MouseClick "left", 2031, 1202
-    MouseClick "left", 2188, 628
-    MouseClick "left", 2030, 720, 2
-    SendText("4")
-    MouseClick "left", 2171, 719
-    MouseClick "left", 2057, 806, 2
-    SendText("11")
-    MouseClick "left", 2175, 801
-    MouseClick "left", 2133, 623
-    MouseClick "left", 2129, 836, 2
-    SendText("1.2")
-    Send "{Enter}"
-    ToolTip "OK"
-    SetTimer () => ToolTip(), -1000
-    return
-}
-
-+!l::
-{
-    CoordMode "Mouse", "Screen"
-    Sleep 000
-    MouseClick "left", 2208, 556
-    MouseClick "left", 2073, 628
-    MouseClick "left", 2152, 1100
-    MouseClick "left", 2031, 1202
-    MouseClick "left", 2188, 628
-    MouseClick "left", 2199, 673
-    MouseClick "left", 2132, 754
-    MouseClick "left", 2030, 720, 2
-    SendText("7.5")
-    MouseClick "left", 2171, 719
-    MouseClick "left", 2057, 806, 2
-    SendText("23")
-    MouseClick "left", 2175, 801
-    MouseClick "left", 2133, 623
-    MouseClick "left", 2129, 836, 2
-    SendText("0.9")
-    Send "{Enter}"
-    ToolTip "OK"
-    SetTimer () => ToolTip(), -1000
-    return
 }
 
 ^#+c::
