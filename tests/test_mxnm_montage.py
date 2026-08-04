@@ -41,6 +41,7 @@ class MxNMMontageTests(unittest.TestCase):
         )[1].split("MxNMMontageCollectUiaControls(session, controlId, className) {", 1)[0]
         self.assertIn('"User32\\\\EnumChildWindows"', resolver)
         self.assertIn("candidatesByHwnd", resolver)
+        self.assertNotIn("uia :=", resolver)
         self.assertIn("MxNMMontageCollectUiaControls", module)
         self.assertIn("AutomationId: String(controlId)", module)
 

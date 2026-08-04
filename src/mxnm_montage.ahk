@@ -349,11 +349,15 @@ MxNMMontageResolveControl(session, controlId, className) {
     callback := CallbackCreate(MxNMMontageCollectNativeControl.Bind(session, controlId, className, win32), "Fast", 2)
     try DllCall("User32\\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
     finally CallbackFree(callback)
-    uia := MxNMMontageCollectUiaControls(session, controlId, className)
+    uiaCandidates := MxNMMontageCollectUiaControls(
+        session,
+        controlId,
+        className
+    )
     candidatesByHwnd := Map()
     for candidate in win32
         candidatesByHwnd[candidate.hwnd] := candidate
-    for candidate in uia
+    for candidate in uiaCandidates
         candidatesByHwnd[candidate.hwnd] := candidate
     candidates := []
     for _, candidate in candidatesByHwnd

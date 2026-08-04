@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 5d4a1f1ea6c6cf17f7158e0f7eb621ee11fe9dcf-dirty
-; Generated at: 2026-08-03 12:38:01 UTC
+; Source revision: 63c0cf6302f9cfe7fc56928710e47326805a195b-dirty
+; Generated at: 2026-08-04 09:48:43 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-08-03"
-    static SourceRevision := "5d4a1f1ea6c6cf17f7158e0f7eb621ee11fe9dcf-dirty"
+    static BuildDate := "2026-08-04"
+    static SourceRevision := "63c0cf6302f9cfe7fc56928710e47326805a195b-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18672,11 +18672,15 @@ MxNMMontageResolveControl(session, controlId, className) {
     callback := CallbackCreate(MxNMMontageCollectNativeControl.Bind(session, controlId, className, win32), "Fast", 2)
     try DllCall("User32\\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
     finally CallbackFree(callback)
-    uia := MxNMMontageCollectUiaControls(session, controlId, className)
+    uiaCandidates := MxNMMontageCollectUiaControls(
+        session,
+        controlId,
+        className
+    )
     candidatesByHwnd := Map()
     for candidate in win32
         candidatesByHwnd[candidate.hwnd] := candidate
-    for candidate in uia
+    for candidate in uiaCandidates
         candidatesByHwnd[candidate.hwnd] := candidate
     candidates := []
     for _, candidate in candidatesByHwnd
