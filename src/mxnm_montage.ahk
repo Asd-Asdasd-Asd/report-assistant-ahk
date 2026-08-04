@@ -437,6 +437,9 @@ MxNMMontageWaitForControl(session, controlId, className, timeoutMs) {
 }
 
 MxNMMontagePhysicalClick(x, y) {
+    ; All resolved rectangles and WindowFromPoint checks use screen coordinates.
+    ; CoordMode is per AHK thread, so the hotkey handler must set it itself.
+    CoordMode "Mouse", "Screen"
     MouseGetPos &originalX, &originalY
     clicked := false, restored := false
     try {

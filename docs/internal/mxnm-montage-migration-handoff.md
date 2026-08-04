@@ -136,6 +136,10 @@ Control ID 在字段验证中稳定，但 HWND 每次运行都会变化，绝不
 4. 保存鼠标位置，发送真实单击，立即恢复鼠标；
 5. 再检查 Viewer 前台身份未变化。
 
+字段测试脚本在自动执行区显式设置 `CoordMode "Mouse", "Screen"`。production 的每个
+hotkey 线程也必须在真实点击前设置相同模式：控件矩形和 `WindowFromPoint` 都是屏幕
+坐标，若沿用默认的活动窗口相对坐标，点击会落在错误位置并表现为 Tab 无反应。
+
 当前已验证 Tab 相对位置为：
 
 | Tab | x ratio | y ratio | 后置观察 |

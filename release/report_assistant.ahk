@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 98e311990954b15de54913edd0e9845fbdd0d744-dirty
-; Generated at: 2026-08-04 09:59:07 UTC
+; Source revision: 1da9c3a8f98c6f59ace10a5a5da9b36c6aee6ac7-dirty
+; Generated at: 2026-08-04 10:01:47 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-04"
-    static SourceRevision := "98e311990954b15de54913edd0e9845fbdd0d744-dirty"
+    static SourceRevision := "1da9c3a8f98c6f59ace10a5a5da9b36c6aee6ac7-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18760,6 +18760,9 @@ MxNMMontageWaitForControl(session, controlId, className, timeoutMs) {
 }
 
 MxNMMontagePhysicalClick(x, y) {
+    ; All resolved rectangles and WindowFromPoint checks use screen coordinates.
+    ; CoordMode is per AHK thread, so the hotkey handler must set it itself.
+    CoordMode "Mouse", "Screen"
     MouseGetPos &originalX, &originalY
     clicked := false, restored := false
     try {
