@@ -24,6 +24,12 @@ class MxNMMontageDefaults {
     }
 }
 
+class MxNMMontageTiming {
+    ; The layout matrix exposes no selected-state signal. All other transitions
+    ; use a control/value confirmation instead of a fixed inter-step delay.
+    static LayoutSettleMs := 500
+}
+
 MxNMMontageProfileDefaults() {
     return [
         {Id: "body", Label: "Body", Preset: "default", ThicknessKey: "BodyThickness", Thickness: "8.5", SliceKey: "BodySlice", Slice: "8", ZoomKey: "BodyZoom", Zoom: "0.8"},
@@ -153,9 +159,8 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
         result := step.Call(session)
         if !result.ok
             return result
-        settleMs := index = 1 ? 750 : index < steps.Length ? 250 : 0
-        if settleMs
-            Sleep settleMs
+        if index = 1
+            Sleep MxNMMontageTiming.LayoutSettleMs
     }
     return MxNMMontageResult(true, "READY")
 }
