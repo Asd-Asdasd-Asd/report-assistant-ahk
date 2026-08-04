@@ -101,7 +101,11 @@ InvokeMxNMMontageHotkey(profileId, settings, *) {
     busy := true
     try {
         viewerHwnd := WinExist("A")
-        result := MxNMMontageRun(profileId, settings, viewerHwnd)
+        if !MxNMMontageWaitForHotkeyRelease(profileId) {
+            result := MxNMMontageResult(false, "HOTKEY_RELEASE_TIMEOUT")
+        } else {
+            result := MxNMMontageRun(profileId, settings, viewerHwnd)
+        }
         if result.ok
             Flash(settings.profiles[profileId].label " montage 已完成", 1200)
         else
@@ -109,6 +113,15 @@ InvokeMxNMMontageHotkey(profileId, settings, *) {
     } finally {
         busy := false
     }
+}
+
+MxNMMontageWaitForHotkeyRelease(profileId) {
+    keyByProfile := Map("body", "b", "head", "h", "lung", "l")
+    if !keyByProfile.Has(profileId)
+        return false
+    return KeyWait(keyByProfile[profileId], "T2")
+        && KeyWait("Alt", "T2")
+        && KeyWait("Shift", "T2")
 }
 
 MxNMMontageRun(profileId, settings, viewerHwnd) {
@@ -475,6 +488,7 @@ MxNMMontageFailureMessage(code) {
         "LAYOUT_PROFILE_UNVALIDATED", "Montage 仅已验证布局 4×4；未执行。",
         "VIEWER_NOT_MEDEX", "请在 MedExNMFusion Viewer 前台执行 Montage。",
         "VIEWER_FOREGROUND_CHANGED", "Viewer 前台已变化，Montage 已停止。",
+        "HOTKEY_RELEASE_TIMEOUT", "请松开 Montage 快捷键后重试。",
         "CONTROL_NOT_UNIQUE", "Viewer 控件未唯一识别，Montage 未继续。"
     )
     return messages.Has(code) ? messages[code] : "Montage 未完成：" code

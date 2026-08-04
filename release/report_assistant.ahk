@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 0a0581493b1880714f53c33bea70571312d742a6-dirty
-; Generated at: 2026-08-04 09:53:15 UTC
+; Source revision: 7134638757384926258c02829eb182f33ad8c277-dirty
+; Generated at: 2026-08-04 09:55:51 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-04"
-    static SourceRevision := "0a0581493b1880714f53c33bea70571312d742a6-dirty"
+    static SourceRevision := "7134638757384926258c02829eb182f33ad8c277-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18424,7 +18424,11 @@ InvokeMxNMMontageHotkey(profileId, settings, *) {
     busy := true
     try {
         viewerHwnd := WinExist("A")
-        result := MxNMMontageRun(profileId, settings, viewerHwnd)
+        if !MxNMMontageWaitForHotkeyRelease(profileId) {
+            result := MxNMMontageResult(false, "HOTKEY_RELEASE_TIMEOUT")
+        } else {
+            result := MxNMMontageRun(profileId, settings, viewerHwnd)
+        }
         if result.ok
             Flash(settings.profiles[profileId].label " montage 已完成", 1200)
         else
@@ -18432,6 +18436,15 @@ InvokeMxNMMontageHotkey(profileId, settings, *) {
     } finally {
         busy := false
     }
+}
+
+MxNMMontageWaitForHotkeyRelease(profileId) {
+    keyByProfile := Map("body", "b", "head", "h", "lung", "l")
+    if !keyByProfile.Has(profileId)
+        return false
+    return KeyWait(keyByProfile[profileId], "T2")
+        && KeyWait("Alt", "T2")
+        && KeyWait("Shift", "T2")
 }
 
 MxNMMontageRun(profileId, settings, viewerHwnd) {
@@ -18798,6 +18811,7 @@ MxNMMontageFailureMessage(code) {
         "LAYOUT_PROFILE_UNVALIDATED", "Montage 仅已验证布局 4×4；未执行。",
         "VIEWER_NOT_MEDEX", "请在 MedExNMFusion Viewer 前台执行 Montage。",
         "VIEWER_FOREGROUND_CHANGED", "Viewer 前台已变化，Montage 已停止。",
+        "HOTKEY_RELEASE_TIMEOUT", "请松开 Montage 快捷键后重试。",
         "CONTROL_NOT_UNIQUE", "Viewer 控件未唯一识别，Montage 未继续。"
     )
     return messages.Has(code) ? messages[code] : "Montage 未完成：" code
