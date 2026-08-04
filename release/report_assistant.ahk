@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 6ef4ddf41b74351adfe1fedfea6f2aab1d7ce447-dirty
-; Generated at: 2026-08-04 10:12:15 UTC
+; Source revision: d48f9958d8db0f2620988f0a3c401c4932c0994d-dirty
+; Generated at: 2026-08-04 10:20:21 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-04"
-    static SourceRevision := "6ef4ddf41b74351adfe1fedfea6f2aab1d7ce447-dirty"
+    static SourceRevision := "d48f9958d8db0f2620988f0a3c401c4932c0994d-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18350,7 +18350,10 @@ class MxNMMontageDefaults {
 class MxNMMontageTiming {
     ; The layout matrix exposes no selected-state signal. All other transitions
     ; use a control/value confirmation instead of a fixed inter-step delay.
-    static LayoutSettleMs := 500
+    static LayoutSettleMs := 350
+    static EditConfirmTimeoutMs := 300
+    static EditConfirmPollMs := 20
+    static ButtonSettleMs := 60
 }
 
 MxNMMontageProfileDefaults() {
@@ -18638,8 +18641,18 @@ MxNMMontageSetEdit(controlId, value, session) {
         if element.ProcessId != session.viewerPid || !element.IsValuePatternAvailable
             throw Error()
         element.ValuePattern.SetValue(value)
-        Sleep 60
-        if String(element.ValuePattern.Value) != value
+        valueConfirmed := false
+        deadline := A_TickCount + MxNMMontageTiming.EditConfirmTimeoutMs
+        loop {
+            if String(element.ValuePattern.Value) = value {
+                valueConfirmed := true
+                break
+            }
+            if A_TickCount >= deadline
+                break
+            Sleep MxNMMontageTiming.EditConfirmPollMs
+        }
+        if !valueConfirmed
             return MxNMMontageResult(false, "EDIT_VALUE_NOT_CONFIRMED")
     } catch {
         return MxNMMontageResult(false, "EDIT_SET_VALUE_FAILED")
@@ -18660,7 +18673,7 @@ MxNMMontageInvokeButton(controlId, session) {
         element.InvokePattern.Invoke()
     } catch
         return MxNMMontageResult(false, "BUTTON_INVOKE_FAILED")
-    Sleep 120
+    Sleep MxNMMontageTiming.ButtonSettleMs
     return MxNMMontageResult(true, "BUTTON_INVOKE_DISPATCHED")
 }
 
@@ -18684,7 +18697,6 @@ MxNMMontageCommitZoom(session) {
     if !matches || !MxNMMontageViewerStillActive(session)
         return MxNMMontageResult(false, "ZOOM_FOCUS_NOT_CONFIRMED")
     Send "{Enter}"
-    Sleep 120
     return MxNMMontageResult(true, "ENTER_DISPATCHED")
 }
 

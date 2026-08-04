@@ -27,7 +27,10 @@ class MxNMMontageDefaults {
 class MxNMMontageTiming {
     ; The layout matrix exposes no selected-state signal. All other transitions
     ; use a control/value confirmation instead of a fixed inter-step delay.
-    static LayoutSettleMs := 500
+    static LayoutSettleMs := 350
+    static EditConfirmTimeoutMs := 300
+    static EditConfirmPollMs := 20
+    static ButtonSettleMs := 60
 }
 
 MxNMMontageProfileDefaults() {
@@ -315,8 +318,18 @@ MxNMMontageSetEdit(controlId, value, session) {
         if element.ProcessId != session.viewerPid || !element.IsValuePatternAvailable
             throw Error()
         element.ValuePattern.SetValue(value)
-        Sleep 60
-        if String(element.ValuePattern.Value) != value
+        valueConfirmed := false
+        deadline := A_TickCount + MxNMMontageTiming.EditConfirmTimeoutMs
+        loop {
+            if String(element.ValuePattern.Value) = value {
+                valueConfirmed := true
+                break
+            }
+            if A_TickCount >= deadline
+                break
+            Sleep MxNMMontageTiming.EditConfirmPollMs
+        }
+        if !valueConfirmed
             return MxNMMontageResult(false, "EDIT_VALUE_NOT_CONFIRMED")
     } catch {
         return MxNMMontageResult(false, "EDIT_SET_VALUE_FAILED")
@@ -337,7 +350,7 @@ MxNMMontageInvokeButton(controlId, session) {
         element.InvokePattern.Invoke()
     } catch
         return MxNMMontageResult(false, "BUTTON_INVOKE_FAILED")
-    Sleep 120
+    Sleep MxNMMontageTiming.ButtonSettleMs
     return MxNMMontageResult(true, "BUTTON_INVOKE_DISPATCHED")
 }
 
@@ -361,7 +374,6 @@ MxNMMontageCommitZoom(session) {
     if !matches || !MxNMMontageViewerStillActive(session)
         return MxNMMontageResult(false, "ZOOM_FOCUS_NOT_CONFIRMED")
     Send "{Enter}"
-    Sleep 120
     return MxNMMontageResult(true, "ENTER_DISPATCHED")
 }
 
