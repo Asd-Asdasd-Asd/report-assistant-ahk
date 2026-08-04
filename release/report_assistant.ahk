@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 7134638757384926258c02829eb182f33ad8c277-dirty
-; Generated at: 2026-08-04 09:55:51 UTC
+; Source revision: 98e311990954b15de54913edd0e9845fbdd0d744-dirty
+; Generated at: 2026-08-04 09:59:07 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-04"
-    static SourceRevision := "7134638757384926258c02829eb182f33ad8c277-dirty"
+    static SourceRevision := "98e311990954b15de54913edd0e9845fbdd0d744-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18470,12 +18470,15 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
         MxNMMontageSetEdit.Bind(21032, profile.zoom),
         MxNMMontageCommitZoom
     ]
-    for step in steps {
+    for index, step in steps {
         if !MxNMMontageViewerStillActive(session)
             return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED")
         result := step.Call(session)
         if !result.ok
             return result
+        settleMs := index = 1 ? 750 : index < steps.Length ? 250 : 0
+        if settleMs
+            Sleep settleMs
     }
     return MxNMMontageResult(true, "READY")
 }

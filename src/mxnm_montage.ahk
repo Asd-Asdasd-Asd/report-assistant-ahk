@@ -147,12 +147,15 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
         MxNMMontageSetEdit.Bind(21032, profile.zoom),
         MxNMMontageCommitZoom
     ]
-    for step in steps {
+    for index, step in steps {
         if !MxNMMontageViewerStillActive(session)
             return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED")
         result := step.Call(session)
         if !result.ok
             return result
+        settleMs := index = 1 ? 750 : index < steps.Length ? 250 : 0
+        if settleMs
+            Sleep settleMs
     }
     return MxNMMontageResult(true, "READY")
 }

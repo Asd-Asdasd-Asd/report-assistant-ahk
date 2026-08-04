@@ -36,6 +36,7 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("MxNMMontageWaitForHotkeyRelease(profileId)", module)
         self.assertIn('KeyWait("Alt", "T2")', module)
         self.assertIn('KeyWait("Shift", "T2")', module)
+        self.assertIn("settleMs := index = 1 ? 750 : index < steps.Length ? 250 : 0", module)
 
     def test_control_resolution_keeps_win32_and_uia_paths(self) -> None:
         module = source("src/mxnm_montage.ahk")
