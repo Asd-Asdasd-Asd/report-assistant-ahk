@@ -41,13 +41,13 @@ LayoutRow=4
 LayoutColumn=4
 BodyThickness=8.5
 BodySlice=8
-BodyZoom=0.8
+BodyZoom=0.7
 HeadThickness=4
 HeadSlice=11
 HeadZoom=1.2
-LungThickness=7.5
+LungThickness=8
 LungSlice=23
-LungZoom=0.9
+LungZoom=0.85
 ```
 
 明天 Windows 现场测试前，将 `Enabled=true`，重新加载脚本，然后在无患者隐私的
@@ -84,9 +84,9 @@ Body、Head 也应显式选择 `default`，不能依赖 Viewer 启动时或上�
 
 | Profile | Hotkey | Window preset | Thickness | Current slice | Zoom | 状态 |
 | --- | --- | --- | ---: | ---: | ---: | --- |
-| Body | `Shift+Alt+B` | `default` | 8.5 | 8 | 0.8 | legacy 初始值，待现场复验/微调 |
+| Body | `Shift+Alt+B` | `default` | 8.5 | 8 | 0.7 | production 成品测试后微调值，待复验 |
 | Head | `Shift+Alt+H` | `default` | 4 | 11 | 1.2 | legacy 初始值，待现场复验/微调 |
-| Lung | `Shift+Alt+L` | `lung` | 7.5 | 23 | 0.9 | 当前工作站已现场通过，仍允许用户微调 |
+| Lung | `Shift+Alt+L` | `lung` | 8 | 23 | 0.85 | production 成品测试后微调值，待复验 |
 
 布局配置的初始值为 `row=4`、`column=4`。允许范围暂定为 5 行 × 4 列，但只有
 R4C4 完成了自动执行验证。第 5 行虽然被 Tab 遮住一部分，探测确认露出区域可命中；

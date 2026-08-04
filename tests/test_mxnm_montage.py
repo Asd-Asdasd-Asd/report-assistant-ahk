@@ -19,8 +19,9 @@ class MxNMMontageTests(unittest.TestCase):
         module = source("src/mxnm_montage.ahk")
         self.assertIn('static Section := "MontageHotkeys"', module)
         self.assertIn('static EnabledDefault := "false"', module)
-        for value in ('"8.5"', '"8"', '"0.8"', '"4"', '"11"', '"1.2"', '"7.5"', '"23"', '"0.9"'):
-            self.assertIn(value, module)
+        self.assertIn('Thickness: "8.5", SliceKey: "BodySlice", Slice: "8", ZoomKey: "BodyZoom", Zoom: "0.7"', module)
+        self.assertIn('Thickness: "4", SliceKey: "HeadSlice", Slice: "11", ZoomKey: "HeadZoom", Zoom: "1.2"', module)
+        self.assertIn('Thickness: "8", SliceKey: "LungSlice", Slice: "23", ZoomKey: "LungZoom", Zoom: "0.85"', module)
         self.assertIn('Preset: "lung"', module)
         self.assertEqual(module.count('Preset: "default"'), 2)
 

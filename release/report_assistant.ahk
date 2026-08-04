@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: d48f9958d8db0f2620988f0a3c401c4932c0994d-dirty
-; Generated at: 2026-08-04 10:20:21 UTC
+; Source revision: a7b0a16129fd835b40ac1f98ba5b1bdb2f186b2c-dirty
+; Generated at: 2026-08-04 10:37:13 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-04"
-    static SourceRevision := "d48f9958d8db0f2620988f0a3c401c4932c0994d-dirty"
+    static SourceRevision := "a7b0a16129fd835b40ac1f98ba5b1bdb2f186b2c-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18358,9 +18358,9 @@ class MxNMMontageTiming {
 
 MxNMMontageProfileDefaults() {
     return [
-        {Id: "body", Label: "Body", Preset: "default", ThicknessKey: "BodyThickness", Thickness: "8.5", SliceKey: "BodySlice", Slice: "8", ZoomKey: "BodyZoom", Zoom: "0.8"},
+        {Id: "body", Label: "Body", Preset: "default", ThicknessKey: "BodyThickness", Thickness: "8.5", SliceKey: "BodySlice", Slice: "8", ZoomKey: "BodyZoom", Zoom: "0.7"},
         {Id: "head", Label: "Head", Preset: "default", ThicknessKey: "HeadThickness", Thickness: "4", SliceKey: "HeadSlice", Slice: "11", ZoomKey: "HeadZoom", Zoom: "1.2"},
-        {Id: "lung", Label: "Lung", Preset: "lung", ThicknessKey: "LungThickness", Thickness: "7.5", SliceKey: "LungSlice", Slice: "23", ZoomKey: "LungZoom", Zoom: "0.9"}
+        {Id: "lung", Label: "Lung", Preset: "lung", ThicknessKey: "LungThickness", Thickness: "8", SliceKey: "LungSlice", Slice: "23", ZoomKey: "LungZoom", Zoom: "0.85"}
     ]
 }
 

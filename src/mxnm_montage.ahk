@@ -35,9 +35,9 @@ class MxNMMontageTiming {
 
 MxNMMontageProfileDefaults() {
     return [
-        {Id: "body", Label: "Body", Preset: "default", ThicknessKey: "BodyThickness", Thickness: "8.5", SliceKey: "BodySlice", Slice: "8", ZoomKey: "BodyZoom", Zoom: "0.8"},
+        {Id: "body", Label: "Body", Preset: "default", ThicknessKey: "BodyThickness", Thickness: "8.5", SliceKey: "BodySlice", Slice: "8", ZoomKey: "BodyZoom", Zoom: "0.7"},
         {Id: "head", Label: "Head", Preset: "default", ThicknessKey: "HeadThickness", Thickness: "4", SliceKey: "HeadSlice", Slice: "11", ZoomKey: "HeadZoom", Zoom: "1.2"},
-        {Id: "lung", Label: "Lung", Preset: "lung", ThicknessKey: "LungThickness", Thickness: "7.5", SliceKey: "LungSlice", Slice: "23", ZoomKey: "LungZoom", Zoom: "0.9"}
+        {Id: "lung", Label: "Lung", Preset: "lung", ThicknessKey: "LungThickness", Thickness: "8", SliceKey: "LungSlice", Slice: "23", ZoomKey: "LungZoom", Zoom: "0.85"}
     ]
 }
 
