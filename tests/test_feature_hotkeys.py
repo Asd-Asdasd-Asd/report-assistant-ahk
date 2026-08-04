@@ -130,7 +130,7 @@ class FeatureHotkeyTests(unittest.TestCase):
         release = source("release/report_assistant.ahk")
         self.assertIn('"global_hjkl_arrows.ahk"', build)
         self.assertIn('"features.ahk"', build)
-        feature_start = release.index("RegisterConfiguredFeatures(LoadFeatureSettings())")
+        feature_start = release.index("RegisterConfiguredFeatures(\n    LoadFeatureSettings(),")
         suspend_exempt = release.index("#SuspendExempt", feature_start)
         self.assertLess(feature_start, suspend_exempt)
 

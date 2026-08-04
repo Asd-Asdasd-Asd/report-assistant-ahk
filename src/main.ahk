@@ -36,6 +36,7 @@
 #Include template_renderer.ahk
 #Include hotstring_normalization.ahk
 #Include config_reconciliation.ahk
+#Include mxnm_montage.ahk
 #Include hotstring_config_migration.ahk
 #Include hotstring_config_editor.ahk
 #Include config_bootstrap.ahk

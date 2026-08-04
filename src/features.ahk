@@ -1,6 +1,18 @@
-RegisterConfiguredFeatures(LoadFeatureSettings())
+RegisterConfiguredFeatures(
+    LoadFeatureSettings(),
+    LoadMxNMMontageSettings()
+)
 
-RegisterConfiguredFeatures(settings) {
+RegisterConfiguredFeatures(settings, montageSettings := 0) {
+    if IsObject(montageSettings)
+        && montageSettings.ok
+        && montageSettings.enabled {
+        RegisterHotkeyDefinitions(
+            MxNMMontageHotkeyDefinitions(montageSettings),
+            ReservedApplicationHotkeyChords(),
+            MedExViewerForegroundActive
+        )
+    }
     RegisterHotkeyDefinitions(
         ReportImageCaptionHotkeyDefinitions(settings),
         ReservedApplicationHotkeyChords(),

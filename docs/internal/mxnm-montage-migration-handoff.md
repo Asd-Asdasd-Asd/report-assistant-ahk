@@ -3,8 +3,8 @@
 更新时间：2026-08-03
 
 本文用于从已验证的 Lung 字段测试继续开发正式的 Body、Head、Lung montage
-功能。当前只完成运行时契约探测和单机字段验证；`Shift+Alt+B/H/L` 尚未迁入
-production，legacy compatibility 仍拥有这些快捷键。
+功能。运行时契约探测、Lung 单机字段验证和 production 的初版接入均已完成；
+`Shift+Alt+B/H/L` 默认不注册，避免在仍启用 legacy compatibility 时发生快捷键抢占。
 
 ## 当前结论
 
@@ -25,6 +25,35 @@ Viewer 最终表现正确。验证环境为：
 - [控件探测](mxnm-montage-control-diagnostic.md)；
 - [Lung 受控执行](mxnm-montage-lung-field-test.md)；
 - 当前字段测试基线：commit `3cd41ad`，`FieldTestVersion=0.7`。
+
+## 目前 production 接入
+
+`src/mxnm_montage.ahk` 已复用字段测试 0.7 的 resolver 与 transport，并以一键方式
+注册以下 profile：Body `Shift+Alt+B`、Head `Shift+Alt+H`、Lung `Shift+Alt+L`。三者
+共用同一执行链；默认窗宽为 `default`，Lung 为 `lung`。
+
+首次运行会在 `%LOCALAPPDATA%\MedExReportAssistant\config.ini` 补入：
+
+```ini
+[MontageHotkeys]
+Enabled=false
+LayoutRow=4
+LayoutColumn=4
+BodyThickness=8.5
+BodySlice=8
+BodyZoom=0.8
+HeadThickness=4
+HeadSlice=11
+HeadZoom=1.2
+LungThickness=7.5
+LungSlice=23
+LungZoom=0.9
+```
+
+明天 Windows 现场测试前，将 `Enabled=true`，重新加载脚本，然后在无患者隐私的
+Viewer 检查中分别验证三个快捷键。数值可在这一段微调。配置的其他 layout 值会被
+读取和校验，但 production 暂时只允许已验证的 `LayoutRow=4`、`LayoutColumn=4`
+实际执行；其他值会提示并停止，不会发送半条点击链。
 
 ## 业务顺序
 

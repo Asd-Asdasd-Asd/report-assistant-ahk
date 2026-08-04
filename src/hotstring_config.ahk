@@ -72,8 +72,12 @@ BuildDefaultReportHotstringConfig(defaults := 0) {
         FeatureDefaults.ViewerCaptureEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
         FeatureDefaults.ViewerCaptureChordKey "=" FeatureDefaults.ViewerCaptureChordDefault,
         FeatureDefaults.ViewerClearEnabledKey "=" FeatureDefaults.ViewerToolEnabledDefault,
-        FeatureDefaults.ViewerClearChordKey "=" FeatureDefaults.ViewerClearChordDefault
+        FeatureDefaults.ViewerClearChordKey "=" FeatureDefaults.ViewerClearChordDefault,
+        "",
+        "[" MxNMMontageDefaults.Section "]"
     ]
+    for definition in MxNMMontageDefaults.ManagedConfigDefaults()
+        lines.Push(definition.Key "=" definition.DefaultValue)
     for entry in defaults {
         lines.Push("")
         lines.Push("[" entry.Section "]")

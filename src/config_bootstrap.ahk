@@ -2,6 +2,8 @@ ReportAssistantManagedConfigDefaults() {
     defaults := []
     for definition in FeatureDefaults.ManagedConfigDefaults()
         defaults.Push(definition)
+    for definition in MxNMMontageDefaults.ManagedConfigDefaults()
+        defaults.Push(definition)
     return defaults
 }
 
