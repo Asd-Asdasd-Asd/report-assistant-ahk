@@ -25,7 +25,9 @@ MedEx 报告图像页面的 `flipImage(direction)` 有一个 500 ms 保存门槛
 
 production 不再把 `WheelDown` 自带的条件保存当作唯一提交入口。目标解析已经要求
 窗口中存在唯一、可用且与 caption Pane 同属一个 root-owner 的“保存”按钮；执行时
-在粘贴后显式点击该按钮，等待 200 ms，再发送 `WheelDown`。这等价于用户点击页面
+在粘贴后显式点击该按钮。新捕获 caption 的首次执行等待 550 ms，使随后
+`WheelDown` 同时获得 Vendor 条件保存的备用机会；已缓存 caption 的后续执行仍等待
+200 ms。这等价于用户点击页面
 原有保存入口，复用 `saveDescription()` 的 guard、payload、认证、缓存和错误处理，
 同时绕开 `flipImage()` 的 500 ms 条件分支。
 
@@ -161,7 +163,7 @@ Electron main/preload，再只读枚举 renderer target，最后才允许对唯�
 1. 激活并复核唯一报告图像窗口；
 2. `Ctrl+A` 覆盖当前 caption，粘贴 cache；
 3. 复核并点击唯一“保存”按钮；
-4. 等待 200 ms；
+4. 新捕获 caption 时等待 550 ms，后续缓存复用时等待 200 ms；
 5. 再移动到 image point 发送一次 `WheelDown`。
 
 save point 无效、窗口切换或保存点击未派发时返回明确失败，不继续翻页。该路径不再

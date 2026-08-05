@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: d2ed67e3baf055c66e4f3157cabc7e32aa1b81e7-dirty
-; Generated at: 2026-08-04 10:51:53 UTC
+; Source revision: 8120b6d0affccfad076db287f7a5b4de4e84d8f2-dirty
+; Generated at: 2026-08-05 06:34:42 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-08-04"
-    static SourceRevision := "d2ed67e3baf055c66e4f3157cabc7e32aa1b81e7-dirty"
+    static BuildDate := "2026-08-05"
+    static SourceRevision := "8120b6d0affccfad076db287f7a5b4de4e84d8f2-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -18359,6 +18359,7 @@ class MxNMMontageDefaults {
 class MxNMMontageTiming {
     ; The layout matrix exposes no selected-state signal. All other transitions
     ; use a control/value confirmation instead of a fixed inter-step delay.
+    static InitialControlReadyTimeoutMs := 1500
     static LayoutSettleMs := 350
     static EditConfirmTimeoutMs := 300
     static EditConfirmPollMs := 20
@@ -18554,16 +18555,16 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
     if !layoutPoint.ok
         return MxNMMontageResult(false, "LAYOUT_PROFILE_INVALID")
     steps := [
-        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, ""),
-        MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox"),
+        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, "", MxNMMontageTiming.InitialControlReadyTimeoutMs),
+        MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox", 0),
         MxNMMontageComboSelect.Bind(21155, "null"),
-        MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox"),
+        MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox", 0),
         MxNMMontageComboSelect.Bind(21014, profile.preset),
         MxNMMontageSetEdit.Bind(21012, profile.thickness),
         MxNMMontageInvokeButton.Bind(21015),
         MxNMMontageSetEdit.Bind(21201, profile.slice),
         MxNMMontageInvokeButton.Bind(21203),
-        MxNMMontageStaticClick.Bind(21007, "Static", .681208, .5, 21032, "Edit"),
+        MxNMMontageStaticClick.Bind(21007, "Static", .681208, .5, 21032, "Edit", 0),
         MxNMMontageSetEdit.Bind(21032, profile.zoom),
         MxNMMontageCommitZoom
     ]
@@ -18606,8 +18607,18 @@ MxNMMontageCreateSession(viewerHwnd) {
     return {ok: true, code: "READY", viewerHwnd: viewerHwnd, viewerPid: viewerPid, viewerRootOwner: rootOwner}
 }
 
-MxNMMontageStaticClick(controlId, className, xRatio, yRatio, effectId, effectClass, session) {
-    resolved := MxNMMontageResolveControl(session, controlId, className)
+MxNMMontageStaticClick(controlId, className, xRatio, yRatio, effectId, effectClass, resolveTimeoutMs, session) {
+    ; Only the first required control gets a bounded readiness retry. This does
+    ; not add a machine-specific signature: it waits for the same control that
+    ; the next physical click already requires.
+    resolved := resolveTimeoutMs > 0
+        ? MxNMMontageWaitForControl(
+            session,
+            controlId,
+            className,
+            resolveTimeoutMs
+        )
+        : MxNMMontageResolveControl(session, controlId, className)
     if !resolved.ok
         return resolved
     rect := resolved.rectObject
@@ -21088,6 +21099,9 @@ class ReportImageCaptionDefaults {
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
     static ExplicitSaveSettleMs := 200
+    ; A newly captured caption gets one conservative save window. The later
+    ; cached reuse path keeps the field-validated 200 ms cadence.
+    static CaptureSaveFallbackSettleMs := 550
     static MinCaptionGapPx := 120
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
@@ -21287,7 +21301,8 @@ class ReportImageCaptionProvider {
         return ExecuteReportImageCaptionAction(
             REPORT_IMAGE_CAPTION_CACHE,
             target,
-            sourceHwnd
+            sourceHwnd,
+            ReportImageCaptionDefaults.CaptureSaveFallbackSettleMs
         )
     }
 
@@ -21314,7 +21329,8 @@ class ReportImageCaptionProvider {
         return ExecuteReportImageCaptionAction(
             cache,
             target,
-            targetHwnd
+            targetHwnd,
+            ReportImageCaptionDefaults.ExplicitSaveSettleMs
         )
     }
 }
@@ -21644,7 +21660,12 @@ ResolveReportImageCaptionImagePoint(
     }
 }
 
-ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
+ExecuteReportImageCaptionAction(
+    cache,
+    target,
+    expectedForegroundHwnd,
+    saveSettleMs
+) {
     CoordMode "Mouse", "Screen"
     MouseGetPos &originalX, &originalY
     pasteDispatched := false
@@ -21757,7 +21778,7 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
                 true
             )
         }
-        Sleep ReportImageCaptionDefaults.ExplicitSaveSettleMs
+        Sleep saveSettleMs
 
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(

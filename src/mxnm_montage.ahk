@@ -36,6 +36,7 @@ class MxNMMontageDefaults {
 class MxNMMontageTiming {
     ; The layout matrix exposes no selected-state signal. All other transitions
     ; use a control/value confirmation instead of a fixed inter-step delay.
+    static InitialControlReadyTimeoutMs := 1500
     static LayoutSettleMs := 350
     static EditConfirmTimeoutMs := 300
     static EditConfirmPollMs := 20
@@ -231,16 +232,16 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
     if !layoutPoint.ok
         return MxNMMontageResult(false, "LAYOUT_PROFILE_INVALID")
     steps := [
-        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, ""),
-        MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox"),
+        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, "", MxNMMontageTiming.InitialControlReadyTimeoutMs),
+        MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox", 0),
         MxNMMontageComboSelect.Bind(21155, "null"),
-        MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox"),
+        MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox", 0),
         MxNMMontageComboSelect.Bind(21014, profile.preset),
         MxNMMontageSetEdit.Bind(21012, profile.thickness),
         MxNMMontageInvokeButton.Bind(21015),
         MxNMMontageSetEdit.Bind(21201, profile.slice),
         MxNMMontageInvokeButton.Bind(21203),
-        MxNMMontageStaticClick.Bind(21007, "Static", .681208, .5, 21032, "Edit"),
+        MxNMMontageStaticClick.Bind(21007, "Static", .681208, .5, 21032, "Edit", 0),
         MxNMMontageSetEdit.Bind(21032, profile.zoom),
         MxNMMontageCommitZoom
     ]
@@ -283,8 +284,18 @@ MxNMMontageCreateSession(viewerHwnd) {
     return {ok: true, code: "READY", viewerHwnd: viewerHwnd, viewerPid: viewerPid, viewerRootOwner: rootOwner}
 }
 
-MxNMMontageStaticClick(controlId, className, xRatio, yRatio, effectId, effectClass, session) {
-    resolved := MxNMMontageResolveControl(session, controlId, className)
+MxNMMontageStaticClick(controlId, className, xRatio, yRatio, effectId, effectClass, resolveTimeoutMs, session) {
+    ; Only the first required control gets a bounded readiness retry. This does
+    ; not add a machine-specific signature: it waits for the same control that
+    ; the next physical click already requires.
+    resolved := resolveTimeoutMs > 0
+        ? MxNMMontageWaitForControl(
+            session,
+            controlId,
+            className,
+            resolveTimeoutMs
+        )
+        : MxNMMontageResolveControl(session, controlId, className)
     if !resolved.ok
         return resolved
     rect := resolved.rectObject

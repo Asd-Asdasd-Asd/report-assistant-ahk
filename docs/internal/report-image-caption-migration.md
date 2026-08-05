@@ -208,7 +208,8 @@ paste 已发送后若 wheel 失败，返回 partial success，不重贴、不补
 粘贴 settle 根治。
 
 production 现改为从同一套 UIA signature 中同时解析唯一“保存”按钮：粘贴后先
-复核并点击 save point，等待 200 ms，再向 image point 发送一次 `WheelDown`。
+复核并点击 save point。新捕获 caption 的首次执行等待 550 ms，使随后的
+`WheelDown` 越过 Vendor 条件保存门槛；已缓存 caption 的后续执行仍等待 200 ms。
 save point 与 caption/image points 一起缓存并逐次校验 target PID、client rect 和
 root-owner；保存入口失效时返回 `SAVE_DISPATCH_FAILED`，不继续翻页。这样通过页面
 原有按钮触发已确认的 `saveDescription()` 业务链，不再把 500 ms 条件保存当作正常

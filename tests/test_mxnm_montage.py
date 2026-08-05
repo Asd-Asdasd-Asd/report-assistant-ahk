@@ -40,6 +40,7 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("MxNMMontageWaitForHotkeyRelease(chord)", module)
         self.assertIn("ViewerHotkeyChordHasPressedComponent(chord)", module)
         self.assertIn("static LayoutSettleMs := 350", module)
+        self.assertIn("static InitialControlReadyTimeoutMs := 1500", module)
         self.assertIn("static EditConfirmTimeoutMs := 300", module)
         self.assertIn("static EditConfirmPollMs := 20", module)
         self.assertIn("static ButtonSettleMs := 60", module)
@@ -48,6 +49,28 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("Sleep MxNMMontageTiming.ButtonSettleMs", module)
         self.assertNotIn("index < steps.Length ? 250", module)
         self.assertIn('CoordMode "Mouse", "Screen"', module)
+
+    def test_only_required_initial_control_gets_bounded_readiness_retry(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        steps = module.split("steps := [", 1)[1].split("\n    ]", 1)[0]
+        self.assertEqual(
+            steps.count("MxNMMontageTiming.InitialControlReadyTimeoutMs"),
+            1,
+        )
+        self.assertIn(
+            'MxNMMontageStaticClick.Bind(21112, "Static", '
+            "layoutPoint.xRatio, layoutPoint.yRatio, 0, \"\", "
+            "MxNMMontageTiming.InitialControlReadyTimeoutMs)",
+            steps,
+        )
+        static_click = module.split(
+            "MxNMMontageStaticClick(controlId, className, xRatio, yRatio, "
+            "effectId, effectClass, resolveTimeoutMs, session) {",
+            1,
+        )[1].split("\nMxNMMontageComboSelect", 1)[0]
+        self.assertIn("MxNMMontageWaitForControl(", static_click)
+        self.assertNotIn("WinGetTitle", static_click)
+        self.assertNotIn("MonitorGet", static_click)
 
     def test_control_resolution_keeps_win32_and_uia_paths(self) -> None:
         module = source("src/mxnm_montage.ahk")

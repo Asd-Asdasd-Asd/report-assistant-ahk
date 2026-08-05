@@ -54,7 +54,7 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
 
     def test_save_dispatch_starts_feedback_inside_existing_wait(self) -> None:
         action = self.caption.split(
-            "ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd)",
+            "\nExecuteReportImageCaptionAction(\n    cache,",
             1,
         )[1].split("\nSetReportImageCaptionClipboard(payload)", 1)[0]
         show = "ShowReportImageCaptionTransferFeedback("
@@ -66,7 +66,7 @@ class ReportImageCaptionFeedbackTests(unittest.TestCase):
         )
         self.assertLess(
             action.index(show),
-            action.index("ExplicitSaveSettleMs"),
+            action.index("Sleep saveSettleMs"),
         )
         self.assertLess(
             action.index(show),

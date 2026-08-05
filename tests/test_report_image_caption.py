@@ -216,7 +216,7 @@ class ReportImageCaptionTests(unittest.TestCase):
 
     def test_action_keeps_caption_clipboard_and_restores_only_mouse(self) -> None:
         action = self.body(
-            "ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd)",
+            "\nExecuteReportImageCaptionAction(\n    cache,",
             "\nSetReportImageCaptionClipboard(payload)",
         )
         self.assertIn('WinActivate "ahk_id " target.hwnd', action)
@@ -238,6 +238,10 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertIn("static CaptionFocusSettleMs := 15", self.module)
         self.assertIn("static PasteSettleMs := 20", self.module)
         self.assertIn("static ExplicitSaveSettleMs := 200", self.module)
+        self.assertIn(
+            "static CaptureSaveFallbackSettleMs := 550",
+            self.module,
+        )
         self.assertLess(
             action.index("CaptionFocusSettleMs"),
             action.index('SendInput "^a"'),
@@ -253,7 +257,7 @@ class ReportImageCaptionTests(unittest.TestCase):
             "\nResolveReportImageCaptionPane(\n",
         )
         action = self.body(
-            "ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd)",
+            "\nExecuteReportImageCaptionAction(\n    cache,",
             "\nSetReportImageCaptionClipboard(payload)",
         )
         self.assertIn(
@@ -263,12 +267,34 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertIn("savePoint: savePoint", candidate)
         self.assertIn("target.savePoint.x", action)
         self.assertIn("target.savePoint.y", action)
-        self.assertIn("ExplicitSaveSettleMs", action)
+        self.assertIn("Sleep saveSettleMs", action)
         self.assertLess(
             action.index("target.savePoint.x"),
             action.index('SendInput "{WheelDown}"'),
         )
         self.assertIn("SAVE_DISPATCH_FAILED", action)
+
+    def test_only_fresh_caption_capture_uses_vendor_save_fallback_window(self) -> None:
+        capture = self.body(
+            "static InvokeCapture(sourceHwnd, priorCache := 0)",
+            "static InvokeReuse(targetHwnd, cache)",
+        )
+        reuse = self.body(
+            "static InvokeReuse(targetHwnd, cache)",
+            "CaptureFreshReportImageCaption(",
+        )
+        self.assertIn(
+            "ReportImageCaptionDefaults.CaptureSaveFallbackSettleMs",
+            capture,
+        )
+        self.assertNotIn(
+            "ReportImageCaptionDefaults.CaptureSaveFallbackSettleMs",
+            reuse,
+        )
+        self.assertIn(
+            "ReportImageCaptionDefaults.ExplicitSaveSettleMs",
+            reuse,
+        )
 
     def test_cache_has_explicit_tray_reset_and_no_persistence(self) -> None:
         tray = source("src/tray_menu.ahk")

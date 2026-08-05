@@ -5,6 +5,9 @@ class ReportImageCaptionDefaults {
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
     static ExplicitSaveSettleMs := 200
+    ; A newly captured caption gets one conservative save window. The later
+    ; cached reuse path keeps the field-validated 200 ms cadence.
+    static CaptureSaveFallbackSettleMs := 550
     static MinCaptionGapPx := 120
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
@@ -204,7 +207,8 @@ class ReportImageCaptionProvider {
         return ExecuteReportImageCaptionAction(
             REPORT_IMAGE_CAPTION_CACHE,
             target,
-            sourceHwnd
+            sourceHwnd,
+            ReportImageCaptionDefaults.CaptureSaveFallbackSettleMs
         )
     }
 
@@ -231,7 +235,8 @@ class ReportImageCaptionProvider {
         return ExecuteReportImageCaptionAction(
             cache,
             target,
-            targetHwnd
+            targetHwnd,
+            ReportImageCaptionDefaults.ExplicitSaveSettleMs
         )
     }
 }
@@ -561,7 +566,12 @@ ResolveReportImageCaptionImagePoint(
     }
 }
 
-ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
+ExecuteReportImageCaptionAction(
+    cache,
+    target,
+    expectedForegroundHwnd,
+    saveSettleMs
+) {
     CoordMode "Mouse", "Screen"
     MouseGetPos &originalX, &originalY
     pasteDispatched := false
@@ -674,7 +684,7 @@ ExecuteReportImageCaptionAction(cache, target, expectedForegroundHwnd) {
                 true
             )
         }
-        Sleep ReportImageCaptionDefaults.ExplicitSaveSettleMs
+        Sleep saveSettleMs
 
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(
