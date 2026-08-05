@@ -250,6 +250,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "targetRuntimeToolAnchorFallbackCode",
             hotkeys,
         )
+        self.assertIn("targetConfigCode", hotkeys)
         self.assertIn(
             "TARGET_CLIENT_POINT_INVALID",
             hotkeys,

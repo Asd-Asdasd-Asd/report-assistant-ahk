@@ -58,6 +58,44 @@ RunMxNMMeasurementTargetRegression() {
         "clipped bottom"
     )
 
+    fieldGeometry := {
+        imageSizeResolved: true,
+        imageWidth: 750,
+        imageHeight: 938
+    }
+    fieldClippedEntries := BuildMxNMTargetFixtureEntries([
+        [
+            {left: 0, top: 0, width: 750, height: 938},
+            {left: 0, top: 475, width: 372, height: 475},
+            {left: 372, top: 475, width: 372, height: 475}
+        ]
+    ])
+    fieldClipped := ParseMxNMDeclaredLayoutModels(
+        fieldClippedEntries,
+        fieldGeometry
+    )
+    AssertMxNMTarget(
+        fieldClipped.ok,
+        "field-observed twelve-pixel clipping"
+    )
+    AssertMxNMTarget(
+        fieldClipped.models[1].panes[2].bottom = 938
+            && fieldClipped.models[1].panes[3].bottom = 938,
+        "field-observed panes clipped to image bottom"
+    )
+
+    excessiveClippingEntries := BuildMxNMTargetFixtureEntries([
+        [{left: 0, top: 0, width: 750, height: 955}]
+    ])
+    excessiveClipping := ParseMxNMDeclaredLayoutModels(
+        excessiveClippingEntries,
+        fieldGeometry
+    )
+    AssertMxNMTarget(
+        !excessiveClipping.ok,
+        "clipping beyond bounded cap fails closed"
+    )
+
     malformedEntries := BuildMxNMTargetFixtureEntries([
         [{left: 0, top: 0, width: 100, height: 100}]
     ])

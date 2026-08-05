@@ -9,6 +9,11 @@ class MxNMMeasurementTargetCode {
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
 
+class MxNMMeasurementTargetDefaults {
+    static LayoutClippingToleranceRatio := 0.015
+    static LayoutClippingToleranceMaxPixels := 16
+}
+
 class MxNMMeasurementTargetResolver {
     static BuildPlan(viewerExe := "", configPaths := 0) {
         if viewerExe = ""
@@ -113,6 +118,10 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
     try {
         if IsObject(plan) && plan.HasOwnProp("configCode")
             result.configCode := plan.configCode
+        if IsObject(plan) && plan.HasOwnProp("code")
+            && plan.code != "" {
+            result.code := plan.code
+        }
         if !IsReusableMxNMMeasurementTargetPlan(plan, viewerExe)
             return result
         result.configReady := true
@@ -720,11 +729,14 @@ ParseMxNMDeclaredLayoutModels(layoutEntries, mainGeometry) {
     if modelCount > 100
         return failure
 
-    clippingTolerance := Max(
-        1,
-        Ceil(
-            Max(mainGeometry.imageWidth, mainGeometry.imageHeight)
-            * 0.01
+    clippingTolerance := Min(
+        MxNMMeasurementTargetDefaults.LayoutClippingToleranceMaxPixels,
+        Max(
+            1,
+            Ceil(
+                Max(mainGeometry.imageWidth, mainGeometry.imageHeight)
+                * MxNMMeasurementTargetDefaults.LayoutClippingToleranceRatio
+            )
         )
     )
     models := []

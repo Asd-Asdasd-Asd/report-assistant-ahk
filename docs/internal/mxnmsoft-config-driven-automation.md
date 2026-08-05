@@ -242,7 +242,9 @@ config complete logical image rectangle
 自动目标 field checkpoint 已实现但尚待 Windows 验证。它只使用
 `ShowModelGroup.ShowModelSize` 声明的 `ShowModel1..N`，不会把额外 section
 猜成当前 layout，也不会识别 active model。每个声明 model 的 pane geometry
-先裁剪到主图区；只有不超过主图区 1% 的 vendor 边缘溢出可以被裁剪。
+先裁剪到主图区；vendor 边缘溢出只允许在主图区长边 1.5% 且最多 16 px
+的双重上限内裁剪。该上限覆盖新工作站 `ShowImageHeight=938`、声明 pane
+底边 `950` 的 12 px 差异；超过上限仍 fail closed。
 
 安全点从所有 pane 中心候选里选择：候选必须严格落在每一个声明 layout
 的某个 pane 内，并最大化跨 layout 的最小边缘距离；平局选择更小 Y，

@@ -101,7 +101,15 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn('"ShowModelSize"', resolver)
         self.assertIn('"LowWndSize"', resolver)
         self.assertIn("* 0.05", resolver)
-        self.assertIn("* 0.01", resolver)
+        self.assertIn(
+            "LayoutClippingToleranceRatio := 0.015",
+            resolver,
+        )
+        self.assertIn(
+            "LayoutClippingToleranceMaxPixels := 16",
+            resolver,
+        )
+        self.assertIn("result.code := plan.code", resolver)
         runtime_resolver = resolver.split(
             "\nResolveMxNMRuntimeImageTarget(", 1
         )[1].split(
@@ -272,6 +280,8 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         for phrase in (
             "valid layout schema",
             "one-percent clipping",
+            "field-observed twelve-pixel clipping",
+            "clipping beyond bounded cap fails closed",
             "missing pane field",
             "duplicate pane field",
             "no shared safe point",
