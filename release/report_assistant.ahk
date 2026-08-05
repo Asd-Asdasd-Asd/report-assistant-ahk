@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 8120b6d0affccfad076db287f7a5b4de4e84d8f2-dirty
-; Generated at: 2026-08-05 06:34:42 UTC
+; Source revision: 423ecc2677f0537a4c7d87f8c2588eee7493f0c6
+; Generated at: 2026-08-05 10:21:58 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-05"
-    static SourceRevision := "8120b6d0affccfad076db287f7a5b4de4e84d8f2-dirty"
+    static SourceRevision := "423ecc2677f0537a4c7d87f8c2588eee7493f0c6"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11145,6 +11145,11 @@ class MxNMMeasurementTargetCode {
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
 
+class MxNMMeasurementTargetDefaults {
+    static LayoutClippingToleranceRatio := 0.015
+    static LayoutClippingToleranceMaxPixels := 16
+}
+
 class MxNMMeasurementTargetResolver {
     static BuildPlan(viewerExe := "", configPaths := 0) {
         if viewerExe = ""
@@ -11249,6 +11254,10 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
     try {
         if IsObject(plan) && plan.HasOwnProp("configCode")
             result.configCode := plan.configCode
+        if IsObject(plan) && plan.HasOwnProp("code")
+            && plan.code != "" {
+            result.code := plan.code
+        }
         if !IsReusableMxNMMeasurementTargetPlan(plan, viewerExe)
             return result
         result.configReady := true
@@ -11856,11 +11865,14 @@ ParseMxNMDeclaredLayoutModels(layoutEntries, mainGeometry) {
     if modelCount > 100
         return failure
 
-    clippingTolerance := Max(
-        1,
-        Ceil(
-            Max(mainGeometry.imageWidth, mainGeometry.imageHeight)
-            * 0.01
+    clippingTolerance := Min(
+        MxNMMeasurementTargetDefaults.LayoutClippingToleranceMaxPixels,
+        Max(
+            1,
+            Ceil(
+                Max(mainGeometry.imageWidth, mainGeometry.imageHeight)
+                * MxNMMeasurementTargetDefaults.LayoutClippingToleranceRatio
+            )
         )
     )
     models := []
@@ -21002,6 +21014,12 @@ MxNMViewerClearFailureMessage(result) {
             . MxNMViewerClearContextValue(
                 result,
                 "targetCode",
+                "UNKNOWN"
+            )
+            . "/"
+            . MxNMViewerClearContextValue(
+                result,
+                "targetConfigCode",
                 "UNKNOWN"
             )
             . "/"
