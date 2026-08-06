@@ -210,6 +210,12 @@ MxNMViewerClearFailureMessage(result) {
             . "/"
             . MxNMViewerClearContextValue(
                 result,
+                "targetLayoutCode",
+                "UNKNOWN"
+            )
+            . "/"
+            . MxNMViewerClearContextValue(
+                result,
                 "targetRuntimeFrameCandidateCount",
                 0
             )

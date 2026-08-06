@@ -170,10 +170,18 @@ FormatMxNMMeasurementTargetFieldOutput(
             MxNMTargetFieldBoolean(target.runtimeToolAnchorUsed),
         "RuntimeToolAnchorFallbackCode=" .
             target.runtimeToolAnchorFallbackCode,
+        "RuntimeSurfaceSelectionCode=" .
+            target.runtimeSurfaceSelectionCode,
+        "RuntimePointSource=" target.runtimePointSource,
         "MappedImageRectResolved=" .
             MxNMTargetFieldBoolean(target.mappedImageRectResolved),
         "LayoutReady=" MxNMTargetFieldBoolean(target.layoutReady),
+        "LayoutCode=" target.layoutCode,
         "LayoutModelCount=" target.layoutModelCount,
+        "RuntimeSurfaceFallbackEligible=" .
+            MxNMTargetFieldBoolean(
+                target.runtimeSurfaceFallbackEligible
+            ),
         "MinimumLogicalClearance=" target.minimumLogicalClearance,
         "MinimumRequiredClearance=" .
             target.minimumRequiredClearance,

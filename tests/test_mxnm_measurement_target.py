@@ -88,6 +88,9 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "ResolveMxNMRuntimeImageTarget",
             "ResolveMxNMRuntimeImageTargetFromToolAnchor",
             "ResolveMxNMRuntimeImageSurfaceFromToolAnchor",
+            "SelectMxNMRuntimeSurfaceSafePoint",
+            "BuildMxNMRuntimeSurfacePointCandidates",
+            "MxNMPointClearanceInsideRect",
             "BuildMxNMRuntimeOwnerFrameCandidates",
             "CaptureMxNMRuntimeOwnerFrame",
             "MxNMPointInsideRuntimeFrameClient",
@@ -143,6 +146,19 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         )[1].split("\n}\n\nMakeMxNMMeasurementTargetPlan", 1)[0]
         self.assertIn("BuildMxNMViewerToolCommandPlan(", build_plan)
         self.assertIn("plan.viewerToolPlan := viewerToolPlan", build_plan)
+        self.assertIn(
+            "plan.runtimeSurfaceFallbackEligible := true",
+            build_plan,
+        )
+        self.assertLess(
+            build_plan.index("BuildMxNMViewerToolCommandPlan("),
+            build_plan.index("ParseMxNMDeclaredLayoutModels("),
+        )
+        self.assertIn(
+            "if !plan.layoutReady\n"
+            "            && !plan.runtimeSurfaceFallbackEligible",
+            build_plan,
+        )
 
         resolve = resolver.split(
             "ResolveMxNMMeasurementTargetFromPlan(", 1
@@ -184,12 +200,15 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "MxNMPointInsideRuntimeFrameClient",
             fallback_target,
         )
+        self.assertIn("MapMxNMLogicalImageRectToRuntime(", fallback_target)
+        self.assertIn("plan.mainGeometry,", fallback_target)
+        self.assertIn("actionFrame", fallback_target)
         self.assertIn(
-            "MapMxNMLogicalImageRectToRuntime("
-            "\n        plan.mainGeometry,"
-            "\n        actionFrame",
+            "SelectMxNMRuntimeSurfaceSafePoint(",
             fallback_target,
         )
+        self.assertIn('pointSource := "RUNTIME_SURFACE_POINT"', fallback_target)
+        self.assertIn('"READY_RUNTIME_SURFACE_POINT"', fallback_target)
         anchored_action = resolver.split(
             "\nResolveMxNMActionWindowFromAnchor(", 1
         )[1].split(
@@ -239,6 +258,15 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "MapMxNMClippedImageRectToRuntimeClient",
             resolver,
         )
+        runtime_point = resolver.split(
+            "\nSelectMxNMRuntimeSurfaceSafePoint(", 1
+        )[1].split("\n}\n\nMxNMTargetParentHwnd", 1)[0]
+        self.assertIn("WindowFromScreenPoint", runtime_point)
+        self.assertIn("MxNMTargetWindowPid", runtime_point)
+        self.assertIn("ResolveMxNMRootOwnerHwnd", runtime_point)
+        self.assertIn("MxNMTargetWindowIsSameOrDescendant", runtime_point)
+        self.assertIn("minimumHitClearance", runtime_point)
+        self.assertNotIn("UIA", runtime_point)
 
     def test_resolver_and_field_harness_are_privacy_safe(self) -> None:
         resolver = source("src/mxnm_measurement_target_resolver.ahk")
@@ -286,6 +314,8 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "duplicate pane field",
             "no shared safe point",
             "five-percent clearance gate",
+            "runtime surface candidate grid",
+            "runtime surface candidates stay inside client",
         ):
             self.assertIn(phrase, regression)
         self.assertIn("^!F10::PreviewMxNMMeasurementTarget()", field)
@@ -302,6 +332,9 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             'Map("imageScreenPoint", target.screenPoint)',
             field,
         )
+        self.assertIn('"RuntimePointSource="', field)
+        self.assertIn('"LayoutCode="', field)
+        self.assertIn('"RuntimeSurfaceFallbackEligible="', field)
 
 
 if __name__ == "__main__":

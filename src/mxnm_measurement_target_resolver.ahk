@@ -47,43 +47,53 @@ BuildMxNMMeasurementTargetPlan(viewerExe, configPaths := 0) {
             return plan
         }
 
+        plan.viewerExe := viewerExe
+        plan.viewerProcessPath := configResult.viewerProcessPath
+        plan.mainConfigSha256 := configResult.mainConfigSha256
+        plan.layoutConfigSha256 := configResult.layoutConfigSha256
+        plan.mainGeometry := configResult.mainGeometry
+        viewerToolPlan := BuildMxNMViewerToolCommandPlan(
+            viewerExe,
+            configPaths
+        )
+        if viewerToolPlan.ok {
+            plan.viewerToolPlan := viewerToolPlan
+            plan.runtimeSurfaceFallbackEligible := true
+        }
+
         layoutResult := ParseMxNMDeclaredLayoutModels(
             configResult.layoutEntries,
             configResult.mainGeometry
         )
         plan.layoutModelCount := layoutResult.modelCount
         if !layoutResult.ok {
-            plan.code := MxNMMeasurementTargetCode.LAYOUT_SCHEMA_INVALID
+            plan.layoutCode :=
+                MxNMMeasurementTargetCode.LAYOUT_SCHEMA_INVALID
+        } else {
+            safePointResult := FindMxNMCrossLayoutSafePoint(
+                layoutResult.models,
+                configResult.mainGeometry.imageWidth,
+                configResult.mainGeometry.imageHeight
+            )
+            if safePointResult.ok {
+                plan.layoutReady := true
+                plan.layoutCode :=
+                    MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION
+                plan.logicalPoint := safePointResult.point
+                plan.minimumLogicalClearance :=
+                    safePointResult.minimumClearance
+                plan.minimumRequiredClearance :=
+                    safePointResult.minimumRequiredClearance
+            } else {
+                plan.layoutCode :=
+                    MxNMMeasurementTargetCode.LAYOUT_SAFE_POINT_NOT_FOUND
+            }
+        }
+        if !plan.layoutReady
+            && !plan.runtimeSurfaceFallbackEligible {
+            plan.code := plan.layoutCode
             return plan
         }
-        plan.layoutReady := true
-
-        safePointResult := FindMxNMCrossLayoutSafePoint(
-            layoutResult.models,
-            configResult.mainGeometry.imageWidth,
-            configResult.mainGeometry.imageHeight
-        )
-        if !safePointResult.ok {
-            plan.code :=
-                MxNMMeasurementTargetCode.LAYOUT_SAFE_POINT_NOT_FOUND
-            return plan
-        }
-        plan.viewerExe := viewerExe
-        plan.viewerProcessPath := configResult.viewerProcessPath
-        plan.mainConfigSha256 := configResult.mainConfigSha256
-        plan.layoutConfigSha256 := configResult.layoutConfigSha256
-        plan.mainGeometry := configResult.mainGeometry
-        plan.logicalPoint := safePointResult.point
-        plan.minimumLogicalClearance :=
-            safePointResult.minimumClearance
-        plan.minimumRequiredClearance :=
-            safePointResult.minimumRequiredClearance
-        viewerToolPlan := BuildMxNMViewerToolCommandPlan(
-            viewerExe,
-            configPaths
-        )
-        if viewerToolPlan.ok
-            plan.viewerToolPlan := viewerToolPlan
         plan.ok := true
         plan.code := MxNMMeasurementTargetCode.READY_FOR_FIELD_VALIDATION
         return plan
@@ -100,7 +110,9 @@ MakeMxNMMeasurementTargetPlan() {
         configCode: "",
         configReady: false,
         layoutReady: false,
+        layoutCode: "",
         layoutModelCount: 0,
+        runtimeSurfaceFallbackEligible: false,
         viewerExe: "",
         viewerProcessPath: "",
         mainConfigSha256: "",
@@ -122,11 +134,21 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
             && plan.code != "" {
             result.code := plan.code
         }
+        if IsObject(plan) {
+            if plan.HasOwnProp("layoutReady")
+                result.layoutReady := plan.layoutReady
+            if plan.HasOwnProp("layoutCode")
+                result.layoutCode := plan.layoutCode
+            if plan.HasOwnProp("layoutModelCount")
+                result.layoutModelCount := plan.layoutModelCount
+            if plan.HasOwnProp("runtimeSurfaceFallbackEligible") {
+                result.runtimeSurfaceFallbackEligible :=
+                    plan.runtimeSurfaceFallbackEligible
+            }
+        }
         if !IsReusableMxNMMeasurementTargetPlan(plan, viewerExe)
             return result
         result.configReady := true
-        result.layoutReady := true
-        result.layoutModelCount := plan.layoutModelCount
         result.logicalPoint := plan.logicalPoint
         result.minimumLogicalClearance := plan.minimumLogicalClearance
         result.minimumRequiredClearance := plan.minimumRequiredClearance
@@ -162,6 +184,9 @@ ResolveMxNMMeasurementTargetFromPlan(plan, viewerExe) {
                 )
             result.runtimeToolAnchorFallbackCode :=
                 runtimeTarget.fallbackCode
+            result.runtimeSurfaceSelectionCode :=
+                runtimeTarget.surfaceCode
+            result.runtimePointSource := runtimeTarget.pointSource
             result.runtimeToolAnchorUsed := runtimeTarget.ok
         }
         result.runtimeFrameCandidateCount :=
@@ -321,11 +346,12 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         imageRect: 0,
         screenPoint: 0,
         actionHwnd: 0,
-        fallbackCode: "ANCHOR_INVALID"
+        fallbackCode: "ANCHOR_INVALID",
+        surfaceCode: "",
+        pointSource: ""
     }
     if !IsObject(plan)
         || !IsObject(plan.mainGeometry)
-        || !IsObject(plan.logicalPoint)
         || !IsObject(toolAnchor)
         || !toolAnchor.ok
         || !toolAnchor.frameHwnd
@@ -360,24 +386,45 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         return failure
     }
     actionFrame := surfaceResult.frame
-    mappedImage := MapMxNMLogicalImageRectToRuntime(
-        plan.mainGeometry,
-        actionFrame
-    )
-    if !mappedImage.ok {
-        failure.fallbackCode := "ANCHOR_IMAGE_MAPPING_INVALID"
+    if IsObject(plan.logicalPoint) {
+        mappedImage := MapMxNMLogicalImageRectToRuntime(
+            plan.mainGeometry,
+            actionFrame
+        )
+        if !mappedImage.ok {
+            failure.fallbackCode := "ANCHOR_IMAGE_MAPPING_INVALID"
+            return failure
+        }
+        imageRect := mappedImage.rect
+        screenPoint := MapMxNMLogicalPointToRuntimeRect(
+            plan.logicalPoint,
+            plan.mainGeometry,
+            imageRect
+        )
+        pointSource := "CONFIG_COMMON_POINT"
+    } else if plan.runtimeSurfaceFallbackEligible {
+        imageRect := {
+            left: actionFrame.clientX,
+            top: actionFrame.clientY,
+            right: actionFrame.clientX + actionFrame.clientWidth,
+            bottom: actionFrame.clientY + actionFrame.clientHeight
+        }
+        runtimePoint := SelectMxNMRuntimeSurfaceSafePoint(
+            actionFrame,
+            ownerFrame
+        )
+        if !runtimePoint.ok {
+            failure.fallbackCode := "RUNTIME_SURFACE_POINT_NOT_FOUND"
+            failure.surfaceCode := surfaceResult.code
+            return failure
+        }
+        screenPoint := runtimePoint.point
+        pointSource := "RUNTIME_SURFACE_POINT"
+    } else {
         return failure
     }
-    screenPoint := MapMxNMLogicalPointToRuntimeRect(
-        plan.logicalPoint,
-        plan.mainGeometry,
-        mappedImage.rect
-    )
-    if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
-        || !MxNMPointInsideRuntimeFrameClient(
-            screenPoint,
-            actionFrame
-        ) {
+    if !MxNMPointInsideRect(screenPoint, imageRect)
+        || !MxNMPointInsideRuntimeFrameClient(screenPoint, actionFrame) {
         failure.fallbackCode := "ANCHOR_POINT_OUT_OF_BOUNDS"
         return failure
     }
@@ -389,10 +436,14 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
             toolAnchor.frameHwnd
         ),
         frame: ownerFrame,
-        imageRect: mappedImage.rect,
+        imageRect: imageRect,
         screenPoint: screenPoint,
         actionHwnd: actionFrame.hwnd,
-        fallbackCode: surfaceResult.code
+        fallbackCode: pointSource = "RUNTIME_SURFACE_POINT"
+            ? "READY_RUNTIME_SURFACE_POINT"
+            : surfaceResult.code,
+        surfaceCode: surfaceResult.code,
+        pointSource: pointSource
     }
 }
 
@@ -490,6 +541,124 @@ ResolveMxNMRuntimeImageSurfaceFromToolAnchor(
         candidateCount: candidates.Length,
         frame: best.frame
     }
+}
+
+SelectMxNMRuntimeSurfaceSafePoint(surfaceFrame, ownerFrame) {
+    failure := {
+        ok: false,
+        point: 0,
+        pointHwnd: 0,
+        candidateCount: 0,
+        validCandidateCount: 0,
+        minimumHitClearance: 0
+    }
+    if !IsObject(surfaceFrame)
+        || !IsObject(ownerFrame)
+        || !surfaceFrame.hwnd
+        || !ownerFrame.hwnd
+        || surfaceFrame.clientWidth < 200
+        || surfaceFrame.clientHeight < 200 {
+        return failure
+    }
+    expectedPid := MxNMTargetWindowPid(ownerFrame.hwnd)
+    if !expectedPid
+        || MxNMTargetWindowPid(surfaceFrame.hwnd) != expectedPid
+        || ResolveMxNMRootOwnerHwnd(surfaceFrame.hwnd)
+            != ownerFrame.hwnd {
+        return failure
+    }
+    candidates := BuildMxNMRuntimeSurfacePointCandidates(surfaceFrame)
+    failure.candidateCount := candidates.Length
+    minimumHitClearance := Max(
+        6,
+        Min(
+            16,
+            Round(
+                Min(
+                    surfaceFrame.clientWidth,
+                    surfaceFrame.clientHeight
+                ) * 0.01
+            )
+        )
+    )
+    failure.minimumHitClearance := minimumHitClearance
+    bestPoint := 0
+    bestHwnd := 0
+    bestClearance := -1
+    for candidate in candidates {
+        pointHwnd := ResolveMxNMWindowFromScreenPoint(candidate)
+        if !pointHwnd
+            || !MxNMTargetWindowIsSameOrDescendant(
+                pointHwnd,
+                surfaceFrame.hwnd
+            )
+            || MxNMTargetWindowPid(pointHwnd) != expectedPid
+            || ResolveMxNMRootOwnerHwnd(pointHwnd)
+                != ownerFrame.hwnd {
+            continue
+        }
+        hitRect := MxNMTargetClientRectScreen(pointHwnd)
+        clearance := MxNMPointClearanceInsideRect(
+            candidate,
+            hitRect
+        )
+        if clearance < minimumHitClearance
+            continue
+        failure.validCandidateCount += 1
+        if clearance > bestClearance
+            || (clearance = bestClearance
+                && MxNMPointComesBefore(candidate, bestPoint)) {
+            bestPoint := candidate
+            bestHwnd := pointHwnd
+            bestClearance := clearance
+        }
+    }
+    if !IsObject(bestPoint)
+        return failure
+    return {
+        ok: true,
+        point: bestPoint,
+        pointHwnd: bestHwnd,
+        candidateCount: candidates.Length,
+        validCandidateCount: failure.validCandidateCount,
+        minimumHitClearance: minimumHitClearance,
+        selectedClearance: bestClearance
+    }
+}
+
+BuildMxNMRuntimeSurfacePointCandidates(surfaceFrame) {
+    candidates := []
+    if !IsObject(surfaceFrame)
+        || surfaceFrame.clientWidth <= 0
+        || surfaceFrame.clientHeight <= 0 {
+        return candidates
+    }
+    ratios := [0.23, 0.41, 0.59, 0.77]
+    for yRatio in ratios {
+        for xRatio in ratios {
+            candidates.Push({
+                x: surfaceFrame.clientX
+                    + Round(surfaceFrame.clientWidth * xRatio),
+                y: surfaceFrame.clientY
+                    + Round(surfaceFrame.clientHeight * yRatio)
+            })
+        }
+    }
+    return candidates
+}
+
+MxNMPointClearanceInsideRect(point, rect) {
+    if !IsObject(point)
+        || !IsObject(rect)
+        || !MxNMPointInsideRect(point, rect) {
+        return -1
+    }
+    return Min(
+        point.x - rect.left,
+        rect.right - point.x,
+        point.y - rect.top,
+        rect.bottom - point.y
+    )
 }
 
 MxNMTargetParentHwnd(hwnd) {
@@ -679,7 +848,10 @@ IsReusableMxNMMeasurementTargetPlan(plan, viewerExe) {
         && StrLower(plan.viewerExe) = StrLower(viewerExe)
         && plan.viewerProcessPath != ""
         && IsObject(plan.mainGeometry)
-        && IsObject(plan.logicalPoint)
+        && (
+            IsObject(plan.logicalPoint)
+            || plan.runtimeSurfaceFallbackEligible
+        )
 }
 
 MakeMxNMMeasurementTargetResult() {
@@ -695,9 +867,13 @@ MakeMxNMMeasurementTargetResult() {
         runtimeToolAnchorHwnd: 0,
         runtimeToolAnchorUsed: false,
         runtimeToolAnchorFallbackCode: "",
+        runtimeSurfaceSelectionCode: "",
+        runtimePointSource: "",
         mappedImageRectResolved: false,
         layoutReady: false,
+        layoutCode: "",
         layoutModelCount: 0,
+        runtimeSurfaceFallbackEligible: false,
         minimumLogicalClearance: 0,
         minimumRequiredClearance: 0,
         logicalPoint: 0,

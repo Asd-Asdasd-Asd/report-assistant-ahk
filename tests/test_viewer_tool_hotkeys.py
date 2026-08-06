@@ -251,6 +251,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             hotkeys,
         )
         self.assertIn("targetConfigCode", hotkeys)
+        self.assertIn("targetLayoutCode", hotkeys)
         self.assertIn(
             "TARGET_CLIENT_POINT_INVALID",
             hotkeys,

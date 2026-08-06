@@ -158,6 +158,32 @@ RunMxNMMeasurementTargetRegression() {
         "five-percent clearance gate"
     )
 
+    runtimeSurface := {
+        clientX: 100,
+        clientY: 200,
+        clientWidth: 1000,
+        clientHeight: 800
+    }
+    runtimeCandidates :=
+        BuildMxNMRuntimeSurfacePointCandidates(runtimeSurface)
+    AssertMxNMTarget(
+        runtimeCandidates.Length = 16,
+        "runtime surface candidate grid"
+    )
+    for candidate in runtimeCandidates {
+        AssertMxNMTarget(
+            candidate.x > runtimeSurface.clientX
+                && candidate.x
+                    < runtimeSurface.clientX
+                        + runtimeSurface.clientWidth
+                && candidate.y > runtimeSurface.clientY
+                && candidate.y
+                    < runtimeSurface.clientY
+                        + runtimeSurface.clientHeight,
+            "runtime surface candidates stay inside client"
+        )
+    }
+
     ToolTip "MxNM 自动目标纯逻辑回归通过"
     SetTimer (() => ToolTip()), -2500
 }

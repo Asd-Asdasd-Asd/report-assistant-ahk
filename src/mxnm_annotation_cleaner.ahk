@@ -56,6 +56,7 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
         target := MxNMMeasurementProvider.ResolveTarget(options)
         result.context["targetCode"] := target.code
         result.context["targetConfigCode"] := target.configCode
+        result.context["targetLayoutCode"] := target.layoutCode
         result.context["targetRuntimeFrameCandidateCount"] :=
             target.runtimeFrameCandidateCount
         result.context["targetRuntimeFrameOwnerFamilyCount"] :=
@@ -66,6 +67,10 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             target.runtimeToolAnchorUsed
         result.context["targetRuntimeToolAnchorFallbackCode"] :=
             target.runtimeToolAnchorFallbackCode
+        result.context["targetRuntimeSurfaceSelectionCode"] :=
+            target.runtimeSurfaceSelectionCode
+        result.context["targetRuntimePointSource"] :=
+            target.runtimePointSource
         if !target.ok {
             result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
