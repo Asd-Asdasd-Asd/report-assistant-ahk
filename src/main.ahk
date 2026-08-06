@@ -19,6 +19,7 @@
 #Include context_measurement_provider.ahk
 #Include <UIA>
 #Include mxnm_measurement_target_resolver.ahk
+#Include mxnm_context_target_session.ahk
 #Include mxnm_measurement_provider.ahk
 #Include mxnm_annotation_cleaner.ahk
 #Include mxnm_viewer_tool_commands.ahk
@@ -53,7 +54,6 @@
 #Include tray_menu.ahk
 
 ConfigureReportAssistantTrayMenu()
-MxNMMeasurementProvider.PrepareTargetPlanFromPathCache()
 MxNMViewerToolCommandProvider.PrepareAtStartup()
 
 #SuspendExempt

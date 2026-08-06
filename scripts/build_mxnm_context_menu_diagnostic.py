@@ -30,9 +30,11 @@ OUTPUT = (
 )
 
 COMPONENTS = (
+    "src/measurement_model.ahk",
     "src/mxnm_config_geometry_provider.ahk",
     "src/mxnm_viewer_tool_commands.ahk",
     "src/mxnm_measurement_target_resolver.ahk",
+    "src/mxnm_context_target_session.ahk",
     "tests/windows/mxnm_context_menu_receiver_diagnostic.ahk",
 )
 

@@ -8,6 +8,7 @@
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_viewer_tool_commands.ahk
 #Include ..\..\src\mxnm_measurement_target_resolver.ahk
+#Include ..\..\src\mxnm_context_target_session.ahk
 #Include ..\..\src\mxnm_measurement_provider.ahk
 #Include ..\..\src\context_measurement_provider.ahk
 
@@ -182,6 +183,13 @@ FormatMxNMMeasurementTargetFieldOutput(
             MxNMTargetFieldBoolean(
                 target.runtimeSurfaceFallbackEligible
             ),
+        "SessionCacheHit=" .
+            MxNMTargetFieldBoolean(target.sessionCacheHit),
+        "SessionGeneration=" target.sessionGeneration,
+        "SessionRootHwnd=" target.sessionRootHwnd,
+        "SessionSurfaceHwnd=" target.sessionSurfaceHwnd,
+        "SessionCandidateCount=" target.sessionCandidateCount,
+        "SessionPointProbeCount=" target.sessionPointProbeCount,
         "MinimumLogicalClearance=" target.minimumLogicalClearance,
         "MinimumRequiredClearance=" .
             target.minimumRequiredClearance,

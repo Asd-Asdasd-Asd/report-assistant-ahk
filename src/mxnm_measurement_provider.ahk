@@ -1,6 +1,4 @@
 class MxNMMeasurementProvider {
-    static CachedPlan := 0
-
     static ReadSuvMax(options := 0) {
         return ReadMxNMMeasurementWithTarget(
             BuildSuvMaxMeasurementCommandSpec(),
@@ -21,108 +19,18 @@ class MxNMMeasurementProvider {
             "viewerExe",
             MxNMConfigGeometryDefaults.ViewerExe
         )
-        plan := this.ResolvePlan(options)
-        target := MxNMMeasurementTargetResolver.Resolve(plan, viewerExe)
-        if target.ok
-            return target
-        if !IsReusableMxNMMeasurementTargetPlan(plan, viewerExe)
-            return target
-
-        configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
-        if !configPaths.ok
-            || StrLower(configPaths.viewerProcessPath)
-                = StrLower(plan.viewerProcessPath) {
-            return target
-        }
-        refreshedPlan := MxNMMeasurementTargetResolver.BuildPlan(
+        return MxNMContextTargetSessionProvider.Resolve(
             viewerExe,
-            configPaths
+            options
         )
-        if !refreshedPlan.ok
-            return target
-        this.CachedPlan := refreshedPlan
-        SaveValidatedMxNMConfigPathCache(viewerExe, configPaths)
-        return MxNMMeasurementTargetResolver.Resolve(
-            refreshedPlan,
-            viewerExe
-        )
-    }
-
-    static ResolvePlan(options := 0) {
-        viewerExe := MeasurementOption(
-            options,
-            "viewerExe",
-            MxNMConfigGeometryDefaults.ViewerExe
-        )
-        forcePlanRefresh := MeasurementOption(
-            options,
-            "forceTargetPlanRefresh",
-            MeasurementOption(
-                options,
-                "forceTargetRefresh",
-                false
-            )
-        )
-        if !forcePlanRefresh
-            && IsReusableMxNMMeasurementTargetPlan(
-                this.CachedPlan,
-                viewerExe
-            ) {
-            return this.CachedPlan
-        }
-
-        this.CachedPlan := 0
-        cache := LoadValidatedMxNMConfigPathCache()
-        if IsObject(cache)
-            && StrLower(cache["viewerExe"]) = StrLower(viewerExe) {
-            plan := MxNMMeasurementTargetResolver.BuildPlan(
-                viewerExe,
-                cache["configPaths"]
-            )
-        } else {
-            configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
-            plan := MxNMMeasurementTargetResolver.BuildPlan(
-                viewerExe,
-                configPaths
-            )
-            if plan.ok {
-                SaveValidatedMxNMConfigPathCache(
-                    viewerExe,
-                    configPaths
-                )
-            }
-        }
-        if plan.ok
-            this.CachedPlan := plan
-        return plan
     }
 
     static PrepareTargetPlan(options := 0) {
-        return this.ResolvePlan(options).ok
+        return this.ResolveTarget(options).ok
     }
 
-    static PrepareTargetPlanFromPathCache(viewerExe := "") {
-        if viewerExe = ""
-            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
-        if IsReusableMxNMMeasurementTargetPlan(
-            this.CachedPlan,
-            viewerExe
-        ) {
-            return true
-        }
-        cache := LoadValidatedMxNMConfigPathCache()
-        if !IsObject(cache)
-            || StrLower(cache["viewerExe"]) != StrLower(viewerExe) {
-            return false
-        }
-        plan := MxNMMeasurementTargetResolver.BuildPlan(
-            viewerExe,
-            cache["configPaths"]
-        )
-        if !plan.ok
-            return false
-        this.CachedPlan := plan
-        return true
+    static InvalidateTargetSession() {
+        MxNMContextTargetSessionProvider.Invalidate()
     }
 }
 
@@ -177,6 +85,15 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
     result.context["targetActionPid"] := target.actionPid
     result.context["targetScreenX"] := target.screenPoint.x
     result.context["targetScreenY"] := target.screenPoint.y
+    result.context["targetSessionCacheHit"] := target.sessionCacheHit
+    result.context["targetSessionGeneration"] := target.sessionGeneration
+    result.context["targetSessionRootHwnd"] := target.sessionRootHwnd
+    result.context["targetSessionSurfaceHwnd"] :=
+        target.sessionSurfaceHwnd
+    result.context["targetSessionCandidateCount"] :=
+        target.sessionCandidateCount
+    result.context["targetSessionPointProbeCount"] :=
+        target.sessionPointProbeCount
     result.context["targetResolutionMs"] := targetResolutionMs
     result.context["totalReadMs"] := A_TickCount - startedAt
     return result
@@ -198,6 +115,7 @@ MakeMxNMTargetFailureMeasurement(
     totalReadMs := 0
 ) {
     failureReason := target.configCode = MxNMConfigGeometryCode.VIEWER_NOT_FOUND
+        || target.code = MxNMContextTargetSessionCode.VIEWER_NOT_FOUND
         ? MeasurementFailureReason.VIEWER_NOT_FOUND
         : MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE
     context := Map(
@@ -205,6 +123,8 @@ MakeMxNMTargetFailureMeasurement(
         "targetConfigCode", target.configCode,
         "targetActionHwnd", 0,
         "targetActionPid", 0,
+        "targetSessionCandidateCount", target.sessionCandidateCount,
+        "targetSessionPointProbeCount", target.sessionPointProbeCount,
         "targetResolutionMs", targetResolutionMs,
         "totalReadMs", totalReadMs
     )

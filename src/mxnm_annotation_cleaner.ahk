@@ -71,6 +71,18 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             target.runtimeSurfaceSelectionCode
         result.context["targetRuntimePointSource"] :=
             target.runtimePointSource
+        result.context["targetSessionCacheHit"] :=
+            target.sessionCacheHit
+        result.context["targetSessionGeneration"] :=
+            target.sessionGeneration
+        result.context["targetSessionRootHwnd"] :=
+            target.sessionRootHwnd
+        result.context["targetSessionSurfaceHwnd"] :=
+            target.sessionSurfaceHwnd
+        result.context["targetSessionCandidateCount"] :=
+            target.sessionCandidateCount
+        result.context["targetSessionPointProbeCount"] :=
+            target.sessionPointProbeCount
         if !target.ok {
             result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE

@@ -35,6 +35,7 @@ ORDER = [
     "mxnm_config_path_cache.ahk",
     "context_measurement_provider.ahk",
     "mxnm_measurement_target_resolver.ahk",
+    "mxnm_context_target_session.ahk",
     "mxnm_measurement_provider.ahk",
     "mxnm_annotation_cleaner.ahk",
     "mxnm_viewer_tool_commands.ahk",

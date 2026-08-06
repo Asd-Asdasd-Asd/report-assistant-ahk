@@ -2,11 +2,13 @@
 #SingleInstance Force
 #Warn
 
+#Include ..\..\src\measurement_model.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_viewer_tool_commands.ahk
 #Include ..\..\src\mxnm_measurement_target_resolver.ahk
+#Include ..\..\src\mxnm_context_target_session.ahk
 
-global MXNM_CONTEXT_DIAGNOSTIC_VERSION := "1.1"
+global MXNM_CONTEXT_DIAGNOSTIC_VERSION := "1.2"
 global MXNM_CONTEXT_DIAGNOSTIC_BUSY := false
 
 CoordMode "Mouse", "Screen"
@@ -119,15 +121,30 @@ BuildMxNMContextMenuReceiverDiagnostic(manualPoint, foregroundBefore) {
     )
     report .= FormatMxNMContextDiagnosticTarget(target)
 
-    expectedPid := toolAnchor.ok
-        ? MxNMContextDiagnosticPid(toolAnchor.frameHwnd)
-        : target.actionPid
-    expectedOwner := toolAnchor.ok
-        ? toolAnchor.frameHwnd
+    sessionTarget := MxNMContextTargetSessionProvider.Resolve(
+        viewerExe,
+        Map("forceTargetRefresh", true)
+    )
+    report .= FormatMxNMContextDiagnosticSessionTarget(
+        sessionTarget
+    )
+
+    expectedPid := sessionTarget.ok
+        ? sessionTarget.actionPid
         : (
+            toolAnchor.ok
+                ? MxNMContextDiagnosticPid(toolAnchor.frameHwnd)
+                : target.actionPid
+        )
+    expectedOwner := sessionTarget.ok
+        ? sessionTarget.sessionRootHwnd
+        : (toolAnchor.ok
+            ? toolAnchor.frameHwnd
+            : (
             target.actionHwnd
                 ? ResolveMxNMRootOwnerHwnd(target.actionHwnd)
                 : 0
+            )
         )
     report .=
         "ExpectedPid=" expectedPid "`r`n" .
@@ -136,14 +153,17 @@ BuildMxNMContextMenuReceiverDiagnostic(manualPoint, foregroundBefore) {
     points := [
         {label: "manual", point: manualPoint}
     ]
-    if IsObject(target.screenPoint)
+    automaticPoint := sessionTarget.ok
+        ? sessionTarget.screenPoint
+        : target.screenPoint
+    if IsObject(automaticPoint)
         && (
-            target.screenPoint.x != manualPoint.x
-            || target.screenPoint.y != manualPoint.y
+            automaticPoint.x != manualPoint.x
+            || automaticPoint.y != manualPoint.y
         ) {
         points.Push({
             label: "automatic",
-            point: target.screenPoint
+            point: automaticPoint
         })
     }
 
@@ -193,6 +213,23 @@ BuildMxNMContextMenuReceiverDiagnostic(manualPoint, foregroundBefore) {
         "ElapsedMs=" (A_TickCount - startedAt) "`r`n" .
         "EndOfReport=true`r`n"
     return report
+}
+
+FormatMxNMContextDiagnosticSessionTarget(target) {
+    return (
+        "SessionTargetOk=" MxNMContextDiagnosticBool(target.ok) "`r`n" .
+        "SessionTargetCode=" target.code "`r`n" .
+        "SessionGeneration=" target.sessionGeneration "`r`n" .
+        "SessionRootHwnd=" target.sessionRootHwnd "`r`n" .
+        "SessionSurfaceHwnd=" target.sessionSurfaceHwnd "`r`n" .
+        "SessionCandidateCount=" target.sessionCandidateCount "`r`n" .
+        "SessionPointProbeCount=" target.sessionPointProbeCount "`r`n" .
+        "SessionDiscoveryMethod=" target.runtimePointSource "`r`n" .
+        "SessionScreenPoint=" .
+            MxNMContextDiagnosticPoint(target.screenPoint) "`r`n" .
+        "SessionActionHwnd=" target.actionHwnd "`r`n" .
+        "SessionActionPid=" target.actionPid "`r`n"
+    )
 }
 
 FormatMxNMContextDiagnosticTarget(target) {

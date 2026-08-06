@@ -326,42 +326,59 @@ class MeasurementCaptureTests(unittest.TestCase):
         for forbidden in ("MouseMove", "WinActivate", "SoundBeep"):
             self.assertNotIn(forbidden, cleaner)
 
-    def test_production_target_caches_only_config_plan_and_resolves_runtime_each_read(
+    def test_production_target_uses_cached_context_session_fast_path(
         self,
     ) -> None:
         provider = source("src/mxnm_measurement_provider.ahk")
+        session = source("src/mxnm_context_target_session.ahk")
         main = source("src/main.ahk")
         for required in (
-            "static CachedPlan := 0",
-            "IsReusableMxNMMeasurementTargetPlan(",
-            "LoadValidatedMxNMConfigPathCache()",
-            "SaveValidatedMxNMConfigPathCache(",
-            'cache["configPaths"]',
-            "StrLower(configPaths.viewerProcessPath)",
-            "= StrLower(plan.viewerProcessPath)",
-            "refreshedPlan := MxNMMeasurementTargetResolver.BuildPlan(",
-            "MxNMMeasurementTargetResolver.Resolve(plan, viewerExe)",
+            "MxNMContextTargetSessionProvider.Resolve(",
             "static PrepareTargetPlan(options := 0)",
-            "static PrepareTargetPlanFromPathCache(viewerExe := \"\")",
+            "static InvalidateTargetSession()",
             '"targetResolutionMs"',
             '"totalReadMs"',
         ):
             self.assertIn(required, provider)
-        self.assertIn(
-            "MxNMMeasurementProvider.PrepareTargetPlanFromPathCache()",
-            main,
-        )
-        for forbidden in (
-            "CachedTarget",
-            "HasReusableTarget",
-            "WarmTarget",
-            "StartMxNMMeasurementTargetWarmup",
-            "RegisterShellHookWindow",
-            "RegisterWindowMessageW",
-            "MxNMMeasurementWarmup",
+        self.assertIn("#Include mxnm_context_target_session.ahk", main)
+        self.assertNotIn("PrepareTargetPlanFromPathCache", main + provider)
+        for required in (
+            "static CachedSession := 0",
+            "static Generation := 0",
+            "ValidateMxNMContextTargetSession(",
+            "DiscoverMxNMContextTargetSession(",
+            "DiscoverMxNMContextSurface(",
+            "safePointNormalized",
+            "safePointScreen",
+            "discoveryMethod",
+            "session.surfaceClientRect := surfaceRect",
+            "WindowFromScreenPoint",
+            "ResolveMxNMRootOwnerHwnd",
+            "pointProbeCount",
         ):
-            self.assertNotIn(forbidden, provider + main)
-        self.assertFalse((ROOT / "src" / "mxnm_measurement_warmup.ahk").exists())
+            self.assertIn(required, session)
+        for forbidden in (
+            "BuildMxNMMeasurementTargetPlan(",
+            "BuildMxNMViewerToolCommandPlan(",
+            "ParseMxNMDeclaredLayoutModels(",
+            "FindMxNMCrossLayoutSafePoint(",
+            "IsWindowEnabled",
+            "MxNMViewerTool",
+        ):
+            self.assertNotIn(forbidden, session + provider)
+        self.assertNotIn("candidates.Length != 1", session)
+        self.assertNotIn('StrLower(className) != "#32770"', session)
+        self.assertNotIn("MxNMTargetParentHwnd(hwnd) !=", session)
+        self.assertIn("candidate.score > best.score", session)
+        self.assertIn("{x: 0.65, y: 0.35}", session)
+        self.assertIn("denseRatios := [0.20, 0.35, 0.50, 0.65, 0.80]", session)
+        resolve_internal = session.split(
+            "static ResolveInternal(viewerExe := \"\", options := 0) {", 1
+        )[1].split("\n    static Invalidate()", 1)[0]
+        self.assertEqual(
+            resolve_internal.count("DiscoverMxNMContextTargetSession("),
+            1,
+        )
 
     def test_geometry_is_owned_by_one_resolver_and_fails_closed(self) -> None:
         provider = source("src/context_measurement_provider.ahk")
@@ -403,6 +420,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"mxnm_config_path_cache.ahk"',
             '"context_measurement_provider.ahk"',
             '"mxnm_measurement_target_resolver.ahk"',
+            '"mxnm_context_target_session.ahk"',
             '"mxnm_measurement_provider.ahk"',
             '"hotstrings.ahk"',
         )
@@ -419,6 +437,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             "mxnm_config_path_cache.ahk",
             "context_measurement_provider.ahk",
             "mxnm_measurement_target_resolver.ahk",
+            "mxnm_context_target_session.ahk",
             "mxnm_measurement_provider.ahk",
         ):
             self.assertIn(f"; --- BEGIN {component} ---", release)

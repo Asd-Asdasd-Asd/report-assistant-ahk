@@ -210,26 +210,26 @@ MxNMViewerClearFailureMessage(result) {
             . "/"
             . MxNMViewerClearContextValue(
                 result,
-                "targetLayoutCode",
-                "UNKNOWN"
+                "targetSessionCacheHit",
+                false
             )
             . "/"
             . MxNMViewerClearContextValue(
                 result,
-                "targetRuntimeFrameCandidateCount",
+                "targetSessionGeneration",
                 0
             )
             . "/"
             . MxNMViewerClearContextValue(
                 result,
-                "targetRuntimeFrameOwnerFamilyCount",
+                "targetSessionCandidateCount",
                 0
             )
             . "/"
             . MxNMViewerClearContextValue(
                 result,
-                "targetRuntimeToolAnchorFallbackCode",
-                "NO_ANCHOR"
+                "targetSessionPointProbeCount",
+                0
             )
             . "）"
     if code = MxNMAnnotationCleanupCode.TARGET_CLIENT_POINT_INVALID

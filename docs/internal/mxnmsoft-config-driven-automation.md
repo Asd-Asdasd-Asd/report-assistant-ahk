@@ -254,14 +254,20 @@ config complete logical image rectangle
 rectangle 后预期 screen point 为 `(2686,217)`。这些值是算法结果，
 不得作为 profile 常量写死。
 
-跨机器运行不再把上述 vendor layout schema 作为绝对门槛。若 layout 无法
-解析、不存在跨 layout 共同点，或共同点无法映射到实际窗口，但 native tool
-group 仍能唯一绑定 Viewer，resolver 会复用已采集的同 PID/root-owner
-可见 image surface，在其 client 内部以避开常见分割线的 4×4 候选网格
-只读执行 `WindowFromPoint`，要求命中
-窗口属于该 surface、PID/root-owner 一致且点与实际命中 client 边缘保持
-最小距离；随后仍只发送一次右键，并保留 popup PID、精确菜单文字、client
-bounds 与 clipboard freshness 校验。该 fallback 不引入 production UIA。
+上述 config/layout resolver 现保留为 field diagnostic，不再作为 production
+右键菜单准入门槛。production 使用独立 `ViewerSession`：首次从当前 Viewer
+PID/root 下宽松收集可见、非空且在屏幕内的 surface，class、面积、鼠标位置
+和层级只参与候选评分，不要求固定 `#32770`、直接 parent、唯一 frame、唯一
+surface 或工具栏 schema。候选有多个时按分数依次尝试，只有所有候选都无法
+产生有效点才失败。
+
+discovery 先按 `(65%,35%)`、四个偏角位置尝试，首个通过 `WindowFromPoint`、
+PID/root-owner 和 client bounds 的点立即采用；五点均失败才进入较密集扫描。
+成功后缓存 root HWND、surface HWND 和 normalized point。后续热键只复核
+缓存 HWND、PID/root-owner、process path、可见状态和一个重算后的点；rect
+变化本身不触发失败。fast validation 失败时只清除缓存、discovery 一次并
+重试一次。右键后仍保留同 PID popup、精确菜单文字、当前 runtime ID、
+client bounds 与 clipboard freshness 校验。production 不引入 UIA。
 
 首次 Windows automatic-target transport 返回 `FOUND`，证明在非目标 pane
 保持活动且只有该 pane 存在标注时，复制命令仍能取得当前活动/全局 SUVMax；

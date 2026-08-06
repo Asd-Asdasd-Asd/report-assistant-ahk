@@ -9,6 +9,7 @@
 #Include ..\..\src\mxnm_viewer_tool_commands.ahk
 #Include ..\..\src\context_measurement_provider.ahk
 #Include ..\..\src\mxnm_measurement_target_resolver.ahk
+#Include ..\..\src\mxnm_context_target_session.ahk
 #Include ..\..\src\mxnm_measurement_provider.ahk
 #Include ..\..\src\mxnm_annotation_cleaner.ahk
 

@@ -62,6 +62,9 @@ class MxNMContextMenuDiagnosticBuildTests(unittest.TestCase):
         self.assertIn("pid != expectedPid", harness)
         self.assertIn("ownerMatches: rootOwner = expectedOwner", harness)
         self.assertIn("RawWindowTextCaptured=false", harness)
+        self.assertIn("SessionTargetOk=", harness)
+        self.assertIn("SessionCandidateCount=", harness)
+        self.assertIn("SessionPointProbeCount=", harness)
         self.assertIn("HasDeleteAll=", harness)
         self.assertIn('discovery := "STATE_CHANGED"', harness)
 
