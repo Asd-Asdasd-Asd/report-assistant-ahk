@@ -372,6 +372,9 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertIn("candidate.score > best.score", session)
         self.assertIn("{x: 0.65, y: 0.35}", session)
         self.assertIn("denseRatios := [0.20, 0.35, 0.50, 0.65, 0.80]", session)
+        self.assertIn("cursorPointBuffer := Buffer(8, 0)", session)
+        self.assertIn("classNameBuffer := Buffer(512 * 2, 0)", session)
+        self.assertNotIn("\n    buffer := Buffer(", session)
         resolve_internal = session.split(
             "static ResolveInternal(viewerExe := \"\", options := 0) {", 1
         )[1].split("\n    static Invalidate()", 1)[0]

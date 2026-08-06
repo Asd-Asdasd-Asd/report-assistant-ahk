@@ -650,11 +650,15 @@ MxNMContextPointFromNormalized(rect, normalized) {
 }
 
 GetMxNMContextCursorScreenPoint() {
-    buffer := Buffer(8, 0)
-    if DllCall("User32\GetCursorPos", "Ptr", buffer.Ptr, "Int") {
+    cursorPointBuffer := Buffer(8, 0)
+    if DllCall(
+        "User32\GetCursorPos",
+        "Ptr", cursorPointBuffer.Ptr,
+        "Int"
+    ) {
         return {
-            x: NumGet(buffer, 0, "Int"),
-            y: NumGet(buffer, 4, "Int")
+            x: NumGet(cursorPointBuffer, 0, "Int"),
+            y: NumGet(cursorPointBuffer, 4, "Int")
         }
     }
     return {x: -2147483648, y: -2147483648}
@@ -690,17 +694,19 @@ MxNMContextClassLooksLikeToolChrome(className) {
 MxNMContextWindowClass(hwnd) {
     if !hwnd
         return ""
-    buffer := Buffer(512 * 2, 0)
+    classNameBuffer := Buffer(512 * 2, 0)
     try length := DllCall(
         "User32\GetClassNameW",
         "Ptr", hwnd,
-        "Ptr", buffer.Ptr,
+        "Ptr", classNameBuffer.Ptr,
         "Int", 512,
         "Int"
     )
     catch
         return ""
-    return length > 0 ? StrGet(buffer, length, "UTF-16") : ""
+    return length > 0
+        ? StrGet(classNameBuffer, length, "UTF-16")
+        : ""
 }
 
 MxNMContextWindowDepth(hwnd, rootHwnd) {
