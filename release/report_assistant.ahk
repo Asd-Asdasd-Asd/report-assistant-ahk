@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: b115b4f770e2a8b68b5de4d9a3d305fa8a8e5987
-; Generated at: 2026-08-06 04:35:43 UTC
+; Source revision: 56c13c649c56956d3d4534ba037ed88a15f6900f
+; Generated at: 2026-08-06 04:51:07 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-06"
-    static SourceRevision := "b115b4f770e2a8b68b5de4d9a3d305fa8a8e5987"
+    static SourceRevision := "56c13c649c56956d3d4534ba037ed88a15f6900f"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -11522,23 +11522,38 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         return failure
     }
     actionFrame := surfaceResult.frame
+    pointSource := ""
+    configPointFailureCode := ""
     if IsObject(plan.logicalPoint) {
         mappedImage := MapMxNMLogicalImageRectToRuntime(
             plan.mainGeometry,
             actionFrame
         )
         if !mappedImage.ok {
-            failure.fallbackCode := "ANCHOR_IMAGE_MAPPING_INVALID"
-            return failure
+            configPointFailureCode := "ANCHOR_IMAGE_MAPPING_INVALID"
+        } else {
+            configImageRect := mappedImage.rect
+            configScreenPoint := MapMxNMLogicalPointToRuntimeRect(
+                plan.logicalPoint,
+                plan.mainGeometry,
+                configImageRect
+            )
+            if MxNMPointInsideRect(
+                configScreenPoint,
+                configImageRect
+            ) && MxNMPointInsideRuntimeFrameClient(
+                configScreenPoint,
+                actionFrame
+            ) {
+                imageRect := configImageRect
+                screenPoint := configScreenPoint
+                pointSource := "CONFIG_COMMON_POINT"
+            } else {
+                configPointFailureCode := "ANCHOR_POINT_OUT_OF_BOUNDS"
+            }
         }
-        imageRect := mappedImage.rect
-        screenPoint := MapMxNMLogicalPointToRuntimeRect(
-            plan.logicalPoint,
-            plan.mainGeometry,
-            imageRect
-        )
-        pointSource := "CONFIG_COMMON_POINT"
-    } else if plan.runtimeSurfaceFallbackEligible {
+    }
+    if pointSource = "" && plan.runtimeSurfaceFallbackEligible {
         imageRect := {
             left: actionFrame.clientX,
             top: actionFrame.clientY,
@@ -11556,7 +11571,9 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         }
         screenPoint := runtimePoint.point
         pointSource := "RUNTIME_SURFACE_POINT"
-    } else {
+    } else if pointSource = "" {
+        if configPointFailureCode != ""
+            failure.fallbackCode := configPointFailureCode
         return failure
     }
     if !MxNMPointInsideRect(screenPoint, imageRect)
