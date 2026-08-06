@@ -255,9 +255,10 @@ rectangle 后预期 screen point 为 `(2686,217)`。这些值是算法结果，
 不得作为 profile 常量写死。
 
 跨机器运行不再把上述 vendor layout schema 作为绝对门槛。若 layout 无法
-解析或不存在跨 layout 共同点，但 native tool group 仍能唯一绑定 Viewer，
-resolver 会复用已采集的同 PID/root-owner 可见 image surface，在其 client
-内部以避开常见分割线的 4×4 候选网格只读执行 `WindowFromPoint`，要求命中
+解析、不存在跨 layout 共同点，或共同点无法映射到实际窗口，但 native tool
+group 仍能唯一绑定 Viewer，resolver 会复用已采集的同 PID/root-owner
+可见 image surface，在其 client 内部以避开常见分割线的 4×4 候选网格
+只读执行 `WindowFromPoint`，要求命中
 窗口属于该 surface、PID/root-owner 一致且点与实际命中 client 边缘保持
 最小距离；随后仍只发送一次右键，并保留 popup PID、精确菜单文字、client
 bounds 与 clipboard freshness 校验。该 fallback 不引入 production UIA。

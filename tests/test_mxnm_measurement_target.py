@@ -209,6 +209,18 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         )
         self.assertIn('pointSource := "RUNTIME_SURFACE_POINT"', fallback_target)
         self.assertIn('"READY_RUNTIME_SURFACE_POINT"', fallback_target)
+        self.assertIn(
+            'configPointFailureCode := "ANCHOR_IMAGE_MAPPING_INVALID"',
+            fallback_target,
+        )
+        self.assertIn(
+            'if pointSource = "" && plan.runtimeSurfaceFallbackEligible',
+            fallback_target,
+        )
+        mapping_failure = fallback_target.split(
+            'configPointFailureCode := "ANCHOR_IMAGE_MAPPING_INVALID"', 1
+        )[1].split("} else {", 1)[0]
+        self.assertNotIn("return failure", mapping_failure)
         anchored_action = resolver.split(
             "\nResolveMxNMActionWindowFromAnchor(", 1
         )[1].split(

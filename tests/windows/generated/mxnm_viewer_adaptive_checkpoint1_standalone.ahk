@@ -1859,23 +1859,38 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         return failure
     }
     actionFrame := surfaceResult.frame
+    pointSource := ""
+    configPointFailureCode := ""
     if IsObject(plan.logicalPoint) {
         mappedImage := MapMxNMLogicalImageRectToRuntime(
             plan.mainGeometry,
             actionFrame
         )
         if !mappedImage.ok {
-            failure.fallbackCode := "ANCHOR_IMAGE_MAPPING_INVALID"
-            return failure
+            configPointFailureCode := "ANCHOR_IMAGE_MAPPING_INVALID"
+        } else {
+            configImageRect := mappedImage.rect
+            configScreenPoint := MapMxNMLogicalPointToRuntimeRect(
+                plan.logicalPoint,
+                plan.mainGeometry,
+                configImageRect
+            )
+            if MxNMPointInsideRect(
+                configScreenPoint,
+                configImageRect
+            ) && MxNMPointInsideRuntimeFrameClient(
+                configScreenPoint,
+                actionFrame
+            ) {
+                imageRect := configImageRect
+                screenPoint := configScreenPoint
+                pointSource := "CONFIG_COMMON_POINT"
+            } else {
+                configPointFailureCode := "ANCHOR_POINT_OUT_OF_BOUNDS"
+            }
         }
-        imageRect := mappedImage.rect
-        screenPoint := MapMxNMLogicalPointToRuntimeRect(
-            plan.logicalPoint,
-            plan.mainGeometry,
-            imageRect
-        )
-        pointSource := "CONFIG_COMMON_POINT"
-    } else if plan.runtimeSurfaceFallbackEligible {
+    }
+    if pointSource = "" && plan.runtimeSurfaceFallbackEligible {
         imageRect := {
             left: actionFrame.clientX,
             top: actionFrame.clientY,
@@ -1893,7 +1908,9 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         }
         screenPoint := runtimePoint.point
         pointSource := "RUNTIME_SURFACE_POINT"
-    } else {
+    } else if pointSource = "" {
+        if configPointFailureCode != ""
+            failure.fallbackCode := configPointFailureCode
         return failure
     }
     if !MxNMPointInsideRect(screenPoint, imageRect)
