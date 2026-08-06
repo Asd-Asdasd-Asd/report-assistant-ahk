@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 58e7e727efbae4059e59d85f8249a7e7011ea5e3
-; Generated at: 2026-08-06 05:36:24 UTC
+; Source revision: 25cb6a783ea577f4152f4275e19b0db7ec15e371
+; Generated at: 2026-08-06 06:06:53 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-06"
-    static SourceRevision := "58e7e727efbae4059e59d85f8249a7e7011ea5e3"
+    static SourceRevision := "25cb6a783ea577f4152f4275e19b0db7ec15e371"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -13136,11 +13136,15 @@ MxNMContextPointFromNormalized(rect, normalized) {
 }
 
 GetMxNMContextCursorScreenPoint() {
-    buffer := Buffer(8, 0)
-    if DllCall("User32\GetCursorPos", "Ptr", buffer.Ptr, "Int") {
+    cursorPointBuffer := Buffer(8, 0)
+    if DllCall(
+        "User32\GetCursorPos",
+        "Ptr", cursorPointBuffer.Ptr,
+        "Int"
+    ) {
         return {
-            x: NumGet(buffer, 0, "Int"),
-            y: NumGet(buffer, 4, "Int")
+            x: NumGet(cursorPointBuffer, 0, "Int"),
+            y: NumGet(cursorPointBuffer, 4, "Int")
         }
     }
     return {x: -2147483648, y: -2147483648}
@@ -13176,17 +13180,19 @@ MxNMContextClassLooksLikeToolChrome(className) {
 MxNMContextWindowClass(hwnd) {
     if !hwnd
         return ""
-    buffer := Buffer(512 * 2, 0)
+    classNameBuffer := Buffer(512 * 2, 0)
     try length := DllCall(
         "User32\GetClassNameW",
         "Ptr", hwnd,
-        "Ptr", buffer.Ptr,
+        "Ptr", classNameBuffer.Ptr,
         "Int", 512,
         "Int"
     )
     catch
         return ""
-    return length > 0 ? StrGet(buffer, length, "UTF-16") : ""
+    return length > 0
+        ? StrGet(classNameBuffer, length, "UTF-16")
+        : ""
 }
 
 MxNMContextWindowDepth(hwnd, rootHwnd) {
