@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 25cb6a783ea577f4152f4275e19b0db7ec15e371
-; Generated at: 2026-08-06 06:06:53 UTC
+; Source revision: 38fb21583931faab10547f5f2168609934549da8
+; Generated at: 2026-08-10 03:22:31 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-08-06"
-    static SourceRevision := "25cb6a783ea577f4152f4275e19b0db7ec15e371"
+    static BuildDate := "2026-08-10"
+    static SourceRevision := "38fb21583931faab10547f5f2168609934549da8"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -12495,6 +12495,8 @@ class MxNMContextTargetSessionCode {
 class MxNMContextTargetSessionProvider {
     static CachedSession := 0
     static Generation := 0
+    static ColdRecoveryConsumed := false
+    static ColdRecoveryDelayMs := 350
 
     static Resolve(viewerExe := "", options := 0) {
         try return this.ResolveInternal(viewerExe, options)
@@ -12534,13 +12536,39 @@ class MxNMContextTargetSessionProvider {
             options,
             this.Generation + 1
         )
+        coldRecoveryAttempted := false
         if !discovery.ok
-            return MakeMxNMContextTargetFailure(
+            && discovery.code
+                = MxNMContextTargetSessionCode.DISCOVERY_FAILED
+            && !this.ColdRecoveryConsumed {
+            this.ColdRecoveryConsumed := true
+            coldRecoveryAttempted := true
+            Sleep this.ColdRecoveryDelayMs
+            discovery := DiscoverMxNMContextTargetSession(
+                viewerExe,
+                options,
+                this.Generation + 1
+            )
+        }
+        if !discovery.ok {
+            failure := MakeMxNMContextTargetFailure(
                 discovery.code,
                 discovery
             )
+            failure.coldRecoveryAttempted := coldRecoveryAttempted
+            failure.coldRecoverySucceeded := false
+            failure.coldRecoveryDelayMs := coldRecoveryAttempted
+                ? this.ColdRecoveryDelayMs
+                : 0
+            return failure
+        }
         this.Generation += 1
         discovery.session.generation := this.Generation
+        discovery.session.coldRecoveryAttempted := coldRecoveryAttempted
+        discovery.session.coldRecoverySucceeded := coldRecoveryAttempted
+        discovery.session.coldRecoveryDelayMs := coldRecoveryAttempted
+            ? this.ColdRecoveryDelayMs
+            : 0
         this.CachedSession := discovery.session
 
         retryResult := ValidateMxNMContextTargetSession(
@@ -12554,10 +12582,58 @@ class MxNMContextTargetSessionProvider {
                 retryResult,
                 false
             )
+        failedSession := this.CachedSession
         this.CachedSession := 0
-        return MakeMxNMContextTargetFailure(
+        if !this.ColdRecoveryConsumed {
+            this.ColdRecoveryConsumed := true
+            coldRecoveryAttempted := true
+            Sleep this.ColdRecoveryDelayMs
+            recoveryDiscovery := DiscoverMxNMContextTargetSession(
+                viewerExe,
+                options,
+                this.Generation + 1
+            )
+            if recoveryDiscovery.ok {
+                this.Generation += 1
+                recoveryDiscovery.session.generation := this.Generation
+                recoveryDiscovery.session.coldRecoveryAttempted := true
+                recoveryDiscovery.session.coldRecoverySucceeded := false
+                recoveryDiscovery.session.coldRecoveryDelayMs :=
+                    this.ColdRecoveryDelayMs
+                this.CachedSession := recoveryDiscovery.session
+                recoveryValidation := ValidateMxNMContextTargetSession(
+                    this.CachedSession,
+                    viewerExe,
+                    options
+                )
+                if recoveryValidation.ok {
+                    this.CachedSession.coldRecoverySucceeded := true
+                    return BuildMxNMContextTargetResult(
+                        this.CachedSession,
+                        recoveryValidation,
+                        false
+                    )
+                }
+                failedSession := this.CachedSession
+                this.CachedSession := 0
+            }
+        }
+        failure := MakeMxNMContextTargetFailure(
             MxNMContextTargetSessionCode.FAST_VALIDATION_FAILED
         )
+        failure.coldRecoveryAttempted := coldRecoveryAttempted
+        failure.coldRecoverySucceeded := false
+        failure.coldRecoveryDelayMs := coldRecoveryAttempted
+            ? this.ColdRecoveryDelayMs
+            : 0
+        if IsObject(failedSession) {
+            failure.sessionGeneration := failedSession.generation
+            failure.sessionRootHwnd := failedSession.rootHwnd
+            failure.sessionSurfaceHwnd := failedSession.surfaceHwnd
+            failure.sessionCandidateCount := failedSession.candidateCount
+            failure.sessionPointProbeCount := failedSession.pointProbeCount
+        }
+        return failure
     }
 
     static Invalidate() {
@@ -13077,6 +13153,15 @@ BuildMxNMContextTargetResult(session, validation, cacheHit) {
     result.sessionSurfaceHwnd := session.surfaceHwnd
     result.sessionCandidateCount := session.candidateCount
     result.sessionPointProbeCount := session.pointProbeCount
+    result.coldRecoveryAttempted := session.HasOwnProp(
+        "coldRecoveryAttempted"
+    ) && session.coldRecoveryAttempted
+    result.coldRecoverySucceeded := session.HasOwnProp(
+        "coldRecoverySucceeded"
+    ) && session.coldRecoverySucceeded
+    result.coldRecoveryDelayMs := session.HasOwnProp(
+        "coldRecoveryDelayMs"
+    ) ? session.coldRecoveryDelayMs : 0
     return result
 }
 
@@ -13113,7 +13198,10 @@ MakeMxNMContextTargetFailure(code, details := 0) {
         sessionRootHwnd: 0,
         sessionSurfaceHwnd: 0,
         sessionCandidateCount: 0,
-        sessionPointProbeCount: 0
+        sessionPointProbeCount: 0,
+        coldRecoveryAttempted: false,
+        coldRecoverySucceeded: false,
+        coldRecoveryDelayMs: 0
     }
     if IsObject(details) {
         if details.HasOwnProp("candidateCount")
@@ -13234,10 +13322,53 @@ class MxNMMeasurementProvider {
             "viewerExe",
             MxNMConfigGeometryDefaults.ViewerExe
         )
-        return MxNMContextTargetSessionProvider.Resolve(
+        startedAt := A_TickCount
+        result := MxNMContextTargetSessionProvider.Resolve(
             viewerExe,
             options
         )
+        if !result.ok {
+            WriteMxNMViewerFailureDiagnostic(
+                "ContextTarget",
+                result.code,
+                Map(
+                    "stage", "TARGET_RESOLVE",
+                    "viewerPid", result.actionPid,
+                    "viewerRootHwnd", result.sessionRootHwnd,
+                    "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "sessionCandidateCount", result.sessionCandidateCount,
+                    "pointProbeCount", result.sessionPointProbeCount,
+                    "sessionCacheHit", result.sessionCacheHit,
+                    "sessionGeneration", result.sessionGeneration,
+                    "coldRecoveryAttempted", result.coldRecoveryAttempted,
+                    "coldRecoverySucceeded", result.coldRecoverySucceeded,
+                    "coldRecoveryDelayMs", result.coldRecoveryDelayMs,
+                    "elapsedMs", A_TickCount - startedAt
+                )
+            )
+        } else if result.coldRecoveryAttempted
+            && !result.sessionCacheHit {
+            WriteMxNMViewerFailureDiagnostic(
+                "ContextTarget",
+                "COLD_RECOVERY_SUCCEEDED",
+                Map(
+                    "stage", "TARGET_RECOVERED",
+                    "viewerPid", result.actionPid,
+                    "viewerHwnd", result.actionHwnd,
+                    "viewerRootHwnd", result.sessionRootHwnd,
+                    "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "sessionCandidateCount", result.sessionCandidateCount,
+                    "pointProbeCount", result.sessionPointProbeCount,
+                    "sessionCacheHit", result.sessionCacheHit,
+                    "sessionGeneration", result.sessionGeneration,
+                    "coldRecoveryAttempted", true,
+                    "coldRecoverySucceeded", result.coldRecoverySucceeded,
+                    "coldRecoveryDelayMs", result.coldRecoveryDelayMs,
+                    "elapsedMs", A_TickCount - startedAt
+                )
+            )
+        }
+        return result
     }
 
     static PrepareTargetPlan(options := 0) {
@@ -13311,6 +13442,59 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
         target.sessionPointProbeCount
     result.context["targetResolutionMs"] := targetResolutionMs
     result.context["totalReadMs"] := A_TickCount - startedAt
+    if result.state = MeasurementState.AUTOMATION_FAILED {
+        WriteMxNMViewerFailureDiagnostic(
+            "ContextMeasurement",
+            result.failureReason,
+            Map(
+                "stage", "CONTEXT_COMMAND",
+                "measurementType", requestedMeasurementType,
+                "failureReason", result.failureReason,
+                "viewerPid", target.actionPid,
+                "viewerHwnd", target.actionHwnd,
+                "viewerRootHwnd", target.sessionRootHwnd,
+                "surfaceHwnd", target.sessionSurfaceHwnd,
+                "sessionCandidateCount", target.sessionCandidateCount,
+                "pointProbeCount", target.sessionPointProbeCount,
+                "popupDiscovery", MedExContextValue(
+                    result.context,
+                    "popupDiscovery",
+                    ""
+                ),
+                "popupHwnd", MedExContextValue(
+                    result.context,
+                    "popupHwnd",
+                    0
+                ),
+                "commandControlHwnd", MedExContextValue(
+                    result.context,
+                    "commandControlHwnd",
+                    0
+                ),
+                "clipboardSequenceBefore", MedExContextValue(
+                    result.context,
+                    "clipboardSequenceBeforeCommand",
+                    0
+                ),
+                "clipboardSequenceAfter", MedExContextValue(
+                    result.context,
+                    "clipboardSequenceAfterCommand",
+                    0
+                ),
+                "clipboardCaptureSucceeded", MedExContextValue(
+                    result.context,
+                    "clipboardCaptureSucceeded",
+                    false
+                ),
+                "sessionCacheHit", target.sessionCacheHit,
+                "sessionGeneration", target.sessionGeneration,
+                "coldRecoveryAttempted", target.coldRecoveryAttempted,
+                "coldRecoverySucceeded", target.coldRecoverySucceeded,
+                "coldRecoveryDelayMs", target.coldRecoveryDelayMs,
+                "elapsedMs", result.context["totalReadMs"]
+            )
+        )
+    }
     return result
 }
 
@@ -13383,12 +13567,95 @@ class MxNMAnnotationCleaner {
     static DeleteAll(expectedViewerHwnd := 0, expectedViewerPid := 0,
         options := 0,
         cleanupMeasurementType := MeasurementType.SUVMAX) {
-        return DeleteAllMxNMAnnotations(
+        startedAt := A_TickCount
+        result := DeleteAllMxNMAnnotations(
             expectedViewerHwnd,
             expectedViewerPid,
             options,
             cleanupMeasurementType
         )
+        if !result.ok {
+            WriteMxNMViewerFailureDiagnostic(
+                "AnnotationCleanup",
+                result.code,
+                Map(
+                    "stage", MxNMViewerFailureDetail(
+                        result.context,
+                        "failureStage",
+                        "CLEANUP"
+                    ),
+                    "measurementType", cleanupMeasurementType,
+                    "failureReason", result.failureReason,
+                    "viewerPid", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetActionPid",
+                        expectedViewerPid
+                    ),
+                    "viewerHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetActionHwnd",
+                        expectedViewerHwnd
+                    ),
+                    "viewerRootHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionRootHwnd",
+                        0
+                    ),
+                    "surfaceHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionSurfaceHwnd",
+                        0
+                    ),
+                    "sessionCandidateCount", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionCandidateCount",
+                        0
+                    ),
+                    "pointProbeCount", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionPointProbeCount",
+                        0
+                    ),
+                    "popupDiscovery", MxNMViewerFailureDetail(
+                        result.context,
+                        "popupDiscovery",
+                        ""
+                    ),
+                    "popupHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "popupHwnd",
+                        0
+                    ),
+                    "sessionCacheHit", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionCacheHit",
+                        false
+                    ),
+                    "sessionGeneration", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionGeneration",
+                        0
+                    ),
+                    "coldRecoveryAttempted", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetColdRecoveryAttempted",
+                        false
+                    ),
+                    "coldRecoverySucceeded", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetColdRecoverySucceeded",
+                        false
+                    ),
+                    "coldRecoveryDelayMs", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetColdRecoveryDelayMs",
+                        0
+                    ),
+                    "elapsedMs", A_TickCount - startedAt
+                )
+            )
+        }
+        return result
     }
 }
 
@@ -13442,6 +13709,14 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             target.sessionCandidateCount
         result.context["targetSessionPointProbeCount"] :=
             target.sessionPointProbeCount
+        result.context["targetActionHwnd"] := target.actionHwnd
+        result.context["targetActionPid"] := target.actionPid
+        result.context["targetColdRecoveryAttempted"] :=
+            target.coldRecoveryAttempted
+        result.context["targetColdRecoverySucceeded"] :=
+            target.coldRecoverySucceeded
+        result.context["targetColdRecoveryDelayMs"] :=
+            target.coldRecoveryDelayMs
         if !target.ok {
             result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
@@ -13751,6 +14026,8 @@ class MxNMViewerToolCommandProvider {
                 result.commandId := command.commandId
                 result.commandRow := command.row
                 result.commandColumn := command.column
+                result.viewerPid := controlSet.pid
+                result.viewerProcessCount := controlSet.processCount
                 result.viewerHwnd := controlSet.frameHwnd
                 result.buttonPanelHwnd := controlSet.panelHwnd
                 result.runtimeCandidateCount :=
@@ -13768,6 +14045,8 @@ class MxNMViewerToolCommandProvider {
                 result.commandId := command.commandId
                 result.commandRow := command.row
                 result.commandColumn := command.column
+                result.viewerPid := controlSet.pid
+                result.viewerProcessCount := controlSet.processCount
                 result.viewerHwnd := controlSet.frameHwnd
                 result.buttonHwnd := target.hwnd
                 result.buttonParentHwnd := target.parentHwnd
@@ -13786,6 +14065,8 @@ class MxNMViewerToolCommandProvider {
             result.commandId := command.commandId
             result.commandRow := command.row
             result.commandColumn := command.column
+            result.viewerPid := controlSet.pid
+            result.viewerProcessCount := controlSet.processCount
             result.viewerHwnd := controlSet.frameHwnd
             result.buttonHwnd := target.hwnd
             result.buttonParentHwnd := target.parentHwnd
@@ -14060,6 +14341,8 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     failure := {
         ok: false,
         code: MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE,
+        pid: 0,
+        processCount: 0,
         frameHwnd: 0,
         actionRootHwnd: 0,
         panelHwnd: 0,
@@ -14075,9 +14358,12 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     )
     if !processResult.ok {
         failure.code := processResult.code
+        failure.processCount := processResult.processCount
         return failure
     }
     runtimePid := processResult.pid
+    failure.pid := runtimePid
+    failure.processCount := processResult.processCount
 
     commandKeyById := Map()
     for commandKey, command in plan.commands
@@ -14158,6 +14444,8 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     return {
         ok: true,
         code: MxNMViewerToolCode.READY,
+        pid: runtimePid,
+        processCount: processResult.processCount,
         frameHwnd: validGroups[1].frameHwnd,
         actionRootHwnd: validGroups[1].actionRootHwnd,
         panelHwnd: validGroups[1].panelHwnd,
@@ -14181,14 +14469,16 @@ ResolveMxNMViewerToolProcess(viewerWindows) {
             code: pids.Count = 0
                 ? MxNMViewerToolCode.VIEWER_NOT_FOUND
                 : MxNMViewerToolCode.VIEWER_NOT_UNIQUE,
-            pid: 0
+            pid: 0,
+            processCount: pids.Count
         }
     }
     for pid, _ in pids {
         return {
             ok: true,
             code: MxNMViewerToolCode.READY,
-            pid: pid
+            pid: pid,
+            processCount: pids.Count
         }
     }
 }
@@ -15476,6 +15766,106 @@ MedExMachineProfileValue(profile, key, defaultValue) {
 ; --- END machine_profile.ahk ---
 
 ; --- BEGIN diagnostics.ahk ---
+class MxNMViewerFailureDiagnosticDefaults {
+    static LogDirectoryName := "logs"
+    static LogFileName := "viewer-failures.log"
+    static MaxFileBytes := 524288
+}
+
+DefaultMxNMViewerFailureLogPath() {
+    configPath := ReportAssistantConfig.Path()
+    SplitPath configPath, , &configDirectory
+    return configDirectory "\"
+        MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\"
+        MxNMViewerFailureDiagnosticDefaults.LogFileName
+}
+
+WriteMxNMViewerFailureDiagnostic(action, resultCode, details := 0,
+    logPath := "") {
+    try {
+        if logPath = ""
+            logPath := DefaultMxNMViewerFailureLogPath()
+        SplitPath logPath, , &logDirectory
+        if !DirExist(logDirectory)
+            DirCreate logDirectory
+        RotateMxNMViewerFailureDiagnostic(logPath)
+        FileAppend FormatMxNMViewerFailureDiagnostic(
+            action,
+            resultCode,
+            details
+        ) "`r`n", logPath, "UTF-8"
+        return logPath
+    } catch {
+        return ""
+    }
+}
+
+RotateMxNMViewerFailureDiagnostic(logPath) {
+    if !FileExist(logPath)
+        return
+    try size := FileGetSize(logPath)
+    catch
+        return
+    if size < MxNMViewerFailureDiagnosticDefaults.MaxFileBytes
+        return
+    rotatedPath := logPath ".1"
+    try FileMove logPath, rotatedPath, true
+}
+
+FormatMxNMViewerFailureDiagnostic(action, resultCode, details := 0) {
+    fields := [
+        "schema=1",
+        "timestamp=" SafeDiagnosticValue(FormatTime(, "yyyy-MM-ddTHH:mm:ss")),
+        "tickCount=" SafeDiagnosticValue(A_TickCount),
+        "appVersion=" SafeDiagnosticValue(AppMetadata.Version),
+        "sourceRevision=" SafeDiagnosticValue(AppMetadata.SourceRevision),
+        "action=" SafeDiagnosticValue(action),
+        "resultCode=" SafeDiagnosticValue(resultCode),
+        "stage=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "stage", "")),
+        "profileId=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "profileId", "")),
+        "commandName=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "commandName", "")),
+        "measurementType=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "measurementType", "")),
+        "failureReason=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "failureReason", "")),
+        "stepIndex=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "stepIndex", 0)),
+        "controlId=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "controlId", 0)),
+        "controlClass=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "controlClass", "")),
+        "viewerPid=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerPid", 0)),
+        "viewerHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerHwnd", 0)),
+        "viewerRootHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerRootHwnd", 0)),
+        "surfaceHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "surfaceHwnd", 0)),
+        "win32Candidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "win32CandidateCount", 0)),
+        "uiaRawCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaRawCandidateCount", 0)),
+        "uiaCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaCandidateCount", 0)),
+        "uiaQuerySucceeded=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "uiaQuerySucceeded", false)),
+        "mergedCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "mergedCandidateCount", 0)),
+        "runtimeCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "runtimeCandidateCount", 0)),
+        "viewerProcessCount=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerProcessCount", 0)),
+        "sessionCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "sessionCandidateCount", 0)),
+        "pointProbes=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "pointProbeCount", 0)),
+        "popupDiscovery=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupDiscovery", "")),
+        "popupHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupHwnd", 0)),
+        "commandControlHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "commandControlHwnd", 0)),
+        "clipboardSequenceBefore=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "clipboardSequenceBefore", 0)),
+        "clipboardSequenceAfter=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "clipboardSequenceAfter", 0)),
+        "clipboardCaptureSucceeded=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "clipboardCaptureSucceeded", false)),
+        "sessionCacheHit=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "sessionCacheHit", false)),
+        "sessionGeneration=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "sessionGeneration", 0)),
+        "coldRecoveryAttempted=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "coldRecoveryAttempted", false)),
+        "coldRecoverySucceeded=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "coldRecoverySucceeded", false)),
+        "coldRecoveryDelayMs=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "coldRecoveryDelayMs", 0)),
+        "elapsedMs=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "elapsedMs", 0))
+    ]
+    return JoinDiagnosticFields(fields, "|")
+}
+
+MxNMViewerFailureDetail(details, key, fallback := "") {
+    if Type(details) = "Map"
+        return details.Has(key) ? details[key] : fallback
+    if IsObject(details) && details.HasOwnProp(key)
+        return details.%key%
+    return fallback
+}
+
 DefaultMedExColorResetLogPath() {
     return A_Temp "\MedExAHK\field\medex-color-reset-field.log"
 }
@@ -19231,10 +19621,16 @@ class MxNMMontageTiming {
     ; The layout matrix exposes no selected-state signal. All other transitions
     ; use a control/value confirmation instead of a fixed inter-step delay.
     static InitialControlReadyTimeoutMs := 1500
+    static ColdRecoveryDelayMs := 350
+    static ColdRecoveryControlTimeoutMs := 2500
     static LayoutSettleMs := 350
     static EditConfirmTimeoutMs := 300
     static EditConfirmPollMs := 20
     static ButtonSettleMs := 60
+}
+
+class MxNMMontageColdRecovery {
+    static Consumed := false
 }
 
 MxNMMontageProfileDefaults() {
@@ -19386,6 +19782,7 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
     if busy || !settings.ok || !settings.profiles.Has(profileId)
         return
     busy := true
+    startedAt := A_TickCount
     try {
         viewerHwnd := WinExist("A")
         if !MxNMMontageWaitForHotkeyRelease(chord) {
@@ -19393,10 +19790,25 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
         } else {
             result := MxNMMontageRun(profileId, settings, viewerHwnd)
         }
-        if result.ok
+        if result.ok {
+            if result.HasOwnProp("coldRecoveryAttempted")
+                && result.coldRecoveryAttempted {
+                WriteMxNMViewerFailureDiagnostic(
+                    "Montage",
+                    "COLD_RECOVERY_SUCCEEDED",
+                    result
+                )
+            }
             Flash(settings.profiles[profileId].label " montage 已完成", 1200)
-        else
+        } else {
+            result.elapsedMs := A_TickCount - startedAt
+            WriteMxNMViewerFailureDiagnostic(
+                "Montage",
+                result.code,
+                result
+            )
             Flash(MxNMMontageFailureMessage(result.code), 2200)
+        }
     } finally {
         busy := false
     }
@@ -19417,7 +19829,12 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
         return MxNMMontageResult(false, "PROFILE_UNKNOWN")
     session := MxNMMontageCreateSession(viewerHwnd)
     if !session.ok
-        return session
+        return MxNMMontageAttachFailureContext(
+            session,
+            profileId,
+            0,
+            session
+        )
     profile := settings.profiles[profileId]
     layoutPoint := MxNMMontageLayoutPoint(
         settings.layoutRow,
@@ -19425,8 +19842,62 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
     )
     if !layoutPoint.ok
         return MxNMMontageResult(false, "LAYOUT_PROFILE_INVALID")
+    firstStep := MxNMMontageStaticClick.Bind(
+        21112,
+        "Static",
+        layoutPoint.xRatio,
+        layoutPoint.yRatio,
+        0,
+        "",
+        MxNMMontageTiming.InitialControlReadyTimeoutMs
+    )
+    result := firstStep.Call(session)
+    coldRecoveryAttempted := false
+    coldRecoverySucceeded := false
+    if !result.ok
+        && result.code = "CONTROL_NOT_UNIQUE"
+        && !MxNMMontageColdRecovery.Consumed {
+        MxNMMontageColdRecovery.Consumed := true
+        coldRecoveryAttempted := true
+        Sleep MxNMMontageTiming.ColdRecoveryDelayMs
+        recoveryHwnd := WinExist("A")
+        recoverySession := MxNMMontageCreateSession(recoveryHwnd)
+        if recoverySession.ok {
+            session := recoverySession
+            result := MxNMMontageStaticClick(
+                21112,
+                "Static",
+                layoutPoint.xRatio,
+                layoutPoint.yRatio,
+                0,
+                "",
+                MxNMMontageTiming.ColdRecoveryControlTimeoutMs,
+                session
+            )
+            coldRecoverySucceeded := result.ok
+        } else {
+            result := recoverySession
+        }
+    }
+    result.coldRecoveryAttempted := coldRecoveryAttempted
+    result.coldRecoverySucceeded := coldRecoverySucceeded
+    result.coldRecoveryDelayMs := coldRecoveryAttempted
+        ? MxNMMontageTiming.ColdRecoveryDelayMs
+        : 0
+    session.coldRecoveryAttempted := result.coldRecoveryAttempted
+    session.coldRecoverySucceeded := result.coldRecoverySucceeded
+    session.coldRecoveryDelayMs := result.coldRecoveryDelayMs
+    if !result.ok {
+        return MxNMMontageAttachFailureContext(
+            result,
+            profileId,
+            1,
+            session
+        )
+    }
+    Sleep MxNMMontageTiming.LayoutSettleMs
+
     steps := [
-        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, "", MxNMMontageTiming.InitialControlReadyTimeoutMs),
         MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox", 0),
         MxNMMontageComboSelect.Bind(21155, "null"),
         MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox", 0),
@@ -19441,14 +19912,29 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
     ]
     for index, step in steps {
         if !MxNMMontageViewerStillActive(session)
-            return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED")
+            return MxNMMontageAttachFailureContext(
+                MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED"),
+                profileId,
+                index + 1,
+                session
+            )
         result := step.Call(session)
         if !result.ok
-            return result
-        if index = 1
-            Sleep MxNMMontageTiming.LayoutSettleMs
+            return MxNMMontageAttachFailureContext(
+                result,
+                profileId,
+                index + 1,
+                session
+            )
     }
-    return MxNMMontageResult(true, "READY")
+    ready := MxNMMontageAttachFailureContext(
+        MxNMMontageResult(true, "READY"),
+        profileId,
+        0,
+        session
+    )
+    ready.stage := "COMPLETE"
+    return ready
 }
 
 MxNMMontageLayoutPoint(row, column) {
@@ -19687,7 +20173,7 @@ MxNMMontageResolveControl(session, controlId, className) {
     callback := CallbackCreate(MxNMMontageCollectNativeControl.Bind(session, controlId, className, win32), "Fast", 2)
     try DllCall("User32\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
     finally CallbackFree(callback)
-    uiaCandidates := MxNMMontageCollectUiaControls(
+    uiaResult := MxNMMontageCollectUiaControls(
         session,
         controlId,
         className
@@ -19695,28 +20181,57 @@ MxNMMontageResolveControl(session, controlId, className) {
     candidatesByHwnd := Map()
     for candidate in win32
         candidatesByHwnd[candidate.hwnd] := candidate
-    for candidate in uiaCandidates
+    for candidate in uiaResult.candidates
         candidatesByHwnd[candidate.hwnd] := candidate
     candidates := []
     for _, candidate in candidatesByHwnd
         candidates.Push(candidate)
-    if candidates.Length != 1
-        return MxNMMontageResult(false, "CONTROL_NOT_UNIQUE")
+    if candidates.Length != 1 {
+        return MxNMMontageResult(
+            false,
+            "CONTROL_NOT_UNIQUE",
+            {
+                controlId: controlId,
+                controlClass: className,
+                win32CandidateCount: win32.Length,
+                uiaRawCandidateCount: uiaResult.rawCandidateCount,
+                uiaCandidateCount: uiaResult.candidates.Length,
+                uiaQuerySucceeded: uiaResult.querySucceeded,
+                mergedCandidateCount: candidates.Length
+            }
+        )
+    }
     candidate := candidates[1]
     return {ok: true, code: "CONTROL_READY", hwnd: candidate.hwnd, rectObject: candidate.rect}
 }
 
 MxNMMontageCollectUiaControls(session, controlId, className) {
     candidates := []
+    rawCandidateCount := 0
+    querySucceeded := false
     try root := UIA.ElementFromHandle(session.viewerRootOwner)
     catch
-        return candidates
+        return {
+            candidates: candidates,
+            rawCandidateCount: rawCandidateCount,
+            querySucceeded: querySucceeded
+        }
     try elements := root.FindElements({AutomationId: String(controlId)})
     catch
-        return candidates
+        return {
+            candidates: candidates,
+            rawCandidateCount: rawCandidateCount,
+            querySucceeded: querySucceeded
+        }
+    querySucceeded := true
+    rawCandidateCount := elements.Length
     viewerRect := MxNMMontageWindowRect(session.viewerRootOwner)
     if !IsObject(viewerRect)
-        return candidates
+        return {
+            candidates: candidates,
+            rawCandidateCount: rawCandidateCount,
+            querySucceeded: querySucceeded
+        }
     for element in elements {
         try {
             if element.ProcessId != session.viewerPid || StrLower(element.ClassName) != StrLower(className) || !element.IsEnabled || element.IsOffscreen
@@ -19730,7 +20245,11 @@ MxNMMontageCollectUiaControls(session, controlId, className) {
             candidates.Push({hwnd: hwnd, rect: rect})
         }
     }
-    return candidates
+    return {
+        candidates: candidates,
+        rawCandidateCount: rawCandidateCount,
+        querySucceeded: querySucceeded
+    }
 }
 
 MxNMMontageCollectNativeControl(session, controlId, className, candidates, hwnd, *) {
@@ -19807,8 +20326,44 @@ MxNMMontageRectInside(inner, outer) {
     return inner.l >= outer.l && inner.t >= outer.t && inner.r <= outer.r && inner.b <= outer.b && inner.r > inner.l && inner.b > inner.t
 }
 
-MxNMMontageResult(ok, code) {
-    return {ok: ok = true, code: code}
+MxNMMontageResult(ok, code, details := 0) {
+    result := {ok: ok = true, code: code}
+    if IsObject(details) {
+        for name in [
+            "controlId",
+            "controlClass",
+            "win32CandidateCount",
+            "uiaRawCandidateCount",
+            "uiaCandidateCount",
+            "uiaQuerySucceeded",
+            "mergedCandidateCount"
+        ] {
+            if details.HasOwnProp(name)
+                result.%name% := details.%name%
+        }
+    }
+    return result
+}
+
+MxNMMontageAttachFailureContext(result, profileId, stepIndex, session) {
+    result.profileId := profileId
+    result.stepIndex := stepIndex
+    result.stage := stepIndex > 0 ? "STEP_" stepIndex : "SESSION"
+    if IsObject(session) {
+        if session.HasOwnProp("viewerPid")
+            result.viewerPid := session.viewerPid
+        if session.HasOwnProp("viewerHwnd")
+            result.viewerHwnd := session.viewerHwnd
+        if session.HasOwnProp("viewerRootOwner")
+            result.viewerRootHwnd := session.viewerRootOwner
+        if session.HasOwnProp("coldRecoveryAttempted")
+            result.coldRecoveryAttempted := session.coldRecoveryAttempted
+        if session.HasOwnProp("coldRecoverySucceeded")
+            result.coldRecoverySucceeded := session.coldRecoverySucceeded
+        if session.HasOwnProp("coldRecoveryDelayMs")
+            result.coldRecoveryDelayMs := session.coldRecoveryDelayMs
+    }
+    return result
 }
 
 MxNMMontageFailureMessage(code) {
@@ -21800,8 +22355,10 @@ InvokeMxNMViewerSuv3DHotkey(chord, *) {
             return
         result := MxNMViewerToolCommandProvider.Invoke("suv3d")
         if !result.ok {
-            if result.code != MxNMViewerToolCode.WRONG_FOREGROUND
+            if result.code != MxNMViewerToolCode.WRONG_FOREGROUND {
+                LogMxNMViewerToolFailure("suv3d", result)
                 Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+            }
             return
         }
     } finally {
@@ -21949,10 +22506,34 @@ InvokeMxNMViewerToolHotkey(commandName, chord, *) {
         result := MxNMViewerToolCommandProvider.Invoke(commandName)
         if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
             return
+        LogMxNMViewerToolFailure(commandName, result)
         Flash(MxNMViewerToolFailureMessage(result.code), 1600)
     } finally {
         active := false
     }
+}
+
+LogMxNMViewerToolFailure(commandName, result) {
+    WriteMxNMViewerFailureDiagnostic(
+        "ViewerTool",
+        result.code,
+        Map(
+            "stage", "TOOL_COMMAND",
+            "commandName", commandName,
+            "viewerPid", result.HasOwnProp("viewerPid")
+                ? result.viewerPid
+                : 0,
+            "viewerHwnd", result.HasOwnProp("viewerHwnd")
+                ? result.viewerHwnd
+                : 0,
+            "runtimeCandidateCount", result.HasOwnProp(
+                "runtimeCandidateCount"
+            ) ? result.runtimeCandidateCount : 0,
+            "viewerProcessCount", result.HasOwnProp(
+                "viewerProcessCount"
+            ) ? result.viewerProcessCount : 0
+        )
+    )
 }
 
 MxNMViewerToolFailureMessage(code) {
