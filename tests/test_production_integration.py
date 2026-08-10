@@ -443,7 +443,12 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn('static LogFileName := "viewer-failures.log"', diagnostics)
         self.assertIn("static MaxFileBytes := 524288", diagnostics)
         self.assertIn("RotateMxNMViewerFailureDiagnostic(logPath)", diagnostics)
-        self.assertIn('return configDirectory "\\"', diagnostics)
+        self.assertIn(
+            'return configDirectory "\\" '
+            'MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\\" '
+            "MxNMViewerFailureDiagnosticDefaults.LogFileName",
+            diagnostics,
+        )
         for required_field in (
             '"schema=1"',
             '"tickCount="',

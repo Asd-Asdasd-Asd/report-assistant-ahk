@@ -7,9 +7,7 @@ class MxNMViewerFailureDiagnosticDefaults {
 DefaultMxNMViewerFailureLogPath() {
     configPath := ReportAssistantConfig.Path()
     SplitPath configPath, , &configDirectory
-    return configDirectory "\"
-        MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\"
-        MxNMViewerFailureDiagnosticDefaults.LogFileName
+    return configDirectory "\" MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\" MxNMViewerFailureDiagnosticDefaults.LogFileName
 }
 
 WriteMxNMViewerFailureDiagnostic(action, resultCode, details := 0,
