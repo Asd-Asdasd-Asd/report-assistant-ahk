@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: a703593d272705cfde84ec1db37193f44191ab95
-; Generated at: 2026-08-10 08:01:30 UTC
+; Source revision: adc91574917575bf54dd050f49664cf67ade2134-dirty
+; Generated at: 2026-08-10 08:53:23 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-10"
-    static SourceRevision := "a703593d272705cfde84ec1db37193f44191ab95"
+    static SourceRevision := "adc91574917575bf54dd050f49664cf67ade2134-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -12492,6 +12492,10 @@ class MxNMContextTargetSessionCode {
     static UNEXPECTED_ERROR := "CONTEXT_SESSION_UNEXPECTED_ERROR"
 }
 
+class MxNMContextTargetPolicy {
+    static HorizontalRegion := "VIEWER_LEFT_HALF"
+}
+
 class MxNMContextTargetSessionProvider {
     static CachedSession := 0
     static Generation := 0
@@ -12804,12 +12808,10 @@ DiscoverMxNMContextSurface(identity) {
         return failure
     candidates := []
     seen := Map()
-    cursor := GetMxNMContextCursorScreenPoint()
     callback := CallbackCreate(
         CollectMxNMContextSurfaceCandidate.Bind(
             identity,
             rootRect,
-            cursor,
             seen,
             candidates
         ),
@@ -12830,7 +12832,6 @@ DiscoverMxNMContextSurface(identity) {
             CollectMxNMContextSurfaceCandidate(
                 identity,
                 rootRect,
-                cursor,
                 seen,
                 candidates,
                 topHwnd
@@ -12866,7 +12867,8 @@ DiscoverMxNMContextSurface(identity) {
         tried[String(best.hwnd)] := true
         pointResult := FindMxNMContextSurfaceSafePoint(
             best,
-            identity
+            identity,
+            rootRect
         )
         totalProbeCount += pointResult.probeCount
         if !pointResult.ok
@@ -12890,7 +12892,6 @@ DiscoverMxNMContextSurface(identity) {
 CollectMxNMContextSurfaceCandidate(
     identity,
     rootRect,
-    cursor,
     seen,
     candidates,
     hwnd,
@@ -12931,8 +12932,6 @@ CollectMxNMContextSurfaceCandidate(
     className := MxNMContextWindowClass(hwnd)
     if StrLower(className) = "#32770"
         score += 60
-    if MxNMContextRectContainsPoint(rect, cursor)
-        score += 500
     if MxNMContextClassLooksLikeToolChrome(className)
         score -= 800
     depth := MxNMContextWindowDepth(hwnd, identity.rootHwnd)
@@ -12950,13 +12949,12 @@ CollectMxNMContextSurfaceCandidate(
     return true
 }
 
-FindMxNMContextSurfaceSafePoint(candidate, identity) {
+FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
     preferred := [
-        {x: 0.65, y: 0.35},
-        {x: 0.75, y: 0.25},
         {x: 0.25, y: 0.25},
-        {x: 0.75, y: 0.75},
-        {x: 0.25, y: 0.75}
+        {x: 0.35, y: 0.35},
+        {x: 0.25, y: 0.75},
+        {x: 0.35, y: 0.65}
     ]
     tried := Map()
     probeCount := 0
@@ -12967,7 +12965,8 @@ FindMxNMContextSurfaceSafePoint(candidate, identity) {
         validated := ValidateMxNMContextSurfacePoint(
             candidate,
             identity,
-            normalized
+            normalized,
+            rootRect
         )
         if validated.ok {
             validated.probeCount := probeCount
@@ -12975,9 +12974,10 @@ FindMxNMContextSurfaceSafePoint(candidate, identity) {
             return validated
         }
     }
-    denseRatios := [0.20, 0.35, 0.50, 0.65, 0.80]
-    for yRatio in denseRatios {
-        for xRatio in denseRatios {
+    denseYRatios := [0.20, 0.35, 0.50, 0.65, 0.80]
+    denseXRatios := [0.20, 0.35, 0.45]
+    for yRatio in denseYRatios {
+        for xRatio in denseXRatios {
             key := xRatio "," yRatio
             if tried.Has(key)
                 continue
@@ -12985,7 +12985,8 @@ FindMxNMContextSurfaceSafePoint(candidate, identity) {
             validated := ValidateMxNMContextSurfacePoint(
                 candidate,
                 identity,
-                {x: xRatio, y: yRatio}
+                {x: xRatio, y: yRatio},
+                rootRect
             )
             if validated.ok {
                 validated.probeCount := probeCount
@@ -13003,8 +13004,15 @@ FindMxNMContextSurfaceSafePoint(candidate, identity) {
     }
 }
 
-ValidateMxNMContextSurfacePoint(candidate, identity, normalized) {
+ValidateMxNMContextSurfacePoint(
+    candidate,
+    identity,
+    normalized,
+    rootRect
+) {
     point := MxNMContextPointFromNormalized(candidate.rect, normalized)
+    if !MxNMContextPointInLeftViewerHalf(point, rootRect)
+        return {ok: false, point: 0, actionHwnd: 0}
     minimumClearance := Max(
         6,
         Min(16, Round(Min(candidate.width, candidate.height) * 0.01))
@@ -13097,9 +13105,13 @@ ValidateMxNMContextTargetSession(session, viewerExe, options := 0) {
     }
 
     surfaceRect := MxNMTargetClientRectScreen(session.surfaceHwnd)
+    rootRect := MxNMTargetClientRectScreen(session.rootHwnd)
     if !IsObject(surfaceRect)
+        || !IsObject(rootRect)
         || surfaceRect.right <= surfaceRect.left
-        || surfaceRect.bottom <= surfaceRect.top {
+        || surfaceRect.bottom <= surfaceRect.top
+        || rootRect.right <= rootRect.left
+        || rootRect.bottom <= rootRect.top {
         return failure
     }
     candidate := {
@@ -13114,7 +13126,8 @@ ValidateMxNMContextTargetSession(session, viewerExe, options := 0) {
             pid: session.pid,
             rootHwnd: session.rootHwnd
         },
-        session.safePointNormalized
+        session.safePointNormalized,
+        rootRect
     )
     if !validated.ok
         return failure
@@ -13147,6 +13160,8 @@ BuildMxNMContextTargetResult(session, validation, cacheHit) {
     result.actionPid := validation.actionPid
     result.actionClientPoint := validation.actionClientPoint
     result.runtimePointSource := session.discoveryMethod
+    result.targetHorizontalRegion :=
+        MxNMContextTargetPolicy.HorizontalRegion
     result.sessionCacheHit := cacheHit = true
     result.sessionGeneration := session.generation
     result.sessionRootHwnd := session.rootHwnd
@@ -13183,6 +13198,8 @@ MakeMxNMContextTargetFailure(code, details := 0) {
         runtimeToolAnchorFallbackCode: "NOT_REQUIRED",
         runtimeSurfaceSelectionCode: "",
         runtimePointSource: "",
+        targetHorizontalRegion:
+            MxNMContextTargetPolicy.HorizontalRegion,
         mappedImageRectResolved: false,
         runtimeSurfaceFallbackEligible: false,
         minimumLogicalClearance: 0,
@@ -13223,21 +13240,6 @@ MxNMContextPointFromNormalized(rect, normalized) {
     }
 }
 
-GetMxNMContextCursorScreenPoint() {
-    cursorPointBuffer := Buffer(8, 0)
-    if DllCall(
-        "User32\GetCursorPos",
-        "Ptr", cursorPointBuffer.Ptr,
-        "Int"
-    ) {
-        return {
-            x: NumGet(cursorPointBuffer, 0, "Int"),
-            y: NumGet(cursorPointBuffer, 4, "Int")
-        }
-    }
-    return {x: -2147483648, y: -2147483648}
-}
-
 MxNMContextRectContainsPoint(rect, point) {
     return IsObject(rect)
         && IsObject(point)
@@ -13245,6 +13247,14 @@ MxNMContextRectContainsPoint(rect, point) {
         && point.x < rect.right
         && point.y >= rect.top
         && point.y < rect.bottom
+}
+
+MxNMContextPointInLeftViewerHalf(point, rootRect) {
+    if !MxNMContextRectContainsPoint(rootRect, point)
+        return false
+    midpointX := rootRect.left
+        + Floor((rootRect.right - rootRect.left) / 2)
+    return point.x < midpointX
 }
 
 MxNMContextVisibleScreenArea(rect) {
@@ -13336,6 +13346,8 @@ class MxNMMeasurementProvider {
                     "viewerPid", result.actionPid,
                     "viewerRootHwnd", result.sessionRootHwnd,
                     "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "targetHorizontalRegion",
+                        result.targetHorizontalRegion,
                     "sessionCandidateCount", result.sessionCandidateCount,
                     "pointProbeCount", result.sessionPointProbeCount,
                     "sessionCacheHit", result.sessionCacheHit,
@@ -13357,6 +13369,8 @@ class MxNMMeasurementProvider {
                     "viewerHwnd", result.actionHwnd,
                     "viewerRootHwnd", result.sessionRootHwnd,
                     "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "targetHorizontalRegion",
+                        result.targetHorizontalRegion,
                     "sessionCandidateCount", result.sessionCandidateCount,
                     "pointProbeCount", result.sessionPointProbeCount,
                     "sessionCacheHit", result.sessionCacheHit,
@@ -13436,6 +13450,8 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
     result.context["targetSessionRootHwnd"] := target.sessionRootHwnd
     result.context["targetSessionSurfaceHwnd"] :=
         target.sessionSurfaceHwnd
+    result.context["targetHorizontalRegion"] :=
+        target.targetHorizontalRegion
     result.context["targetSessionCandidateCount"] :=
         target.sessionCandidateCount
     result.context["targetSessionPointProbeCount"] :=
@@ -13454,6 +13470,8 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
                 "viewerHwnd", target.actionHwnd,
                 "viewerRootHwnd", target.sessionRootHwnd,
                 "surfaceHwnd", target.sessionSurfaceHwnd,
+                "targetHorizontalRegion",
+                    target.targetHorizontalRegion,
                 "sessionCandidateCount", target.sessionCandidateCount,
                 "pointProbeCount", target.sessionPointProbeCount,
                 "popupDiscovery", MedExContextValue(
@@ -13522,6 +13540,7 @@ MakeMxNMTargetFailureMeasurement(
         "targetConfigCode", target.configCode,
         "targetActionHwnd", 0,
         "targetActionPid", 0,
+        "targetHorizontalRegion", target.targetHorizontalRegion,
         "targetSessionCandidateCount", target.sessionCandidateCount,
         "targetSessionPointProbeCount", target.sessionPointProbeCount,
         "targetResolutionMs", targetResolutionMs,
@@ -15831,6 +15850,7 @@ FormatMxNMViewerFailureDiagnostic(action, resultCode, details := 0) {
         "viewerHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerHwnd", 0)),
         "viewerRootHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerRootHwnd", 0)),
         "surfaceHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "surfaceHwnd", 0)),
+        "targetHorizontalRegion=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "targetHorizontalRegion", "")),
         "win32Candidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "win32CandidateCount", 0)),
         "uiaRawCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaRawCandidateCount", 0)),
         "uiaCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaCandidateCount", 0)),
