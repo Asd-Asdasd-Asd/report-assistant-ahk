@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: 38fb21583931faab10547f5f2168609934549da8
-; Generated at: 2026-08-10 03:22:31 UTC
+; Source revision: a703593d272705cfde84ec1db37193f44191ab95
+; Generated at: 2026-08-10 08:01:30 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-10"
-    static SourceRevision := "38fb21583931faab10547f5f2168609934549da8"
+    static SourceRevision := "a703593d272705cfde84ec1db37193f44191ab95"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -15775,9 +15775,7 @@ class MxNMViewerFailureDiagnosticDefaults {
 DefaultMxNMViewerFailureLogPath() {
     configPath := ReportAssistantConfig.Path()
     SplitPath configPath, , &configDirectory
-    return configDirectory "\"
-        MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\"
-        MxNMViewerFailureDiagnosticDefaults.LogFileName
+    return configDirectory "\" MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\" MxNMViewerFailureDiagnosticDefaults.LogFileName
 }
 
 WriteMxNMViewerFailureDiagnostic(action, resultCode, details := 0,
