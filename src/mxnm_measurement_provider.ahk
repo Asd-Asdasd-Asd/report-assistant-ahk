@@ -19,10 +19,53 @@ class MxNMMeasurementProvider {
             "viewerExe",
             MxNMConfigGeometryDefaults.ViewerExe
         )
-        return MxNMContextTargetSessionProvider.Resolve(
+        startedAt := A_TickCount
+        result := MxNMContextTargetSessionProvider.Resolve(
             viewerExe,
             options
         )
+        if !result.ok {
+            WriteMxNMViewerFailureDiagnostic(
+                "ContextTarget",
+                result.code,
+                Map(
+                    "stage", "TARGET_RESOLVE",
+                    "viewerPid", result.actionPid,
+                    "viewerRootHwnd", result.sessionRootHwnd,
+                    "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "sessionCandidateCount", result.sessionCandidateCount,
+                    "pointProbeCount", result.sessionPointProbeCount,
+                    "sessionCacheHit", result.sessionCacheHit,
+                    "sessionGeneration", result.sessionGeneration,
+                    "coldRecoveryAttempted", result.coldRecoveryAttempted,
+                    "coldRecoverySucceeded", result.coldRecoverySucceeded,
+                    "coldRecoveryDelayMs", result.coldRecoveryDelayMs,
+                    "elapsedMs", A_TickCount - startedAt
+                )
+            )
+        } else if result.coldRecoveryAttempted
+            && !result.sessionCacheHit {
+            WriteMxNMViewerFailureDiagnostic(
+                "ContextTarget",
+                "COLD_RECOVERY_SUCCEEDED",
+                Map(
+                    "stage", "TARGET_RECOVERED",
+                    "viewerPid", result.actionPid,
+                    "viewerHwnd", result.actionHwnd,
+                    "viewerRootHwnd", result.sessionRootHwnd,
+                    "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "sessionCandidateCount", result.sessionCandidateCount,
+                    "pointProbeCount", result.sessionPointProbeCount,
+                    "sessionCacheHit", result.sessionCacheHit,
+                    "sessionGeneration", result.sessionGeneration,
+                    "coldRecoveryAttempted", true,
+                    "coldRecoverySucceeded", result.coldRecoverySucceeded,
+                    "coldRecoveryDelayMs", result.coldRecoveryDelayMs,
+                    "elapsedMs", A_TickCount - startedAt
+                )
+            )
+        }
+        return result
     }
 
     static PrepareTargetPlan(options := 0) {
@@ -96,6 +139,59 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
         target.sessionPointProbeCount
     result.context["targetResolutionMs"] := targetResolutionMs
     result.context["totalReadMs"] := A_TickCount - startedAt
+    if result.state = MeasurementState.AUTOMATION_FAILED {
+        WriteMxNMViewerFailureDiagnostic(
+            "ContextMeasurement",
+            result.failureReason,
+            Map(
+                "stage", "CONTEXT_COMMAND",
+                "measurementType", requestedMeasurementType,
+                "failureReason", result.failureReason,
+                "viewerPid", target.actionPid,
+                "viewerHwnd", target.actionHwnd,
+                "viewerRootHwnd", target.sessionRootHwnd,
+                "surfaceHwnd", target.sessionSurfaceHwnd,
+                "sessionCandidateCount", target.sessionCandidateCount,
+                "pointProbeCount", target.sessionPointProbeCount,
+                "popupDiscovery", MedExContextValue(
+                    result.context,
+                    "popupDiscovery",
+                    ""
+                ),
+                "popupHwnd", MedExContextValue(
+                    result.context,
+                    "popupHwnd",
+                    0
+                ),
+                "commandControlHwnd", MedExContextValue(
+                    result.context,
+                    "commandControlHwnd",
+                    0
+                ),
+                "clipboardSequenceBefore", MedExContextValue(
+                    result.context,
+                    "clipboardSequenceBeforeCommand",
+                    0
+                ),
+                "clipboardSequenceAfter", MedExContextValue(
+                    result.context,
+                    "clipboardSequenceAfterCommand",
+                    0
+                ),
+                "clipboardCaptureSucceeded", MedExContextValue(
+                    result.context,
+                    "clipboardCaptureSucceeded",
+                    false
+                ),
+                "sessionCacheHit", target.sessionCacheHit,
+                "sessionGeneration", target.sessionGeneration,
+                "coldRecoveryAttempted", target.coldRecoveryAttempted,
+                "coldRecoverySucceeded", target.coldRecoverySucceeded,
+                "coldRecoveryDelayMs", target.coldRecoveryDelayMs,
+                "elapsedMs", result.context["totalReadMs"]
+            )
+        )
+    }
     return result
 }
 

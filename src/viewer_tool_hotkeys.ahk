@@ -126,8 +126,10 @@ InvokeMxNMViewerSuv3DHotkey(chord, *) {
             return
         result := MxNMViewerToolCommandProvider.Invoke("suv3d")
         if !result.ok {
-            if result.code != MxNMViewerToolCode.WRONG_FOREGROUND
+            if result.code != MxNMViewerToolCode.WRONG_FOREGROUND {
+                LogMxNMViewerToolFailure("suv3d", result)
                 Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+            }
             return
         }
     } finally {
@@ -275,10 +277,34 @@ InvokeMxNMViewerToolHotkey(commandName, chord, *) {
         result := MxNMViewerToolCommandProvider.Invoke(commandName)
         if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
             return
+        LogMxNMViewerToolFailure(commandName, result)
         Flash(MxNMViewerToolFailureMessage(result.code), 1600)
     } finally {
         active := false
     }
+}
+
+LogMxNMViewerToolFailure(commandName, result) {
+    WriteMxNMViewerFailureDiagnostic(
+        "ViewerTool",
+        result.code,
+        Map(
+            "stage", "TOOL_COMMAND",
+            "commandName", commandName,
+            "viewerPid", result.HasOwnProp("viewerPid")
+                ? result.viewerPid
+                : 0,
+            "viewerHwnd", result.HasOwnProp("viewerHwnd")
+                ? result.viewerHwnd
+                : 0,
+            "runtimeCandidateCount", result.HasOwnProp(
+                "runtimeCandidateCount"
+            ) ? result.runtimeCandidateCount : 0,
+            "viewerProcessCount", result.HasOwnProp(
+                "viewerProcessCount"
+            ) ? result.viewerProcessCount : 0
+        )
+    )
 }
 
 MxNMViewerToolFailureMessage(code) {

@@ -191,4 +191,9 @@ ExecutablePath
 ConfigPath
 ```
 
+Viewer 自动化失败另写入同一 `logs` 目录下的 `viewer-failures.log`，达到
+512 KiB 后轮转为 `.1`。它只记录稳定错误码、阶段、Control ID/class、候选数量、
+PID/HWND、session/recovery 状态和耗时；详细字段和读取方法见
+[Viewer failure-only 诊断日志](viewer-failure-diagnostics.md)。
+
 运行时失败日志和 field diagnostics 不得包含 report text、template Text、clipboard payload、患者标识、窗口正文或 screenshot。

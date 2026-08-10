@@ -37,10 +37,16 @@ class MxNMMontageTiming {
     ; The layout matrix exposes no selected-state signal. All other transitions
     ; use a control/value confirmation instead of a fixed inter-step delay.
     static InitialControlReadyTimeoutMs := 1500
+    static ColdRecoveryDelayMs := 350
+    static ColdRecoveryControlTimeoutMs := 2500
     static LayoutSettleMs := 350
     static EditConfirmTimeoutMs := 300
     static EditConfirmPollMs := 20
     static ButtonSettleMs := 60
+}
+
+class MxNMMontageColdRecovery {
+    static Consumed := false
 }
 
 MxNMMontageProfileDefaults() {
@@ -192,6 +198,7 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
     if busy || !settings.ok || !settings.profiles.Has(profileId)
         return
     busy := true
+    startedAt := A_TickCount
     try {
         viewerHwnd := WinExist("A")
         if !MxNMMontageWaitForHotkeyRelease(chord) {
@@ -199,10 +206,25 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
         } else {
             result := MxNMMontageRun(profileId, settings, viewerHwnd)
         }
-        if result.ok
+        if result.ok {
+            if result.HasOwnProp("coldRecoveryAttempted")
+                && result.coldRecoveryAttempted {
+                WriteMxNMViewerFailureDiagnostic(
+                    "Montage",
+                    "COLD_RECOVERY_SUCCEEDED",
+                    result
+                )
+            }
             Flash(settings.profiles[profileId].label " montage 已完成", 1200)
-        else
+        } else {
+            result.elapsedMs := A_TickCount - startedAt
+            WriteMxNMViewerFailureDiagnostic(
+                "Montage",
+                result.code,
+                result
+            )
             Flash(MxNMMontageFailureMessage(result.code), 2200)
+        }
     } finally {
         busy := false
     }
@@ -223,7 +245,12 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
         return MxNMMontageResult(false, "PROFILE_UNKNOWN")
     session := MxNMMontageCreateSession(viewerHwnd)
     if !session.ok
-        return session
+        return MxNMMontageAttachFailureContext(
+            session,
+            profileId,
+            0,
+            session
+        )
     profile := settings.profiles[profileId]
     layoutPoint := MxNMMontageLayoutPoint(
         settings.layoutRow,
@@ -231,8 +258,62 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
     )
     if !layoutPoint.ok
         return MxNMMontageResult(false, "LAYOUT_PROFILE_INVALID")
+    firstStep := MxNMMontageStaticClick.Bind(
+        21112,
+        "Static",
+        layoutPoint.xRatio,
+        layoutPoint.yRatio,
+        0,
+        "",
+        MxNMMontageTiming.InitialControlReadyTimeoutMs
+    )
+    result := firstStep.Call(session)
+    coldRecoveryAttempted := false
+    coldRecoverySucceeded := false
+    if !result.ok
+        && result.code = "CONTROL_NOT_UNIQUE"
+        && !MxNMMontageColdRecovery.Consumed {
+        MxNMMontageColdRecovery.Consumed := true
+        coldRecoveryAttempted := true
+        Sleep MxNMMontageTiming.ColdRecoveryDelayMs
+        recoveryHwnd := WinExist("A")
+        recoverySession := MxNMMontageCreateSession(recoveryHwnd)
+        if recoverySession.ok {
+            session := recoverySession
+            result := MxNMMontageStaticClick(
+                21112,
+                "Static",
+                layoutPoint.xRatio,
+                layoutPoint.yRatio,
+                0,
+                "",
+                MxNMMontageTiming.ColdRecoveryControlTimeoutMs,
+                session
+            )
+            coldRecoverySucceeded := result.ok
+        } else {
+            result := recoverySession
+        }
+    }
+    result.coldRecoveryAttempted := coldRecoveryAttempted
+    result.coldRecoverySucceeded := coldRecoverySucceeded
+    result.coldRecoveryDelayMs := coldRecoveryAttempted
+        ? MxNMMontageTiming.ColdRecoveryDelayMs
+        : 0
+    session.coldRecoveryAttempted := result.coldRecoveryAttempted
+    session.coldRecoverySucceeded := result.coldRecoverySucceeded
+    session.coldRecoveryDelayMs := result.coldRecoveryDelayMs
+    if !result.ok {
+        return MxNMMontageAttachFailureContext(
+            result,
+            profileId,
+            1,
+            session
+        )
+    }
+    Sleep MxNMMontageTiming.LayoutSettleMs
+
     steps := [
-        MxNMMontageStaticClick.Bind(21112, "Static", layoutPoint.xRatio, layoutPoint.yRatio, 0, "", MxNMMontageTiming.InitialControlReadyTimeoutMs),
         MxNMMontageStaticClick.Bind(21007, "Static", .479866, .5, 21155, "ComboBox", 0),
         MxNMMontageComboSelect.Bind(21155, "null"),
         MxNMMontageStaticClick.Bind(21007, "Static", .869128, .5, 21014, "ComboBox", 0),
@@ -247,14 +328,29 @@ MxNMMontageRun(profileId, settings, viewerHwnd) {
     ]
     for index, step in steps {
         if !MxNMMontageViewerStillActive(session)
-            return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED")
+            return MxNMMontageAttachFailureContext(
+                MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED"),
+                profileId,
+                index + 1,
+                session
+            )
         result := step.Call(session)
         if !result.ok
-            return result
-        if index = 1
-            Sleep MxNMMontageTiming.LayoutSettleMs
+            return MxNMMontageAttachFailureContext(
+                result,
+                profileId,
+                index + 1,
+                session
+            )
     }
-    return MxNMMontageResult(true, "READY")
+    ready := MxNMMontageAttachFailureContext(
+        MxNMMontageResult(true, "READY"),
+        profileId,
+        0,
+        session
+    )
+    ready.stage := "COMPLETE"
+    return ready
 }
 
 MxNMMontageLayoutPoint(row, column) {
@@ -493,7 +589,7 @@ MxNMMontageResolveControl(session, controlId, className) {
     callback := CallbackCreate(MxNMMontageCollectNativeControl.Bind(session, controlId, className, win32), "Fast", 2)
     try DllCall("User32\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
     finally CallbackFree(callback)
-    uiaCandidates := MxNMMontageCollectUiaControls(
+    uiaResult := MxNMMontageCollectUiaControls(
         session,
         controlId,
         className
@@ -501,28 +597,57 @@ MxNMMontageResolveControl(session, controlId, className) {
     candidatesByHwnd := Map()
     for candidate in win32
         candidatesByHwnd[candidate.hwnd] := candidate
-    for candidate in uiaCandidates
+    for candidate in uiaResult.candidates
         candidatesByHwnd[candidate.hwnd] := candidate
     candidates := []
     for _, candidate in candidatesByHwnd
         candidates.Push(candidate)
-    if candidates.Length != 1
-        return MxNMMontageResult(false, "CONTROL_NOT_UNIQUE")
+    if candidates.Length != 1 {
+        return MxNMMontageResult(
+            false,
+            "CONTROL_NOT_UNIQUE",
+            {
+                controlId: controlId,
+                controlClass: className,
+                win32CandidateCount: win32.Length,
+                uiaRawCandidateCount: uiaResult.rawCandidateCount,
+                uiaCandidateCount: uiaResult.candidates.Length,
+                uiaQuerySucceeded: uiaResult.querySucceeded,
+                mergedCandidateCount: candidates.Length
+            }
+        )
+    }
     candidate := candidates[1]
     return {ok: true, code: "CONTROL_READY", hwnd: candidate.hwnd, rectObject: candidate.rect}
 }
 
 MxNMMontageCollectUiaControls(session, controlId, className) {
     candidates := []
+    rawCandidateCount := 0
+    querySucceeded := false
     try root := UIA.ElementFromHandle(session.viewerRootOwner)
     catch
-        return candidates
+        return {
+            candidates: candidates,
+            rawCandidateCount: rawCandidateCount,
+            querySucceeded: querySucceeded
+        }
     try elements := root.FindElements({AutomationId: String(controlId)})
     catch
-        return candidates
+        return {
+            candidates: candidates,
+            rawCandidateCount: rawCandidateCount,
+            querySucceeded: querySucceeded
+        }
+    querySucceeded := true
+    rawCandidateCount := elements.Length
     viewerRect := MxNMMontageWindowRect(session.viewerRootOwner)
     if !IsObject(viewerRect)
-        return candidates
+        return {
+            candidates: candidates,
+            rawCandidateCount: rawCandidateCount,
+            querySucceeded: querySucceeded
+        }
     for element in elements {
         try {
             if element.ProcessId != session.viewerPid || StrLower(element.ClassName) != StrLower(className) || !element.IsEnabled || element.IsOffscreen
@@ -536,7 +661,11 @@ MxNMMontageCollectUiaControls(session, controlId, className) {
             candidates.Push({hwnd: hwnd, rect: rect})
         }
     }
-    return candidates
+    return {
+        candidates: candidates,
+        rawCandidateCount: rawCandidateCount,
+        querySucceeded: querySucceeded
+    }
 }
 
 MxNMMontageCollectNativeControl(session, controlId, className, candidates, hwnd, *) {
@@ -613,8 +742,44 @@ MxNMMontageRectInside(inner, outer) {
     return inner.l >= outer.l && inner.t >= outer.t && inner.r <= outer.r && inner.b <= outer.b && inner.r > inner.l && inner.b > inner.t
 }
 
-MxNMMontageResult(ok, code) {
-    return {ok: ok = true, code: code}
+MxNMMontageResult(ok, code, details := 0) {
+    result := {ok: ok = true, code: code}
+    if IsObject(details) {
+        for name in [
+            "controlId",
+            "controlClass",
+            "win32CandidateCount",
+            "uiaRawCandidateCount",
+            "uiaCandidateCount",
+            "uiaQuerySucceeded",
+            "mergedCandidateCount"
+        ] {
+            if details.HasOwnProp(name)
+                result.%name% := details.%name%
+        }
+    }
+    return result
+}
+
+MxNMMontageAttachFailureContext(result, profileId, stepIndex, session) {
+    result.profileId := profileId
+    result.stepIndex := stepIndex
+    result.stage := stepIndex > 0 ? "STEP_" stepIndex : "SESSION"
+    if IsObject(session) {
+        if session.HasOwnProp("viewerPid")
+            result.viewerPid := session.viewerPid
+        if session.HasOwnProp("viewerHwnd")
+            result.viewerHwnd := session.viewerHwnd
+        if session.HasOwnProp("viewerRootOwner")
+            result.viewerRootHwnd := session.viewerRootOwner
+        if session.HasOwnProp("coldRecoveryAttempted")
+            result.coldRecoveryAttempted := session.coldRecoveryAttempted
+        if session.HasOwnProp("coldRecoverySucceeded")
+            result.coldRecoverySucceeded := session.coldRecoverySucceeded
+        if session.HasOwnProp("coldRecoveryDelayMs")
+            result.coldRecoveryDelayMs := session.coldRecoveryDelayMs
+    }
+    return result
 }
 
 MxNMMontageFailureMessage(code) {

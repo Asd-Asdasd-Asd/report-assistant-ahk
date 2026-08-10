@@ -52,16 +52,28 @@ class MxNMMontageTests(unittest.TestCase):
 
     def test_only_required_initial_control_gets_bounded_readiness_retry(self) -> None:
         module = source("src/mxnm_montage.ahk")
+        first_step = module.split("firstStep :=", 1)[1].split(
+            "result := firstStep.Call(session)", 1
+        )[0]
+        self.assertEqual(
+            first_step.count("MxNMMontageTiming.InitialControlReadyTimeoutMs"),
+            1,
+        )
         steps = module.split("steps := [", 1)[1].split("\n    ]", 1)[0]
         self.assertEqual(
             steps.count("MxNMMontageTiming.InitialControlReadyTimeoutMs"),
-            1,
+            0,
         )
         self.assertIn(
-            'MxNMMontageStaticClick.Bind(21112, "Static", '
-            "layoutPoint.xRatio, layoutPoint.yRatio, 0, \"\", "
-            "MxNMMontageTiming.InitialControlReadyTimeoutMs)",
-            steps,
+            "static ColdRecoveryDelayMs := 350",
+            module,
+        )
+        self.assertIn("static ColdRecoveryControlTimeoutMs := 2500", module)
+        self.assertIn('result.code = "CONTROL_NOT_UNIQUE"', module)
+        self.assertIn("!MxNMMontageColdRecovery.Consumed", module)
+        self.assertLess(
+            module.index('result.code = "CONTROL_NOT_UNIQUE"'),
+            module.index("Sleep MxNMMontageTiming.ColdRecoveryDelayMs"),
         )
         static_click = module.split(
             "MxNMMontageStaticClick(controlId, className, xRatio, yRatio, "
@@ -71,6 +83,20 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("MxNMMontageWaitForControl(", static_click)
         self.assertNotIn("WinGetTitle", static_click)
         self.assertNotIn("MonitorGet", static_click)
+
+    def test_failure_log_preserves_control_candidate_evidence(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        for required in (
+            'WriteMxNMViewerFailureDiagnostic(',
+            '"Montage"',
+            "win32CandidateCount: win32.Length",
+            "uiaRawCandidateCount: uiaResult.rawCandidateCount",
+            "uiaCandidateCount: uiaResult.candidates.Length",
+            "uiaQuerySucceeded: uiaResult.querySucceeded",
+            "mergedCandidateCount: candidates.Length",
+            "MxNMMontageAttachFailureContext(",
+        ):
+            self.assertIn(required, module)
 
     def test_control_resolution_keeps_win32_and_uia_paths(self) -> None:
         module = source("src/mxnm_montage.ahk")

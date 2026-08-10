@@ -1,3 +1,103 @@
+class MxNMViewerFailureDiagnosticDefaults {
+    static LogDirectoryName := "logs"
+    static LogFileName := "viewer-failures.log"
+    static MaxFileBytes := 524288
+}
+
+DefaultMxNMViewerFailureLogPath() {
+    configPath := ReportAssistantConfig.Path()
+    SplitPath configPath, , &configDirectory
+    return configDirectory "\"
+        MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\"
+        MxNMViewerFailureDiagnosticDefaults.LogFileName
+}
+
+WriteMxNMViewerFailureDiagnostic(action, resultCode, details := 0,
+    logPath := "") {
+    try {
+        if logPath = ""
+            logPath := DefaultMxNMViewerFailureLogPath()
+        SplitPath logPath, , &logDirectory
+        if !DirExist(logDirectory)
+            DirCreate logDirectory
+        RotateMxNMViewerFailureDiagnostic(logPath)
+        FileAppend FormatMxNMViewerFailureDiagnostic(
+            action,
+            resultCode,
+            details
+        ) "`r`n", logPath, "UTF-8"
+        return logPath
+    } catch {
+        return ""
+    }
+}
+
+RotateMxNMViewerFailureDiagnostic(logPath) {
+    if !FileExist(logPath)
+        return
+    try size := FileGetSize(logPath)
+    catch
+        return
+    if size < MxNMViewerFailureDiagnosticDefaults.MaxFileBytes
+        return
+    rotatedPath := logPath ".1"
+    try FileMove logPath, rotatedPath, true
+}
+
+FormatMxNMViewerFailureDiagnostic(action, resultCode, details := 0) {
+    fields := [
+        "schema=1",
+        "timestamp=" SafeDiagnosticValue(FormatTime(, "yyyy-MM-ddTHH:mm:ss")),
+        "tickCount=" SafeDiagnosticValue(A_TickCount),
+        "appVersion=" SafeDiagnosticValue(AppMetadata.Version),
+        "sourceRevision=" SafeDiagnosticValue(AppMetadata.SourceRevision),
+        "action=" SafeDiagnosticValue(action),
+        "resultCode=" SafeDiagnosticValue(resultCode),
+        "stage=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "stage", "")),
+        "profileId=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "profileId", "")),
+        "commandName=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "commandName", "")),
+        "measurementType=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "measurementType", "")),
+        "failureReason=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "failureReason", "")),
+        "stepIndex=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "stepIndex", 0)),
+        "controlId=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "controlId", 0)),
+        "controlClass=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "controlClass", "")),
+        "viewerPid=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerPid", 0)),
+        "viewerHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerHwnd", 0)),
+        "viewerRootHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerRootHwnd", 0)),
+        "surfaceHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "surfaceHwnd", 0)),
+        "win32Candidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "win32CandidateCount", 0)),
+        "uiaRawCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaRawCandidateCount", 0)),
+        "uiaCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaCandidateCount", 0)),
+        "uiaQuerySucceeded=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "uiaQuerySucceeded", false)),
+        "mergedCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "mergedCandidateCount", 0)),
+        "runtimeCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "runtimeCandidateCount", 0)),
+        "viewerProcessCount=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerProcessCount", 0)),
+        "sessionCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "sessionCandidateCount", 0)),
+        "pointProbes=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "pointProbeCount", 0)),
+        "popupDiscovery=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupDiscovery", "")),
+        "popupHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupHwnd", 0)),
+        "commandControlHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "commandControlHwnd", 0)),
+        "clipboardSequenceBefore=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "clipboardSequenceBefore", 0)),
+        "clipboardSequenceAfter=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "clipboardSequenceAfter", 0)),
+        "clipboardCaptureSucceeded=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "clipboardCaptureSucceeded", false)),
+        "sessionCacheHit=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "sessionCacheHit", false)),
+        "sessionGeneration=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "sessionGeneration", 0)),
+        "coldRecoveryAttempted=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "coldRecoveryAttempted", false)),
+        "coldRecoverySucceeded=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "coldRecoverySucceeded", false)),
+        "coldRecoveryDelayMs=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "coldRecoveryDelayMs", 0)),
+        "elapsedMs=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "elapsedMs", 0))
+    ]
+    return JoinDiagnosticFields(fields, "|")
+}
+
+MxNMViewerFailureDetail(details, key, fallback := "") {
+    if Type(details) = "Map"
+        return details.Has(key) ? details[key] : fallback
+    if IsObject(details) && details.HasOwnProp(key)
+        return details.%key%
+    return fallback
+}
+
 DefaultMedExColorResetLogPath() {
     return A_Temp "\MedExAHK\field\medex-color-reset-field.log"
 }

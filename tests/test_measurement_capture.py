@@ -380,7 +380,16 @@ class MeasurementCaptureTests(unittest.TestCase):
         )[1].split("\n    static Invalidate()", 1)[0]
         self.assertEqual(
             resolve_internal.count("DiscoverMxNMContextTargetSession("),
-            1,
+            3,
+        )
+        self.assertIn("static ColdRecoveryConsumed := false", session)
+        self.assertIn("static ColdRecoveryDelayMs := 350", session)
+        self.assertIn("if !this.ColdRecoveryConsumed", resolve_internal)
+        self.assertIn("Sleep this.ColdRecoveryDelayMs", resolve_internal)
+        self.assertIn("coldRecoveryAttempted", session + provider)
+        self.assertIn(
+            'WriteMxNMViewerFailureDiagnostic(\n                "ContextTarget"',
+            provider,
         )
 
     def test_geometry_is_owned_by_one_resolver_and_fails_closed(self) -> None:

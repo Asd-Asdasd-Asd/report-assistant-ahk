@@ -435,6 +435,44 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn("FormatMedExFieldDebugResult", diagnostics)
         self.assertIn('"RegionAnchorRect="', diagnostics)
 
+    def test_viewer_failures_share_privacy_safe_rotating_log(self) -> None:
+        diagnostics = source("src/diagnostics.ahk")
+        montage = source("src/mxnm_montage.ahk")
+        measurement = source("src/mxnm_measurement_provider.ahk")
+        hotkeys = source("src/viewer_tool_hotkeys.ahk")
+        self.assertIn('static LogFileName := "viewer-failures.log"', diagnostics)
+        self.assertIn("static MaxFileBytes := 524288", diagnostics)
+        self.assertIn("RotateMxNMViewerFailureDiagnostic(logPath)", diagnostics)
+        self.assertIn('return configDirectory "\\"', diagnostics)
+        for required_field in (
+            '"schema=1"',
+            '"tickCount="',
+            '"controlId="',
+            '"win32Candidates="',
+            '"uiaRawCandidates="',
+            '"uiaQuerySucceeded="',
+            '"viewerProcessCount="',
+            '"popupDiscovery="',
+            '"clipboardSequenceBefore="',
+            '"clipboardCaptureSucceeded="',
+            '"coldRecoveryAttempted="',
+            '"elapsedMs="',
+        ):
+            self.assertIn(required_field, diagnostics)
+        for forbidden in (
+            "clipboardPayload",
+            "reportText",
+            "windowTitle",
+            "patient",
+            "screenshot",
+        ):
+            self.assertNotIn(forbidden, diagnostics)
+        self.assertIn('"Montage"', montage)
+        self.assertIn('"ContextTarget"', measurement)
+        self.assertIn('"ContextMeasurement"', measurement)
+        self.assertIn('"COLD_RECOVERY_SUCCEEDED"', measurement + montage)
+        self.assertIn('"ViewerTool"', hotkeys)
+
     def test_performance_diagnostics_are_explicit_and_privacy_safe(self) -> None:
         diagnostics = source("src/diagnostics.ahk")
         field_debug = source("debug/medex_color_reset_field_debug.ahk")

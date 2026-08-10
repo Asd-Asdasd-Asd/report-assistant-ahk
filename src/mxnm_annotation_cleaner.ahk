@@ -24,12 +24,95 @@ class MxNMAnnotationCleaner {
     static DeleteAll(expectedViewerHwnd := 0, expectedViewerPid := 0,
         options := 0,
         cleanupMeasurementType := MeasurementType.SUVMAX) {
-        return DeleteAllMxNMAnnotations(
+        startedAt := A_TickCount
+        result := DeleteAllMxNMAnnotations(
             expectedViewerHwnd,
             expectedViewerPid,
             options,
             cleanupMeasurementType
         )
+        if !result.ok {
+            WriteMxNMViewerFailureDiagnostic(
+                "AnnotationCleanup",
+                result.code,
+                Map(
+                    "stage", MxNMViewerFailureDetail(
+                        result.context,
+                        "failureStage",
+                        "CLEANUP"
+                    ),
+                    "measurementType", cleanupMeasurementType,
+                    "failureReason", result.failureReason,
+                    "viewerPid", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetActionPid",
+                        expectedViewerPid
+                    ),
+                    "viewerHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetActionHwnd",
+                        expectedViewerHwnd
+                    ),
+                    "viewerRootHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionRootHwnd",
+                        0
+                    ),
+                    "surfaceHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionSurfaceHwnd",
+                        0
+                    ),
+                    "sessionCandidateCount", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionCandidateCount",
+                        0
+                    ),
+                    "pointProbeCount", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionPointProbeCount",
+                        0
+                    ),
+                    "popupDiscovery", MxNMViewerFailureDetail(
+                        result.context,
+                        "popupDiscovery",
+                        ""
+                    ),
+                    "popupHwnd", MxNMViewerFailureDetail(
+                        result.context,
+                        "popupHwnd",
+                        0
+                    ),
+                    "sessionCacheHit", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionCacheHit",
+                        false
+                    ),
+                    "sessionGeneration", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetSessionGeneration",
+                        0
+                    ),
+                    "coldRecoveryAttempted", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetColdRecoveryAttempted",
+                        false
+                    ),
+                    "coldRecoverySucceeded", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetColdRecoverySucceeded",
+                        false
+                    ),
+                    "coldRecoveryDelayMs", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetColdRecoveryDelayMs",
+                        0
+                    ),
+                    "elapsedMs", A_TickCount - startedAt
+                )
+            )
+        }
+        return result
     }
 }
 
@@ -83,6 +166,14 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             target.sessionCandidateCount
         result.context["targetSessionPointProbeCount"] :=
             target.sessionPointProbeCount
+        result.context["targetActionHwnd"] := target.actionHwnd
+        result.context["targetActionPid"] := target.actionPid
+        result.context["targetColdRecoveryAttempted"] :=
+            target.coldRecoveryAttempted
+        result.context["targetColdRecoverySucceeded"] :=
+            target.coldRecoverySucceeded
+        result.context["targetColdRecoveryDelayMs"] :=
+            target.coldRecoveryDelayMs
         if !target.ok {
             result.context["failureStage"] := "TARGET_RESOLVE"
             result.code := MxNMAnnotationCleanupCode.TARGET_UNAVAILABLE
