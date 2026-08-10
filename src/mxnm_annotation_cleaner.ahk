@@ -63,6 +63,11 @@ class MxNMAnnotationCleaner {
                         "targetSessionSurfaceHwnd",
                         0
                     ),
+                    "targetHorizontalRegion", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetHorizontalRegion",
+                        ""
+                    ),
                     "sessionCandidateCount", MxNMViewerFailureDetail(
                         result.context,
                         "targetSessionCandidateCount",
@@ -154,6 +159,8 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             target.runtimeSurfaceSelectionCode
         result.context["targetRuntimePointSource"] :=
             target.runtimePointSource
+        result.context["targetHorizontalRegion"] :=
+            target.targetHorizontalRegion
         result.context["targetSessionCacheHit"] :=
             target.sessionCacheHit
         result.context["targetSessionGeneration"] :=

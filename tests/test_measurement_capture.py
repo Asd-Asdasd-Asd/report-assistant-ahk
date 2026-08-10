@@ -372,7 +372,7 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertIn("candidate.score > best.score", session)
         self.assertIn('static HorizontalRegion := "VIEWER_LEFT_HALF"', session)
         self.assertIn("{x: 0.25, y: 0.25}", session)
-        self.assertIn("denseXRatios := [0.20, 0.35, 0.45]", session)
+        self.assertIn("denseXRatios := [0.35, 0.45, 0.20]", session)
         self.assertIn("denseYRatios := [0.20, 0.35, 0.50, 0.65, 0.80]", session)
         self.assertIn("MxNMContextPointInLeftViewerHalf(point, rootRect)", session)
         self.assertIn("return point.x < midpointX", session)
@@ -386,6 +386,18 @@ class MeasurementCaptureTests(unittest.TestCase):
             surface_validation.index("ResolveMxNMWindowFromScreenPoint"),
         )
         self.assertIn(
+            "actionHwnd = identity.rootHwnd",
+            surface_validation,
+        )
+        preferred = session.split(
+            "FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {",
+            1,
+        )[1].split("tried := Map()", 1)[0]
+        self.assertLess(
+            preferred.index("{x: 0.35, y: 0.35}"),
+            preferred.index("{x: 0.25, y: 0.25}"),
+        )
+        self.assertIn(
             '"targetHorizontalRegion", target.targetHorizontalRegion',
             provider,
         )
@@ -395,6 +407,15 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertIn(
             '"TargetHorizontalRegion=" target.targetHorizontalRegion',
             field,
+        )
+        cleaner = source("src/mxnm_annotation_cleaner.ahk")
+        self.assertIn(
+            'result.context["targetHorizontalRegion"] :=',
+            cleaner,
+        )
+        self.assertIn(
+            '"targetHorizontalRegion", MxNMViewerFailureDetail(',
+            cleaner,
         )
         self.assertIn("classNameBuffer := Buffer(512 * 2, 0)", session)
         self.assertNotIn("\n    buffer := Buffer(", session)
