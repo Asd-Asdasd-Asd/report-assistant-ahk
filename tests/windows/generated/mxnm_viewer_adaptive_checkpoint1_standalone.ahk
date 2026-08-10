@@ -1042,6 +1042,8 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     failure := {
         ok: false,
         code: MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE,
+        pid: 0,
+        processCount: 0,
         frameHwnd: 0,
         actionRootHwnd: 0,
         panelHwnd: 0,
@@ -1057,9 +1059,12 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     )
     if !processResult.ok {
         failure.code := processResult.code
+        failure.processCount := processResult.processCount
         return failure
     }
     runtimePid := processResult.pid
+    failure.pid := runtimePid
+    failure.processCount := processResult.processCount
 
     commandKeyById := Map()
     for commandKey, command in plan.commands
@@ -1140,6 +1145,8 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     return {
         ok: true,
         code: MxNMViewerToolCode.READY,
+        pid: runtimePid,
+        processCount: processResult.processCount,
         frameHwnd: validGroups[1].frameHwnd,
         actionRootHwnd: validGroups[1].actionRootHwnd,
         panelHwnd: validGroups[1].panelHwnd,
@@ -1163,14 +1170,16 @@ ResolveMxNMViewerToolProcess(viewerWindows) {
             code: pids.Count = 0
                 ? MxNMViewerToolCode.VIEWER_NOT_FOUND
                 : MxNMViewerToolCode.VIEWER_NOT_UNIQUE,
-            pid: 0
+            pid: 0,
+            processCount: pids.Count
         }
     }
     for pid, _ in pids {
         return {
             ok: true,
             code: MxNMViewerToolCode.READY,
-            pid: pid
+            pid: pid,
+            processCount: pids.Count
         }
     }
 }

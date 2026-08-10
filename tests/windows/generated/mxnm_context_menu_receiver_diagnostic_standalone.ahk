@@ -1147,6 +1147,8 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     failure := {
         ok: false,
         code: MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE,
+        pid: 0,
+        processCount: 0,
         frameHwnd: 0,
         actionRootHwnd: 0,
         panelHwnd: 0,
@@ -1162,9 +1164,12 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     )
     if !processResult.ok {
         failure.code := processResult.code
+        failure.processCount := processResult.processCount
         return failure
     }
     runtimePid := processResult.pid
+    failure.pid := runtimePid
+    failure.processCount := processResult.processCount
 
     commandKeyById := Map()
     for commandKey, command in plan.commands
@@ -1245,6 +1250,8 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
     return {
         ok: true,
         code: MxNMViewerToolCode.READY,
+        pid: runtimePid,
+        processCount: processResult.processCount,
         frameHwnd: validGroups[1].frameHwnd,
         actionRootHwnd: validGroups[1].actionRootHwnd,
         panelHwnd: validGroups[1].panelHwnd,
@@ -1268,14 +1275,16 @@ ResolveMxNMViewerToolProcess(viewerWindows) {
             code: pids.Count = 0
                 ? MxNMViewerToolCode.VIEWER_NOT_FOUND
                 : MxNMViewerToolCode.VIEWER_NOT_UNIQUE,
-            pid: 0
+            pid: 0,
+            processCount: pids.Count
         }
     }
     for pid, _ in pids {
         return {
             ok: true,
             code: MxNMViewerToolCode.READY,
-            pid: pid
+            pid: pid,
+            processCount: pids.Count
         }
     }
 }
@@ -2937,6 +2946,8 @@ class MxNMContextTargetSessionCode {
 class MxNMContextTargetSessionProvider {
     static CachedSession := 0
     static Generation := 0
+    static ColdRecoveryConsumed := false
+    static ColdRecoveryDelayMs := 350
 
     static Resolve(viewerExe := "", options := 0) {
         try return this.ResolveInternal(viewerExe, options)
@@ -2976,13 +2987,39 @@ class MxNMContextTargetSessionProvider {
             options,
             this.Generation + 1
         )
+        coldRecoveryAttempted := false
         if !discovery.ok
-            return MakeMxNMContextTargetFailure(
+            && discovery.code
+                = MxNMContextTargetSessionCode.DISCOVERY_FAILED
+            && !this.ColdRecoveryConsumed {
+            this.ColdRecoveryConsumed := true
+            coldRecoveryAttempted := true
+            Sleep this.ColdRecoveryDelayMs
+            discovery := DiscoverMxNMContextTargetSession(
+                viewerExe,
+                options,
+                this.Generation + 1
+            )
+        }
+        if !discovery.ok {
+            failure := MakeMxNMContextTargetFailure(
                 discovery.code,
                 discovery
             )
+            failure.coldRecoveryAttempted := coldRecoveryAttempted
+            failure.coldRecoverySucceeded := false
+            failure.coldRecoveryDelayMs := coldRecoveryAttempted
+                ? this.ColdRecoveryDelayMs
+                : 0
+            return failure
+        }
         this.Generation += 1
         discovery.session.generation := this.Generation
+        discovery.session.coldRecoveryAttempted := coldRecoveryAttempted
+        discovery.session.coldRecoverySucceeded := coldRecoveryAttempted
+        discovery.session.coldRecoveryDelayMs := coldRecoveryAttempted
+            ? this.ColdRecoveryDelayMs
+            : 0
         this.CachedSession := discovery.session
 
         retryResult := ValidateMxNMContextTargetSession(
@@ -2996,10 +3033,58 @@ class MxNMContextTargetSessionProvider {
                 retryResult,
                 false
             )
+        failedSession := this.CachedSession
         this.CachedSession := 0
-        return MakeMxNMContextTargetFailure(
+        if !this.ColdRecoveryConsumed {
+            this.ColdRecoveryConsumed := true
+            coldRecoveryAttempted := true
+            Sleep this.ColdRecoveryDelayMs
+            recoveryDiscovery := DiscoverMxNMContextTargetSession(
+                viewerExe,
+                options,
+                this.Generation + 1
+            )
+            if recoveryDiscovery.ok {
+                this.Generation += 1
+                recoveryDiscovery.session.generation := this.Generation
+                recoveryDiscovery.session.coldRecoveryAttempted := true
+                recoveryDiscovery.session.coldRecoverySucceeded := false
+                recoveryDiscovery.session.coldRecoveryDelayMs :=
+                    this.ColdRecoveryDelayMs
+                this.CachedSession := recoveryDiscovery.session
+                recoveryValidation := ValidateMxNMContextTargetSession(
+                    this.CachedSession,
+                    viewerExe,
+                    options
+                )
+                if recoveryValidation.ok {
+                    this.CachedSession.coldRecoverySucceeded := true
+                    return BuildMxNMContextTargetResult(
+                        this.CachedSession,
+                        recoveryValidation,
+                        false
+                    )
+                }
+                failedSession := this.CachedSession
+                this.CachedSession := 0
+            }
+        }
+        failure := MakeMxNMContextTargetFailure(
             MxNMContextTargetSessionCode.FAST_VALIDATION_FAILED
         )
+        failure.coldRecoveryAttempted := coldRecoveryAttempted
+        failure.coldRecoverySucceeded := false
+        failure.coldRecoveryDelayMs := coldRecoveryAttempted
+            ? this.ColdRecoveryDelayMs
+            : 0
+        if IsObject(failedSession) {
+            failure.sessionGeneration := failedSession.generation
+            failure.sessionRootHwnd := failedSession.rootHwnd
+            failure.sessionSurfaceHwnd := failedSession.surfaceHwnd
+            failure.sessionCandidateCount := failedSession.candidateCount
+            failure.sessionPointProbeCount := failedSession.pointProbeCount
+        }
+        return failure
     }
 
     static Invalidate() {
@@ -3519,6 +3604,15 @@ BuildMxNMContextTargetResult(session, validation, cacheHit) {
     result.sessionSurfaceHwnd := session.surfaceHwnd
     result.sessionCandidateCount := session.candidateCount
     result.sessionPointProbeCount := session.pointProbeCount
+    result.coldRecoveryAttempted := session.HasOwnProp(
+        "coldRecoveryAttempted"
+    ) && session.coldRecoveryAttempted
+    result.coldRecoverySucceeded := session.HasOwnProp(
+        "coldRecoverySucceeded"
+    ) && session.coldRecoverySucceeded
+    result.coldRecoveryDelayMs := session.HasOwnProp(
+        "coldRecoveryDelayMs"
+    ) ? session.coldRecoveryDelayMs : 0
     return result
 }
 
@@ -3555,7 +3649,10 @@ MakeMxNMContextTargetFailure(code, details := 0) {
         sessionRootHwnd: 0,
         sessionSurfaceHwnd: 0,
         sessionCandidateCount: 0,
-        sessionPointProbeCount: 0
+        sessionPointProbeCount: 0,
+        coldRecoveryAttempted: false,
+        coldRecoverySucceeded: false,
+        coldRecoveryDelayMs: 0
     }
     if IsObject(details) {
         if details.HasOwnProp("candidateCount")
