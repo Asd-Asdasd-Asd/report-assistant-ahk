@@ -3402,10 +3402,10 @@ CollectMxNMContextSurfaceCandidate(
 
 FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
     preferred := [
-        {x: 0.25, y: 0.25},
         {x: 0.35, y: 0.35},
-        {x: 0.25, y: 0.75},
-        {x: 0.35, y: 0.65}
+        {x: 0.35, y: 0.65},
+        {x: 0.25, y: 0.25},
+        {x: 0.25, y: 0.75}
     ]
     tried := Map()
     probeCount := 0
@@ -3426,7 +3426,7 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
         }
     }
     denseYRatios := [0.20, 0.35, 0.50, 0.65, 0.80]
-    denseXRatios := [0.20, 0.35, 0.45]
+    denseXRatios := [0.35, 0.45, 0.20]
     for yRatio in denseYRatios {
         for xRatio in denseXRatios {
             key := xRatio "," yRatio
@@ -3474,6 +3474,7 @@ ValidateMxNMContextSurfacePoint(
     }
     actionHwnd := ResolveMxNMWindowFromScreenPoint(point)
     if !actionHwnd
+        || actionHwnd = identity.rootHwnd
         || !MxNMTargetWindowIsSameOrDescendant(
             actionHwnd,
             candidate.hwnd

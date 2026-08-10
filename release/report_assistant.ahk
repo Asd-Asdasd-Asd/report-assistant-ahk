@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: e3cd4f80d14bc2d7685c70f0cfd9fe45ff4ee7b0
-; Generated at: 2026-08-10 09:07:39 UTC
+; Source revision: c762c3b92aeb1d0ddffcc1bb9847f113cf6b3b52-dirty
+; Generated at: 2026-08-10 09:33:37 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-10"
-    static SourceRevision := "e3cd4f80d14bc2d7685c70f0cfd9fe45ff4ee7b0"
+    static SourceRevision := "c762c3b92aeb1d0ddffcc1bb9847f113cf6b3b52-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -12951,10 +12951,10 @@ CollectMxNMContextSurfaceCandidate(
 
 FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
     preferred := [
-        {x: 0.25, y: 0.25},
         {x: 0.35, y: 0.35},
-        {x: 0.25, y: 0.75},
-        {x: 0.35, y: 0.65}
+        {x: 0.35, y: 0.65},
+        {x: 0.25, y: 0.25},
+        {x: 0.25, y: 0.75}
     ]
     tried := Map()
     probeCount := 0
@@ -12975,7 +12975,7 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
         }
     }
     denseYRatios := [0.20, 0.35, 0.50, 0.65, 0.80]
-    denseXRatios := [0.20, 0.35, 0.45]
+    denseXRatios := [0.35, 0.45, 0.20]
     for yRatio in denseYRatios {
         for xRatio in denseXRatios {
             key := xRatio "," yRatio
@@ -13023,6 +13023,7 @@ ValidateMxNMContextSurfacePoint(
     }
     actionHwnd := ResolveMxNMWindowFromScreenPoint(point)
     if !actionHwnd
+        || actionHwnd = identity.rootHwnd
         || !MxNMTargetWindowIsSameOrDescendant(
             actionHwnd,
             candidate.hwnd
@@ -13625,6 +13626,11 @@ class MxNMAnnotationCleaner {
                         "targetSessionSurfaceHwnd",
                         0
                     ),
+                    "targetHorizontalRegion", MxNMViewerFailureDetail(
+                        result.context,
+                        "targetHorizontalRegion",
+                        ""
+                    ),
                     "sessionCandidateCount", MxNMViewerFailureDetail(
                         result.context,
                         "targetSessionCandidateCount",
@@ -13716,6 +13722,8 @@ DeleteAllMxNMAnnotations(expectedViewerHwnd := 0, expectedViewerPid := 0,
             target.runtimeSurfaceSelectionCode
         result.context["targetRuntimePointSource"] :=
             target.runtimePointSource
+        result.context["targetHorizontalRegion"] :=
+            target.targetHorizontalRegion
         result.context["targetSessionCacheHit"] :=
             target.sessionCacheHit
         result.context["targetSessionGeneration"] :=
