@@ -6,7 +6,7 @@
 %LOCALAPPDATA%\MedExReportAssistant\logs\viewer-failures.log
 ```
 
-实际位置以 `startup.log` 的 `ConfigPath` 所在目录为准。文件达到 512 KiB
+具体位置以 `startup.log` 的 `ConfigPath` 所在目录为准。文件达到 512 KiB
 后轮转为 `viewer-failures.log.1`。日志写入是 best-effort；日志目录不可写或
 轮转失败不得改变原自动化结果。
 
