@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.7.0
-; Source revision: adc91574917575bf54dd050f49664cf67ade2134-dirty
-; Generated at: 2026-08-10 08:53:23 UTC
+; Source revision: e3cd4f80d14bc2d7685c70f0cfd9fe45ff4ee7b0
+; Generated at: 2026-08-10 09:07:39 UTC
 ;@Ahk2Exe-SetFileVersion 0.7.0.0
 ;@Ahk2Exe-SetProductVersion 0.7.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.7.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-10"
-    static SourceRevision := "adc91574917575bf54dd050f49664cf67ade2134-dirty"
+    static SourceRevision := "e3cd4f80d14bc2d7685c70f0cfd9fe45ff4ee7b0"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
