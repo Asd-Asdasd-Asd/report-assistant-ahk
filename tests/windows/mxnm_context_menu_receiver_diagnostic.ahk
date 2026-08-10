@@ -225,6 +225,8 @@ FormatMxNMContextDiagnosticSessionTarget(target) {
         "SessionCandidateCount=" target.sessionCandidateCount "`r`n" .
         "SessionPointProbeCount=" target.sessionPointProbeCount "`r`n" .
         "SessionDiscoveryMethod=" target.runtimePointSource "`r`n" .
+        "SessionTargetHorizontalRegion=" .
+            target.targetHorizontalRegion "`r`n" .
         "SessionScreenPoint=" .
             MxNMContextDiagnosticPoint(target.screenPoint) "`r`n" .
         "SessionActionHwnd=" target.actionHwnd "`r`n" .

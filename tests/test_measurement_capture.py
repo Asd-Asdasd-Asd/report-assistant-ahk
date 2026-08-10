@@ -370,9 +370,32 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertNotIn('StrLower(className) != "#32770"', session)
         self.assertNotIn("MxNMTargetParentHwnd(hwnd) !=", session)
         self.assertIn("candidate.score > best.score", session)
-        self.assertIn("{x: 0.65, y: 0.35}", session)
-        self.assertIn("denseRatios := [0.20, 0.35, 0.50, 0.65, 0.80]", session)
-        self.assertIn("cursorPointBuffer := Buffer(8, 0)", session)
+        self.assertIn('static HorizontalRegion := "VIEWER_LEFT_HALF"', session)
+        self.assertIn("{x: 0.25, y: 0.25}", session)
+        self.assertIn("denseXRatios := [0.20, 0.35, 0.45]", session)
+        self.assertIn("denseYRatios := [0.20, 0.35, 0.50, 0.65, 0.80]", session)
+        self.assertIn("MxNMContextPointInLeftViewerHalf(point, rootRect)", session)
+        self.assertIn("return point.x < midpointX", session)
+        self.assertNotIn("GetMxNMContextCursorScreenPoint", session)
+        self.assertNotIn("score += 500", session)
+        surface_validation = session.split(
+            "\nValidateMxNMContextSurfacePoint(\n", 1
+        )[1].split("\n}\n\nValidateMxNMContextTargetSession", 1)[0]
+        self.assertLess(
+            surface_validation.index("MxNMContextPointInLeftViewerHalf"),
+            surface_validation.index("ResolveMxNMWindowFromScreenPoint"),
+        )
+        self.assertIn(
+            '"targetHorizontalRegion", target.targetHorizontalRegion',
+            provider,
+        )
+        diagnostics = source("src/diagnostics.ahk")
+        self.assertIn('"targetHorizontalRegion="', diagnostics)
+        field = source("tests/windows/mxnm_measurement_target_field.ahk")
+        self.assertIn(
+            '"TargetHorizontalRegion=" target.targetHorizontalRegion',
+            field,
+        )
         self.assertIn("classNameBuffer := Buffer(512 * 2, 0)", session)
         self.assertNotIn("\n    buffer := Buffer(", session)
         resolve_internal = session.split(

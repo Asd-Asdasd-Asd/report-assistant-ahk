@@ -174,6 +174,7 @@ FormatMxNMMeasurementTargetFieldOutput(
         "RuntimeSurfaceSelectionCode=" .
             target.runtimeSurfaceSelectionCode,
         "RuntimePointSource=" target.runtimePointSource,
+        "TargetHorizontalRegion=" target.targetHorizontalRegion,
         "MappedImageRectResolved=" .
             MxNMTargetFieldBoolean(target.mappedImageRectResolved),
         "LayoutReady=" MxNMTargetFieldBoolean(target.layoutReady),

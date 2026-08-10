@@ -33,6 +33,8 @@ class MxNMMeasurementProvider {
                     "viewerPid", result.actionPid,
                     "viewerRootHwnd", result.sessionRootHwnd,
                     "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "targetHorizontalRegion",
+                        result.targetHorizontalRegion,
                     "sessionCandidateCount", result.sessionCandidateCount,
                     "pointProbeCount", result.sessionPointProbeCount,
                     "sessionCacheHit", result.sessionCacheHit,
@@ -54,6 +56,8 @@ class MxNMMeasurementProvider {
                     "viewerHwnd", result.actionHwnd,
                     "viewerRootHwnd", result.sessionRootHwnd,
                     "surfaceHwnd", result.sessionSurfaceHwnd,
+                    "targetHorizontalRegion",
+                        result.targetHorizontalRegion,
                     "sessionCandidateCount", result.sessionCandidateCount,
                     "pointProbeCount", result.sessionPointProbeCount,
                     "sessionCacheHit", result.sessionCacheHit,
@@ -133,6 +137,8 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
     result.context["targetSessionRootHwnd"] := target.sessionRootHwnd
     result.context["targetSessionSurfaceHwnd"] :=
         target.sessionSurfaceHwnd
+    result.context["targetHorizontalRegion"] :=
+        target.targetHorizontalRegion
     result.context["targetSessionCandidateCount"] :=
         target.sessionCandidateCount
     result.context["targetSessionPointProbeCount"] :=
@@ -151,6 +157,8 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
                 "viewerHwnd", target.actionHwnd,
                 "viewerRootHwnd", target.sessionRootHwnd,
                 "surfaceHwnd", target.sessionSurfaceHwnd,
+                "targetHorizontalRegion",
+                    target.targetHorizontalRegion,
                 "sessionCandidateCount", target.sessionCandidateCount,
                 "pointProbeCount", target.sessionPointProbeCount,
                 "popupDiscovery", MedExContextValue(
@@ -219,6 +227,7 @@ MakeMxNMTargetFailureMeasurement(
         "targetConfigCode", target.configCode,
         "targetActionHwnd", 0,
         "targetActionPid", 0,
+        "targetHorizontalRegion", target.targetHorizontalRegion,
         "targetSessionCandidateCount", target.sessionCandidateCount,
         "targetSessionPointProbeCount", target.sessionPointProbeCount,
         "targetResolutionMs", targetResolutionMs,

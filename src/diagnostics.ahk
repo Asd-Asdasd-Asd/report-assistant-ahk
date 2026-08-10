@@ -63,6 +63,7 @@ FormatMxNMViewerFailureDiagnostic(action, resultCode, details := 0) {
         "viewerHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerHwnd", 0)),
         "viewerRootHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerRootHwnd", 0)),
         "surfaceHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "surfaceHwnd", 0)),
+        "targetHorizontalRegion=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "targetHorizontalRegion", "")),
         "win32Candidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "win32CandidateCount", 0)),
         "uiaRawCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaRawCandidateCount", 0)),
         "uiaCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "uiaCandidateCount", 0)),

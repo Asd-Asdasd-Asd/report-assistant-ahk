@@ -21,7 +21,9 @@ generation、cold-recovery 状态和耗时。禁止记录患者标识、窗口�
 
 - `Montage`：Body/Head/Lung 的失败 step、Control ID、Win32/UIA/合并候选数；
 - `ContextTarget`：SUVMax、尺寸和清除共用目标 session 的 discovery/validation
-  失败；
+  失败；`targetHorizontalRegion=VIEWER_LEFT_HALF` 表示右键目标受 Viewer 根客户区
+  左半区硬约束，鼠标位置不参与 surface 候选打分，右半区旧缓存会 validation
+  失败并触发重新发现；
 - `ContextMeasurement`：目标已解析后，右键菜单、命令或剪贴板 transport 失败；
 - `AnnotationCleanup`：删除标注命令或确认失败；
 - `ViewerTool`：Arrow、Length、3D SUV 的 Viewer PID、按钮候选和布局失败。

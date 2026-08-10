@@ -67,6 +67,9 @@
 - [ ] `tests/windows/mxnm_measurement_target_regression.ahk` 通过纯逻辑回归。
 - [ ] `tests/windows/mxnm_measurement_target_field.ahk` 在 Viewer 前台和报告
   前台均能解析唯一 target；失败时 popup/clipboard 不可达。
+- [ ] 同时打开左右两列 PET 对比时，从右列旧 PET 上触发 SUVMax、尺寸和清除，
+  输出仍为 `TargetHorizontalRegion=VIEWER_LEFT_HALF`，`ScreenPoint` 必须位于
+  Viewer 根客户区中线左侧，并读取/清除左列当前 PET；连续第二次缓存命中仍相同。
 - [ ] tool-anchor fallback 的 `imageRect` 使用 Vendor `ShowImagePos/Size`
   映射到 resolved image receiver，自动点不得落在 `Static` 标题区或工具按钮。
 - [ ] 自动点命中的同 PID、同 root-owner image child 作为右键 receiver；
