@@ -40,6 +40,10 @@ class MxNMMontageTiming {
     static ColdRecoveryDelayMs := 350
     static ColdRecoveryControlTimeoutMs := 2500
     static LayoutSettleMs := 350
+    static ComboOptionTimeoutMs := 1500
+    static ComboValueTimeoutMs := 900
+    static ComboPollMs := 10
+    static ComboCollapseFallbackMs := 120
     static EditConfirmTimeoutMs := 300
     static EditConfirmPollMs := 20
     static ButtonSettleMs := 60
@@ -425,12 +429,12 @@ MxNMMontageComboSelect(controlId, optionName, session) {
     } catch {
         return MxNMMontageResult(false, "COMBO_EXPAND_FAILED")
     }
-    deadline := A_TickCount + 1500
+    deadline := A_TickCount + MxNMMontageTiming.ComboOptionTimeoutMs
     loop {
         options := MxNMMontageCollectComboOptions(combo, optionName, session)
         if options.matches.Length = 1 || A_TickCount >= deadline
             break
-        Sleep 20
+        Sleep MxNMMontageTiming.ComboPollMs
     }
     if options.matches.Length != 1 {
         try combo.ExpandCollapsePattern.Collapse()
@@ -462,20 +466,29 @@ MxNMMontageComboSelect(controlId, optionName, session) {
     }
     if !MxNMMontagePhysicalClick(x, y)
         return MxNMMontageResult(false, "COMBO_OPTION_PHYSICAL_CLICK_FAILED")
-    Sleep 120
-    try combo.ExpandCollapsePattern.Collapse()
-    deadline := A_TickCount + 900
+    startedAt := A_TickCount
+    deadline := startedAt + MxNMMontageTiming.ComboValueTimeoutMs
+    collapseFallbackAt := startedAt
+        + MxNMMontageTiming.ComboCollapseFallbackMs
+    collapseAttempted := false
     loop {
         try currentValue := combo.ValuePattern.Value
         catch {
             currentValue := ""
         }
-        if StrLower(Trim(currentValue, " `t`r`n")) = StrLower(optionName)
+        if StrLower(Trim(currentValue, " `t`r`n")) = StrLower(optionName) {
+            try combo.ExpandCollapsePattern.Collapse()
             return MxNMMontageResult(true, "COMBO_PHYSICAL_SELECTION_CONFIRMED")
+        }
+        if !collapseAttempted && A_TickCount >= collapseFallbackAt {
+            try combo.ExpandCollapsePattern.Collapse()
+            collapseAttempted := true
+        }
         if A_TickCount >= deadline
             break
-        Sleep 20
+        Sleep MxNMMontageTiming.ComboPollMs
     }
+    try combo.ExpandCollapsePattern.Collapse()
     return MxNMMontageResult(false, "COMBO_VALUE_NOT_CONFIRMED")
 }
 

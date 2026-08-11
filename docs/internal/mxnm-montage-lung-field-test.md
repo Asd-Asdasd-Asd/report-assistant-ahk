@@ -28,6 +28,9 @@ ComboBox 的 UIA 展开/定位与真实选项点击、Edit/Button 的 UIA Value/
 - ComboBox 展开项属于桌面根下的 `ComboLBox`；选择前从桌面搜索同名项，再要求其
   UIA 父链回到刚展开的 ComboBox，并校验同一 Viewer PID；选项名称使用忽略大小写
   的精确匹配，以兼容 Viewer 实际显示的 `Null`/`NULL` 等形式；
+- production 在展开后以 10 ms 间隔轮询唯一目标项，出现即点击；点击后立即轮询
+  ComboBox 值，不再固定等待 120 ms。仅在 120 ms 内尚未确认值时执行一次兼容性
+  Collapse，并继续受 900 ms 总上限约束；
 - UIA `SelectionItem.Select()` 只能改变 ComboBox 值，不能可靠触发 MedEx 应用窗宽；
   因此最终在唯一 ListItem 中心发送真实鼠标单击并恢复光标，再校验 ComboBox 值；
 - ListItem 是虚拟 UIA 元素，其 `NativeWindowHandle` 不要求等于命中窗口；命中窗口

@@ -41,6 +41,10 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("ViewerHotkeyChordHasPressedComponent(chord)", module)
         self.assertIn("static LayoutSettleMs := 350", module)
         self.assertIn("static InitialControlReadyTimeoutMs := 1500", module)
+        self.assertIn("static ComboOptionTimeoutMs := 1500", module)
+        self.assertIn("static ComboValueTimeoutMs := 900", module)
+        self.assertIn("static ComboPollMs := 10", module)
+        self.assertIn("static ComboCollapseFallbackMs := 120", module)
         self.assertIn("static EditConfirmTimeoutMs := 300", module)
         self.assertIn("static EditConfirmPollMs := 20", module)
         self.assertIn("static ButtonSettleMs := 60", module)
@@ -49,6 +53,31 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("Sleep MxNMMontageTiming.ButtonSettleMs", module)
         self.assertNotIn("index < steps.Length ? 250", module)
         self.assertIn('CoordMode "Mouse", "Screen"', module)
+
+    def test_combo_fast_path_polls_state_without_fixed_post_click_sleep(
+        self,
+    ) -> None:
+        module = source("src/mxnm_montage.ahk")
+        combo = module.split(
+            "MxNMMontageComboSelect(controlId, optionName, session) {", 1
+        )[1].split("\nMxNMMontageCollectComboOptions", 1)[0]
+        self.assertIn(
+            "MxNMMontageTiming.ComboOptionTimeoutMs",
+            combo,
+        )
+        self.assertIn("Sleep MxNMMontageTiming.ComboPollMs", combo)
+        self.assertIn("collapseFallbackAt := startedAt", combo)
+        self.assertIn("collapseAttempted := false", combo)
+        self.assertIn("A_TickCount >= collapseFallbackAt", combo)
+        self.assertNotIn("Sleep 120", combo)
+        value_check = (
+            'StrLower(Trim(currentValue, " `t`r`n")) '
+            "= StrLower(optionName)"
+        )
+        self.assertLess(
+            combo.index(value_check),
+            combo.index("A_TickCount >= collapseFallbackAt"),
+        )
 
     def test_only_required_initial_control_gets_bounded_readiness_retry(self) -> None:
         module = source("src/mxnm_montage.ahk")
