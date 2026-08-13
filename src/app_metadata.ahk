@@ -1,5 +1,5 @@
 class AppMetadata {
-    static Version := "0.7.0"
+    static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "UNSTAMPED"
     static SourceRevision := "UNSTAMPED"

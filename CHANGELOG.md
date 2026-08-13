@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-13
+
+### Added
+
+- Added configurable Body, Head, and Lung Montage hotkeys with user-owned
+  layout and profile values, bounded UIA/Win32 control resolution, and
+  fail-closed execution.
+- Added privacy-safe Viewer failure logging and reusable context-target
+  sessions for measurement and annotation commands.
+
+### Changed
+
+- Montage menu and field transitions now use bounded readiness polling where
+  the Vendor UI exposes an observable state, while retaining short fixed waits
+  only where completion cannot be observed.
+- Viewer context-menu commands now target the left half of the image area and
+  reject the Viewer root when it cannot receive the image context menu.
+- Report image Caption now retries first-use Save control activation before it
+  advances to the next image.
+
+### Fixed
+
+- Fixed Viewer commands using stale or ambiguous image surfaces after Viewer
+  layout changes, cold starts, and multiple PET comparison panes.
+- Fixed Montage dropdown actions waiting for their full timeout after the menu
+  had already become ready.
+- Fixed generated AutoHotkey warnings in the Viewer diagnostic path.
+
 ## [0.6.3] - 2026-07-30
 
 ### Added

@@ -1,4 +1,4 @@
-# v0.7.0 Internal Release 检查清单
+# v0.8.0 Internal Release 检查清单
 
 ## Source 与版本
 
