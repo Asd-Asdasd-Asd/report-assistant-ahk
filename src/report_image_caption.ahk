@@ -97,6 +97,27 @@ class ReportImageCaptionProvider {
     static Busy := false
 
     static Invoke(foregroundHwnd := 0) {
+        operation := BeginAutomationDiagnosticOperation(
+            "ReportImageCaption"
+        )
+        result := MakeReportImageCaptionResult(
+            false,
+            ReportImageCaptionCode.UNEXPECTED_ERROR
+        )
+        try result := this.InvokeCore(foregroundHwnd, operation)
+        catch
+            result := MakeReportImageCaptionResult(
+                false,
+                ReportImageCaptionCode.UNEXPECTED_ERROR
+            )
+        operation.Complete(
+            result.ok ? "COMPLETED" : "FAILED",
+            result.code
+        )
+        return result
+    }
+
+    static InvokeCore(foregroundHwnd, operation) {
         global REPORT_IMAGE_CAPTION_CACHE
 
         if this.Busy
@@ -123,10 +144,15 @@ class ReportImageCaptionProvider {
                     = foregroundHwnd {
                 return this.InvokeReuse(
                     foregroundHwnd,
-                    priorCache
+                    priorCache,
+                    operation
                 )
             }
-            return this.InvokeCapture(foregroundHwnd, priorCache)
+            return this.InvokeCapture(
+                foregroundHwnd,
+                priorCache,
+                operation
+            )
         } catch {
             return MakeReportImageCaptionResult(
                 false,
@@ -137,8 +163,13 @@ class ReportImageCaptionProvider {
         }
     }
 
-    static InvokeCapture(sourceHwnd, priorCache := 0) {
+    static InvokeCapture(sourceHwnd, priorCache := 0, operation := 0) {
         global REPORT_IMAGE_CAPTION_CACHE
+
+        if IsObject(operation) {
+            operation.SetCacheHit(false)
+            operation.SetField("caption.capturePath", "FRESH_CAPTURE")
+        }
 
         sourcePid := ReportImageCaptionWindowPid(sourceHwnd)
         sourceProcess := ReportImageCaptionWindowProcess(sourceHwnd)
@@ -153,12 +184,15 @@ class ReportImageCaptionProvider {
             )
         }
 
-        capture := CaptureFreshReportImageCaption(sourceHwnd)
+        capture := CaptureFreshReportImageCaption(sourceHwnd, operation)
         if !capture.ok {
             ClearReportImageCaptionCache(false)
             return capture
         }
 
+        discoveryStartedAt := A_TickCount
+        if IsObject(operation)
+            operation.Stage("TARGET_DISCOVERY_STARTED")
         target := ReportImageCaptionSourceBindingValid(
             priorCache,
             sourceHwnd
@@ -174,6 +208,16 @@ class ReportImageCaptionProvider {
                 sourcePid
             )
         }
+        if IsObject(operation) {
+            operation.SetField(
+                "caption.freshDiscoveryMs",
+                A_TickCount - discoveryStartedAt
+            )
+            operation.SetField(
+                "caption.targetCandidateCount",
+                target.candidateCount
+            )
+        }
         if !target.ok {
             ClearReportImageCaptionCache(false)
             return MakeReportImageCaptionResult(
@@ -182,6 +226,10 @@ class ReportImageCaptionProvider {
                 false,
                 target.candidateCount
             )
+        }
+        if IsObject(operation) {
+            operation.ObserveTarget(target.pid, target.hwnd)
+            operation.Stage("TARGET_RESOLVED")
         }
         if WinExist("A") != sourceHwnd {
             ClearReportImageCaptionCache(false)
@@ -208,11 +256,16 @@ class ReportImageCaptionProvider {
             REPORT_IMAGE_CAPTION_CACHE,
             target,
             sourceHwnd,
-            ReportImageCaptionDefaults.CaptureSaveFallbackSettleMs
+            ReportImageCaptionDefaults.CaptureSaveFallbackSettleMs,
+            operation
         )
     }
 
-    static InvokeReuse(targetHwnd, cache) {
+    static InvokeReuse(targetHwnd, cache, operation := 0) {
+        if IsObject(operation) {
+            operation.SetCacheHit(true)
+            operation.SetField("caption.capturePath", "CACHED_REUSE")
+        }
         if !ReportImageCaptionCacheBindingValid(cache, targetHwnd) {
             ClearReportImageCaptionCache(false)
             return MakeReportImageCaptionResult(
@@ -225,6 +278,11 @@ class ReportImageCaptionProvider {
             cache,
             targetHwnd
         )
+        if IsObject(operation)
+            operation.SetField(
+                "caption.targetCandidateCount",
+                target.candidateCount
+            )
         if !target.ok {
             ClearReportImageCaptionCache(false)
             return MakeReportImageCaptionResult(
@@ -232,16 +290,21 @@ class ReportImageCaptionProvider {
                 ReportImageCaptionCode.TARGET_INVALID
             )
         }
+        if IsObject(operation) {
+            operation.ObserveTarget(target.pid, target.hwnd)
+            operation.Stage("TARGET_RESOLVED")
+        }
         return ExecuteReportImageCaptionAction(
             cache,
             target,
             targetHwnd,
-            ReportImageCaptionDefaults.ExplicitSaveSettleMs
+            ReportImageCaptionDefaults.ExplicitSaveSettleMs,
+            operation
         )
     }
 }
 
-CaptureFreshReportImageCaption(sourceHwnd) {
+CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
     try {
         A_Clipboard := ""
         SendInput "^c"
@@ -265,6 +328,8 @@ CaptureFreshReportImageCaption(sourceHwnd) {
             )
         }
         payload := ClipboardAll()
+        if IsObject(operation)
+            operation.Stage("SOURCE_CAPTURED")
         return {
             ok: true,
             code: ReportImageCaptionCode.OK,
@@ -570,11 +635,29 @@ ExecuteReportImageCaptionAction(
     cache,
     target,
     expectedForegroundHwnd,
-    saveSettleMs
+    saveSettleMs,
+    operation := 0
 ) {
     CoordMode "Mouse", "Screen"
     MouseGetPos &originalX, &originalY
     pasteDispatched := false
+    activationStartedAt := 0
+    pasteDispatchedAt := 0
+    saveDispatchedAt := 0
+    if IsObject(operation) {
+        operation.SetField(
+            "caption.saveDispatchResult",
+            "NOT_DISPATCHED"
+        )
+        operation.SetField(
+            "caption.persistenceState",
+            "NOT_APPLICABLE"
+        )
+        operation.SetField(
+            "caption.advanceDispatchResult",
+            "NOT_DISPATCHED"
+        )
+    }
     try {
         if WinExist("A") != expectedForegroundHwnd {
             return MakeReportImageCaptionResult(
@@ -588,6 +671,7 @@ ExecuteReportImageCaptionAction(
                 ReportImageCaptionCode.CLIPBOARD_WRITE_FAILED
             )
         }
+        activationStartedAt := A_TickCount
         if WinExist("A") != target.hwnd {
             try WinActivate "ahk_id " target.hwnd
             catch {
@@ -613,6 +697,13 @@ ExecuteReportImageCaptionAction(
                 ReportImageCaptionCode.TARGET_INVALID
             )
         }
+        if IsObject(operation) {
+            operation.SetField(
+                "caption.activationMs",
+                A_TickCount - activationStartedAt
+            )
+            operation.Stage("TARGET_ACTIVATED")
+        }
         if !ReportImageCaptionPointBelongsToTarget(
             target.hwnd,
             target.captionPoint
@@ -622,6 +713,8 @@ ExecuteReportImageCaptionAction(
                 ReportImageCaptionCode.TARGET_INVALID
             )
         }
+        if IsObject(operation)
+            operation.Stage("CAPTION_POINT_VALIDATED")
         MouseClick(
             "left",
             target.captionPoint.x,
@@ -647,6 +740,9 @@ ExecuteReportImageCaptionAction(
             )
         }
         pasteDispatched := true
+        pasteDispatchedAt := A_TickCount
+        if IsObject(operation)
+            operation.Stage("PASTE_DISPATCHED")
         Sleep ReportImageCaptionDefaults.PasteSettleMs
 
         if WinExist("A") != target.hwnd
@@ -661,6 +757,8 @@ ExecuteReportImageCaptionAction(
             )
         }
         try {
+            if IsObject(operation)
+                operation.Stage("SAVE_POINT_VALIDATED")
             MouseClick(
                 "left",
                 target.savePoint.x,
@@ -668,6 +766,22 @@ ExecuteReportImageCaptionAction(
                 1,
                 0
             )
+            saveDispatchedAt := A_TickCount
+            if IsObject(operation) {
+                operation.SetField(
+                    "caption.saveDispatchResult",
+                    "DISPATCHED"
+                )
+                operation.SetField(
+                    "caption.persistenceState",
+                    "UNOBSERVABLE"
+                )
+                operation.SetField(
+                    "caption.pasteToSaveMs",
+                    saveDispatchedAt - pasteDispatchedAt
+                )
+                operation.Stage("SAVE_CLICK_DISPATCHED")
+            }
             feedbackOrigin := ReportImageCaptionFeedbackOrigin(
                 cache,
                 originalX,
@@ -685,6 +799,8 @@ ExecuteReportImageCaptionAction(
             )
         }
         Sleep saveSettleMs
+        if IsObject(operation)
+            operation.Stage("SAVE_SETTLE_COMPLETED")
 
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(
@@ -704,6 +820,17 @@ ExecuteReportImageCaptionAction(
                 0
             )
             SendInput "{WheelDown}"
+            if IsObject(operation) {
+                operation.SetField(
+                    "caption.advanceDispatchResult",
+                    "DISPATCHED"
+                )
+                operation.SetField(
+                    "caption.saveToAdvanceMs",
+                    A_TickCount - saveDispatchedAt
+                )
+                operation.Stage("ADVANCE_DISPATCHED")
+            }
         } catch {
             return MakeReportImageCaptionResult(
                 false,

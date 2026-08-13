@@ -1,6 +1,8 @@
 class ReportAssistantTrayDefaults {
     static SettingsItemName := "设置…"
     static AboutItemName := "关于麦旋风…"
+    static CopyDiagnosticItemName := "复制诊断信息"
+    static EnableDiagnosticItemName := "开启 10 分钟详细诊断"
     static ClearCaptionItemName := "清除快速标图 caption"
     static ReloadItemName := "重新加载配置"
     static ExitItemName := "E&xit"
@@ -16,6 +18,16 @@ ConfigureReportAssistantTrayMenu() {
         ReportAssistantTrayDefaults.ExitItemName,
         ReportAssistantTrayDefaults.AboutItemName,
         ShowReportAssistantAbout
+    )
+    A_TrayMenu.Insert(
+        ReportAssistantTrayDefaults.ExitItemName,
+        ReportAssistantTrayDefaults.CopyDiagnosticItemName,
+        CopyAutomationDiagnosticInformation
+    )
+    A_TrayMenu.Insert(
+        ReportAssistantTrayDefaults.ExitItemName,
+        ReportAssistantTrayDefaults.EnableDiagnosticItemName,
+        EnableAutomationDiagnosticsForTenMinutes
     )
     A_TrayMenu.Insert(
         ReportAssistantTrayDefaults.ExitItemName,

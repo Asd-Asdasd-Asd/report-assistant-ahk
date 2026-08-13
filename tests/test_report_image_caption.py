@@ -106,7 +106,7 @@ class ReportImageCaptionTests(unittest.TestCase):
 
     def test_source_capture_requires_fresh_nonempty_clipboard(self) -> None:
         capture = self.body(
-            "\nCaptureFreshReportImageCaption(sourceHwnd) {\n",
+            "\nCaptureFreshReportImageCaption(sourceHwnd, operation := 0) {\n",
             "\nResolveReportImageCaptionTarget(",
         )
         self.assertIn('A_Clipboard := ""', capture)
@@ -118,11 +118,11 @@ class ReportImageCaptionTests(unittest.TestCase):
 
     def test_reuse_is_only_selected_for_the_exact_bound_target(self) -> None:
         invoke = self.body(
-            "static Invoke(foregroundHwnd := 0)",
-            "static InvokeCapture(sourceHwnd)",
+            "static InvokeCore(foregroundHwnd, operation)",
+            "static InvokeCapture(sourceHwnd, priorCache := 0, operation := 0)",
         )
         reuse = self.body(
-            "static InvokeReuse(targetHwnd, cache)",
+            "static InvokeReuse(targetHwnd, cache, operation := 0)",
             "CaptureFreshReportImageCaption(",
         )
         self.assertIn(
@@ -130,7 +130,7 @@ class ReportImageCaptionTests(unittest.TestCase):
             "                    = foregroundHwnd",
             invoke,
         )
-        self.assertIn("ClearReportImageCaptionCache(false)", invoke)
+        self.assertIn("ClearReportImageCaptionCache(false)", reuse)
         self.assertIn("ReportImageCaptionCacheBindingValid", reuse)
         self.assertIn("ResolveCachedReportImageCaptionTarget", reuse)
         self.assertNotIn('SendInput "^c"', reuse)
@@ -141,8 +141,8 @@ class ReportImageCaptionTests(unittest.TestCase):
 
     def test_new_source_caption_reuses_stable_target_geometry(self) -> None:
         capture = self.body(
-            "static InvokeCapture(sourceHwnd, priorCache := 0)",
-            "static InvokeReuse(targetHwnd, cache)",
+            "static InvokeCapture(sourceHwnd, priorCache := 0, operation := 0)",
+            "static InvokeReuse(targetHwnd, cache, operation := 0)",
         )
         cached = self.body(
             "ResolveCachedReportImageCaptionTarget(cache, targetHwnd)",
@@ -276,11 +276,11 @@ class ReportImageCaptionTests(unittest.TestCase):
 
     def test_only_fresh_caption_capture_uses_vendor_save_fallback_window(self) -> None:
         capture = self.body(
-            "static InvokeCapture(sourceHwnd, priorCache := 0)",
-            "static InvokeReuse(targetHwnd, cache)",
+            "static InvokeCapture(sourceHwnd, priorCache := 0, operation := 0)",
+            "static InvokeReuse(targetHwnd, cache, operation := 0)",
         )
         reuse = self.body(
-            "static InvokeReuse(targetHwnd, cache)",
+            "static InvokeReuse(targetHwnd, cache, operation := 0)",
             "CaptureFreshReportImageCaption(",
         )
         self.assertIn(

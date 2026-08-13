@@ -4,6 +4,7 @@
 
 #Include app_metadata.ahk
 #Include app_config.ahk
+#Include automation_diagnostics.ahk
 #Include app_startup.ahk
 #Include config.example.ahk
 #Include *i config.local.ahk

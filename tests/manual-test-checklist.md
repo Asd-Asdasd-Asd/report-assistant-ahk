@@ -138,6 +138,16 @@
 
 ### Shift+Alt+S caption + advance
 
+- [ ] 新启动后第一次快速标图产生带 `firstSessionUse=true`、
+  `firstTargetProcessUse=true` 的 summary 和 stage trace；第二次正常成功默认只产生
+  summary。
+- [ ] Caption summary 明确区分 `saveDispatchResult=DISPATCHED` 与
+  `persistenceState=UNOBSERVABLE`，不出现 `SAVE_CONFIRMED` 或持久化成功声明。
+- [ ] 托盘“复制诊断信息”包含同一个 `sessionId` 下最近 Caption operation 和
+  `RecommendedDiagnostic=REPORT_IMAGE_CAPTION`，不包含所选文字、报告内容、患者信息
+  或窗口标题。
+- [ ] 托盘“开启 10 分钟详细诊断”立即使后续成功操作输出 stage trace；重启后自动
+  关闭，不修改 config.ini。
 - [ ] 使用非临床测试文字运行
   `tests/windows/report_image_caption_migration_diagnostic.ahk`，按说明依次采集
   source selection、caption input point 和 image wheel point。

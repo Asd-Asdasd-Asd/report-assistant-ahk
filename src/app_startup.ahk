@@ -20,6 +20,7 @@ StartReportAssistantRuntime() {
         "Ptr"
     )
     createError := A_LastError
+    AutomationDiagnosticSession.EnsureStarted()
 
     if !handle {
         WriteReportAssistantStartupDiagnostic("SINGLETON_UNAVAILABLE")
@@ -93,6 +94,7 @@ FormatReportAssistantStartupDiagnostic(startupResult, configPath) {
         "AppVersion=" AppMetadata.Version,
         "BuildDate=" AppMetadata.BuildDate,
         "SourceRevision=" AppMetadata.SourceRevision,
+        "SessionId=" AutomationDiagnosticSession.SessionId,
         "ExecutablePath=" A_ScriptFullPath,
         "ConfigPath=" configPath
     ]

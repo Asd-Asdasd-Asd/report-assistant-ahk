@@ -83,6 +83,7 @@ class AppStartupPolicyTests(unittest.TestCase):
             "AppVersion=",
             "BuildDate=",
             "SourceRevision=",
+            "SessionId=",
             "ExecutablePath=",
             "ConfigPath=",
         ):

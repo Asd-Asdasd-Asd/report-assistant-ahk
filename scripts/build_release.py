@@ -21,6 +21,7 @@ GENERATED_METADATA_PATHS = (
 ORDER = [
     "app_metadata.ahk",
     "app_config.ahk",
+    "automation_diagnostics.ahk",
     "app_startup.ahk",
     "Lib/UIA.ahk",
     "config.example.ahk",
