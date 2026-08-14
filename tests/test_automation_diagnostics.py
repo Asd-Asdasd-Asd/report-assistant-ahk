@@ -57,6 +57,21 @@ class AutomationDiagnosticsTests(unittest.TestCase):
         ):
             self.assertIn(required, self.diagnostics)
 
+    def test_default_log_path_is_one_valid_ahk_expression(self) -> None:
+        path_builder = self.diagnostics.split(
+            "DefaultAutomationDiagnosticLogPath() {", 1
+        )[1].split("\n}", 1)[0]
+        self.assertIn(
+            'return configDirectory "\\" '
+            'AutomationDiagnosticDefaults.LogDirectoryName "\\" '
+            "AutomationDiagnosticDefaults.LogFileName",
+            path_builder,
+        )
+        self.assertNotIn(
+            'AutomationDiagnosticDefaults.LogDirectoryName\n        "\\"',
+            path_builder,
+        )
+
     def test_public_snapshot_and_diagnostic_window_are_restart_local(self) -> None:
         self.assertIn("static DiagnosticUntilTick := 0", self.diagnostics)
         self.assertIn("A_TickCount < this.DiagnosticUntilTick", self.diagnostics)

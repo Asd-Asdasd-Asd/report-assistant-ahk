@@ -256,8 +256,7 @@ JoinAutomationDiagnosticFields(fields) {
 DefaultAutomationDiagnosticLogPath() {
     configPath := ReportAssistantConfig.Path()
     SplitPath configPath, , &configDirectory
-    return configDirectory "\" AutomationDiagnosticDefaults.LogDirectoryName
-        "\" AutomationDiagnosticDefaults.LogFileName
+    return configDirectory "\" AutomationDiagnosticDefaults.LogDirectoryName "\" AutomationDiagnosticDefaults.LogFileName
 }
 
 WriteAutomationDiagnosticLines(lines, logPath := "") {
