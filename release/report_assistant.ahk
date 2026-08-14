@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 0c92052314ed6442e062b2658a8a46919eb0368d
-; Generated at: 2026-08-13 14:40:34 UTC
+; Source revision: 428606344325dba027a374105296e18fc3debaf9
+; Generated at: 2026-08-14 09:33:45 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-08-13"
-    static SourceRevision := "0c92052314ed6442e062b2658a8a46919eb0368d"
+    static BuildDate := "2026-08-14"
+    static SourceRevision := "428606344325dba027a374105296e18fc3debaf9"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -361,8 +361,7 @@ JoinAutomationDiagnosticFields(fields) {
 DefaultAutomationDiagnosticLogPath() {
     configPath := ReportAssistantConfig.Path()
     SplitPath configPath, , &configDirectory
-    return configDirectory "\" AutomationDiagnosticDefaults.LogDirectoryName
-        "\" AutomationDiagnosticDefaults.LogFileName
+    return configDirectory "\" AutomationDiagnosticDefaults.LogDirectoryName "\" AutomationDiagnosticDefaults.LogFileName
 }
 
 WriteAutomationDiagnosticLines(lines, logPath := "") {
