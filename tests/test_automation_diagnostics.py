@@ -91,6 +91,11 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             self.assertIn(required, self.diagnostics)
         self.assertIn("DefaultMxNMViewerFailureLogPath()", self.diagnostics)
         self.assertIn("NewerAutomationDiagnosticEvent", self.diagnostics)
+        self.assertIn("StrCompare(", self.diagnostics)
+        self.assertNotIn(
+            "viewerEvent.timestamp > automationEvent.timestamp",
+            self.diagnostics,
+        )
         self.assertIn('source: "VIEWER_FAILURE"', self.diagnostics)
         self.assertIn('InStr(action, "Annotation")', self.diagnostics)
 

@@ -432,7 +432,10 @@ FindRecentViewerFailureEvent(lines) {
 NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {
     if viewerEvent.timestamp != ""
         && (automationEvent.timestamp = ""
-            || viewerEvent.timestamp > automationEvent.timestamp) {
+            || StrCompare(
+                viewerEvent.timestamp,
+                automationEvent.timestamp
+            ) > 0) {
         return viewerEvent
     }
     return automationEvent

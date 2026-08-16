@@ -145,6 +145,7 @@ class MxNMContextTargetSessionProvider {
             ? this.ColdRecoveryDelayMs
             : 0
         if IsObject(failedSession) {
+            failure.actionPid := failedSession.pid
             failure.sessionGeneration := failedSession.generation
             failure.sessionRootHwnd := failedSession.rootHwnd
             failure.sessionSurfaceHwnd := failedSession.surfaceHwnd
@@ -388,10 +389,15 @@ DiscoverMxNMContextSurface(identity) {
         totalProbeCount += pointResult.probeCount
         if !pointResult.ok
             continue
+        receiverRect := MxNMTargetClientRectScreen(
+            pointResult.actionHwnd
+        )
+        if !IsObject(receiverRect)
+            continue
         return {
             ok: true,
-            surfaceHwnd: best.hwnd,
-            surfaceRect: best.rect,
+            surfaceHwnd: pointResult.actionHwnd,
+            surfaceRect: receiverRect,
             point: pointResult.point,
             actionHwnd: pointResult.actionHwnd,
             candidateCount: candidates.Length,

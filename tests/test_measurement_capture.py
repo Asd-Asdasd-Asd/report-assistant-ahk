@@ -357,6 +357,15 @@ class MeasurementCaptureTests(unittest.TestCase):
             "pointProbeCount",
         ):
             self.assertIn(required, session)
+        self.assertIn(
+            "receiverRect := MxNMTargetClientRectScreen(\n"
+            "            pointResult.actionHwnd",
+            session,
+        )
+        self.assertIn("surfaceHwnd: pointResult.actionHwnd", session)
+        self.assertIn("surfaceRect: receiverRect", session)
+        self.assertNotIn("surfaceHwnd: best.hwnd", session)
+        self.assertNotIn("surfaceRect: best.rect", session)
         for forbidden in (
             "BuildMxNMMeasurementTargetPlan(",
             "BuildMxNMViewerToolCommandPlan(",
