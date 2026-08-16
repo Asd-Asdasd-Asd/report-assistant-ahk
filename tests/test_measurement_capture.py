@@ -437,11 +437,17 @@ class MeasurementCaptureTests(unittest.TestCase):
         )[1].split("\n    static Invalidate()", 1)[0]
         self.assertEqual(
             resolve_internal.count("DiscoverMxNMContextTargetSession("),
-            3,
+            2,
         )
+        self.assertIn(
+            "BuildMxNMContextFreshDiscoveryValidation(\n"
+            "                this.CachedSession",
+            resolve_internal,
+        )
+        self.assertNotIn("retryResult :=", resolve_internal)
         self.assertIn("static ColdRecoveryConsumed := false", session)
         self.assertIn("static ColdRecoveryDelayMs := 350", session)
-        self.assertIn("if !this.ColdRecoveryConsumed", resolve_internal)
+        self.assertIn("&& !this.ColdRecoveryConsumed", resolve_internal)
         self.assertIn("Sleep this.ColdRecoveryDelayMs", resolve_internal)
         self.assertIn("coldRecoveryAttempted", session + provider)
         self.assertIn(

@@ -79,6 +79,9 @@
   外层布局窗口只提供映射边界，不替代实际 point HWND 接收右键。
 - [ ] 双 PET 对比布局中，root-owner 的矩形即使不覆盖可见 Viewer，自动点仍以
   实际右键 receiver 的矩形判断左半区；只操作左列，右列不接收命令。
+- [ ] Fresh discovery 已验证 receiver 后可直接执行本次操作；若下一次缓存快速
+  复验失败，则重新 discovery 后继续，不得把可用结果转成
+  `CONTEXT_FAST_VALIDATION_FAILED`。
 - [ ] `;fzg` 的 positive、`NOT_ANNOTATED` 和 automation failure 路径分别
   写入数值、留下人工输入锚点或显示无焦点失败提示。
 - [ ] `;cma`/custom `{{size}}` 对 1–3 个正数按数值降序输出，使用 `×` 和逐项
