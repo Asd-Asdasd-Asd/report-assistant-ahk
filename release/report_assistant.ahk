@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 656e6d72ed830822c64e0be9930432ad9664f534
-; Generated at: 2026-08-16 17:11:51 UTC
+; Source revision: 12583f700ea8cdbcf28899ca93c023c8e2ec2368
+; Generated at: 2026-08-16 17:18:56 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-17"
-    static SourceRevision := "656e6d72ed830822c64e0be9930432ad9664f534"
+    static SourceRevision := "12583f700ea8cdbcf28899ca93c023c8e2ec2368"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -271,6 +271,8 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
             "caption.capturePath", true,
             "caption.freshDiscoveryMs", true,
             "caption.activationMs", true,
+            "caption.preSaveSettlePath", true,
+            "caption.preSaveSettleMs", true,
             "caption.pasteToSaveMs", true,
             "caption.saveToAdvanceMs", true,
             "caption.saveDispatchResult", true,
@@ -23115,6 +23117,9 @@ class ReportImageCaptionDefaults {
     static TargetActivationTimeoutSeconds := 1
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
+    ; The first paste into a newly observed renderer can be visible before its
+    ; backing editor state accepts the change. Gate only that cold boundary.
+    static FirstTargetProcessPasteSettleMs := 500
     static ExplicitSaveSettleMs := 200
     ; A newly captured caption gets one conservative save window. The later
     ; cached reuse path keeps the field-validated 200 ms cadence.
@@ -23755,6 +23760,7 @@ ExecuteReportImageCaptionAction(
     activationStartedAt := 0
     pasteDispatchedAt := 0
     saveDispatchedAt := 0
+    pasteSettle := ReportImageCaptionPasteSettle(operation)
     if IsObject(operation) {
         operation.SetField(
             "caption.saveDispatchResult",
@@ -23767,6 +23773,14 @@ ExecuteReportImageCaptionAction(
         operation.SetField(
             "caption.advanceDispatchResult",
             "NOT_DISPATCHED"
+        )
+        operation.SetField(
+            "caption.preSaveSettlePath",
+            pasteSettle.path
+        )
+        operation.SetField(
+            "caption.preSaveSettleMs",
+            pasteSettle.milliseconds
         )
     }
     try {
@@ -23854,7 +23868,9 @@ ExecuteReportImageCaptionAction(
         pasteDispatchedAt := A_TickCount
         if IsObject(operation)
             operation.Stage("PASTE_DISPATCHED")
-        Sleep ReportImageCaptionDefaults.PasteSettleMs
+        Sleep pasteSettle.milliseconds
+        if IsObject(operation)
+            operation.Stage("PASTE_SETTLE_COMPLETED")
 
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(
@@ -23964,6 +23980,20 @@ ExecuteReportImageCaptionAction(
         )
     } finally {
         MouseMove originalX, originalY, 0
+    }
+}
+
+ReportImageCaptionPasteSettle(operation := 0) {
+    if IsObject(operation) && operation.FirstTargetProcessUse {
+        return {
+            path: "FIRST_TARGET_PROCESS_GATE",
+            milliseconds:
+                ReportImageCaptionDefaults.FirstTargetProcessPasteSettleMs
+        }
+    }
+    return {
+        path: "STANDARD",
+        milliseconds: ReportImageCaptionDefaults.PasteSettleMs
     }
 }
 
