@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: a41534b939a2f93829a542637e427977c7379082
-; Generated at: 2026-08-16 16:38:26 UTC
+; Source revision: 336dcf76666d71a68ccf35390ef74f3b106c87c4
+; Generated at: 2026-08-16 16:43:07 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-17"
-    static SourceRevision := "a41534b939a2f93829a542637e427977c7379082"
+    static SourceRevision := "336dcf76666d71a68ccf35390ef74f3b106c87c4"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -13042,71 +13042,13 @@ class MxNMContextTargetSessionProvider {
             ? this.ColdRecoveryDelayMs
             : 0
         this.CachedSession := discovery.session
-
-        retryResult := ValidateMxNMContextTargetSession(
+        return BuildMxNMContextTargetResult(
             this.CachedSession,
-            viewerExe,
-            options
+            BuildMxNMContextFreshDiscoveryValidation(
+                this.CachedSession
+            ),
+            false
         )
-        if retryResult.ok
-            return BuildMxNMContextTargetResult(
-                this.CachedSession,
-                retryResult,
-                false
-            )
-        failedSession := this.CachedSession
-        this.CachedSession := 0
-        if !this.ColdRecoveryConsumed {
-            this.ColdRecoveryConsumed := true
-            coldRecoveryAttempted := true
-            Sleep this.ColdRecoveryDelayMs
-            recoveryDiscovery := DiscoverMxNMContextTargetSession(
-                viewerExe,
-                options,
-                this.Generation + 1
-            )
-            if recoveryDiscovery.ok {
-                this.Generation += 1
-                recoveryDiscovery.session.generation := this.Generation
-                recoveryDiscovery.session.coldRecoveryAttempted := true
-                recoveryDiscovery.session.coldRecoverySucceeded := false
-                recoveryDiscovery.session.coldRecoveryDelayMs :=
-                    this.ColdRecoveryDelayMs
-                this.CachedSession := recoveryDiscovery.session
-                recoveryValidation := ValidateMxNMContextTargetSession(
-                    this.CachedSession,
-                    viewerExe,
-                    options
-                )
-                if recoveryValidation.ok {
-                    this.CachedSession.coldRecoverySucceeded := true
-                    return BuildMxNMContextTargetResult(
-                        this.CachedSession,
-                        recoveryValidation,
-                        false
-                    )
-                }
-                failedSession := this.CachedSession
-                this.CachedSession := 0
-            }
-        }
-        failure := MakeMxNMContextTargetFailure(
-            MxNMContextTargetSessionCode.FAST_VALIDATION_FAILED
-        )
-        failure.coldRecoveryAttempted := coldRecoveryAttempted
-        failure.coldRecoverySucceeded := false
-        failure.coldRecoveryDelayMs := coldRecoveryAttempted
-            ? this.ColdRecoveryDelayMs
-            : 0
-        if IsObject(failedSession) {
-            failure.actionPid := failedSession.pid
-            failure.sessionGeneration := failedSession.generation
-            failure.sessionRootHwnd := failedSession.rootHwnd
-            failure.sessionSurfaceHwnd := failedSession.surfaceHwnd
-            failure.sessionCandidateCount := failedSession.candidateCount
-            failure.sessionPointProbeCount := failedSession.pointProbeCount
-        }
-        return failure
     }
 
     static Invalidate() {
@@ -13137,6 +13079,21 @@ DiscoverMxNMContextTargetSession(viewerExe, options, generation) {
     }
     point := surfaceResult.point
     surfaceRect := surfaceResult.surfaceRect
+    actionClientPoint := MxNMTargetScreenToClient(
+        surfaceResult.actionHwnd,
+        point
+    )
+    if !IsObject(actionClientPoint) {
+        return {
+            ok: false,
+            code: MxNMContextTargetSessionCode.DISCOVERY_FAILED,
+            session: 0,
+            pid: identity.pid,
+            rootHwnd: identity.rootHwnd,
+            candidateCount: surfaceResult.candidateCount,
+            pointProbeCount: surfaceResult.pointProbeCount
+        }
+    }
     return {
         ok: true,
         code: MxNMContextTargetSessionCode.READY,
@@ -13154,11 +13111,22 @@ DiscoverMxNMContextTargetSession(viewerExe, options, generation) {
                     / (surfaceRect.bottom - surfaceRect.top)
             },
             safePointScreen: point,
+            safePointClient: actionClientPoint,
             discoveryMethod: surfaceResult.discoveryMethod,
             generation: generation,
             candidateCount: surfaceResult.candidateCount,
             pointProbeCount: surfaceResult.pointProbeCount
         }
+    }
+}
+
+BuildMxNMContextFreshDiscoveryValidation(session) {
+    return {
+        ok: true,
+        screenPoint: session.safePointScreen,
+        actionHwnd: session.surfaceHwnd,
+        actionPid: session.pid,
+        actionClientPoint: session.safePointClient
     }
 }
 
