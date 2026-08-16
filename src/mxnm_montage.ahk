@@ -599,14 +599,52 @@ MxNMMontageCommitZoom(session) {
 
 MxNMMontageResolveControl(session, controlId, className) {
     win32 := []
-    callback := CallbackCreate(MxNMMontageCollectNativeControl.Bind(session, controlId, className, win32), "Fast", 2)
-    try DllCall("User32\EnumChildWindows", "Ptr", session.viewerRootOwner, "Ptr", callback, "Ptr", 0, "Int")
-    finally CallbackFree(callback)
-    uiaResult := MxNMMontageCollectUiaControls(
-        session,
-        controlId,
-        className
+    nativeSeen := Map()
+    ownerFamily := MxNMMontageOwnerFamilyWindows(session)
+    callback := CallbackCreate(
+        MxNMMontageCollectNativeControl.Bind(
+            session,
+            controlId,
+            className,
+            nativeSeen,
+            win32
+        ),
+        "Fast",
+        2
     )
+    try {
+        for topHwnd in ownerFamily {
+            MxNMMontageCollectNativeControl(
+                session,
+                controlId,
+                className,
+                nativeSeen,
+                win32,
+                topHwnd
+            )
+            DllCall(
+                "User32\EnumChildWindows",
+                "Ptr", topHwnd,
+                "Ptr", callback,
+                "Ptr", 0,
+                "Int"
+            )
+        }
+    }
+    finally CallbackFree(callback)
+    uiaResult := {
+        candidates: [],
+        rawCandidateCount: 0,
+        querySucceeded: false
+    }
+    if win32.Length = 0 {
+        uiaResult := MxNMMontageCollectUiaControls(
+            session,
+            controlId,
+            className,
+            ownerFamily
+        )
+    }
     candidatesByHwnd := Map()
     for candidate in win32
         candidatesByHwnd[candidate.hwnd] := candidate
@@ -626,7 +664,8 @@ MxNMMontageResolveControl(session, controlId, className) {
                 uiaRawCandidateCount: uiaResult.rawCandidateCount,
                 uiaCandidateCount: uiaResult.candidates.Length,
                 uiaQuerySucceeded: uiaResult.querySucceeded,
-                mergedCandidateCount: candidates.Length
+                mergedCandidateCount: candidates.Length,
+                runtimeCandidateCount: ownerFamily.Length
             }
         )
     }
@@ -634,44 +673,55 @@ MxNMMontageResolveControl(session, controlId, className) {
     return {ok: true, code: "CONTROL_READY", hwnd: candidate.hwnd, rectObject: candidate.rect}
 }
 
-MxNMMontageCollectUiaControls(session, controlId, className) {
+MxNMMontageOwnerFamilyWindows(session) {
+    output := []
+    seen := Map()
+    try topLevelWindows := WinGetList("ahk_pid " session.viewerPid)
+    catch
+        topLevelWindows := []
+    topLevelWindows.Push(session.viewerRootOwner)
+    for hwnd in topLevelWindows {
+        if !hwnd || seen.Has(hwnd)
+            continue
+        seen[hwnd] := true
+        if MxNMMontageRootOwner(hwnd) = session.viewerRootOwner
+            output.Push(hwnd)
+    }
+    return output
+}
+
+MxNMMontageCollectUiaControls(
+    session,
+    controlId,
+    className,
+    ownerFamily
+) {
     candidates := []
     rawCandidateCount := 0
     querySucceeded := false
-    try root := UIA.ElementFromHandle(session.viewerRootOwner)
-    catch
-        return {
-            candidates: candidates,
-            rawCandidateCount: rawCandidateCount,
-            querySucceeded: querySucceeded
-        }
-    try elements := root.FindElements({AutomationId: String(controlId)})
-    catch
-        return {
-            candidates: candidates,
-            rawCandidateCount: rawCandidateCount,
-            querySucceeded: querySucceeded
-        }
-    querySucceeded := true
-    rawCandidateCount := elements.Length
-    viewerRect := MxNMMontageWindowRect(session.viewerRootOwner)
-    if !IsObject(viewerRect)
-        return {
-            candidates: candidates,
-            rawCandidateCount: rawCandidateCount,
-            querySucceeded: querySucceeded
-        }
-    for element in elements {
-        try {
-            if element.ProcessId != session.viewerPid || StrLower(element.ClassName) != StrLower(className) || !element.IsEnabled || element.IsOffscreen
-                continue
-            hwnd := element.NativeWindowHandle
-            if !hwnd || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
-                continue
-            rect := MxNMMontageWindowRect(hwnd)
-            if !IsObject(rect) || !MxNMMontageRectInside(rect, viewerRect)
-                continue
-            candidates.Push({hwnd: hwnd, rect: rect})
+    seen := Map()
+    for topHwnd in ownerFamily {
+        try root := UIA.ElementFromHandle(topHwnd)
+        catch
+            continue
+        try elements := root.FindElements({AutomationId: String(controlId)})
+        catch
+            continue
+        querySucceeded := true
+        rawCandidateCount += elements.Length
+        for element in elements {
+            try {
+                if element.ProcessId != session.viewerPid || StrLower(element.ClassName) != StrLower(className) || !element.IsEnabled || element.IsOffscreen
+                    continue
+                hwnd := element.NativeWindowHandle
+                if !hwnd || seen.Has(hwnd) || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
+                    continue
+                rect := MxNMMontageWindowRect(hwnd)
+                if !MxNMMontageRectVisible(rect)
+                    continue
+                seen[hwnd] := true
+                candidates.Push({hwnd: hwnd, rect: rect})
+            }
         }
     }
     return {
@@ -681,16 +731,25 @@ MxNMMontageCollectUiaControls(session, controlId, className) {
     }
 }
 
-MxNMMontageCollectNativeControl(session, controlId, className, candidates, hwnd, *) {
-    if !hwnd
+MxNMMontageCollectNativeControl(
+    session,
+    controlId,
+    className,
+    seen,
+    candidates,
+    hwnd,
+    *
+) {
+    if !hwnd || seen.Has(hwnd)
         return true
+    seen[hwnd] := true
     try {
         if DllCall("User32\GetDlgCtrlID", "Ptr", hwnd, "Int") != controlId || StrLower(WinGetClass("ahk_id " hwnd)) != StrLower(className) || WinGetPID("ahk_id " hwnd) != session.viewerPid
             return true
         if !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int") || !DllCall("User32\IsWindowEnabled", "Ptr", hwnd, "Int") || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
             return true
-        rect := MxNMMontageWindowRect(hwnd), viewerRect := MxNMMontageWindowRect(session.viewerRootOwner)
-        if IsObject(rect) && IsObject(viewerRect) && MxNMMontageRectInside(rect, viewerRect)
+        rect := MxNMMontageWindowRect(hwnd)
+        if MxNMMontageRectVisible(rect)
             candidates.Push({hwnd: hwnd, rect: rect})
     }
     return true
@@ -755,6 +814,17 @@ MxNMMontageRectInside(inner, outer) {
     return inner.l >= outer.l && inner.t >= outer.t && inner.r <= outer.r && inner.b <= outer.b && inner.r > inner.l && inner.b > inner.t
 }
 
+MxNMMontageRectVisible(rect) {
+    if !IsObject(rect) || rect.r <= rect.l || rect.b <= rect.t
+        return false
+    screenLeft := SysGet(76)
+    screenTop := SysGet(77)
+    screenRight := screenLeft + SysGet(78)
+    screenBottom := screenTop + SysGet(79)
+    return Min(rect.r, screenRight) > Max(rect.l, screenLeft)
+        && Min(rect.b, screenBottom) > Max(rect.t, screenTop)
+}
+
 MxNMMontageResult(ok, code, details := 0) {
     result := {ok: ok = true, code: code}
     if IsObject(details) {
@@ -765,7 +835,8 @@ MxNMMontageResult(ok, code, details := 0) {
             "uiaRawCandidateCount",
             "uiaCandidateCount",
             "uiaQuerySucceeded",
-            "mergedCandidateCount"
+            "mergedCandidateCount",
+            "runtimeCandidateCount"
         ] {
             if details.HasOwnProp(name)
                 result.%name% := details.%name%

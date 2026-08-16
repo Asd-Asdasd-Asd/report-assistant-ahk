@@ -110,6 +110,14 @@
 - [ ] 截图只在 Viewer 前台发送 F12；约 90 ms 白色 pulse 不表示截图完成。
 - [ ] 清除快捷键复用 context-menu cleaner，不移动鼠标，不依赖工具按钮坐标。
 
+## Montage
+
+- [ ] Montage 在 root-owner 仅作为 owner、其矩形不覆盖实际控件的布局中，仍从
+  同 PID、同 root-owner 的完整 owner family 唯一解析 `21112/Static`；不得要求
+  控件矩形位于 root-owner 的小客户区内。
+- [ ] 若 owner family 中确有零个或多个目标控件，Montage 继续 fail closed，日志
+  保留 Win32、UIA raw、UIA filtered、merged 与 owner-family 候选数。
+
 跨机器 target resolver 的现场顺序与判据见
 `docs/internal/viewer-adaptive-runtime-checkpoints.md`。
 

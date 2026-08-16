@@ -131,12 +131,20 @@ class MxNMMontageTests(unittest.TestCase):
         module = source("src/mxnm_montage.ahk")
         resolver = module.split(
             "MxNMMontageResolveControl(session, controlId, className) {", 1
-        )[1].split("MxNMMontageCollectUiaControls(session, controlId, className) {", 1)[0]
+        )[1].split("MxNMMontageOwnerFamilyWindows(session) {", 1)[0]
         self.assertIn('"User32\\EnumChildWindows"', resolver)
         self.assertIn("candidatesByHwnd", resolver)
         self.assertNotIn("uia :=", resolver)
         self.assertIn("MxNMMontageCollectUiaControls", module)
+        self.assertIn("if win32.Length = 0", resolver)
         self.assertIn("AutomationId: String(controlId)", module)
+        self.assertIn("MxNMMontageOwnerFamilyWindows(session)", resolver)
+        self.assertIn('WinGetList("ahk_pid " session.viewerPid)', module)
+        self.assertIn("MxNMMontageRectVisible(rect)", module)
+        self.assertNotIn(
+            "MxNMMontageRectInside(rect, viewerRect)",
+            module,
+        )
 
     def test_layout_is_configurable_and_r4c4_keeps_validated_point(self) -> None:
         module = source("src/mxnm_montage.ahk")
