@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 428606344325dba027a374105296e18fc3debaf9
-; Generated at: 2026-08-14 09:33:45 UTC
+; Source revision: f12199fdf618f45eaca1e7e508fe28db1c7230bd
+; Generated at: 2026-08-16 16:30:19 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-08-14"
-    static SourceRevision := "428606344325dba027a374105296e18fc3debaf9"
+    static BuildDate := "2026-08-17"
+    static SourceRevision := "f12199fdf618f45eaca1e7e508fe28db1c7230bd"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -422,7 +422,7 @@ CopyAutomationDiagnosticInformation(*) {
     return false
 }
 
-BuildAutomationDiagnosticSnapshot(logPath := "") {
+BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     AutomationDiagnosticSession.EnsureStarted()
     if logPath = "" {
         try logPath := DefaultAutomationDiagnosticLogPath()
@@ -433,7 +433,22 @@ BuildAutomationDiagnosticSnapshot(logPath := "") {
         logPath,
         AutomationDiagnosticDefaults.SnapshotLineCount
     )
-    recentAction := FindRecentAutomationDiagnosticAction(recentLines)
+    if viewerFailureLogPath = "" {
+        try viewerFailureLogPath := DefaultMxNMViewerFailureLogPath()
+        catch
+            viewerFailureLogPath := ""
+    }
+    recentViewerFailures := ReadRecentAutomationDiagnosticLines(
+        viewerFailureLogPath,
+        AutomationDiagnosticDefaults.SnapshotLineCount
+    )
+    automationEvent := FindRecentAutomationDiagnosticEvent(recentLines)
+    viewerEvent := FindRecentViewerFailureEvent(recentViewerFailures)
+    recentEvent := NewerAutomationDiagnosticEvent(
+        automationEvent,
+        viewerEvent
+    )
+    recentAction := recentEvent.action
     lines := [
         "AutomationDiagnosticsSnapshot=1",
         "Timestamp=" AutomationDiagnosticSafeValue(FormatTime(, "yyyy-MM-ddTHH:mm:ss")),
@@ -447,6 +462,7 @@ BuildAutomationDiagnosticSnapshot(logPath := "") {
         "VirtualScreen=" SysGet(76) "," SysGet(77) ","
             SysGet(78) "," SysGet(79),
         "DetailedModeActive=" AutomationDiagnosticBoolean(AutomationDiagnosticSession.DetailedModeActive()),
+        "RecentEventSource=" AutomationDiagnosticSafeValue(recentEvent.source),
         "RecentRelevantAction=" AutomationDiagnosticSafeValue(recentAction),
         "RecommendedDiagnostic=" AutomationDiagnosticRecommendation(recentAction),
         "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES",
@@ -455,6 +471,10 @@ BuildAutomationDiagnosticSnapshot(logPath := "") {
     for line in recentLines
         lines.Push(line)
     lines.Push("RecentEventsEnd")
+    lines.Push("RecentViewerFailuresBegin")
+    for line in recentViewerFailures
+        lines.Push(line)
+    lines.Push("RecentViewerFailuresEnd")
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
@@ -479,20 +499,64 @@ ReadRecentAutomationDiagnosticLines(logPath, maxLines) {
 }
 
 FindRecentAutomationDiagnosticAction(lines) {
+    return FindRecentAutomationDiagnosticEvent(lines).action
+}
+
+FindRecentAutomationDiagnosticEvent(lines) {
     Loop lines.Length {
         line := lines[lines.Length - A_Index + 1]
         if !InStr(line, "recordType=operation-summary")
             continue
-        if RegExMatch(line, "(?:^|\|)action=([^|]+)", &match)
-            return match[1]
+        action := AutomationDiagnosticLineField(line, "action", "NONE")
+        timestamp := AutomationDiagnosticLineField(
+            line,
+            "timestamp",
+            ""
+        )
+        return {action: action, timestamp: timestamp, source: "AUTOMATION"}
     }
-    return "NONE"
+    return {action: "NONE", timestamp: "", source: "NONE"}
+}
+
+FindRecentViewerFailureEvent(lines) {
+    Loop lines.Length {
+        line := lines[lines.Length - A_Index + 1]
+        action := AutomationDiagnosticLineField(line, "action", "")
+        if action = ""
+            continue
+        timestamp := AutomationDiagnosticLineField(
+            line,
+            "timestamp",
+            ""
+        )
+        return {action: action, timestamp: timestamp, source: "VIEWER_FAILURE"}
+    }
+    return {action: "NONE", timestamp: "", source: "NONE"}
+}
+
+NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {
+    if viewerEvent.timestamp != ""
+        && (automationEvent.timestamp = ""
+            || viewerEvent.timestamp > automationEvent.timestamp) {
+        return viewerEvent
+    }
+    return automationEvent
+}
+
+AutomationDiagnosticLineField(line, fieldName, fallback := "") {
+    pattern := "(?:^|\|)" fieldName "=([^|]*)"
+    if RegExMatch(line, pattern, &match)
+        return match[1]
+    return fallback
 }
 
 AutomationDiagnosticRecommendation(action) {
     if action = "ReportImageCaption"
         return "REPORT_IMAGE_CAPTION"
-    if InStr(action, "Viewer") || InStr(action, "Measurement")
+    if InStr(action, "Viewer")
+        || InStr(action, "Measurement")
+        || InStr(action, "Context")
+        || InStr(action, "Annotation")
         return "VIEWER_CONTEXT"
     if InStr(action, "Montage")
         return "MXNM_MONTAGE"
@@ -13061,6 +13125,8 @@ DiscoverMxNMContextTargetSession(viewerExe, options, generation) {
             ok: false,
             code: MxNMContextTargetSessionCode.DISCOVERY_FAILED,
             session: 0,
+            pid: identity.pid,
+            rootHwnd: identity.rootHwnd,
             candidateCount: surfaceResult.candidateCount,
             pointProbeCount: surfaceResult.pointProbeCount
         }
@@ -13268,8 +13334,7 @@ DiscoverMxNMContextSurface(identity) {
         tried[String(best.hwnd)] := true
         pointResult := FindMxNMContextSurfaceSafePoint(
             best,
-            identity,
-            rootRect
+            identity
         )
         totalProbeCount += pointResult.probeCount
         if !pointResult.ok
@@ -13350,7 +13415,7 @@ CollectMxNMContextSurfaceCandidate(
     return true
 }
 
-FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
+FindMxNMContextSurfaceSafePoint(candidate, identity) {
     preferred := [
         {x: 0.35, y: 0.35},
         {x: 0.35, y: 0.65},
@@ -13366,8 +13431,7 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
         validated := ValidateMxNMContextSurfacePoint(
             candidate,
             identity,
-            normalized,
-            rootRect
+            normalized
         )
         if validated.ok {
             validated.probeCount := probeCount
@@ -13386,8 +13450,7 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
             validated := ValidateMxNMContextSurfacePoint(
                 candidate,
                 identity,
-                {x: xRatio, y: yRatio},
-                rootRect
+                {x: xRatio, y: yRatio}
             )
             if validated.ok {
                 validated.probeCount := probeCount
@@ -13408,12 +13471,9 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
 ValidateMxNMContextSurfacePoint(
     candidate,
     identity,
-    normalized,
-    rootRect
+    normalized
 ) {
     point := MxNMContextPointFromNormalized(candidate.rect, normalized)
-    if !MxNMContextPointInLeftViewerHalf(point, rootRect)
-        return {ok: false, point: 0, actionHwnd: 0}
     minimumClearance := Max(
         6,
         Min(16, Round(Min(candidate.width, candidate.height) * 0.01))
@@ -13439,6 +13499,8 @@ ValidateMxNMContextSurfacePoint(
         || !MxNMPointInsideRect(point, actionRect) {
         return {ok: false, point: 0, actionHwnd: 0}
     }
+    if !MxNMContextPointInLeftViewerHalf(point, actionRect)
+        return {ok: false, point: 0, actionHwnd: 0}
     return {ok: true, point: point, actionHwnd: actionHwnd}
 }
 
@@ -13528,8 +13590,7 @@ ValidateMxNMContextTargetSession(session, viewerExe, options := 0) {
             pid: session.pid,
             rootHwnd: session.rootHwnd
         },
-        session.safePointNormalized,
-        rootRect
+        session.safePointNormalized
     )
     if !validated.ok
         return failure
@@ -13623,6 +13684,10 @@ MakeMxNMContextTargetFailure(code, details := 0) {
         coldRecoveryDelayMs: 0
     }
     if IsObject(details) {
+        if details.HasOwnProp("pid")
+            result.actionPid := details.pid
+        if details.HasOwnProp("rootHwnd")
+            result.sessionRootHwnd := details.rootHwnd
         if details.HasOwnProp("candidateCount")
             result.sessionCandidateCount := details.candidateCount
         if details.HasOwnProp("pointProbeCount")
@@ -13651,11 +13716,11 @@ MxNMContextRectContainsPoint(rect, point) {
         && point.y < rect.bottom
 }
 
-MxNMContextPointInLeftViewerHalf(point, rootRect) {
-    if !MxNMContextRectContainsPoint(rootRect, point)
+MxNMContextPointInLeftViewerHalf(point, receiverRect) {
+    if !MxNMContextRectContainsPoint(receiverRect, point)
         return false
-    midpointX := rootRect.left
-        + Floor((rootRect.right - rootRect.left) / 2)
+    midpointX := receiverRect.left
+        + Floor((receiverRect.right - receiverRect.left) / 2)
     return point.x < midpointX
 }
 
