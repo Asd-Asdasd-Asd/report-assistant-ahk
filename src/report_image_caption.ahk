@@ -4,6 +4,9 @@ class ReportImageCaptionDefaults {
     static TargetActivationTimeoutSeconds := 1
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
+    ; The first paste into a newly observed renderer can be visible before its
+    ; backing editor state accepts the change. Gate only that cold boundary.
+    static FirstTargetProcessPasteSettleMs := 500
     static ExplicitSaveSettleMs := 200
     ; A newly captured caption gets one conservative save window. The later
     ; cached reuse path keeps the field-validated 200 ms cadence.
@@ -644,6 +647,7 @@ ExecuteReportImageCaptionAction(
     activationStartedAt := 0
     pasteDispatchedAt := 0
     saveDispatchedAt := 0
+    pasteSettle := ReportImageCaptionPasteSettle(operation)
     if IsObject(operation) {
         operation.SetField(
             "caption.saveDispatchResult",
@@ -656,6 +660,14 @@ ExecuteReportImageCaptionAction(
         operation.SetField(
             "caption.advanceDispatchResult",
             "NOT_DISPATCHED"
+        )
+        operation.SetField(
+            "caption.preSaveSettlePath",
+            pasteSettle.path
+        )
+        operation.SetField(
+            "caption.preSaveSettleMs",
+            pasteSettle.milliseconds
         )
     }
     try {
@@ -743,7 +755,9 @@ ExecuteReportImageCaptionAction(
         pasteDispatchedAt := A_TickCount
         if IsObject(operation)
             operation.Stage("PASTE_DISPATCHED")
-        Sleep ReportImageCaptionDefaults.PasteSettleMs
+        Sleep pasteSettle.milliseconds
+        if IsObject(operation)
+            operation.Stage("PASTE_SETTLE_COMPLETED")
 
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(
@@ -853,6 +867,20 @@ ExecuteReportImageCaptionAction(
         )
     } finally {
         MouseMove originalX, originalY, 0
+    }
+}
+
+ReportImageCaptionPasteSettle(operation := 0) {
+    if IsObject(operation) && operation.FirstTargetProcessUse {
+        return {
+            path: "FIRST_TARGET_PROCESS_GATE",
+            milliseconds:
+                ReportImageCaptionDefaults.FirstTargetProcessPasteSettleMs
+        }
+    }
+    return {
+        path: "STANDARD",
+        milliseconds: ReportImageCaptionDefaults.PasteSettleMs
     }
 }
 

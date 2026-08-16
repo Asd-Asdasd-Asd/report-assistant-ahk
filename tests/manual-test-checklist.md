@@ -154,6 +154,12 @@
 - [ ] 新启动后第一次快速标图产生带 `firstSessionUse=true`、
   `firstTargetProcessUse=true` 的 summary 和 stage trace；第二次正常成功默认只产生
   summary。
+- [ ] 上述第一次操作包含
+  `preSaveSettlePath=FIRST_TARGET_PROCESS_GATE`、`preSaveSettleMs=500` 和
+  `PASTE_SETTLE_COMPLETED`；`pasteToSaveMs` 不得小于 500 ms。翻回第一张确认文字已
+  持久化，不能只根据 `resultCode=OK` 判断成功。
+- [ ] 同一 target 进程的第二次操作包含 `preSaveSettlePath=STANDARD`、
+  `preSaveSettleMs=20`，不重复承受首次 500 ms gate。
 - [ ] Caption summary 明确区分 `saveDispatchResult=DISPATCHED` 与
   `persistenceState=UNOBSERVABLE`，不出现 `SAVE_CONFIRMED` 或持久化成功声明。
 - [ ] 托盘“复制诊断信息”同时包含最近 Caption operation 和 Viewer failure，按两者

@@ -166,6 +166,8 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
             "caption.capturePath", true,
             "caption.freshDiscoveryMs", true,
             "caption.activationMs", true,
+            "caption.preSaveSettlePath", true,
+            "caption.preSaveSettleMs", true,
             "caption.pasteToSaveMs", true,
             "caption.saveToAdvanceMs", true,
             "caption.saveDispatchResult", true,

@@ -169,6 +169,22 @@ Electron main/preload，再只读枚举 renderer target，最后才允许对唯�
 save point 无效、窗口切换或保存点击未派发时返回明确失败，不继续翻页。该路径不再
 依赖 `flipImage()` 是否经过 500 ms 门槛。
 
+### 2026-08-17 首次 renderer 现场证据
+
+一次紧随失败后的隐私安全诊断记录到：首次 session、首次 target process、fresh
+capture 均为 true；目标发现和激活成功，`Ctrl+V`、保存点击和滚轮均已派发，程序仍
+返回 `OK`，但用户翻回后确认 caption 未持久化。该次 `pasteToSaveMs` 只有 63 ms，
+而 `saveToAdvanceMs` 已有 578 ms。
+
+这证明现有“保存后等待 550 ms”没有覆盖首次 renderer 的另一条竞态：保存按钮可能
+在粘贴已显示、但 backing editor state 尚未接受变化时被点击。诊断仍只能证明输入
+和点击已派发，不能把 `persistenceState=UNOBSERVABLE` 当作保存成功。
+
+production 因此只对每次脚本会话首次观察到的 target process，在粘贴后、保存前增加
+500 ms gate；同一进程的后续执行继续使用 20 ms。新捕获后的保存后 550 ms 备用窗口
+和 cached reuse 的 200 ms 节奏保持不变。该解释和修复仍需 Windows/MedEx 现场回看
+第一张图片确认，不能由 macOS 静态测试替代。
+
 ### Experiment 1：只读定位
 
 在独立 experiment branch 中确认如何从页面稳定取得：
