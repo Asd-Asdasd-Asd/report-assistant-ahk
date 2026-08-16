@@ -374,23 +374,27 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertIn("{x: 0.25, y: 0.25}", session)
         self.assertIn("denseXRatios := [0.35, 0.45, 0.20]", session)
         self.assertIn("denseYRatios := [0.20, 0.35, 0.50, 0.65, 0.80]", session)
-        self.assertIn("MxNMContextPointInLeftViewerHalf(point, rootRect)", session)
+        self.assertIn("MxNMContextPointInLeftViewerHalf(point, actionRect)", session)
         self.assertIn("return point.x < midpointX", session)
         self.assertNotIn("GetMxNMContextCursorScreenPoint", session)
         self.assertNotIn("score += 500", session)
         surface_validation = session.split(
             "\nValidateMxNMContextSurfacePoint(\n", 1
         )[1].split("\n}\n\nValidateMxNMContextTargetSession", 1)[0]
-        self.assertLess(
+        self.assertGreater(
             surface_validation.index("MxNMContextPointInLeftViewerHalf"),
-            surface_validation.index("ResolveMxNMWindowFromScreenPoint"),
+            surface_validation.index("MxNMTargetClientRectScreen(actionHwnd)"),
+        )
+        self.assertNotIn(
+            "MxNMContextPointInLeftViewerHalf(point, rootRect)",
+            surface_validation,
         )
         self.assertIn(
             "actionHwnd = identity.rootHwnd",
             surface_validation,
         )
         preferred = session.split(
-            "FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {",
+            "FindMxNMContextSurfaceSafePoint(candidate, identity) {",
             1,
         )[1].split("tried := Map()", 1)[0]
         self.assertLess(

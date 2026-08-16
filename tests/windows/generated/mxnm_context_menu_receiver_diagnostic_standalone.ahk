@@ -3111,6 +3111,8 @@ DiscoverMxNMContextTargetSession(viewerExe, options, generation) {
             ok: false,
             code: MxNMContextTargetSessionCode.DISCOVERY_FAILED,
             session: 0,
+            pid: identity.pid,
+            rootHwnd: identity.rootHwnd,
             candidateCount: surfaceResult.candidateCount,
             pointProbeCount: surfaceResult.pointProbeCount
         }
@@ -3318,8 +3320,7 @@ DiscoverMxNMContextSurface(identity) {
         tried[String(best.hwnd)] := true
         pointResult := FindMxNMContextSurfaceSafePoint(
             best,
-            identity,
-            rootRect
+            identity
         )
         totalProbeCount += pointResult.probeCount
         if !pointResult.ok
@@ -3400,7 +3401,7 @@ CollectMxNMContextSurfaceCandidate(
     return true
 }
 
-FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
+FindMxNMContextSurfaceSafePoint(candidate, identity) {
     preferred := [
         {x: 0.35, y: 0.35},
         {x: 0.35, y: 0.65},
@@ -3416,8 +3417,7 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
         validated := ValidateMxNMContextSurfacePoint(
             candidate,
             identity,
-            normalized,
-            rootRect
+            normalized
         )
         if validated.ok {
             validated.probeCount := probeCount
@@ -3436,8 +3436,7 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
             validated := ValidateMxNMContextSurfacePoint(
                 candidate,
                 identity,
-                {x: xRatio, y: yRatio},
-                rootRect
+                {x: xRatio, y: yRatio}
             )
             if validated.ok {
                 validated.probeCount := probeCount
@@ -3458,12 +3457,9 @@ FindMxNMContextSurfaceSafePoint(candidate, identity, rootRect) {
 ValidateMxNMContextSurfacePoint(
     candidate,
     identity,
-    normalized,
-    rootRect
+    normalized
 ) {
     point := MxNMContextPointFromNormalized(candidate.rect, normalized)
-    if !MxNMContextPointInLeftViewerHalf(point, rootRect)
-        return {ok: false, point: 0, actionHwnd: 0}
     minimumClearance := Max(
         6,
         Min(16, Round(Min(candidate.width, candidate.height) * 0.01))
@@ -3489,6 +3485,8 @@ ValidateMxNMContextSurfacePoint(
         || !MxNMPointInsideRect(point, actionRect) {
         return {ok: false, point: 0, actionHwnd: 0}
     }
+    if !MxNMContextPointInLeftViewerHalf(point, actionRect)
+        return {ok: false, point: 0, actionHwnd: 0}
     return {ok: true, point: point, actionHwnd: actionHwnd}
 }
 
@@ -3578,8 +3576,7 @@ ValidateMxNMContextTargetSession(session, viewerExe, options := 0) {
             pid: session.pid,
             rootHwnd: session.rootHwnd
         },
-        session.safePointNormalized,
-        rootRect
+        session.safePointNormalized
     )
     if !validated.ok
         return failure
@@ -3673,6 +3670,10 @@ MakeMxNMContextTargetFailure(code, details := 0) {
         coldRecoveryDelayMs: 0
     }
     if IsObject(details) {
+        if details.HasOwnProp("pid")
+            result.actionPid := details.pid
+        if details.HasOwnProp("rootHwnd")
+            result.sessionRootHwnd := details.rootHwnd
         if details.HasOwnProp("candidateCount")
             result.sessionCandidateCount := details.candidateCount
         if details.HasOwnProp("pointProbeCount")
@@ -3701,11 +3702,11 @@ MxNMContextRectContainsPoint(rect, point) {
         && point.y < rect.bottom
 }
 
-MxNMContextPointInLeftViewerHalf(point, rootRect) {
-    if !MxNMContextRectContainsPoint(rootRect, point)
+MxNMContextPointInLeftViewerHalf(point, receiverRect) {
+    if !MxNMContextRectContainsPoint(receiverRect, point)
         return false
-    midpointX := rootRect.left
-        + Floor((rootRect.right - rootRect.left) / 2)
+    midpointX := receiverRect.left
+        + Floor((receiverRect.right - receiverRect.left) / 2)
     return point.x < midpointX
 }
 

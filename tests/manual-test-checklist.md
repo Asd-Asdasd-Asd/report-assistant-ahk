@@ -77,6 +77,8 @@
   映射到 resolved image receiver，自动点不得落在 `Static` 标题区或工具按钮。
 - [ ] 自动点命中的同 PID、同 root-owner image child 作为右键 receiver；
   外层布局窗口只提供映射边界，不替代实际 point HWND 接收右键。
+- [ ] 双 PET 对比布局中，root-owner 的矩形即使不覆盖可见 Viewer，自动点仍以
+  实际右键 receiver 的矩形判断左半区；只操作左列，右列不接收命令。
 - [ ] `;fzg` 的 positive、`NOT_ANNOTATED` 和 automation failure 路径分别
   写入数值、留下人工输入锚点或显示无焦点失败提示。
 - [ ] `;cma`/custom `{{size}}` 对 1–3 个正数按数值降序输出，使用 `×` 和逐项
@@ -143,9 +145,9 @@
   summary。
 - [ ] Caption summary 明确区分 `saveDispatchResult=DISPATCHED` 与
   `persistenceState=UNOBSERVABLE`，不出现 `SAVE_CONFIRMED` 或持久化成功声明。
-- [ ] 托盘“复制诊断信息”包含同一个 `sessionId` 下最近 Caption operation 和
-  `RecommendedDiagnostic=REPORT_IMAGE_CAPTION`，不包含所选文字、报告内容、患者信息
-  或窗口标题。
+- [ ] 托盘“复制诊断信息”同时包含最近 Caption operation 和 Viewer failure，按两者
+  时间选择 `RecentEventSource` 与 `RecommendedDiagnostic`；不包含所选文字、报告内容、
+  患者信息或窗口标题。
 - [ ] 托盘“开启 10 分钟详细诊断”立即使后续成功操作输出 stage trace；重启后自动
   关闭，不修改 config.ini。
 - [ ] 使用非临床测试文字运行

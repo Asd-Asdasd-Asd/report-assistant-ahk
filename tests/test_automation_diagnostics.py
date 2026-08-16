@@ -81,11 +81,18 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             "CopyAutomationDiagnosticInformation",
             "BuildAutomationDiagnosticSnapshot",
             "RecentRelevantAction=",
+            "RecentEventSource=",
             "RecommendedDiagnostic=",
             "REPORT_IMAGE_CAPTION",
+            "RecentViewerFailuresBegin",
+            "RecentViewerFailuresEnd",
             "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES",
         ):
             self.assertIn(required, self.diagnostics)
+        self.assertIn("DefaultMxNMViewerFailureLogPath()", self.diagnostics)
+        self.assertIn("NewerAutomationDiagnosticEvent", self.diagnostics)
+        self.assertIn('source: "VIEWER_FAILURE"', self.diagnostics)
+        self.assertIn('InStr(action, "Annotation")', self.diagnostics)
 
     def test_common_and_caption_fields_are_allowlisted(self) -> None:
         self.assertIn("AutomationDiagnosticFieldAllowed", self.diagnostics)

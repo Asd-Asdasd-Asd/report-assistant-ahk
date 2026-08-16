@@ -317,7 +317,7 @@ CopyAutomationDiagnosticInformation(*) {
     return false
 }
 
-BuildAutomationDiagnosticSnapshot(logPath := "") {
+BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     AutomationDiagnosticSession.EnsureStarted()
     if logPath = "" {
         try logPath := DefaultAutomationDiagnosticLogPath()
@@ -328,7 +328,22 @@ BuildAutomationDiagnosticSnapshot(logPath := "") {
         logPath,
         AutomationDiagnosticDefaults.SnapshotLineCount
     )
-    recentAction := FindRecentAutomationDiagnosticAction(recentLines)
+    if viewerFailureLogPath = "" {
+        try viewerFailureLogPath := DefaultMxNMViewerFailureLogPath()
+        catch
+            viewerFailureLogPath := ""
+    }
+    recentViewerFailures := ReadRecentAutomationDiagnosticLines(
+        viewerFailureLogPath,
+        AutomationDiagnosticDefaults.SnapshotLineCount
+    )
+    automationEvent := FindRecentAutomationDiagnosticEvent(recentLines)
+    viewerEvent := FindRecentViewerFailureEvent(recentViewerFailures)
+    recentEvent := NewerAutomationDiagnosticEvent(
+        automationEvent,
+        viewerEvent
+    )
+    recentAction := recentEvent.action
     lines := [
         "AutomationDiagnosticsSnapshot=1",
         "Timestamp=" AutomationDiagnosticSafeValue(FormatTime(, "yyyy-MM-ddTHH:mm:ss")),
@@ -342,6 +357,7 @@ BuildAutomationDiagnosticSnapshot(logPath := "") {
         "VirtualScreen=" SysGet(76) "," SysGet(77) ","
             SysGet(78) "," SysGet(79),
         "DetailedModeActive=" AutomationDiagnosticBoolean(AutomationDiagnosticSession.DetailedModeActive()),
+        "RecentEventSource=" AutomationDiagnosticSafeValue(recentEvent.source),
         "RecentRelevantAction=" AutomationDiagnosticSafeValue(recentAction),
         "RecommendedDiagnostic=" AutomationDiagnosticRecommendation(recentAction),
         "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES",
@@ -350,6 +366,10 @@ BuildAutomationDiagnosticSnapshot(logPath := "") {
     for line in recentLines
         lines.Push(line)
     lines.Push("RecentEventsEnd")
+    lines.Push("RecentViewerFailuresBegin")
+    for line in recentViewerFailures
+        lines.Push(line)
+    lines.Push("RecentViewerFailuresEnd")
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
@@ -374,20 +394,64 @@ ReadRecentAutomationDiagnosticLines(logPath, maxLines) {
 }
 
 FindRecentAutomationDiagnosticAction(lines) {
+    return FindRecentAutomationDiagnosticEvent(lines).action
+}
+
+FindRecentAutomationDiagnosticEvent(lines) {
     Loop lines.Length {
         line := lines[lines.Length - A_Index + 1]
         if !InStr(line, "recordType=operation-summary")
             continue
-        if RegExMatch(line, "(?:^|\|)action=([^|]+)", &match)
-            return match[1]
+        action := AutomationDiagnosticLineField(line, "action", "NONE")
+        timestamp := AutomationDiagnosticLineField(
+            line,
+            "timestamp",
+            ""
+        )
+        return {action: action, timestamp: timestamp, source: "AUTOMATION"}
     }
-    return "NONE"
+    return {action: "NONE", timestamp: "", source: "NONE"}
+}
+
+FindRecentViewerFailureEvent(lines) {
+    Loop lines.Length {
+        line := lines[lines.Length - A_Index + 1]
+        action := AutomationDiagnosticLineField(line, "action", "")
+        if action = ""
+            continue
+        timestamp := AutomationDiagnosticLineField(
+            line,
+            "timestamp",
+            ""
+        )
+        return {action: action, timestamp: timestamp, source: "VIEWER_FAILURE"}
+    }
+    return {action: "NONE", timestamp: "", source: "NONE"}
+}
+
+NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {
+    if viewerEvent.timestamp != ""
+        && (automationEvent.timestamp = ""
+            || viewerEvent.timestamp > automationEvent.timestamp) {
+        return viewerEvent
+    }
+    return automationEvent
+}
+
+AutomationDiagnosticLineField(line, fieldName, fallback := "") {
+    pattern := "(?:^|\|)" fieldName "=([^|]*)"
+    if RegExMatch(line, pattern, &match)
+        return match[1]
+    return fallback
 }
 
 AutomationDiagnosticRecommendation(action) {
     if action = "ReportImageCaption"
         return "REPORT_IMAGE_CAPTION"
-    if InStr(action, "Viewer") || InStr(action, "Measurement")
+    if InStr(action, "Viewer")
+        || InStr(action, "Measurement")
+        || InStr(action, "Context")
+        || InStr(action, "Annotation")
         return "VIEWER_CONTEXT"
     if InStr(action, "Montage")
         return "MXNM_MONTAGE"
