@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: f12199fdf618f45eaca1e7e508fe28db1c7230bd
-; Generated at: 2026-08-16 16:30:19 UTC
+; Source revision: a41534b939a2f93829a542637e427977c7379082
+; Generated at: 2026-08-16 16:38:26 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-17"
-    static SourceRevision := "f12199fdf618f45eaca1e7e508fe28db1c7230bd"
+    static SourceRevision := "a41534b939a2f93829a542637e427977c7379082"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -537,7 +537,10 @@ FindRecentViewerFailureEvent(lines) {
 NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {
     if viewerEvent.timestamp != ""
         && (automationEvent.timestamp = ""
-            || viewerEvent.timestamp > automationEvent.timestamp) {
+            || StrCompare(
+                viewerEvent.timestamp,
+                automationEvent.timestamp
+            ) > 0) {
         return viewerEvent
     }
     return automationEvent
@@ -13096,6 +13099,7 @@ class MxNMContextTargetSessionProvider {
             ? this.ColdRecoveryDelayMs
             : 0
         if IsObject(failedSession) {
+            failure.actionPid := failedSession.pid
             failure.sessionGeneration := failedSession.generation
             failure.sessionRootHwnd := failedSession.rootHwnd
             failure.sessionSurfaceHwnd := failedSession.surfaceHwnd
@@ -13339,10 +13343,15 @@ DiscoverMxNMContextSurface(identity) {
         totalProbeCount += pointResult.probeCount
         if !pointResult.ok
             continue
+        receiverRect := MxNMTargetClientRectScreen(
+            pointResult.actionHwnd
+        )
+        if !IsObject(receiverRect)
+            continue
         return {
             ok: true,
-            surfaceHwnd: best.hwnd,
-            surfaceRect: best.rect,
+            surfaceHwnd: pointResult.actionHwnd,
+            surfaceRect: receiverRect,
             point: pointResult.point,
             actionHwnd: pointResult.actionHwnd,
             candidateCount: candidates.Length,
