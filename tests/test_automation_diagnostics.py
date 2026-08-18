@@ -86,6 +86,8 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             "REPORT_IMAGE_CAPTION",
             "RecentViewerFailuresBegin",
             "RecentViewerFailuresEnd",
+            "CurrentContextTargetCacheBegin",
+            "CurrentContextTargetCacheEnd",
             "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES",
         ):
             self.assertIn(required, self.diagnostics)
@@ -98,6 +100,30 @@ class AutomationDiagnosticsTests(unittest.TestCase):
         )
         self.assertIn('source: "VIEWER_FAILURE"', self.diagnostics)
         self.assertIn('InStr(action, "Annotation")', self.diagnostics)
+
+    def test_snapshot_exposes_read_only_context_target_cache_geometry(self) -> None:
+        for required in (
+            "MxNMContextTargetSessionProvider.CachedSession",
+            '"CacheStoredSurfaceRect="',
+            '"CacheLiveSurfaceRect="',
+            '"CacheStoredScreenPoint="',
+            '"CacheRectUnchanged="',
+            '"CachePointInsideLiveSurface="',
+            '"CachePointInLiveLeftHalf="',
+            "AutomationDiagnosticPointInLeftHalf",
+        ):
+            self.assertIn(required, self.diagnostics)
+        cache_snapshot = self.diagnostics.split(
+            "BuildCurrentMxNMContextTargetCacheSnapshot() {", 1
+        )[1].split("\n}\n\nFormatAutomationDiagnosticPoint", 1)[0]
+        for forbidden in (
+            ".Resolve(",
+            ".Invalidate(",
+            "WinActivate",
+            "MouseMove",
+            "A_Clipboard",
+        ):
+            self.assertNotIn(forbidden, cache_snapshot)
 
     def test_common_and_caption_fields_are_allowlisted(self) -> None:
         self.assertIn("AutomationDiagnosticFieldAllowed", self.diagnostics)

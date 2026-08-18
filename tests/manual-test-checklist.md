@@ -86,6 +86,9 @@
   写入数值、留下人工输入锚点或显示无焦点失败提示。
 - [ ] `;cma`/custom `{{size}}` 对 1–3 个正数按数值降序输出，使用 `×` 和逐项
   `cm`；无标注或失败时留下人工输入锚点。
+- [ ] 若 `;cma` 偶发命中错误图像，切换窗口前立即复制诊断信息；
+  `CurrentContextTargetCache` 必须保留缓存 receiver 的 stored/live rect、point、
+  generation 和左半区判定，复制动作不得重新发现或改写 target cache。
 - [ ] 报告写入成功后才尝试清除标注；清除失败不回滚报告内容。
 - [ ] `tests/windows/mxnm_annotation_cleanup_field.ahk` 验证一次调用最多打开
   一次菜单，并保持 foreground、mouse 和 clipboard。
