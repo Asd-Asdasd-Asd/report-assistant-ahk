@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 12583f700ea8cdbcf28899ca93c023c8e2ec2368
-; Generated at: 2026-08-16 17:18:56 UTC
+; Source revision: b2dccaef980ab16feaea1a067a1efd567b327cdc
+; Generated at: 2026-08-18 07:32:24 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-08-17"
-    static SourceRevision := "12583f700ea8cdbcf28899ca93c023c8e2ec2368"
+    static BuildDate := "2026-08-18"
+    static SourceRevision := "b2dccaef980ab16feaea1a067a1efd567b327cdc"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -274,6 +274,9 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
             "caption.preSaveSettlePath", true,
             "caption.preSaveSettleMs", true,
             "caption.pasteToSaveMs", true,
+            "caption.advanceGatePath", true,
+            "caption.advanceGateMs", true,
+            "caption.interAdvanceMs", true,
             "caption.saveToAdvanceMs", true,
             "caption.saveDispatchResult", true,
             "caption.persistenceState", true,
@@ -23121,6 +23124,9 @@ class ReportImageCaptionDefaults {
     ; backing editor state accepts the change. Gate only that cold boundary.
     static FirstTargetProcessPasteSettleMs := 500
     static ExplicitSaveSettleMs := 200
+    ; WheelDown has a vendor-side conditional save path that is skipped when
+    ; advances are too close together. Only wait for the missing remainder.
+    static InterAdvanceSaveGateMs := 550
     ; A newly captured caption gets one conservative save window. The later
     ; cached reuse path keeps the field-validated 200 ms cadence.
     static CaptureSaveFallbackSettleMs := 550
@@ -23149,6 +23155,45 @@ class ReportImageCaptionCode {
 }
 
 global REPORT_IMAGE_CAPTION_CACHE := 0
+
+class ReportImageCaptionAdvanceGate {
+    static LastAdvanceTicks := Map()
+
+    static Plan(target) {
+        key := this.TargetKey(target)
+        if !this.LastAdvanceTicks.Has(key) {
+            return {
+                path: "NO_PRIOR_ADVANCE",
+                milliseconds: 0,
+                priorAdvanceTick: 0
+            }
+        }
+        priorAdvanceTick := this.LastAdvanceTicks[key]
+        elapsedMs := A_TickCount - priorAdvanceTick
+        if elapsedMs < 0
+            || elapsedMs >= ReportImageCaptionDefaults.InterAdvanceSaveGateMs {
+            return {
+                path: "NATURAL_GAP",
+                milliseconds: 0,
+                priorAdvanceTick: priorAdvanceTick
+            }
+        }
+        return {
+            path: "VENDOR_INTER_ADVANCE_GATE",
+            milliseconds:
+                ReportImageCaptionDefaults.InterAdvanceSaveGateMs - elapsedMs,
+            priorAdvanceTick: priorAdvanceTick
+        }
+    }
+
+    static Observe(target) {
+        this.LastAdvanceTicks[this.TargetKey(target)] := A_TickCount
+    }
+
+    static TargetKey(target) {
+        return String(target.pid) ":" String(target.hwnd)
+    }
+}
 
 ReportImageCaptionHotkeyDefinitions(settings) {
     if !settings.ReportImageCaptionEnabled
@@ -23929,6 +23974,22 @@ ExecuteReportImageCaptionAction(
         if IsObject(operation)
             operation.Stage("SAVE_SETTLE_COMPLETED")
 
+        advanceGate := ReportImageCaptionAdvanceGate.Plan(target)
+        if IsObject(operation) {
+            operation.SetField(
+                "caption.advanceGatePath",
+                advanceGate.path
+            )
+            operation.SetField(
+                "caption.advanceGateMs",
+                advanceGate.milliseconds
+            )
+        }
+        if advanceGate.milliseconds > 0
+            Sleep advanceGate.milliseconds
+        if IsObject(operation)
+            operation.Stage("ADVANCE_GATE_COMPLETED")
+
         if WinExist("A") != target.hwnd
             || !ReportImageCaptionPointBelongsToTarget(
                 target.hwnd,
@@ -23947,6 +24008,7 @@ ExecuteReportImageCaptionAction(
                 0
             )
             SendInput "{WheelDown}"
+            ReportImageCaptionAdvanceGate.Observe(target)
             if IsObject(operation) {
                 operation.SetField(
                     "caption.advanceDispatchResult",
@@ -23955,6 +24017,12 @@ ExecuteReportImageCaptionAction(
                 operation.SetField(
                     "caption.saveToAdvanceMs",
                     A_TickCount - saveDispatchedAt
+                )
+                operation.SetField(
+                    "caption.interAdvanceMs",
+                    advanceGate.priorAdvanceTick > 0
+                        ? A_TickCount - advanceGate.priorAdvanceTick
+                        : 0
                 )
                 operation.Stage("ADVANCE_DISPATCHED")
             }
