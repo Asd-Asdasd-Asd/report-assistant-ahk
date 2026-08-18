@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: be4fe18d0f6ef5ce07375ee2d76a48fccfccc03c
-; Generated at: 2026-08-18 12:05:46 UTC
+; Source revision: 87983062a9bcfe117d0ce9983520e52540a48348
+; Generated at: 2026-08-18 12:15:27 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-18"
-    static SourceRevision := "be4fe18d0f6ef5ce07375ee2d76a48fccfccc03c"
+    static SourceRevision := "87983062a9bcfe117d0ce9983520e52540a48348"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -685,17 +685,25 @@ BuildCurrentMxNMContextTargetCacheSnapshot() {
 FormatAutomationDiagnosticPoint(point) {
     if !IsObject(point)
         return ""
-    return AutomationDiagnosticSafeValue(point.x) ","
-        AutomationDiagnosticSafeValue(point.y)
+    return (
+        AutomationDiagnosticSafeValue(point.x)
+        . ","
+        . AutomationDiagnosticSafeValue(point.y)
+    )
 }
 
 FormatAutomationDiagnosticRect(rect) {
     if !IsObject(rect)
         return ""
-    return AutomationDiagnosticSafeValue(rect.left) ","
-        AutomationDiagnosticSafeValue(rect.top) ","
-        AutomationDiagnosticSafeValue(rect.right) ","
-        AutomationDiagnosticSafeValue(rect.bottom)
+    return (
+        AutomationDiagnosticSafeValue(rect.left)
+        . ","
+        . AutomationDiagnosticSafeValue(rect.top)
+        . ","
+        . AutomationDiagnosticSafeValue(rect.right)
+        . ","
+        . AutomationDiagnosticSafeValue(rect.bottom)
+    )
 }
 
 AutomationDiagnosticRectsEqual(first, second) {
