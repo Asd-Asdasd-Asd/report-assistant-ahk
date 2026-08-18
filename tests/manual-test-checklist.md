@@ -110,7 +110,9 @@
 - [ ] 带修饰键的工具和清除在报告或 Viewer 前台生效；其他程序不触发、不吞键。
 - [ ] 单个无修饰字母/数字只在 Viewer 前台生效，在报告和其他程序中不拦截。
 - [ ] Win modifier 保存、Reload 和重开设置后保持不变。
-- [ ] 截图只在 Viewer 前台发送 F12；约 90 ms 白色 pulse 不表示截图完成。
+- [ ] 截图只在 Viewer 前台发送 F12；约 90 ms 白色 pulse 不表示截图完成。即使焦点
+  位于小型图像/控件窗口，pulse 也应覆盖同 PID、同 root-owner 窗口族中可见面积
+  最大的 Viewer 窗口，而不是只闪烁焦点控件。
 - [ ] 清除快捷键复用 context-menu cleaner，不移动鼠标，不依赖工具按钮坐标。
 
 ## Montage

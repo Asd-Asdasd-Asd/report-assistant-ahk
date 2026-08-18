@@ -209,7 +209,38 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         )
         self.assertIn('if WinExist("A") != viewerHwnd', hotkeys)
         self.assertIn('Send "{F12}"', hotkeys)
-        self.assertIn("ShowReportAssistantDispatchPulse(viewerHwnd)", hotkeys)
+        self.assertIn(
+            "pulseHwnd := ResolveMxNMViewerCapturePulseHwnd(viewerHwnd)",
+            hotkeys,
+        )
+        self.assertIn(
+            "pulseHwnd ? pulseHwnd : viewerHwnd",
+            hotkeys,
+        )
+        capture_handler = hotkeys.split(
+            "InvokeMxNMViewerCaptureHotkey(chord, *) {", 1
+        )[1].split("\n}\n\nResolveMxNMViewerCapturePulseHwnd", 1)[0]
+        self.assertLess(
+            capture_handler.index("ResolveMxNMViewerCapturePulseHwnd"),
+            capture_handler.index('Send "{F12}"'),
+        )
+        pulse_resolver = hotkeys.split(
+            "ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {", 1
+        )[1].split("\n}\n\nMxNMViewerCapturePulseVisibleArea", 1)[0]
+        for required in (
+            'WinGetList("ahk_pid " viewerPid)',
+            '"User32\\IsWindowVisible"',
+            "ResolveMxNMRootOwnerHwnd(candidateHwnd)",
+            "candidateOwner != ownerHwnd",
+            "visibleArea > bestVisibleArea",
+        ):
+            self.assertIn(required, pulse_resolver)
+        self.assertNotIn("WinGetTitle", pulse_resolver)
+        visible_area = hotkeys.split(
+            "MxNMViewerCapturePulseVisibleArea(hwnd) {", 1
+        )[1].split("\n}\nInvokeMxNMViewerSuv3DHotkey", 1)[0]
+        for virtual_metric in ("SysGet(76)", "SysGet(77)", "SysGet(78)", "SysGet(79)"):
+            self.assertIn(virtual_metric, visible_area)
         self.assertIn("MedExViewerForegroundActive", features)
         self.assertIn("ReportAssistantDispatchPulse", feedback)
         pulse = feedback.split(
