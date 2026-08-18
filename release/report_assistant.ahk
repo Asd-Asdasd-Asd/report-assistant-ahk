@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: b2dccaef980ab16feaea1a067a1efd567b327cdc
-; Generated at: 2026-08-18 07:32:24 UTC
+; Source revision: e679907cba3e33b45f5e5a4fb253588f31b6b170
+; Generated at: 2026-08-18 10:58:55 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-18"
-    static SourceRevision := "b2dccaef980ab16feaea1a067a1efd567b327cdc"
+    static SourceRevision := "e679907cba3e33b45f5e5a4fb253588f31b6b170"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -470,9 +470,11 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
         "RecentEventSource=" AutomationDiagnosticSafeValue(recentEvent.source),
         "RecentRelevantAction=" AutomationDiagnosticSafeValue(recentAction),
         "RecommendedDiagnostic=" AutomationDiagnosticRecommendation(recentAction),
-        "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES",
-        "RecentEventsBegin"
+        "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES"
     ]
+    for line in BuildCurrentMxNMContextTargetCacheSnapshot()
+        lines.Push(line)
+    lines.Push("RecentEventsBegin")
     for line in recentLines
         lines.Push(line)
     lines.Push("RecentEventsEnd")
@@ -484,6 +486,130 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
     return output
+}
+
+BuildCurrentMxNMContextTargetCacheSnapshot() {
+    lines := ["CurrentContextTargetCacheBegin"]
+    try session := MxNMContextTargetSessionProvider.CachedSession
+    catch
+        session := 0
+    if !IsObject(session) {
+        lines.Push("CachePresent=false")
+        lines.Push("CurrentContextTargetCacheEnd")
+        return lines
+    }
+
+    surfaceHwnd := session.HasOwnProp("surfaceHwnd")
+        ? session.surfaceHwnd
+        : 0
+    storedRect := session.HasOwnProp("surfaceClientRect")
+        ? session.surfaceClientRect
+        : 0
+    storedPoint := session.HasOwnProp("safePointScreen")
+        ? session.safePointScreen
+        : 0
+    surfaceExists := false
+    surfaceVisible := false
+    liveRect := 0
+    if surfaceHwnd {
+        try surfaceExists := DllCall(
+            "User32\IsWindow",
+            "Ptr", surfaceHwnd,
+            "Int"
+        ) != 0
+        catch
+            surfaceExists := false
+        if surfaceExists {
+            try surfaceVisible := DllCall(
+                "User32\IsWindowVisible",
+                "Ptr", surfaceHwnd,
+                "Int"
+            ) != 0
+            catch
+                surfaceVisible := false
+            try liveRect := MxNMTargetClientRectScreen(surfaceHwnd)
+            catch
+                liveRect := 0
+        }
+    }
+    lines.Push("CachePresent=true")
+    lines.Push("CacheGeneration=" AutomationDiagnosticSafeValue(
+        session.HasOwnProp("generation") ? session.generation : 0
+    ))
+    lines.Push("CachePid=" AutomationDiagnosticSafeValue(
+        session.HasOwnProp("pid") ? session.pid : 0
+    ))
+    lines.Push("CacheRootHwnd=" AutomationDiagnosticSafeValue(
+        session.HasOwnProp("rootHwnd") ? session.rootHwnd : 0
+    ))
+    lines.Push("CacheSurfaceHwnd=" AutomationDiagnosticSafeValue(surfaceHwnd))
+    lines.Push("CacheDiscoveryMethod=" AutomationDiagnosticSafeValue(
+        session.HasOwnProp("discoveryMethod")
+            ? session.discoveryMethod
+            : ""
+    ))
+    lines.Push("CacheStoredSurfaceRect="
+        FormatAutomationDiagnosticRect(storedRect))
+    lines.Push("CacheLiveSurfaceRect="
+        FormatAutomationDiagnosticRect(liveRect))
+    lines.Push("CacheStoredScreenPoint="
+        FormatAutomationDiagnosticPoint(storedPoint))
+    lines.Push("CacheSurfaceExists="
+        AutomationDiagnosticBoolean(surfaceExists))
+    lines.Push("CacheSurfaceVisible="
+        AutomationDiagnosticBoolean(surfaceVisible))
+    lines.Push("CacheRectUnchanged=" AutomationDiagnosticBoolean(
+        AutomationDiagnosticRectsEqual(storedRect, liveRect)
+    ))
+    lines.Push("CachePointInsideLiveSurface=" AutomationDiagnosticBoolean(
+        AutomationDiagnosticPointInsideRect(storedPoint, liveRect)
+    ))
+    lines.Push("CachePointInLiveLeftHalf=" AutomationDiagnosticBoolean(
+        AutomationDiagnosticPointInLeftHalf(storedPoint, liveRect)
+    ))
+    lines.Push("CurrentContextTargetCacheEnd")
+    return lines
+}
+
+FormatAutomationDiagnosticPoint(point) {
+    if !IsObject(point)
+        return ""
+    return AutomationDiagnosticSafeValue(point.x) ","
+        AutomationDiagnosticSafeValue(point.y)
+}
+
+FormatAutomationDiagnosticRect(rect) {
+    if !IsObject(rect)
+        return ""
+    return AutomationDiagnosticSafeValue(rect.left) ","
+        AutomationDiagnosticSafeValue(rect.top) ","
+        AutomationDiagnosticSafeValue(rect.right) ","
+        AutomationDiagnosticSafeValue(rect.bottom)
+}
+
+AutomationDiagnosticRectsEqual(first, second) {
+    return IsObject(first)
+        && IsObject(second)
+        && first.left = second.left
+        && first.top = second.top
+        && first.right = second.right
+        && first.bottom = second.bottom
+}
+
+AutomationDiagnosticPointInsideRect(point, rect) {
+    return IsObject(point)
+        && IsObject(rect)
+        && point.x >= rect.left
+        && point.x < rect.right
+        && point.y >= rect.top
+        && point.y < rect.bottom
+}
+
+AutomationDiagnosticPointInLeftHalf(point, rect) {
+    if !AutomationDiagnosticPointInsideRect(point, rect)
+        return false
+    midpointX := rect.left + Floor((rect.right - rect.left) / 2)
+    return point.x < midpointX
 }
 
 ReadRecentAutomationDiagnosticLines(logPath, maxLines) {
