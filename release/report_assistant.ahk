@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 940bb67b2c0105eaf68e5aa03945c4cb1d6cdade
-; Generated at: 2026-08-18 11:11:52 UTC
+; Source revision: be4fe18d0f6ef5ce07375ee2d76a48fccfccc03c
+; Generated at: 2026-08-18 12:05:46 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-18"
-    static SourceRevision := "940bb67b2c0105eaf68e5aa03945c4cb1d6cdade"
+    static SourceRevision := "be4fe18d0f6ef5ce07375ee2d76a48fccfccc03c"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -110,7 +110,11 @@ class AutomationDiagnosticDefaults {
     static MaxFileBytes := 1048576
     static RotatedFileCount := 3
     static DiagnosticWindowMs := 600000
-    static SnapshotLineCount := 60
+    static SnapshotScanLineCount := 240
+    static SnapshotRecentSummaryCount := 12
+    static SnapshotFailureSummaryCount := 4
+    static SnapshotDetailedEventCount := 30
+    static SnapshotViewerFailureCount := 12
 }
 
 class AutomationDiagnosticSession {
@@ -269,6 +273,7 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
         "ReportImageCaption",
         Map(
             "caption.capturePath", true,
+            "caption.copyState", true,
             "caption.freshDiscoveryMs", true,
             "caption.activationMs", true,
             "caption.preSaveSettlePath", true,
@@ -436,7 +441,7 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     }
     recentLines := ReadRecentAutomationDiagnosticLines(
         logPath,
-        AutomationDiagnosticDefaults.SnapshotLineCount
+        AutomationDiagnosticDefaults.SnapshotScanLineCount
     )
     if viewerFailureLogPath = "" {
         try viewerFailureLogPath := DefaultMxNMViewerFailureLogPath()
@@ -445,7 +450,7 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     }
     recentViewerFailures := ReadRecentAutomationDiagnosticLines(
         viewerFailureLogPath,
-        AutomationDiagnosticDefaults.SnapshotLineCount
+        AutomationDiagnosticDefaults.SnapshotScanLineCount
     )
     automationEvent := FindRecentAutomationDiagnosticEvent(recentLines)
     viewerEvent := FindRecentViewerFailureEvent(recentViewerFailures)
@@ -454,6 +459,15 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
         viewerEvent
     )
     recentAction := recentEvent.action
+    recommendation := AutomationDiagnosticRecommendation(recentAction)
+    snapshotEvents := SelectAutomationDiagnosticSnapshotLines(
+        recentLines,
+        recentAction
+    )
+    snapshotViewerFailures := SelectViewerFailureSnapshotLines(
+        recentViewerFailures,
+        recommendation
+    )
     lines := [
         "AutomationDiagnosticsSnapshot=1",
         "Timestamp=" AutomationDiagnosticSafeValue(FormatTime(, "yyyy-MM-ddTHH:mm:ss")),
@@ -469,22 +483,119 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
         "DetailedModeActive=" AutomationDiagnosticBoolean(AutomationDiagnosticSession.DetailedModeActive()),
         "RecentEventSource=" AutomationDiagnosticSafeValue(recentEvent.source),
         "RecentRelevantAction=" AutomationDiagnosticSafeValue(recentAction),
-        "RecommendedDiagnostic=" AutomationDiagnosticRecommendation(recentAction),
+        "RecommendedDiagnostic=" recommendation,
         "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES"
     ]
-    for line in BuildCurrentMxNMContextTargetCacheSnapshot()
-        lines.Push(line)
+    if recommendation = "VIEWER_CONTEXT" {
+        for line in BuildCurrentMxNMContextTargetCacheSnapshot()
+            lines.Push(line)
+    }
     lines.Push("RecentEventsBegin")
-    for line in recentLines
+    for line in snapshotEvents
         lines.Push(line)
     lines.Push("RecentEventsEnd")
     lines.Push("RecentViewerFailuresBegin")
-    for line in recentViewerFailures
+    for line in snapshotViewerFailures
         lines.Push(line)
     lines.Push("RecentViewerFailuresEnd")
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
+    return output
+}
+
+SelectAutomationDiagnosticSnapshotLines(lines, recentAction) {
+    if recentAction != "ReportImageCaption" {
+        matches := []
+        for line in lines {
+            action := AutomationDiagnosticLineField(line, "action", "NONE")
+            if recentAction = "NONE" || action = recentAction
+                matches.Push(line)
+        }
+        output := []
+        startIndex := Max(
+            1,
+            matches.Length
+                - AutomationDiagnosticDefaults.SnapshotDetailedEventCount
+                + 1
+        )
+        Loop matches.Length - startIndex + 1
+            output.Push(matches[startIndex + A_Index - 1])
+        return output
+    }
+
+    summaries := []
+    failureKeys := Map()
+    for line in lines {
+        if !InStr(line, "recordType=operation-summary")
+            continue
+        action := AutomationDiagnosticLineField(line, "action", "NONE")
+        if recentAction != "NONE" && action != recentAction
+            continue
+        summaries.Push(line)
+        if AutomationDiagnosticLineField(
+            line,
+            "automationResult",
+            ""
+        ) != "COMPLETED" {
+            failureKeys[line] := true
+        }
+    }
+
+    selected := Map()
+    recentStart := Max(
+        1,
+        summaries.Length
+            - AutomationDiagnosticDefaults.SnapshotRecentSummaryCount
+            + 1
+    )
+    Loop summaries.Length - recentStart + 1
+        selected[summaries[recentStart + A_Index - 1]] := true
+
+    failureCount := 0
+    Loop summaries.Length {
+        line := summaries[summaries.Length - A_Index + 1]
+        if !failureKeys.Has(line)
+            continue
+        selected[line] := true
+        failureCount += 1
+        if failureCount
+            >= AutomationDiagnosticDefaults.SnapshotFailureSummaryCount {
+            break
+        }
+    }
+
+    output := []
+    for line in summaries {
+        if selected.Has(line)
+            output.Push(line)
+    }
+    return output
+}
+
+SelectViewerFailureSnapshotLines(lines, recommendation) {
+    if recommendation = "REPORT_IMAGE_CAPTION"
+        return []
+    matches := []
+    for line in lines {
+        action := AutomationDiagnosticLineField(line, "action", "")
+        if action = ""
+            continue
+        if recommendation != "GENERAL_SUPPORT"
+            && AutomationDiagnosticRecommendation(action) != recommendation {
+            continue
+        }
+        matches.Push(line)
+    }
+    output := []
+    startIndex := Max(
+        1,
+        matches.Length
+            - AutomationDiagnosticDefaults.SnapshotViewerFailureCount
+            + 1
+    )
+    Loop matches.Length - startIndex + 1
+        output.Push(matches[startIndex + A_Index - 1])
     return output
 }
 
@@ -23661,29 +23772,86 @@ class ReportImageCaptionProvider {
 }
 
 CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
+    copyStartedAt := A_TickCount
+    keysBefore := ReportImageCaptionCopyModifierMask()
+    keysAfter := keysBefore
+    sequenceBefore := ReportImageCaptionClipboardSequence()
+    sequenceAfterClear := sequenceBefore
+    sequenceAfterCopy := sequenceBefore
+    phase := "CLEAR"
     try {
         A_Clipboard := ""
+        sequenceAfterClear := ReportImageCaptionClipboardSequence()
+        phase := "SEND"
         SendInput "^c"
+        phase := "WAIT"
         if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds) {
+            sequenceAfterCopy := ReportImageCaptionClipboardSequence()
+            keysAfter := ReportImageCaptionCopyModifierMask()
+            SetReportImageCaptionCopyDiagnostic(
+                operation,
+                "WAIT_TIMEOUT",
+                keysBefore,
+                keysAfter,
+                sequenceBefore,
+                sequenceAfterClear,
+                sequenceAfterCopy,
+                A_TickCount - copyStartedAt
+            )
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.COPY_FAILED
             )
         }
+        sequenceAfterCopy := ReportImageCaptionClipboardSequence()
+        keysAfter := ReportImageCaptionCopyModifierMask()
+        phase := "FOREGROUND"
         if WinExist("A") != sourceHwnd {
+            SetReportImageCaptionCopyDiagnostic(
+                operation,
+                "SOURCE_CHANGED",
+                keysBefore,
+                keysAfter,
+                sequenceBefore,
+                sequenceAfterClear,
+                sequenceAfterCopy,
+                A_TickCount - copyStartedAt
+            )
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.SOURCE_CHANGED
             )
         }
+        phase := "READ_TEXT"
         copiedText := A_Clipboard
         if Trim(copiedText, " `t`r`n") = "" {
+            SetReportImageCaptionCopyDiagnostic(
+                operation,
+                "EMPTY",
+                keysBefore,
+                keysAfter,
+                sequenceBefore,
+                sequenceAfterClear,
+                sequenceAfterCopy,
+                A_TickCount - copyStartedAt
+            )
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.COPY_EMPTY
             )
         }
+        phase := "CAPTURE_PAYLOAD"
         payload := ClipboardAll()
+        SetReportImageCaptionCopyDiagnostic(
+            operation,
+            "CAPTURED",
+            keysBefore,
+            keysAfter,
+            sequenceBefore,
+            sequenceAfterClear,
+            sequenceAfterCopy,
+            A_TickCount - copyStartedAt
+        )
         if IsObject(operation)
             operation.Stage("SOURCE_CAPTURED")
         return {
@@ -23693,12 +23861,77 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
             pasteDispatched: false,
             candidateCount: 0
         }
-    } catch {
+    } catch as copyError {
+        sequenceAfterCopy := ReportImageCaptionClipboardSequence()
+        keysAfter := ReportImageCaptionCopyModifierMask()
+        SetReportImageCaptionCopyDiagnostic(
+            operation,
+            "EXCEPTION_" phase "_" Type(copyError),
+            keysBefore,
+            keysAfter,
+            sequenceBefore,
+            sequenceAfterClear,
+            sequenceAfterCopy,
+            A_TickCount - copyStartedAt
+        )
         return MakeReportImageCaptionResult(
             false,
             ReportImageCaptionCode.COPY_FAILED
         )
     }
+}
+
+SetReportImageCaptionCopyDiagnostic(
+    operation,
+    phase,
+    keysBefore,
+    keysAfter,
+    sequenceBefore,
+    sequenceAfterClear,
+    sequenceAfterCopy,
+    elapsedMs
+) {
+    if !IsObject(operation)
+        return
+    operation.SetField(
+        "caption.copyState",
+        "p:" phase
+            . ",k0:" keysBefore
+            . ",k1:" keysAfter
+            . ",clr:" ReportImageCaptionSequenceChangeCode(
+                sequenceBefore,
+                sequenceAfterClear
+            )
+            . ",cpy:" ReportImageCaptionSequenceChangeCode(
+                sequenceAfterClear,
+                sequenceAfterCopy
+            )
+            . ",ms:" elapsedMs
+    )
+}
+
+ReportImageCaptionCopyModifierMask() {
+    mask := ""
+    for key in ["Ctrl", "Alt", "Shift", "LWin", "RWin"] {
+        try pressed := GetKeyState(key, "P")
+        catch
+            pressed := false
+        if pressed
+            mask .= SubStr(key, 1, 1)
+    }
+    return mask = "" ? "N" : mask
+}
+
+ReportImageCaptionClipboardSequence() {
+    try return DllCall("User32\GetClipboardSequenceNumber", "UInt")
+    catch
+        return -1
+}
+
+ReportImageCaptionSequenceChangeCode(before, after) {
+    if before < 0 || after < 0
+        return "U"
+    return before = after ? "0" : "1"
 }
 
 ResolveReportImageCaptionTarget(sourceHwnd, sourcePid) {
