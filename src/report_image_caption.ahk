@@ -350,29 +350,86 @@ class ReportImageCaptionProvider {
 }
 
 CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
+    copyStartedAt := A_TickCount
+    keysBefore := ReportImageCaptionCopyModifierMask()
+    keysAfter := keysBefore
+    sequenceBefore := ReportImageCaptionClipboardSequence()
+    sequenceAfterClear := sequenceBefore
+    sequenceAfterCopy := sequenceBefore
+    phase := "CLEAR"
     try {
         A_Clipboard := ""
+        sequenceAfterClear := ReportImageCaptionClipboardSequence()
+        phase := "SEND"
         SendInput "^c"
+        phase := "WAIT"
         if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds) {
+            sequenceAfterCopy := ReportImageCaptionClipboardSequence()
+            keysAfter := ReportImageCaptionCopyModifierMask()
+            SetReportImageCaptionCopyDiagnostic(
+                operation,
+                "WAIT_TIMEOUT",
+                keysBefore,
+                keysAfter,
+                sequenceBefore,
+                sequenceAfterClear,
+                sequenceAfterCopy,
+                A_TickCount - copyStartedAt
+            )
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.COPY_FAILED
             )
         }
+        sequenceAfterCopy := ReportImageCaptionClipboardSequence()
+        keysAfter := ReportImageCaptionCopyModifierMask()
+        phase := "FOREGROUND"
         if WinExist("A") != sourceHwnd {
+            SetReportImageCaptionCopyDiagnostic(
+                operation,
+                "SOURCE_CHANGED",
+                keysBefore,
+                keysAfter,
+                sequenceBefore,
+                sequenceAfterClear,
+                sequenceAfterCopy,
+                A_TickCount - copyStartedAt
+            )
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.SOURCE_CHANGED
             )
         }
+        phase := "READ_TEXT"
         copiedText := A_Clipboard
         if Trim(copiedText, " `t`r`n") = "" {
+            SetReportImageCaptionCopyDiagnostic(
+                operation,
+                "EMPTY",
+                keysBefore,
+                keysAfter,
+                sequenceBefore,
+                sequenceAfterClear,
+                sequenceAfterCopy,
+                A_TickCount - copyStartedAt
+            )
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.COPY_EMPTY
             )
         }
+        phase := "CAPTURE_PAYLOAD"
         payload := ClipboardAll()
+        SetReportImageCaptionCopyDiagnostic(
+            operation,
+            "CAPTURED",
+            keysBefore,
+            keysAfter,
+            sequenceBefore,
+            sequenceAfterClear,
+            sequenceAfterCopy,
+            A_TickCount - copyStartedAt
+        )
         if IsObject(operation)
             operation.Stage("SOURCE_CAPTURED")
         return {
@@ -382,12 +439,77 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
             pasteDispatched: false,
             candidateCount: 0
         }
-    } catch {
+    } catch as copyError {
+        sequenceAfterCopy := ReportImageCaptionClipboardSequence()
+        keysAfter := ReportImageCaptionCopyModifierMask()
+        SetReportImageCaptionCopyDiagnostic(
+            operation,
+            "EXCEPTION_" phase "_" Type(copyError),
+            keysBefore,
+            keysAfter,
+            sequenceBefore,
+            sequenceAfterClear,
+            sequenceAfterCopy,
+            A_TickCount - copyStartedAt
+        )
         return MakeReportImageCaptionResult(
             false,
             ReportImageCaptionCode.COPY_FAILED
         )
     }
+}
+
+SetReportImageCaptionCopyDiagnostic(
+    operation,
+    phase,
+    keysBefore,
+    keysAfter,
+    sequenceBefore,
+    sequenceAfterClear,
+    sequenceAfterCopy,
+    elapsedMs
+) {
+    if !IsObject(operation)
+        return
+    operation.SetField(
+        "caption.copyState",
+        "p:" phase
+            . ",k0:" keysBefore
+            . ",k1:" keysAfter
+            . ",clr:" ReportImageCaptionSequenceChangeCode(
+                sequenceBefore,
+                sequenceAfterClear
+            )
+            . ",cpy:" ReportImageCaptionSequenceChangeCode(
+                sequenceAfterClear,
+                sequenceAfterCopy
+            )
+            . ",ms:" elapsedMs
+    )
+}
+
+ReportImageCaptionCopyModifierMask() {
+    mask := ""
+    for key in ["Ctrl", "Alt", "Shift", "LWin", "RWin"] {
+        try pressed := GetKeyState(key, "P")
+        catch
+            pressed := false
+        if pressed
+            mask .= SubStr(key, 1, 1)
+    }
+    return mask = "" ? "N" : mask
+}
+
+ReportImageCaptionClipboardSequence() {
+    try return DllCall("User32\GetClipboardSequenceNumber", "UInt")
+    catch
+        return -1
+}
+
+ReportImageCaptionSequenceChangeCode(before, after) {
+    if before < 0 || after < 0
+        return "U"
+    return before = after ? "0" : "1"
 }
 
 ResolveReportImageCaptionTarget(sourceHwnd, sourcePid) {

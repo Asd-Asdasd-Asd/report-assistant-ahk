@@ -137,6 +137,7 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             '"caption.advanceGatePath"',
             '"caption.advanceGateMs"',
             '"caption.interAdvanceMs"',
+            '"caption.copyState"',
         ):
             self.assertIn(required, self.diagnostics)
         for forbidden in (
@@ -161,6 +162,31 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             self.assertIn(required, self.caption)
         self.assertNotIn("SAVE_CONFIRMED", self.caption)
         self.assertNotIn("PERSISTED", self.caption)
+
+    def test_snapshot_keeps_failures_but_drops_duplicate_stage_events(self) -> None:
+        for required in (
+            "SelectAutomationDiagnosticSnapshotLines",
+            'InStr(line, "recordType=operation-summary")',
+            "SnapshotRecentSummaryCount",
+            "SnapshotFailureSummaryCount",
+            'if recentAction != "ReportImageCaption" {',
+            "SnapshotDetailedEventCount",
+        ):
+            self.assertIn(required, self.diagnostics)
+        selector = self.diagnostics.split(
+            "SelectAutomationDiagnosticSnapshotLines(lines, recentAction) {", 1
+        )[1].split("\n}\n\nSelectViewerFailureSnapshotLines", 1)[0]
+        self.assertNotIn("recordType=stage-event", selector)
+
+    def test_caption_snapshot_omits_unrelated_viewer_failures_and_cache(self) -> None:
+        self.assertIn(
+            'if recommendation = "REPORT_IMAGE_CAPTION"\n        return []',
+            self.diagnostics,
+        )
+        self.assertIn(
+            'if recommendation = "VIEWER_CONTEXT" {',
+            self.diagnostics,
+        )
 
     def test_modules_and_tray_support_workflow_are_production_owned(self) -> None:
         main = source("src/main.ahk")

@@ -114,7 +114,27 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertIn("ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds)", capture)
         self.assertIn('Trim(copiedText, " `t`r`n") = ""', capture)
         self.assertIn("payload := ClipboardAll()", capture)
+        self.assertIn("ReportImageCaptionCopyModifierMask()", capture)
+        self.assertIn("ReportImageCaptionClipboardSequence()", capture)
+        self.assertIn('"WAIT_TIMEOUT"', capture)
+        self.assertIn('"EXCEPTION_" phase "_" Type(copyError)', capture)
         self.assertNotIn("savedClipboard", capture)
+
+    def test_source_copy_diagnostic_is_compact_and_content_free(self) -> None:
+        diagnostic = self.body(
+            "\nSetReportImageCaptionCopyDiagnostic(\n",
+            "\nResolveReportImageCaptionTarget(",
+        )
+        self.assertIn('"caption.copyState"', diagnostic)
+        for required in ('"p:"', '",k0:"', '",k1:"', '",clr:"', '",cpy:"', '",ms:"'):
+            self.assertIn(required, diagnostic)
+        for forbidden in (
+            "copiedText",
+            "A_Clipboard",
+            "ClipboardAll",
+            "WinGetTitle",
+        ):
+            self.assertNotIn(forbidden, diagnostic)
 
     def test_reuse_is_only_selected_for_the_exact_bound_target(self) -> None:
         invoke = self.body(

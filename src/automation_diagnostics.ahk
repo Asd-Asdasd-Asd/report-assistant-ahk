@@ -5,7 +5,11 @@ class AutomationDiagnosticDefaults {
     static MaxFileBytes := 1048576
     static RotatedFileCount := 3
     static DiagnosticWindowMs := 600000
-    static SnapshotLineCount := 60
+    static SnapshotScanLineCount := 240
+    static SnapshotRecentSummaryCount := 12
+    static SnapshotFailureSummaryCount := 4
+    static SnapshotDetailedEventCount := 30
+    static SnapshotViewerFailureCount := 12
 }
 
 class AutomationDiagnosticSession {
@@ -164,6 +168,7 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
         "ReportImageCaption",
         Map(
             "caption.capturePath", true,
+            "caption.copyState", true,
             "caption.freshDiscoveryMs", true,
             "caption.activationMs", true,
             "caption.preSaveSettlePath", true,
@@ -331,7 +336,7 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     }
     recentLines := ReadRecentAutomationDiagnosticLines(
         logPath,
-        AutomationDiagnosticDefaults.SnapshotLineCount
+        AutomationDiagnosticDefaults.SnapshotScanLineCount
     )
     if viewerFailureLogPath = "" {
         try viewerFailureLogPath := DefaultMxNMViewerFailureLogPath()
@@ -340,7 +345,7 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     }
     recentViewerFailures := ReadRecentAutomationDiagnosticLines(
         viewerFailureLogPath,
-        AutomationDiagnosticDefaults.SnapshotLineCount
+        AutomationDiagnosticDefaults.SnapshotScanLineCount
     )
     automationEvent := FindRecentAutomationDiagnosticEvent(recentLines)
     viewerEvent := FindRecentViewerFailureEvent(recentViewerFailures)
@@ -349,6 +354,15 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
         viewerEvent
     )
     recentAction := recentEvent.action
+    recommendation := AutomationDiagnosticRecommendation(recentAction)
+    snapshotEvents := SelectAutomationDiagnosticSnapshotLines(
+        recentLines,
+        recentAction
+    )
+    snapshotViewerFailures := SelectViewerFailureSnapshotLines(
+        recentViewerFailures,
+        recommendation
+    )
     lines := [
         "AutomationDiagnosticsSnapshot=1",
         "Timestamp=" AutomationDiagnosticSafeValue(FormatTime(, "yyyy-MM-ddTHH:mm:ss")),
@@ -364,22 +378,119 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
         "DetailedModeActive=" AutomationDiagnosticBoolean(AutomationDiagnosticSession.DetailedModeActive()),
         "RecentEventSource=" AutomationDiagnosticSafeValue(recentEvent.source),
         "RecentRelevantAction=" AutomationDiagnosticSafeValue(recentAction),
-        "RecommendedDiagnostic=" AutomationDiagnosticRecommendation(recentAction),
+        "RecommendedDiagnostic=" recommendation,
         "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES"
     ]
-    for line in BuildCurrentMxNMContextTargetCacheSnapshot()
-        lines.Push(line)
+    if recommendation = "VIEWER_CONTEXT" {
+        for line in BuildCurrentMxNMContextTargetCacheSnapshot()
+            lines.Push(line)
+    }
     lines.Push("RecentEventsBegin")
-    for line in recentLines
+    for line in snapshotEvents
         lines.Push(line)
     lines.Push("RecentEventsEnd")
     lines.Push("RecentViewerFailuresBegin")
-    for line in recentViewerFailures
+    for line in snapshotViewerFailures
         lines.Push(line)
     lines.Push("RecentViewerFailuresEnd")
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
+    return output
+}
+
+SelectAutomationDiagnosticSnapshotLines(lines, recentAction) {
+    if recentAction != "ReportImageCaption" {
+        matches := []
+        for line in lines {
+            action := AutomationDiagnosticLineField(line, "action", "NONE")
+            if recentAction = "NONE" || action = recentAction
+                matches.Push(line)
+        }
+        output := []
+        startIndex := Max(
+            1,
+            matches.Length
+                - AutomationDiagnosticDefaults.SnapshotDetailedEventCount
+                + 1
+        )
+        Loop matches.Length - startIndex + 1
+            output.Push(matches[startIndex + A_Index - 1])
+        return output
+    }
+
+    summaries := []
+    failureKeys := Map()
+    for line in lines {
+        if !InStr(line, "recordType=operation-summary")
+            continue
+        action := AutomationDiagnosticLineField(line, "action", "NONE")
+        if recentAction != "NONE" && action != recentAction
+            continue
+        summaries.Push(line)
+        if AutomationDiagnosticLineField(
+            line,
+            "automationResult",
+            ""
+        ) != "COMPLETED" {
+            failureKeys[line] := true
+        }
+    }
+
+    selected := Map()
+    recentStart := Max(
+        1,
+        summaries.Length
+            - AutomationDiagnosticDefaults.SnapshotRecentSummaryCount
+            + 1
+    )
+    Loop summaries.Length - recentStart + 1
+        selected[summaries[recentStart + A_Index - 1]] := true
+
+    failureCount := 0
+    Loop summaries.Length {
+        line := summaries[summaries.Length - A_Index + 1]
+        if !failureKeys.Has(line)
+            continue
+        selected[line] := true
+        failureCount += 1
+        if failureCount
+            >= AutomationDiagnosticDefaults.SnapshotFailureSummaryCount {
+            break
+        }
+    }
+
+    output := []
+    for line in summaries {
+        if selected.Has(line)
+            output.Push(line)
+    }
+    return output
+}
+
+SelectViewerFailureSnapshotLines(lines, recommendation) {
+    if recommendation = "REPORT_IMAGE_CAPTION"
+        return []
+    matches := []
+    for line in lines {
+        action := AutomationDiagnosticLineField(line, "action", "")
+        if action = ""
+            continue
+        if recommendation != "GENERAL_SUPPORT"
+            && AutomationDiagnosticRecommendation(action) != recommendation {
+            continue
+        }
+        matches.Push(line)
+    }
+    output := []
+    startIndex := Max(
+        1,
+        matches.Length
+            - AutomationDiagnosticDefaults.SnapshotViewerFailureCount
+            + 1
+    )
+    Loop matches.Length - startIndex + 1
+        output.Push(matches[startIndex + A_Index - 1])
     return output
 }
 
