@@ -125,6 +125,17 @@ class AutomationDiagnosticsTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, cache_snapshot)
 
+    def test_geometry_formatters_use_explicit_continuation(self) -> None:
+        point_formatter = self.diagnostics.split(
+            "FormatAutomationDiagnosticPoint(point) {", 1
+        )[1].split("\n}\n\nFormatAutomationDiagnosticRect", 1)[0]
+        rect_formatter = self.diagnostics.split(
+            "FormatAutomationDiagnosticRect(rect) {", 1
+        )[1].split("\n}\n\nAutomationDiagnosticRectsEqual", 1)[0]
+        for formatter in (point_formatter, rect_formatter):
+            self.assertIn("return (", formatter)
+            self.assertIn('. ","', formatter)
+
     def test_common_and_caption_fields_are_allowlisted(self) -> None:
         self.assertIn("AutomationDiagnosticFieldAllowed", self.diagnostics)
         for required in (

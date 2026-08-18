@@ -580,17 +580,25 @@ BuildCurrentMxNMContextTargetCacheSnapshot() {
 FormatAutomationDiagnosticPoint(point) {
     if !IsObject(point)
         return ""
-    return AutomationDiagnosticSafeValue(point.x) ","
-        AutomationDiagnosticSafeValue(point.y)
+    return (
+        AutomationDiagnosticSafeValue(point.x)
+        . ","
+        . AutomationDiagnosticSafeValue(point.y)
+    )
 }
 
 FormatAutomationDiagnosticRect(rect) {
     if !IsObject(rect)
         return ""
-    return AutomationDiagnosticSafeValue(rect.left) ","
-        AutomationDiagnosticSafeValue(rect.top) ","
-        AutomationDiagnosticSafeValue(rect.right) ","
-        AutomationDiagnosticSafeValue(rect.bottom)
+    return (
+        AutomationDiagnosticSafeValue(rect.left)
+        . ","
+        . AutomationDiagnosticSafeValue(rect.top)
+        . ","
+        . AutomationDiagnosticSafeValue(rect.right)
+        . ","
+        . AutomationDiagnosticSafeValue(rect.bottom)
+    )
 }
 
 AutomationDiagnosticRectsEqual(first, second) {
