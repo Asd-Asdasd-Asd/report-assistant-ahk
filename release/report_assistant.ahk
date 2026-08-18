@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: e679907cba3e33b45f5e5a4fb253588f31b6b170
-; Generated at: 2026-08-18 10:58:55 UTC
+; Source revision: 940bb67b2c0105eaf68e5aa03945c4cb1d6cdade
+; Generated at: 2026-08-18 11:11:52 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-08-18"
-    static SourceRevision := "e679907cba3e33b45f5e5a4fb253588f31b6b170"
+    static SourceRevision := "940bb67b2c0105eaf68e5aa03945c4cb1d6cdade"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -23011,15 +23011,84 @@ InvokeMxNMViewerCaptureHotkey(chord, *) {
             || !MedExViewerForegroundActive() {
             return
         }
+        pulseHwnd := ResolveMxNMViewerCapturePulseHwnd(viewerHwnd)
         try Send "{F12}"
         catch {
             Flash("Viewer 截图快捷键执行失败", 1200)
             return
         }
-        ShowReportAssistantDispatchPulse(viewerHwnd)
+        ShowReportAssistantDispatchPulse(
+            pulseHwnd ? pulseHwnd : viewerHwnd
+        )
     } finally {
         active := false
     }
+}
+
+ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {
+    if !viewerHwnd
+        return 0
+    try viewerPid := WinGetPID("ahk_id " viewerHwnd)
+    catch
+        return viewerHwnd
+    if !viewerPid
+        return viewerHwnd
+    try ownerHwnd := ResolveMxNMRootOwnerHwnd(viewerHwnd)
+    catch
+        ownerHwnd := 0
+    if !ownerHwnd
+        return viewerHwnd
+
+    bestHwnd := viewerHwnd
+    bestVisibleArea := MxNMViewerCapturePulseVisibleArea(viewerHwnd)
+    try candidates := WinGetList("ahk_pid " viewerPid)
+    catch
+        candidates := []
+    for candidateHwnd in candidates {
+        try visible := DllCall(
+            "User32\IsWindowVisible",
+            "Ptr", candidateHwnd,
+            "Int"
+        ) != 0
+        catch
+            visible := false
+        if !visible
+            continue
+        try candidateOwner := ResolveMxNMRootOwnerHwnd(candidateHwnd)
+        catch
+            candidateOwner := 0
+        if candidateOwner != ownerHwnd
+            continue
+        visibleArea := MxNMViewerCapturePulseVisibleArea(candidateHwnd)
+        if visibleArea > bestVisibleArea {
+            bestHwnd := candidateHwnd
+            bestVisibleArea := visibleArea
+        }
+    }
+    return bestHwnd
+}
+
+MxNMViewerCapturePulseVisibleArea(hwnd) {
+    if !hwnd
+        return 0
+    try WinGetPos(&x, &y, &width, &height, "ahk_id " hwnd)
+    catch
+        return 0
+    if width <= 0 || height <= 0
+        return 0
+    virtualLeft := SysGet(76)
+    virtualTop := SysGet(77)
+    virtualRight := virtualLeft + SysGet(78)
+    virtualBottom := virtualTop + SysGet(79)
+    visibleWidth := Max(
+        0,
+        Min(x + width, virtualRight) - Max(x, virtualLeft)
+    )
+    visibleHeight := Max(
+        0,
+        Min(y + height, virtualBottom) - Max(y, virtualTop)
+    )
+    return visibleWidth * visibleHeight
 }
 
 InvokeMxNMViewerSuv3DHotkey(chord, *) {
