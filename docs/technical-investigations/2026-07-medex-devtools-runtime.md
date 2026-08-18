@@ -185,6 +185,13 @@ production 因此只对每次脚本会话首次观察到的 target process，在
 和 cached reuse 的 200 ms 节奏保持不变。该解释和修复仍需 Windows/MedEx 现场回看
 第一张图片确认，不能由 macOS 静态测试替代。
 
+2026-08-18 的集中反馈进一步确认随机丢失集中在快速连续粘贴和翻页。现场 summary
+显示 cached reuse 可以在约 250 ms 内完成，因此下一次 `WheelDown` 仍可能落入
+`flipImage()` 的 500 ms 条件保存门槛。production 现在记录每个 target 的上次翻页
+时刻：只有下一次翻页距离不足 550 ms 时，才补齐剩余时间；自然间隔已足够时不等待。
+这保留显式保存按钮，并让 Viewer 自带的翻页保存重新成为可用的第二道保护，而不是
+把每次 Caption 都固定延迟 550 ms。
+
 ### Experiment 1：只读定位
 
 在独立 experiment branch 中确认如何从页面稳定取得：

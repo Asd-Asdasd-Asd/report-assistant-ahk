@@ -199,6 +199,10 @@
   鼠标；clipboard 有意保留当前 caption，不要求恢复触发前内容。
 - [ ] 连续快速触发至少 5 张图片；逐张返回检查 caption 已持久化，不能只在
   当前 UEditor 中可见。保存点校验失败时必须停止在当前图片，不得继续翻页。
+- [ ] 连续触发间隔不足时，summary 出现
+  `advanceGatePath=VENDOR_INTER_ADVANCE_GATE`，并且对应 `interAdvanceMs` 不小于
+  550 ms；自然操作间隔已经足够时为 `NATURAL_GAP` 且 `advanceGateMs=0`，不得再加
+  固定 550 ms。
 - [ ] 保存点击派发后，深灰色文字卡片从 source/选区附近沿轻微弧线飞向 caption，
   临近终点缩小吸附；动画不得抢焦点、拦截
   鼠标、延迟滚轮或阻止下一次快捷键。

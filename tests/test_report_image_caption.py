@@ -242,6 +242,7 @@ class ReportImageCaptionTests(unittest.TestCase):
             self.module,
         )
         self.assertIn("static ExplicitSaveSettleMs := 200", self.module)
+        self.assertIn("static InterAdvanceSaveGateMs := 550", self.module)
         self.assertIn(
             "static CaptureSaveFallbackSettleMs := 550",
             self.module,
@@ -301,6 +302,35 @@ class ReportImageCaptionTests(unittest.TestCase):
             action.index('SendInput "{WheelDown}"'),
         )
         self.assertIn("SAVE_DISPATCH_FAILED", action)
+
+    def test_rapid_reuse_only_waits_for_vendor_gate_remainder(self) -> None:
+        gate = self.body(
+            "\nclass ReportImageCaptionAdvanceGate {",
+            "\nReportImageCaptionHotkeyDefinitions(settings)",
+        )
+        action = self.body(
+            "\nExecuteReportImageCaptionAction(\n    cache,",
+            "\nReportImageCaptionPasteSettle(operation := 0)",
+        )
+        self.assertIn("static LastAdvanceTicks := Map()", gate)
+        self.assertIn('path: "NO_PRIOR_ADVANCE"', gate)
+        self.assertIn('path: "NATURAL_GAP"', gate)
+        self.assertIn('path: "VENDOR_INTER_ADVANCE_GATE"', gate)
+        self.assertIn(
+            "ReportImageCaptionDefaults.InterAdvanceSaveGateMs - elapsedMs",
+            gate,
+        )
+        self.assertIn(
+            "advanceGate := ReportImageCaptionAdvanceGate.Plan(target)",
+            action,
+        )
+        self.assertIn("Sleep advanceGate.milliseconds", action)
+        self.assertIn('operation.Stage("ADVANCE_GATE_COMPLETED")', action)
+        self.assertLess(
+            action.index('operation.Stage("ADVANCE_GATE_COMPLETED")'),
+            action.index('SendInput "{WheelDown}"'),
+        )
+        self.assertIn("ReportImageCaptionAdvanceGate.Observe(target)", action)
 
     def test_only_fresh_caption_capture_uses_vendor_save_fallback_window(self) -> None:
         capture = self.body(

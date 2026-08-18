@@ -108,6 +108,9 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             '"caption.saveToAdvanceMs"',
             '"caption.preSaveSettlePath"',
             '"caption.preSaveSettleMs"',
+            '"caption.advanceGatePath"',
+            '"caption.advanceGateMs"',
+            '"caption.interAdvanceMs"',
         ):
             self.assertIn(required, self.diagnostics)
         for forbidden in (
