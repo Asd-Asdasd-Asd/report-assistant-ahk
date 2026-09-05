@@ -80,36 +80,158 @@ MedExViewerForegroundActive(*) {
 }
 
 InvokeMxNMViewerCaptureHotkey(chord, *) {
+    return RunMxNMViewerHotkey("capture", chord)
+}
+
+; One bounded entry transaction for all Viewer hotkeys. No action is replayed.
+RunMxNMViewerHotkey(commandName, chord) {
     static active := false
-    if active
-        return
-    if !MedExViewerForegroundActive()
-        return
-    try viewerHwnd := WinExist("A")
-    catch
-        return
-    if !viewerHwnd
-        return
+    action := commandName = "capture" ? "ViewerCapture"
+        : commandName = "clear" ? "ViewerClear" : "ViewerTool"
+    operation := BeginAutomationDiagnosticOperation(action)
+    operation.SetField("viewer.command", commandName)
+    operation.SetField("viewer.dispatchResult", "NOT_DISPATCHED")
+    operation.SetField("viewer.effectState", "UNOBSERVABLE")
+    if active {
+        operation.Complete("CANCELLED", "BUSY")
+        return false
+    }
     active := true
+    resultCode := "UNEXPECTED_ERROR"
+    outcome := "FAILED"
     try {
-        while ViewerHotkeyChordHasPressedComponent(chord)
-            Sleep 10
-        if WinExist("A") != viewerHwnd
-            || !MedExViewerForegroundActive() {
-            return
+        foregroundHwnd := WinExist("A")
+        operation.SetField("viewer.foregroundHwnd", foregroundHwnd)
+        if !foregroundHwnd || !(commandName = "capture"
+            ? MedExViewerForegroundActive() : MedExViewerToolForegroundActive()) {
+            resultCode := "WRONG_FOREGROUND"
+            outcome := "CANCELLED"
+            return false
         }
-        pulseHwnd := ResolveMxNMViewerCapturePulseHwnd(viewerHwnd)
-        try Send "{F12}"
-        catch {
-            Flash("Viewer 截图快捷键执行失败", 1200)
-            return
+        operation.SetField("viewer.keysBefore", MxNMViewerModifierState())
+        releaseStartedAt := A_TickCount
+        resultCode := WaitMxNMViewerHotkeyRelease(chord, foregroundHwnd)
+        operation.SetField("viewer.releaseMs", A_TickCount - releaseStartedAt)
+        operation.SetField("viewer.keysAfter", MxNMViewerModifierState())
+        if resultCode != "RELEASED" {
+            outcome := "CANCELLED"
+            if resultCode = "KEY_RELEASE_TIMEOUT"
+                Flash("快捷键等待松键超时，请松开按键后重试", 1600)
+            return false
         }
-        ShowReportAssistantDispatchPulse(
-            pulseHwnd ? pulseHwnd : viewerHwnd
-        )
+        operation.Stage("KEYS_RELEASED")
+        if commandName = "capture" {
+            pulseHwnd := ResolveMxNMViewerCapturePulseHwnd(foregroundHwnd)
+            ; Feedback discovery must not move the final foreground check away
+            ; from the actual keyboard dispatch boundary.
+            if WinExist("A") != foregroundHwnd {
+                resultCode := "FOREGROUND_CHANGED"
+                outcome := "CANCELLED"
+                return false
+            }
+            operation.SetField("viewer.focusHwnd", MxNMViewerFocusedHwnd(foregroundHwnd))
+            resultCode := "DISPATCH_FAILED"
+            Send "{F12}"
+            operation.SetField("viewer.dispatchResult", "DISPATCHED")
+            operation.Stage("COMMAND_DISPATCHED")
+            try ShowReportAssistantDispatchPulse(pulseHwnd ? pulseHwnd : foregroundHwnd)
+        } else if commandName = "clear" {
+            result := MxNMAnnotationCleaner.DeleteAll(
+                0, 0, 0, MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY
+            )
+            resultCode := result.code
+            if !result.ok {
+                Flash(MxNMViewerClearFailureMessage(result), 2200)
+                return false
+            }
+            operation.SetField("viewer.dispatchResult", "DISPATCHED")
+            operation.Stage("COMMAND_DISPATCHED")
+        } else {
+            operation.SetField("viewer.focusHwnd", MxNMViewerFocusedHwnd(foregroundHwnd))
+            result := MxNMViewerToolCommandProvider.Invoke(commandName)
+            resultCode := result.code
+            operation.SetField("viewer.targetHwnd", result.buttonHwnd)
+            operation.SetField("viewer.parentHwnd", result.buttonParentHwnd)
+            operation.SetField("viewer.controlId", result.commandId)
+            operation.SetField("viewer.candidateCount", result.runtimeCandidateCount)
+            if !result.ok {
+                if result.code = MxNMViewerToolCode.WRONG_FOREGROUND {
+                    outcome := "CANCELLED"
+                    return false
+                }
+                LogMxNMViewerToolFailure(commandName, result)
+                Flash(MxNMViewerToolFailureMessage(result.code), 1600)
+                return false
+            }
+            operation.SetField("viewer.dispatchResult", "DISPATCHED")
+            operation.Stage("COMMAND_DISPATCHED")
+        }
+        resultCode := "DISPATCHED"
+        outcome := "COMPLETED"
+        return true
+    } catch as viewerHotkeyError {
+        if resultCode != "DISPATCH_FAILED"
+            resultCode := "UNEXPECTED_ERROR"
+        operation.SetField("viewer.errorType", Type(viewerHotkeyError))
+        Flash("Viewer 快捷键执行失败，请复制诊断信息", 1600)
+        return false
     } finally {
         active := false
+        operation.Complete(outcome, resultCode)
     }
+}
+
+WaitMxNMViewerHotkeyRelease(chord, foregroundHwnd, timeoutMs := 3000) {
+    startedAt := A_TickCount
+    loop {
+        state := MxNMViewerReleaseDecision(
+            ViewerHotkeyChordHasPressedComponent(chord),
+            WinExist("A") = foregroundHwnd,
+            A_TickCount - startedAt,
+            timeoutMs
+        )
+        if state != "WAITING"
+            return state
+        Sleep 10
+    }
+}
+
+MxNMViewerReleaseDecision(pressed, foregroundMatches, elapsedMs, timeoutMs) {
+    if !foregroundMatches
+        return "FOREGROUND_CHANGED"
+    if !pressed
+        return "RELEASED"
+    if elapsedMs >= timeoutMs
+        return "KEY_RELEASE_TIMEOUT"
+    return "WAITING"
+}
+
+MxNMViewerModifierState() {
+    try {
+        physical := 0
+        logical := 0
+        for index, key in ["Control", "Alt", "Shift", "LWin", "RWin"] {
+            bit := 1 << (index - 1)
+            if GetKeyState(key, "P")
+                physical |= bit
+            if GetKeyState(key)
+                logical |= bit
+        }
+        return "p:" physical ",l:" logical
+    } catch {
+        return "UNAVAILABLE"
+    }
+}
+
+MxNMViewerFocusedHwnd(foregroundHwnd) {
+    try {
+        threadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", foregroundHwnd, "Ptr", 0, "UInt")
+        guiInfo := Buffer(8 + 6 * A_PtrSize + 16, 0)
+        NumPut("UInt", guiInfo.Size, guiInfo)
+        if threadId && DllCall("User32\GetGUIThreadInfo", "UInt", threadId, "Ptr", guiInfo.Ptr, "Int")
+            return NumGet(guiInfo, 8 + A_PtrSize, "Ptr")
+    }
+    return 0
 }
 
 ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {
@@ -179,89 +301,38 @@ MxNMViewerCapturePulseVisibleArea(hwnd) {
 }
 
 InvokeMxNMViewerSuv3DHotkey(chord, *) {
-    static active := false
-    if active
-        return
-    try foregroundHwnd := WinExist("A")
-    catch
-        return
-    if !foregroundHwnd
-        return
-    active := true
-    try {
-        while ViewerHotkeyChordHasPressedComponent(chord)
-            Sleep 10
-        if WinExist("A") != foregroundHwnd
-            return
-        result := MxNMViewerToolCommandProvider.Invoke("suv3d")
-        if !result.ok {
-            if result.code != MxNMViewerToolCode.WRONG_FOREGROUND {
-                LogMxNMViewerToolFailure("suv3d", result)
-                Flash(MxNMViewerToolFailureMessage(result.code), 1600)
-            }
-            return
-        }
-    } finally {
-        active := false
-    }
+    return RunMxNMViewerHotkey("suv3d", chord)
 }
 
 InvokeMxNMViewerClearHotkey(chord, *) {
-    static active := false
-    if active
-        return
-    try foregroundHwnd := WinExist("A")
-    catch
-        return
-    if !foregroundHwnd
-        return
-    active := true
-    try {
-        while ViewerHotkeyChordHasPressedComponent(chord)
-            Sleep 10
-        if WinExist("A") != foregroundHwnd
-            return
-        result := MxNMAnnotationCleaner.DeleteAll(
-            0,
-            0,
-            0,
-            MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY
-        )
-        if !result.ok
-            Flash(MxNMViewerClearFailureMessage(result), 2200)
-    } finally {
-        active := false
-    }
+    return RunMxNMViewerHotkey("clear", chord)
 }
 
 ViewerHotkeyChordHasPressedComponent(chord) {
     normalized := Trim(String(chord), " `t`r`n")
     if !RegExMatch(normalized, "^([!+^#]*)(.+)$", &match)
-        return false
-    try {
-        if GetKeyState(match[2], "P")
-            return true
-        if InStr(match[1], "^")
-            && GetKeyState("Control", "P")
-            return true
-        if InStr(match[1], "!")
-            && GetKeyState("Alt", "P")
-            return true
-        if InStr(match[1], "+")
-            && GetKeyState("Shift", "P")
-            return true
-        if InStr(match[1], "#")
-            && (
-                GetKeyState("LWin", "P")
-                || GetKeyState("RWin", "P")
-            ) {
-            return true
-        }
-    } catch {
-        return false
+        throw ValueError("Invalid Viewer hotkey chord")
+    if GetKeyState(match[2], "P")
+        return true
+    if InStr(match[1], "^")
+        && GetKeyState("Control", "P")
+        return true
+    if InStr(match[1], "!")
+        && GetKeyState("Alt", "P")
+        return true
+    if InStr(match[1], "+")
+        && GetKeyState("Shift", "P")
+        return true
+    if InStr(match[1], "#")
+        && (
+            GetKeyState("LWin", "P")
+            || GetKeyState("RWin", "P")
+        ) {
+        return true
     }
     return false
 }
+
 
 MxNMViewerClearFailureMessage(result) {
     code := result.code
@@ -329,28 +400,7 @@ MxNMViewerClearContextValue(result, key, fallback := "") {
 }
 
 InvokeMxNMViewerToolHotkey(commandName, chord, *) {
-    static active := false
-    if active
-        return
-    try foregroundHwnd := WinExist("A")
-    catch
-        return
-    if !foregroundHwnd
-        return
-    active := true
-    try {
-        while ViewerHotkeyChordHasPressedComponent(chord)
-            Sleep 10
-        if WinExist("A") != foregroundHwnd
-            return
-        result := MxNMViewerToolCommandProvider.Invoke(commandName)
-        if result.ok || result.code = MxNMViewerToolCode.WRONG_FOREGROUND
-            return
-        LogMxNMViewerToolFailure(commandName, result)
-        Flash(MxNMViewerToolFailureMessage(result.code), 1600)
-    } finally {
-        active := false
-    }
+    return RunMxNMViewerHotkey(commandName, chord)
 }
 
 LogMxNMViewerToolFailure(commandName, result) {
@@ -383,6 +433,8 @@ MxNMViewerToolFailureMessage(code) {
         return "未找到 MedEx Viewer"
     if code = MxNMViewerToolCode.VIEWER_NOT_UNIQUE
         return "MedEx Viewer 窗口不唯一，快捷键未执行"
+    if code = MxNMViewerToolCode.BUTTON_DISABLED
+        return "Viewer 当前未启用该测量工具"
     if code = MxNMViewerToolCode.BUTTON_TARGET_INVALID
         || code = MxNMViewerToolCode.BUTTON_SET_NOT_UNIQUE
         || code = MxNMViewerToolCode.BUTTON_LAYOUT_INVALID {

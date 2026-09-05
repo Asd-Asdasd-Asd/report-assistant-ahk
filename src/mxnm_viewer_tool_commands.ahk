@@ -31,6 +31,7 @@ class MxNMViewerToolCode {
     static WRONG_FOREGROUND := "WRONG_FOREGROUND"
     static COMMAND_UNKNOWN := "COMMAND_UNKNOWN"
     static BUTTON_TARGET_INVALID := "BUTTON_TARGET_INVALID"
+    static BUTTON_DISABLED := "BUTTON_DISABLED"
     static BUTTON_SET_NOT_UNIQUE := "BUTTON_SET_NOT_UNIQUE"
     static BUTTON_LAYOUT_INVALID := "BUTTON_LAYOUT_INVALID"
     static DISPATCH_FAILED := "DISPATCH_FAILED"
@@ -39,49 +40,40 @@ class MxNMViewerToolCode {
 }
 
 class MxNMViewerToolCommandProvider {
-    static CachedPlan := 0
     static Busy := false
 
-    static PrepareAtStartup(viewerExe := "") {
-        if viewerExe = ""
-            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
-        if this.PrepareFromPathCache(viewerExe)
-            return true
-        if !WinExist("ahk_exe " viewerExe)
-            return false
-        return this.ResolvePlan(viewerExe).ok
-    }
-
-    static PrepareFromPathCache(viewerExe := "") {
-        if viewerExe = ""
-            viewerExe := MxNMConfigGeometryDefaults.ViewerExe
-        cache := LoadValidatedMxNMConfigPathCache()
-        if !IsObject(cache)
-            || StrLower(cache["viewerExe"]) != StrLower(viewerExe) {
-            return false
-        }
-        plan := BuildMxNMViewerToolCommandPlan(
-            viewerExe,
-            cache["configPaths"]
-        )
-        if !plan.ok
-            return false
-        this.CachedPlan := plan
-        return true
-    }
-
+    ; Tool identity comes from live native controls. Vendor image geometry and
+    ; persistent config-path caches are not prerequisites for a button command.
     static ResolvePlan(viewerExe := "") {
         if viewerExe = ""
             viewerExe := MxNMConfigGeometryDefaults.ViewerExe
-        if IsReusableMxNMViewerToolCommandPlan(this.CachedPlan, viewerExe)
-            return this.CachedPlan
-
-        configPaths := ResolveMxNMConfigPathsFromViewer(viewerExe)
-        plan := BuildMxNMViewerToolCommandPlan(viewerExe, configPaths)
-        if plan.ok {
-            this.CachedPlan := plan
-            SaveValidatedMxNMConfigPathCache(viewerExe, configPaths)
+        plan := MakeMxNMViewerToolCommandPlan(viewerExe)
+        paths := Map()
+        for hwnd in WinGetList("ahk_exe " viewerExe) {
+            try processPath := WinGetProcessPath("ahk_id " hwnd)
+            catch
+                continue
+            if processPath != ""
+                paths[StrLower(processPath)] := processPath
         }
+        if paths.Count != 1 {
+            plan.code := paths.Count = 0
+                ? MxNMViewerToolCode.VIEWER_NOT_FOUND
+                : MxNMViewerToolCode.VIEWER_NOT_UNIQUE
+            return plan
+        }
+        for _, processPath in paths
+            plan.viewerProcessPath := processPath
+        for spec in MxNMViewerToolCommand.Specs() {
+            plan.commands[spec.id] := {
+                label: spec.label,
+                commandId: spec.commandId,
+                row: 0,
+                column: 0
+            }
+        }
+        plan.ok := true
+        plan.code := MxNMViewerToolCode.READY
         return plan
     }
 
@@ -90,6 +82,7 @@ class MxNMViewerToolCommandProvider {
             return MakeMxNMViewerToolResult(false, MxNMViewerToolCode.BUSY)
         this.Busy := true
         try {
+            foregroundHwnd := WinExist("A")
             if !MedExViewerToolForegroundActive()
                 return MakeMxNMViewerToolResult(
                     false,
@@ -142,6 +135,18 @@ class MxNMViewerToolCommandProvider {
             }
             target := controlSet.controls[commandKey]
             screenPoint := MxNMViewerToolRectCenter(target.rect)
+            if WinExist("A") != foregroundHwnd
+                return MakeMxNMViewerToolResult(false, MxNMViewerToolCode.WRONG_FOREGROUND)
+            if !DllCall("User32\IsWindowEnabled", "Ptr", target.hwnd, "Int") {
+                result := MakeMxNMViewerToolResult(false, MxNMViewerToolCode.BUTTON_DISABLED)
+                result.commandId := command.commandId
+                result.viewerPid := controlSet.pid
+                result.viewerHwnd := controlSet.frameHwnd
+                result.buttonHwnd := target.hwnd
+                result.buttonParentHwnd := target.parentHwnd
+                result.runtimeCandidateCount := controlSet.candidateCount
+                return result
+            }
             dispatched := DispatchMxNMViewerToolButton(target)
             if !dispatched {
                 result := MakeMxNMViewerToolResult(
@@ -210,6 +215,7 @@ MedExViewerToolForegroundActive(*) {
         || StrLower(processName) = StrLower(VIEWER_EXE)
 }
 
+; Historical config checkpoint only; production uses live ResolvePlan above.
 BuildMxNMViewerToolCommandPlan(viewerExe, configPaths) {
     failure := MakeMxNMViewerToolCommandPlan(viewerExe)
     if !IsObject(configPaths) || !configPaths.ok
@@ -659,10 +665,6 @@ CollectMxNMViewerToolControlCandidate(
         return true
     if !DllCall(
         "User32\IsWindowVisible",
-        "Ptr", hwnd,
-        "Int"
-    ) || !DllCall(
-        "User32\IsWindowEnabled",
         "Ptr", hwnd,
         "Int"
     ) {

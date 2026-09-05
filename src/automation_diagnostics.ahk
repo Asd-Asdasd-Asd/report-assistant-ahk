@@ -164,6 +164,24 @@ BeginAutomationDiagnosticOperation(action) {
 }
 
 AutomationDiagnosticFieldAllowed(action, fieldName) {
+    if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" {
+        static viewerFields := Map(
+            "viewer.command", true,
+            "viewer.foregroundHwnd", true,
+            "viewer.focusHwnd", true,
+            "viewer.keysBefore", true,
+            "viewer.keysAfter", true,
+            "viewer.releaseMs", true,
+            "viewer.targetHwnd", true,
+            "viewer.parentHwnd", true,
+            "viewer.controlId", true,
+            "viewer.candidateCount", true,
+            "viewer.dispatchResult", true,
+            "viewer.effectState", true,
+            "viewer.errorType", true
+        )
+        return viewerFields.Has(String(fieldName))
+    }
     static allowedByAction := Map(
         "ReportImageCaption",
         Map(

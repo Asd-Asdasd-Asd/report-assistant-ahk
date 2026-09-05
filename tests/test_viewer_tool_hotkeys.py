@@ -33,41 +33,25 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn("MxNMViewerToolWindowRectScreen", commands)
         self.assertIn("IsWindowVisible", commands)
         self.assertIn("IsWindowEnabled", commands)
-        self.assertIn("PrepareAtStartup", commands)
+        self.assertNotIn("PrepareAtStartup", commands)
         for forbidden in ("UIA.", "MouseMove", "Click(", "Sleep "):
             self.assertNotIn(forbidden, commands)
 
-    def test_command_schema_is_semantic_and_fails_closed(self) -> None:
+    def test_native_plan_has_no_vendor_geometry_or_persistent_cache_gate(self) -> None:
         commands = source("src/mxnm_viewer_tool_commands.ahk")
-        self.assertIn('"scbtnpadsetting"', commands)
-        self.assertIn('StrSplit(value, "|")', commands)
-        self.assertIn("rows.Count != rowCount", commands)
-        self.assertIn("matches.Length != 1", commands)
-        self.assertIn("SCBtnPadPos", commands)
-        self.assertIn("matches[1].column != 1", commands)
-        self.assertIn("rowIndex := A_Index", commands)
-        self.assertIn("row: rowIndex", commands)
-        self.assertNotIn("row: A_Index", commands)
-        self.assertIn(
-            "MapMxNMViewerToolPadOriginToRuntimeFrame",
-            commands,
-        )
-        invoke = commands.split(
-            "static Invoke(commandName, viewerExe := \"\") {", 1
-        )[1].split("MedExViewerToolForegroundActive(*) {", 1)[0]
-        for legacy_constant in (
-            "BuiltInRowCount",
-            "ButtonCenterX",
-            "ButtonCenterY",
-            "ButtonPitch",
-        ):
-            self.assertNotIn(legacy_constant, invoke)
-        self.assertIn("ResolveMxNMViewerToolControlSet", invoke)
-        self.assertNotIn("ResolveMxNMRuntimeFrame", invoke)
-        self.assertIn(
-            "MxNMViewerToolRectCenter(target.rect)",
-            invoke,
-        )
+        provider = commands.split("class MxNMViewerToolCommandProvider {", 1)[1].split(
+            "MedExViewerToolForegroundActive(*) {", 1)[0]
+        for forbidden in ("LoadStaticConfig", "ConfigPaths", "FileRead", "CachedPlan",
+                          "frameSizeResolved", "SCBtnPadPos", "PrepareFromPathCache"):
+            self.assertNotIn(forbidden, provider)
+        self.assertIn("MxNMViewerToolCommand.Specs()", provider)
+        self.assertIn("WinGetProcessPath", provider)
+        self.assertIn("paths.Count != 1", provider)
+        self.assertIn("ResolveMxNMViewerToolControlSet", provider)
+        self.assertIn('"User32\\IsWindowEnabled", "Ptr", target.hwnd', provider)
+        collector = commands.split("\nCollectMxNMViewerToolControlCandidate(\n", 1)[1].split(
+            "\nMxNMViewerToolPanelMatchesPadOrigin", 1)[0]
+        self.assertNotIn("IsWindowEnabled", collector)
 
     def test_runtime_control_set_is_unique_visible_and_ordered(self) -> None:
         commands = source("src/mxnm_viewer_tool_commands.ahk")
@@ -146,24 +130,18 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             features,
         )
 
-    def test_arrow_and_length_wait_for_release_to_prevent_bare_key_repeat(
-        self,
-    ) -> None:
+    def test_tool_wrappers_share_bounded_release_transaction(self) -> None:
         hotkeys = source("src/viewer_tool_hotkeys.ahk")
-        self.assertIn(
-            'InvokeMxNMViewerToolHotkey.Bind(\n'
-            '                "arrow",',
-            hotkeys,
-        )
-        handler = hotkeys.split(
-            "InvokeMxNMViewerToolHotkey(commandName, chord, *)", 1
-        )[1]
-        self.assertIn("static active := false", handler)
-        self.assertIn(
-            "while ViewerHotkeyChordHasPressedComponent(chord)",
-            handler,
-        )
-        self.assertIn('if WinExist("A") != foregroundHwnd', handler)
+        self.assertIn('return RunMxNMViewerHotkey(commandName, chord)', hotkeys)
+        self.assertIn('return RunMxNMViewerHotkey("suv3d", chord)', hotkeys)
+        self.assertEqual(hotkeys.count("static active := false"), 1)
+        runner = hotkeys.split("RunMxNMViewerHotkey(commandName, chord) {", 1)[1].split(
+            "\nWaitMxNMViewerHotkeyRelease(", 1)[0]
+        self.assertLess(runner.index("WaitMxNMViewerHotkeyRelease"),
+                        runner.index("MxNMViewerToolCommandProvider.Invoke"))
+        self.assertIn('operation.Complete("CANCELLED", "BUSY")', runner)
+        self.assertIn("operation.Complete(outcome, resultCode)", runner)
+        self.assertIn("timeoutMs := 3000", hotkeys)
 
     def test_settings_ui_exposes_all_viewer_hotkeys_and_win_modifier(self) -> None:
         ui = source("src/settings_ui.ahk")
@@ -197,120 +175,37 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn("ReportImageCaptionChordInput", ui)
         self.assertIn("ReportImageCaptionWinInput", ui)
 
-    def test_capture_mapping_is_viewer_only_and_feedback_is_non_textual(self) -> None:
+    def test_capture_dispatch_is_single_and_foreground_checked_after_pulse_discovery(self) -> None:
         hotkeys = source("src/viewer_tool_hotkeys.ahk")
-        features = source("src/features.ahk")
-        feedback = source("src/visual_feedback.ahk")
-        self.assertIn("ViewerCaptureHotkeyDefinitions(settings)", hotkeys)
-        self.assertIn("InvokeMxNMViewerCaptureHotkey.Bind(", hotkeys)
-        self.assertIn(
-            "ViewerHotkeyChordHasPressedComponent(chord)",
-            hotkeys,
-        )
-        self.assertIn('if WinExist("A") != viewerHwnd', hotkeys)
-        self.assertIn('Send "{F12}"', hotkeys)
-        self.assertIn(
-            "pulseHwnd := ResolveMxNMViewerCapturePulseHwnd(viewerHwnd)",
-            hotkeys,
-        )
-        self.assertIn(
-            "pulseHwnd ? pulseHwnd : viewerHwnd",
-            hotkeys,
-        )
-        capture_handler = hotkeys.split(
-            "InvokeMxNMViewerCaptureHotkey(chord, *) {", 1
-        )[1].split("\n}\n\nResolveMxNMViewerCapturePulseHwnd", 1)[0]
-        self.assertLess(
-            capture_handler.index("ResolveMxNMViewerCapturePulseHwnd"),
-            capture_handler.index('Send "{F12}"'),
-        )
-        pulse_resolver = hotkeys.split(
-            "ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {", 1
-        )[1].split("\n}\n\nMxNMViewerCapturePulseVisibleArea", 1)[0]
-        for required in (
-            'WinGetList("ahk_pid " viewerPid)',
-            '"User32\\IsWindowVisible"',
-            "ResolveMxNMRootOwnerHwnd(candidateHwnd)",
-            "candidateOwner != ownerHwnd",
-            "visibleArea > bestVisibleArea",
-        ):
-            self.assertIn(required, pulse_resolver)
-        self.assertNotIn("WinGetTitle", pulse_resolver)
-        visible_area = hotkeys.split(
-            "MxNMViewerCapturePulseVisibleArea(hwnd) {", 1
-        )[1].split("\n}\nInvokeMxNMViewerSuv3DHotkey", 1)[0]
-        for virtual_metric in ("SysGet(76)", "SysGet(77)", "SysGet(78)", "SysGet(79)"):
-            self.assertIn(virtual_metric, visible_area)
-        self.assertIn("MedExViewerForegroundActive", features)
-        self.assertIn("ReportAssistantDispatchPulse", feedback)
-        pulse = feedback.split(
-            "class ReportAssistantDispatchPulse", 1
-        )[1]
-        self.assertIn("durationMs := 90", pulse)
-        self.assertIn('window.BackColor := "FFFFFF"', pulse)
-        self.assertIn("WinSetTransparent(", pulse)
-        self.assertIn('"User32\\SetWindowDisplayAffinity"', pulse)
-        self.assertNotIn('window.Add("Text"', pulse)
-        self.assertIn("NoActivate", pulse)
+        runner = hotkeys.split("RunMxNMViewerHotkey(commandName, chord) {", 1)[1].split(
+            "\nWaitMxNMViewerHotkeyRelease(", 1)[0]
+        self.assertEqual(runner.count('Send "{F12}"'), 1)
+        discover = runner.index("pulseHwnd := ResolveMxNMViewerCapturePulseHwnd")
+        recheck = runner.index('if WinExist("A") != foregroundHwnd', discover)
+        self.assertLess(discover, recheck)
+        self.assertLess(recheck, runner.index('Send "{F12}"'))
+        self.assertLess(runner.index('Send "{F12}"'), runner.index("ShowReportAssistantDispatchPulse"))
+        self.assertIn('"UNOBSERVABLE"', runner)
+        self.assertIn('"viewer.dispatchResult", "DISPATCHED"', runner)
+        pulse = source("src/visual_feedback.ahk").split("class ReportAssistantDispatchPulse", 1)[1]
+        for required in ('durationMs := 90', 'NoActivate', 'SetWindowDisplayAffinity'):
+            self.assertIn(required, pulse)
 
-    def test_clear_hotkey_reuses_verified_context_menu_cleanup(self) -> None:
+    def test_clear_hotkey_reuses_context_menu_cleanup_once(self) -> None:
         hotkeys = source("src/viewer_tool_hotkeys.ahk")
-        self.assertIn('"viewer-clear-annotations"', hotkeys)
-        self.assertIn("InvokeMxNMViewerClearHotkey.Bind(", hotkeys)
-        handler = hotkeys.split(
-            "InvokeMxNMViewerClearHotkey(chord, *)", 1
-        )[1].split(
-            "ViewerHotkeyChordHasPressedComponent(chord) {", 1
-        )[0]
-        self.assertIn("MxNMAnnotationCleaner.DeleteAll(", handler)
-        self.assertIn(
-            "MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY",
-            handler,
-        )
-        self.assertIn(
-            "while ViewerHotkeyChordHasPressedComponent(chord)",
-            handler,
-        )
-        self.assertIn("MxNMViewerClearFailureMessage(result)", handler)
-        self.assertIn(
-            "MxNMAnnotationCleanupCode.COMMAND_FAILED",
-            hotkeys,
-        )
-        self.assertIn("result.failureReason", hotkeys)
-        self.assertIn("targetConfigCode", hotkeys)
-        self.assertIn("targetSessionCacheHit", hotkeys)
-        self.assertIn("targetSessionGeneration", hotkeys)
-        self.assertIn("targetSessionCandidateCount", hotkeys)
-        self.assertIn("targetSessionPointProbeCount", hotkeys)
-        self.assertIn(
-            "TARGET_CLIENT_POINT_INVALID",
-            hotkeys,
-        )
+        self.assertIn('return RunMxNMViewerHotkey("clear", chord)', hotkeys)
+        self.assertEqual(hotkeys.count("MxNMAnnotationCleaner.DeleteAll("), 1)
+        self.assertIn("MxNMAnnotationCleanupVerificationMode.COMMAND_ONLY", hotkeys)
         self.assertNotIn("21081", hotkeys)
 
-    def test_suv3d_dispatches_once_after_the_chord_is_released(self) -> None:
+    def test_key_read_failure_is_not_treated_as_release(self) -> None:
         hotkeys = source("src/viewer_tool_hotkeys.ahk")
-        commands = source("src/mxnm_viewer_tool_commands.ahk")
-        self.assertIn("InvokeMxNMViewerSuv3DHotkey.Bind(", hotkeys)
-        self.assertIn('Invoke("suv3d")', hotkeys)
-        handler = hotkeys.split(
-            "InvokeMxNMViewerSuv3DHotkey(chord, *)", 1
-        )[1].split(
-            "ViewerHotkeyChordHasPressedComponent(chord) {", 1
-        )[0]
-        release_wait = (
-            "while ViewerHotkeyChordHasPressedComponent(chord)"
-        )
-        self.assertIn(release_wait, handler)
-        self.assertLess(
-            handler.index(release_wait),
-            handler.index('Invoke("suv3d")'),
-        )
-        self.assertIn('if WinExist("A") != foregroundHwnd', handler)
-        self.assertNotIn("RepeatValidatedMxNMViewerToolButton", commands)
-        self.assertNotIn("Sleep 35", hotkeys)
-        self.assertIn('GetKeyState("Control", "P")', hotkeys)
-        self.assertIn('GetKeyState("LWin", "P")', hotkeys)
+        reader = hotkeys.split("ViewerHotkeyChordHasPressedComponent(chord) {", 1)[1].split(
+            "\nMxNMViewerClearFailureMessage", 1)[0]
+        self.assertNotIn("catch", reader)
+        self.assertIn("throw ValueError", reader)
+        self.assertIn('GetKeyState("Control", "P")', reader)
+        self.assertIn('GetKeyState("LWin", "P")', reader)
 
     def test_release_order_contains_command_and_hotkey_modules(self) -> None:
         main = source("src/main.ahk")

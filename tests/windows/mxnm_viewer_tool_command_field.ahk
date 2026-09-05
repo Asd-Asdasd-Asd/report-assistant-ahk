@@ -13,6 +13,17 @@
 ^!F11::RunMxNMViewerToolCommandField("suv3d")
 
 RunMxNMViewerToolCommandField(commandName) {
+    ; Provider probe only. Match the production release boundary before dispatch.
+    foregroundAtPress := WinExist("A")
+    key := commandName = "arrow" ? "F9" : commandName = "length" ? "F10" : "F11"
+    startedWaitingAt := A_TickCount
+    while GetKeyState(key, "P") || GetKeyState("Control", "P") || GetKeyState("Alt", "P") {
+        if WinExist("A") != foregroundAtPress || A_TickCount - startedWaitingAt >= 3000
+            return
+        Sleep 10
+    }
+    if WinExist("A") != foregroundAtPress
+        return
     MouseGetPos &mouseBeforeX, &mouseBeforeY
     foregroundBefore := WinExist("A")
     startedAt := A_TickCount
@@ -84,12 +95,6 @@ BuildMxNMViewerToolResolverAudit() {
         "ResolverPlanState=" plan.code "`r`n"
     if !plan.ok
         return output
-    output .=
-        "ResolverPlanPad=" plan.padX "," plan.padY "`r`n"
-        . "ResolverPlanFrame="
-            . plan.mainGeometry.frameWidth ","
-            . plan.mainGeometry.frameHeight "`r`n"
-
     viewerWindows := CaptureMxNMViewerWindowGeometry(
         viewerExe,
         plan.viewerProcessPath
@@ -160,29 +165,6 @@ BuildMxNMViewerToolResolverAudit() {
         frameHwnd := MxNMViewerToolGetRootOwnerHwnd(
             group.parentHwnd
         )
-        snapshotFrame := FindMxNMViewerToolWindowGeometry(
-            viewerWindows,
-            frameHwnd
-        )
-        runtimeFrame := snapshotFrame
-        snapshotFrameFound := IsObject(snapshotFrame)
-        frameFound := IsObject(runtimeFrame)
-        padOrigin := frameFound
-            ? MapMxNMViewerToolPadOriginToRuntimeFrame(
-                {x: plan.padX, y: plan.padY},
-                plan.mainGeometry,
-                runtimeFrame
-            )
-            : 0
-        anchorValid := layoutValid
-            && frameFound
-            && MxNMViewerToolPanelMatchesPadOrigin(
-                group.parentHwnd,
-                group.parentRect,
-                padOrigin,
-                runtimeFrame,
-                processResult.pid
-            )
         output .=
             "ResolverGroup="
             . group.parentHwnd
@@ -193,15 +175,6 @@ BuildMxNMViewerToolResolverAudit() {
             . "|selectionEligible="
                 . MxNMViewerToolFieldBool(layoutValid)
             . "|rootOwner=" frameHwnd
-            . "|snapshotFrameFound="
-                . MxNMViewerToolFieldBool(snapshotFrameFound)
-            . "|frameFound=" MxNMViewerToolFieldBool(frameFound)
-            . "|panelRect="
-                . MxNMViewerToolFieldRect(group.parentRect)
-            . "|expectedPad="
-                . MxNMViewerToolFieldPoint(padOrigin)
-            . "|anchorValid="
-                . MxNMViewerToolFieldBool(anchorValid)
             . "`r`n"
     }
     return output

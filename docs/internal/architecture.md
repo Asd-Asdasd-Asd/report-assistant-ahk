@@ -52,7 +52,7 @@ MxNMSoft 测量值由 `MxNMMeasurementProvider` 解析自动目标，再通过�
 
 `ContextMeasurementProvider` 返回 structured measurement data，包括 measurement type、raw value、formatted value、source、failure reason、context 和 components。hotstrings 或上层报告逻辑只负责决定最终插入的报告文本，不直接承担窗口消息、控件查找和解析细节。
 
-自动 target 使用 config-only 两层模型。首次从运行中的 viewer 验证安装根目录后，将 `viewerProcessPath` 写入 `%LocalAppData%\MedExReportAssistant\mxnm-config-path-cache.ini`；后续启动从该路径重新派生并校验两个固定 vendor config 路径，在不枚举 viewer 窗口的情况下读取配置并建立静态 plan。进程生命周期缓存 `mainGeometry`、配置 hash、viewer process path 和跨 layout maximin point；每次读取先从可见、已验证路径的 Viewer 窗口反查同 PID `GA_ROOTOWNER`，即使 owner 本身未出现在可见 snapshot 中也直接采集其有效几何，再映射 image rectangle/point，并要求该点实际 HWND 的 `GA_ROOTOWNER` 回到同一 frame。若多个候选均通过，则只接受作为 `GA_ROOTOWNER` 拥有唯一最大 Viewer window family 的候选；得分相同继续 fail closed。随后执行 `WindowFromPoint`、PID、进程路径、进程名、root-owner 和 client rect 校验。target 同时返回在该 action HWND 上验证过的 `actionClientPoint`，清除与测量 transport 不再各自重复解析。该规则允许 Viewer 主图区激活后出现额外同进程图像顶层窗口，但不会取消 Viewer/图像身份校验。measurement target 不注册 shell hook、不运行后台 timer，也不依赖 UIA image-region geometry。当前图像读取失败时，manual fallback 仍是上层 workflow。系统优先 false negative，不复用旧剪贴板值，也不把最后一条 SUV log 自动当作当前图像测量值。
+自动 target 当前由 `MxNMContextTargetSessionProvider` 负责，按 Viewer 身份发现图像 surface，并缓存归一化安全点；每次调用验证 PID、root owner、client bounds 和消息 receiver，失效时重新发现。当前右键目标限于 Viewer 左半区。配置几何解析和历史 checkpoint 保留作审计材料，不再是 production `MxNMMeasurementProvider.ResolveTarget` 的入口。清除与测量共用 validated action client point，继续禁止复用旧剪贴板数据或把缺失当成测量阴性。
 
 `{{suvmax}}` 和 `{{size}}` 分别触发 SUVMax 与 1–3 轴读取。只有 `FOUND` 插入数值；`NOT_ANNOTATED`/`AUTOMATION_FAILED` 留下人工输入锚点。报告事务成功后才调用 `删除全部标注`，清除失败不回滚报告。line command 只有在 command 后 clipboard sequence 确实更新为空时才判定 `NOT_ANNOTATED`。
 
@@ -66,7 +66,7 @@ MxNMSoft 测量值由 `MxNMMeasurementProvider` 解析自动目标，再通过�
 
 因此阅片动作应逐个迁移，不能一次性照搬 legacy 点击序列。每个动作必须验证 process/window、fail closed、避免 modal feedback，并在需要移动鼠标时恢复原位置。
 
-v0.6.1 的箭头、长度测量和 3D SUV 快捷键使用一个更窄的 config + native HWND 策略。`mxnm_viewer_tool_commands.ahk` 从 Vendor 配置解析 button-pad 原点和 command rows；runtime 枚举同 PID、visible/enabled 的原生 `Button`，要求三个 command ID 在同一父面板内各唯一出现一次且几何顺序与 Vendor row/column 一致。resolver 从该面板沿 `GA_ROOTOWNER` 反查 outer Viewer，再按其当前 rect 映射并校验面板原点；它不要求 outer Viewer 包含进程内所有临时图像顶层窗口。验证通过后，向实际按钮直接父窗口发送有超时上限的同步 `WM_COMMAND / BN_CLICKED`。production 不再依赖固定按钮中心、固定首三行、固定 pitch 或 `WindowFromPoint` 命中坐标。3D SUV 会等待完整 chord 物理释放后单次投递，避免 Vendor 把仍按下的 modifier 解释为临时工具状态。截图映射只在 Viewer 前台时发送 F12，并用无文字、NoActivate 的全 Viewer 快速白闪表示派发。清除全部标注快捷键不走工具面板或 `21081`，而是复用既有 `MxNMAnnotationCleaner` 的 `删除全部标注` context-menu transport 和 confirmation detection；独立快捷键采用 command-only 结果，不执行额外菜单复读，报告写入后的自动清除仍保留 `NOT_ANNOTATED` postcondition。Settings 原生 Hotkey control 之外使用独立 Win checkbox，以支持 AHK `#` modifier。以上路径不使用 UIA、不移动鼠标、不切换焦点，也没有后台 warmup 或周期轮询。完整模型与现场纠错见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
+箭头、长度和 3D SUV 使用 live native HWND 策略：每次从运行中的 Viewer 获取路径与按钮，三个精确 Control ID 组成唯一可见父面板签名，只要求本次选中的按钮启用；不以图像布局文件、配置坐标、第一列或行列顺序否决。向按钮直接父窗口发送有界同步 `WM_COMMAND / BN_CLICKED`。统一热键入口等待完整松键（最多 3 秒），前台变化取消，不自动重放；截图只发送一次 F12，清除复用 context-menu cleaner。三类入口均写精简诊断，派发成功与 Viewer 业务结果保持区分。当前实现与 Windows 验收边界见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
 
 ## `src/` 模块职责
 
@@ -84,8 +84,8 @@ v0.6.1 的箭头、长度测量和 3D SUV 快捷键使用一个更窄的 config 
 - `report_editor.ahk`：editor-level orchestration，例如插入格式化报告文字、调用目标 editor adapter 恢复 insertion state、处理 workflow result；不得包含 generic clipboard wire-format implementation。
 - `medex_calibration.ahk` / `machine_profile.ahk`：supported profile、UIA readiness、calibration state 和 fail-closed preflight。
 - `mxnm_config_path_cache.ahk`：一次发现后持久化 viewer executable identity；每次加载重新派生并验证固定 vendor config 路径，不保存原始配置内容。
-- `mxnm_viewer_tool_commands.ahk`：缓存 Vendor Viewer 工具静态 plan，执行 runtime frame mapping、native HWND/control-ID 校验和直接父窗口 command dispatch。
-- `viewer_tool_hotkeys.ahk`：根据已归一化设置声明三项 Viewer 工具快捷键，并把结构化失败转换为无焦点视觉提示。
+- `mxnm_viewer_tool_commands.ahk`：执行 live native HWND/control-ID/父面板校验和单次 command dispatch；配置几何 helper 仅供历史 checkpoint。
+- `viewer_tool_hotkeys.ahk`：声明 Viewer 热键，统一有界松键、前台取消、单次派发和诊断。
 - `medex_color_reset_logic.ahk`：layout profile、pure anchor selection、rectangle/geometry、local-offset calculation、screen/client conversion 和 structured result definitions。
 - `adapters/medex_report_editor.ahk`：MedEx-specific strategy dispatch、target validation 和 interaction。`relativeMousePixelValidated` 是 production mainline；`uiaInvoke` 暂存于同一 adapter 作为显式 comparison/rollback。后续如按真实复杂度拆分文件，不得复制 clipboard/report orchestration。
 - `diagnostics.ahk`：区分 production failure-only lightweight log 与 explicit field schema；不得记录报告内容、replacement text 或 clipboard payload。

@@ -1,158 +1,60 @@
 # MxNM Viewer 工具快捷键
 
-本文档固化 v0.6.1–v0.6.2 的箭头、长度测量、3D SUV、截图和清除全部标注快捷键实现，以及 2026-07-26 至 2026-07-27 Windows 多机验证中得到的结论。
+更新：2026-09-06。本文描述当前源码；本次调整尚待 Windows EXE 现场验收。
 
-## 已验证范围
+## 当前命令与作用域
 
-当前工作站已验证三个命令：
+| 功能 | 原生命令 ID | 默认快捷键 |
+| --- | ---: | --- |
+| 箭头 | 21043 | Ctrl+Alt+1 |
+| 长度测量 | 21048 | Ctrl+Alt+2 |
+| 3D SUV 测量 | 21193 | Ctrl+Alt+3 |
+| 截图 | F12 键盘消息 | Ctrl+Alt+4 |
+| 清除全部标注 | 精确右键菜单命令 | Ctrl+Alt+5 |
 
-| 功能 | Vendor command ID | Vendor 配置位置 | 现场按钮位置 |
-| --- | ---: | --- | --- |
-| 箭头 | `21043` | `Row1` | 第 4 个 |
-| 长度测量 | `21048` | `Row3` | 第 6 个 |
-| 3D SUV 测量 | `21193` | `Row6` | 第 9 个 |
+Viewer 工具默认关闭。带修饰键的工具选择/清除支持 MedEx 报告程序及 Viewer 前台；无修饰字母/数字只在 Viewer 前台生效。截图始终限于 Viewer 前台。Win 修饰键通过设置页独立 checkbox 配置。
 
-默认快捷键为 `Ctrl+Alt+1/2/3`，三项首次升级均保持关闭。快捷键只在配置的 MedEx 报告程序或 Viewer 位于前台时注册为有效动作；其他程序中的相同按键继续交给原程序。
+## 统一热键事务
 
-## Win 修饰键
+所有五项热键进入 `RunMxNMViewerHotkey`，共享一个事务占用标记。每次调用最多派发一次，不补发 F12、不重复点击。
 
-AHK 动态 `Hotkey()` 原生支持 `#` 表示 Win，但 Windows common-control `Hotkey` 输入框没有 Win modifier flag，只能采集 Ctrl、Alt 和 Shift。设置页因此在每一行提供独立的 Win checkbox：加载时从 canonical chord 拆出 `#`，保存时再与 native Hotkey 值合并。
+1. 记录动作与前台 HWND；检查当前作用域。
+2. 等待主键及配置中声明的修饰键物理释放，最多 3000 ms。等待过程中前台变化立即取消；异常键名/读取错误进入失败诊断，不解释成“已释放”。
+3. 在派发前复核前台；调用对应原生命令、F12 或清除链。
+4. 在 finally 释放占用标记，并完成操作诊断。超时不派发，松键后可再次触发。
 
-Ctrl、Alt、Shift、Win 中任意一个修饰键即可与主键组成快捷键。无修饰时只接受单个字母或数字，并自动缩窄为仅在 Viewer 前台注册；报告编辑器和其他程序不会拦截该单键。箭头和长度也在完整松键后单次执行，避免无修饰单键长按产生键盘重复。归一化继续使用统一顺序 `^!+#`，并与 emergency/reserved 及其他已启用快捷键做不区分大小写的冲突检查。
+保留松键语义的原因：2026-07 现场曾确认 SUV 命令在 modifier 仍按下时会进入临时状态，并随 modifier 松开取消。本次不改变键盘 hook 安装策略，不把物理状态和逻辑状态视为同一件事；诊断同时记录两者的 modifier mask。
 
-## F12 截图映射
+## 原生按钮定位
 
-第四项默认快捷键为 `Ctrl+Alt+4`，保存键位后只在 `MedExNMFusion.exe` Viewer 位于前台时注册。handler 保存 foreground HWND，等待主键及全部声明 modifier 物理释放，再复核仍是同一个 Viewer 后发送纯 F12，避免 MedEx 收到 Ctrl/Alt/Win+F12；报告窗口或其他程序前台时既不触发，也不吞掉相同按键。
+`MxNMViewerToolCommandProvider.ResolvePlan` 每次从运行中的 Viewer 获取进程路径，并从固定的三项命令定义建立原生计划。工具路径不读 vendor INI、不需要 frame size、面板位置或图像布局文件，不使用持久化路径缓存，也不启动后台 warmup。
 
-F12 派发成功后，以约 23% opacity 的白色 overlay 覆盖 Viewer outer rect 约 90 ms。pulse 使用 `NoActivate`、click-through tool window，不包含文字，不改变焦点；显示前 best-effort 设置 `WDA_EXCLUDEFROMCAPTURE`，降低 overlay 进入截图的风险。它只表示麦旋风在正确 Viewer context 中接受快捷键并执行 F12 send，不验证 MedEx 的截图文件、剪贴板或保存结果。
+运行时枚举同进程原生 `Button`，按直接父窗口分组，要求三个目标 ID 在同一面板内各唯一出现一次，控件可见且矩形位于父面板内。只接受唯一完整组；两组完整可见按钮、跨进程或身份歧义继续拒绝。
 
-## 3D SUV release-then-dispatch semantics
+完整组签名用于区分工具面板；其他按钮的 enabled 状态不再否决当前工具。选中目标本身必须 enabled，否则返回 `BUTTON_DISABLED`。原生计划不以 vendor 行列顺序或第一列作为限制，按钮位置来自 live HWND。
 
-现场确认 `21193` 在快捷键 modifier 仍物理按下时投递，会进入由 modifier 维持的临时状态：抬起主键后仍可测量，但释放 modifier 就会自动取消。这不是期望的产品交互，也不表示 Vendor command 必须持续重复。
+向选中按钮的直接父窗口同步发送 `WM_COMMAND / BN_CLICKED`，超时上限为 250 ms。工具操作不移动鼠标，不激活 Viewer，也不自动重试。成功仅表示消息派发完成，不证明 Viewer 已进入测量模式。
 
-production 因此在 hotkey key-down 后等待主键及所有声明 modifier 完全物理释放，再复核 foreground HWND 未变化，最后只执行一次完整 config、geometry、HWND、PID、control-ID 校验和 command 投递。静态 `active` guard 屏蔽等待期间的操作系统重复 hotkey thread。这样 Vendor 收到 `21193` 时不再带着 Ctrl、Alt、Shift 或 Win 的物理按下状态，目标交互与箭头、长度一致：按下并松开一次完成选择，选择后无需继续按住快捷键。
+旧 `BuildMxNMViewerToolCommandPlan`、配置解析和坐标映射 helper 暂留供历史 checkpoint/审计工具引用，不在生产 `ResolvePlan/Invoke` 路径；搬迁时需同步脚本提取边界。不要把历史 helper 的约束重新接回生产入口。
 
-## 清除全部标注
+## F12 与白闪
 
-第五项默认快捷键为 `Ctrl+Alt+5`，默认关闭，作用域与三个工具选择快捷键相同。handler 等待完整 chord 物理释放并复核 foreground HWND 未变化后，调用既有 `MxNMAnnotationCleaner.DeleteAll()`；它不使用标注工具面板上的 `21081`，也不增加任何工具面板坐标。
+松键后先解析白闪覆盖窗口，再在实际 Send 前复核原前台 HWND。只发送一次 F12。随后以 NoActivate、鼠标穿透的白色 overlay 闪烁约 90 ms，并 best-effort 排除 overlay 被截图。
 
-清除继续复用 production context-menu transport：从 config-only measurement target 取得当前图像点，向 Viewer 投递右键消息；同 PID 的 `#32770` 可以是本次新建，也可以是本次发生状态变化的预创建 hidden dialog，但必须包含精确文字 `删除全部标注`。随后核验 popup PID 和运行时 control ID，异步执行命令并检测意外 confirmation。未发生变化的旧 dialog 不会被复用。独立清除快捷键使用 `COMMAND_ONLY` mode，命令成功投递后不再通过 SUVMax 和直线测量菜单复读结果，因此整个动作只创建一次右键菜单。报告写入后的既有清除仍复核本次使用的 measurement type。失败时只显示短暂视觉提示；不移动鼠标、不切换前台窗口，也不因清除失败改变报告内容。
+白闪表示发送执行到了派发之后。当前没有可验证的截图产物接口，诊断明确写 `viewer.effectState=UNOBSERVABLE`；不得据白闪宣称截图成功。首次截图失败尚需比较物理 F12 与配置热键，以及图像焦点/窗口状态。
 
-清除同样等待主键及所有声明 modifier 完全物理释放，并在 foreground HWND 未变化时只执行一次。等待期间保持 `active` guard，避免长按触发键盘重复而多次发送清除命令；释放后再运行 context-menu transport，也避免把 Ctrl、Alt、Shift 或 Win 的物理按下状态带入 Vendor 菜单处理。
+## 清除
 
-## 配置与运行时模型
+清除复用 `MxNMAnnotationCleaner.DeleteAll` 和 context-session 图像目标，按精确菜单文字识别 `删除全部标注`，保持窗口身份与 confirmation 检测。独立快捷键使用 `COMMAND_ONLY`，不额外打开菜单复读；报告写入后的清除仍保留既有测量后置验证。
 
-`MxNMViewerToolCommandProvider` 在应用启动时尽量复用已经验证的 Viewer process path cache，并从固定相对路径读取 Vendor 配置。静态 plan 缓存：
+## 诊断与验收
 
-- Viewer process path；
-- `FrameWidth` / `FrameHeight`；
-- `SCBtnPadPosX` / `SCBtnPadPosY`；
-- `[SCBtnPadSetting]` 中三个 command ID 的行列；
-- 主配置 hash。
+F12、工具、清除分别以 `ViewerCapture`、`ViewerTool`、`ViewerClear` 写入现有 `automation-events.log`。每次完成一条精简摘要，失败/取消及临时详细模式保留阶段。字段限于固定动作、阶段、耗时、modifier mask、HWND、Control ID、候选数和派发状态；无患者信息、标题、图像或剪贴板内容。
 
-这一路径不使用 UIA，不注册 shell hook，不运行后台 timer，也没有周期轮询。Viewer 尚未运行且没有可用 path cache 时，首次调用按既有 config discovery 流程建立 plan；成功后在本进程内复用。
+关键结果：`KEY_RELEASE_TIMEOUT`、`FOREGROUND_CHANGED`、`WRONG_FOREGROUND`、`BUSY`、`BUTTON_DISABLED`、`DISPATCH_FAILED`、`DISPATCHED`。没有进入 AHK handler 的按键不可能由该日志记录，需现场核对实际键位和热键注册。
 
-每次按键只做以下工作：
+- `tests/windows/generated/viewer_state_regression_standalone.ahk`：从实际生产定义提取的状态与合成原生面板测试，不操作 MedEx。
+- `tests/windows/mxnm_viewer_tool_command_field.ahk`：Ctrl+Alt+F9/F10/F11 provider 测试，等待松键，不替代生产入口验收。
+- 当前正式入口：测试首次/连续调用、持键超过 3 秒、等待中切走前台、禁用其他工具、Viewer 重启及麦旋风重载。
 
-1. 枚举 Viewer 同进程中的 native child controls，只保留目标 command ID、
-   visible/enabled 且 class 为 `Button` 的候选。
-2. 按直接父窗口分组，要求三个目标 ID 在同一面板内各唯一出现一次，实际
-   控件顺序与 Vendor row/column 顺序一致。
-3. 只接受唯一一组完整且顺序有效的原生按钮；不完整的旧/备用面板忽略，
-   两组完整可见面板仍 fail closed。
-4. 向按钮的直接父窗口发送带 250 ms 上限的同步 `WM_COMMAND / BN_CLICKED`。
-
-正常路径不移动鼠标、不切换前台窗口，也不需要 hover。250 ms 是窗口失去响应时的等待上限，不是固定延迟；正常投递会立即返回。
-
-2026-07-28 当前工作站回归发现，三个目标按钮组成的主面板可以同时满足唯一
-ID、可见/启用、顺序和面板原点校验，但其 `GA_ROOTOWNER` 不出现在
-`WinGetList` 的可见 Viewer snapshot 中。旧 resolver 因
-`frameFound=false` 错误淘汰该合法组。进一步现场复测表明，即使直接读取
-owner geometry，outer-frame/panel-origin 仍会产生与按钮身份无关的 false
-negative。当前工具命令因此只让精确 command ID、同 PID、visible/enabled、
-原生 `Button`、共同直接父面板、配置顺序和完整组唯一性决定是否派发。
-Viewer 顶层窗口数量、root-owner snapshot membership 和 `SCBtnPadPos`
-不再拥有否决权。跨 PID、错误 control ID、不完整组、顺序错误和多组完整
-可见按钮仍继续 fail closed。
-
-## 面板映射与实际控件
-
-只缩放 `SCBtnPadPosX/Y` 定义的面板原点：
-
-```text
-padScreenX = windowX + round(SCBtnPadPosX * windowWidth / FrameWidth)
-padScreenY = windowY + round(SCBtnPadPosY * windowHeight / FrameHeight)
-```
-
-该点只用于识别工具面板，不再生成按钮点击坐标。按钮中心来自运行时
-`GetWindowRect`，用于诊断；命令直接投递给实际 HWND，不移动或点击鼠标。
-
-2026-07-27 的第二台机器表明：相同 Viewer frame、相同面板原点下，箭头和
-长度按钮分别从首台机器的 `y=632..666`、`708..742` 变为
-`y=600..637`、`682..719`。旧固定 pitch 算法分别误中 `21044` 和
-`21078`，因此固定首行、尺寸、中心和 `38 px` pitch 均只保留在
-Checkpoint 1 审计回归中，不属于 production resolver。
-
-同一机器还证明，主图区激活会新增一个同进程顶层图像窗口，使“outer frame
-必须包含全部 Viewer 顶层窗口”的通用规则得到零个候选。工具 resolver
-因此不再使用该包含关系，而由已验证工具父面板的 `GA_ROOTOWNER` 唯一反查
-outer Viewer。额外图像层不会参与按钮身份判断。
-
-## 本轮发现
-
-### UIA 名称不能作为按钮身份
-
-按钮默认不稳定暴露 UIA，hover 后出现的名称也可能描述当前作用而不是 Vendor 命令。父 Pane 可以被观察到，但不能可靠解决三个按钮的身份与点击问题。因此 production 路径完全移除 UIA，按钮身份以 Vendor command ID 和 native control ID 为准。
-
-### `WM_COMMAND` 必须发给按钮的直接父窗口
-
-最初将 command ID 发给 Viewer main frame 没有效果。native button 的 `BN_CLICKED` 接收者是直接父窗口；现场确认按钮父窗口可能同时也是独立 root，不应假设它等于 runtime main frame。
-
-### 根 HWND 不相等不代表目标错误
-
-MxNM Viewer 使用同一进程中的多个顶层或浮动窗口。要求
-`button root == runtime frame HWND` 会误拒绝正确按钮。最终边界改为同一
-PID、同一直接父面板、父面板匹配 Vendor 原点，并继续核对 native control
-ID、可见性、启用状态和几何顺序。
-
-### 面板原点可以缩放，按钮位置必须实测
-
-缩放整个 logical point 或完全不缩放都会得到错误目标。多机证据进一步证明
-即使正确映射面板原点，固定像素按钮偏移仍不可迁移。production 只映射
-Vendor 面板原点，按钮位置完全由 native HWND 实际矩形决定。
-
-### 非活动父窗口上的 `BM_CLICK` 不可靠
-
-异步 `BM_CLICK` 在从报告窗口切换焦点后会出现第一次无效、第二次成功。最终改为向已经验证的直接父窗口同步发送 `WM_COMMAND / BN_CLICKED`，既避免激活 Viewer，也消除首次点击失效。
-
-### 嵌套循环不能直接复用 `A_Index`
-
-初版解析 `[SCBtnPadSetting]` 时，在外层 `loop` 内又进入 `for`，对象创建时读取的 `A_Index` 已被内层枚举覆盖。由于当前配置每行只有一个 command，三个命令全部被错误保存为 `row=1`，Length 和 SUV 因而都映射到箭头。解析器现在进入内层循环前保存显式 `rowIndex`，Windows 现场确认 Length 为 `row=3`、SUV 为 `row=6`。
-
-## Fail-closed 边界
-
-以下任一情况都拒绝投递：
-
-- Vendor 配置或 frame geometry 不可用；
-- 三个 command ID 不唯一、行列格式异常或不在第一列；
-- Viewer frame 缺失或不唯一；
-- 同 PID 的可见、启用 native `Button` 候选缺失；
-- 候选不在同一直接父面板，或面板原点与 Vendor 映射不一致；
-- 任一目标 ID 在候选面板中不唯一；
-- runtime control ID 或实际几何顺序与 Vendor command schema 不一致；
-- 父窗口消息超时或发送失败。
-
-配置变化不会通过猜测、UIA Name 或重复点击自动绕过。其他工作站、分辨率、缩放和 Vendor 版本仍须逐机验证后再启用。
-
-## 验证入口
-
-- 纯配置/映射回归：`tests/windows/mxnm_viewer_tool_command_regression.ahk`
-- 现场单按钮测试：`tests/windows/mxnm_viewer_tool_command_field.ahk`
-  - `Ctrl+Alt+F9`：箭头
-  - `Ctrl+Alt+F10`：长度测量
-  - `Ctrl+Alt+F11`：3D SUV 测量
-- Python structural coverage：`tests/test_viewer_tool_hotkeys.py`
-
-旧固定偏移路径仅在首台机器确认成功；第二台机器已证明其不可迁移。新的
-native control-set resolver 仍需按 Checkpoint 2 在至少三台机器完成 EXE
-现场验证后，才能标记跨机器通过。
+Python 测试和生成一致性检查不能替代 Windows AHK 解析、EXE 编译和真实 Viewer 行为验收。

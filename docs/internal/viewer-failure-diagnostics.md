@@ -63,3 +63,11 @@ Get-Content "$env:LOCALAPPDATA\MedExReportAssistant\logs\startup.log" -Tail 30
 ```
 
 然后以最新 `ConfigPath` 所在目录下的 `logs\viewer-failures.log` 为准。
+
+## 2026-09-06：热键入口与派发摘要
+
+F12、工具选择和快捷键清除现另接入 `automation-events.log`，动作分别为 `ViewerCapture`、`ViewerTool`、`ViewerClear`。旧 `viewer-failures.log` 保留 provider 失败记录；托盘“复制诊断信息”沿用现有按最近动作筛选逻辑。
+
+摘要包含松键耗时、物理/逻辑 modifier mask、前台/焦点与工具目标 HWND、Control ID、候选数和派发状态。`KEY_RELEASE_TIMEOUT` 表示持键达到 3 秒而取消；`FOREGROUND_CHANGED`/`WRONG_FOREGROUND` 表示前台取消；`BUTTON_DISABLED` 表示目标原生工具未启用。`DISPATCHED` 仅代表已派发，`viewer.effectState=UNOBSERVABLE` 明确表示尚不能观察截图产物或工具切换结果。物理/逻辑 mask 位顺序为 Control、Alt、Shift、LWin、RWin。
+
+故障发生后先复制诊断再重新加载，以保留当次进程内状态。没有进入 handler 的键位仍需靠实际配置和 Windows 输入状态调查；日志不读取患者信息、窗口标题、图像或剪贴板内容。

@@ -921,6 +921,7 @@ class MxNMViewerToolCode {
     static WRONG_FOREGROUND := "WRONG_FOREGROUND"
     static COMMAND_UNKNOWN := "COMMAND_UNKNOWN"
     static BUTTON_TARGET_INVALID := "BUTTON_TARGET_INVALID"
+    static BUTTON_DISABLED := "BUTTON_DISABLED"
     static BUTTON_SET_NOT_UNIQUE := "BUTTON_SET_NOT_UNIQUE"
     static BUTTON_LAYOUT_INVALID := "BUTTON_LAYOUT_INVALID"
     static DISPATCH_FAILED := "DISPATCH_FAILED"
@@ -1359,10 +1360,6 @@ CollectMxNMViewerToolControlCandidate(
         return true
     if !DllCall(
         "User32\IsWindowVisible",
-        "Ptr", hwnd,
-        "Int"
-    ) || !DllCall(
-        "User32\IsWindowEnabled",
         "Ptr", hwnd,
         "Int"
     ) {

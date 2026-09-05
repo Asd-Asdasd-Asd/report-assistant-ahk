@@ -55,7 +55,6 @@
 #Include tray_menu.ahk
 
 ConfigureReportAssistantTrayMenu()
-MxNMViewerToolCommandProvider.PrepareAtStartup()
 
 #SuspendExempt
 

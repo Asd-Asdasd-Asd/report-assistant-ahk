@@ -6,7 +6,7 @@ class ReportImageCaptionDefaults {
     static PasteSettleMs := 20
     ; The first paste into a newly observed renderer can be visible before its
     ; backing editor state accepts the change. Gate only that cold boundary.
-    static FirstTargetProcessPasteSettleMs := 500
+    static FirstTargetSessionPasteSettleMs := 500
     static ExplicitSaveSettleMs := 200
     ; WheelDown has a vendor-side conditional save path that is skipped when
     ; advances are too close together. Only wait for the missing remainder.
@@ -811,7 +811,7 @@ ExecuteReportImageCaptionAction(
     activationStartedAt := 0
     pasteDispatchedAt := 0
     saveDispatchedAt := 0
-    pasteSettle := ReportImageCaptionPasteSettle(operation)
+    pasteSettle := ReportImageCaptionPasteSettle(target)
     if IsObject(operation) {
         operation.SetField(
             "caption.saveDispatchResult",
@@ -944,6 +944,7 @@ ExecuteReportImageCaptionAction(
                 1,
                 0
             )
+            ReportImageCaptionPasteGate.ObserveSave(target)
             saveDispatchedAt := A_TickCount
             if IsObject(operation) {
                 operation.SetField(
@@ -1057,17 +1058,31 @@ ExecuteReportImageCaptionAction(
     }
 }
 
-ReportImageCaptionPasteSettle(operation := 0) {
-    if IsObject(operation) && operation.FirstTargetProcessUse {
+ReportImageCaptionPasteSettle(target) {
+    return ReportImageCaptionPasteGate.Plan(target)
+}
+
+; This state belongs to the caption transaction, never to diagnostic observation.
+; Retain only the most recently warmed target, matching the single caption cache.
+class ReportImageCaptionPasteGate {
+    static ReadyTargetKey := ""
+
+    static Plan(target) {
+        firstPaste := this.ReadyTargetKey != this.TargetKey(target)
         return {
-            path: "FIRST_TARGET_PROCESS_GATE",
-            milliseconds:
-                ReportImageCaptionDefaults.FirstTargetProcessPasteSettleMs
+            path: firstPaste ? "FIRST_TARGET_SESSION_GATE" : "STANDARD",
+            milliseconds: firstPaste
+                ? ReportImageCaptionDefaults.FirstTargetSessionPasteSettleMs
+                : ReportImageCaptionDefaults.PasteSettleMs
         }
     }
-    return {
-        path: "STANDARD",
-        milliseconds: ReportImageCaptionDefaults.PasteSettleMs
+
+    static ObserveSave(target) {
+        this.ReadyTargetKey := this.TargetKey(target)
+    }
+
+    static TargetKey(target) {
+        return String(target.pid) ":" String(target.hwnd)
     }
 }
 

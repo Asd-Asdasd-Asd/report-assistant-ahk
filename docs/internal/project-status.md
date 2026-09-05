@@ -1,9 +1,22 @@
 # 项目状态与交接
 
-更新时间：2026-07-30
+更新时间：2026-09-06
 当前版本以 `src/app_metadata.ahk` 为唯一真源，并显示在 EXE“关于麦旋风…”和发布目录 `版本信息.md`。
 
-## 当前 mainline
+## 当前状态（2026-09-06）
+
+- 当前源码版本：`0.8.0`，本次为未发布的源码修订；Windows EXE 尚未编译/验收。
+- 当前 measurement target：`MxNMMeasurementProvider.ResolveTarget` → `MxNMContextTargetSessionProvider`，按图像 surface 会话发现/验证；不再以旧 config-only 几何计划作为生产入口。
+- Viewer 工具：live 原生 command ID / 同进程 / 唯一完整父面板；不依赖 vendor 图像几何配置或持久化 plan。仅要求选中工具启用。
+- Viewer 热键：统一单次事务，松键最多 3 秒，前台变化取消，F12/工具/清除均有精简诊断。
+- Caption 首次保存等待由业务 target session 管理，诊断观察不再消耗首次等待。
+- 验证结果与尚待现场确认的故障见 `2026-09-06-design-audit.md`；当前实现说明见 `mxnm-viewer-tool-hotkeys.md`。
+
+## 历史基线（以下保留 2026-07-30 原记录）
+
+以下 v0.6.3、283 tests 与 config-only 描述均为历史状态，不代表当前调用链或本次 Windows 验收结果。
+
+### 当时 mainline
 
 - Application version source：`src/app_metadata.ahk`；版本号只在这里人工修改。
 - Config：Schema 2，路径 `%LocalAppData%\MedExReportAssistant\config.ini`。

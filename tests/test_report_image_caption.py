@@ -258,7 +258,7 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertIn("static CaptionFocusSettleMs := 15", self.module)
         self.assertIn("static PasteSettleMs := 20", self.module)
         self.assertIn(
-            "static FirstTargetProcessPasteSettleMs := 500",
+            "static FirstTargetSessionPasteSettleMs := 500",
             self.module,
         )
         self.assertIn("static ExplicitSaveSettleMs := 200", self.module)
@@ -276,28 +276,30 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertNotIn("A_Clipboard :=", action)
         self.assertIn("SetReportImageCaptionClipboard(cache.payload)", action)
 
-    def test_only_first_target_process_paste_gets_pre_save_gate(self) -> None:
+    def test_first_caption_save_owns_pre_save_gate(self) -> None:
         action = self.body(
             "\nExecuteReportImageCaptionAction(\n    cache,",
-            "\nReportImageCaptionPasteSettle(operation := 0)",
+            "\nReportImageCaptionPasteSettle(target)",
         )
         settle = self.body(
-            "\nReportImageCaptionPasteSettle(operation := 0)",
+            "\nReportImageCaptionPasteSettle(target)",
             "\nSetReportImageCaptionClipboard(payload)",
         )
         self.assertIn(
-            "pasteSettle := ReportImageCaptionPasteSettle(operation)",
+            "pasteSettle := ReportImageCaptionPasteSettle(target)",
             action,
         )
         self.assertIn("Sleep pasteSettle.milliseconds", action)
         self.assertIn('operation.Stage("PASTE_SETTLE_COMPLETED")', action)
-        self.assertIn("operation.FirstTargetProcessUse", settle)
-        self.assertIn('path: "FIRST_TARGET_PROCESS_GATE"', settle)
+        self.assertNotIn("operation.FirstTargetProcessUse", settle)
+        self.assertIn("static ReadyTargetKey", settle)
+        self.assertIn("ReportImageCaptionPasteGate.ObserveSave(target)", action)
+        self.assertIn('"FIRST_TARGET_SESSION_GATE"', settle)
         self.assertIn(
-            "ReportImageCaptionDefaults.FirstTargetProcessPasteSettleMs",
+            "ReportImageCaptionDefaults.FirstTargetSessionPasteSettleMs",
             settle,
         )
-        self.assertIn('path: "STANDARD"', settle)
+        self.assertIn('"STANDARD"', settle)
         self.assertIn("ReportImageCaptionDefaults.PasteSettleMs", settle)
 
     def test_explicit_save_button_is_dispatched_before_advance(self) -> None:
@@ -330,7 +332,7 @@ class ReportImageCaptionTests(unittest.TestCase):
         )
         action = self.body(
             "\nExecuteReportImageCaptionAction(\n    cache,",
-            "\nReportImageCaptionPasteSettle(operation := 0)",
+            "\nReportImageCaptionPasteSettle(target)",
         )
         self.assertIn("static LastAdvanceTicks := Map()", gate)
         self.assertIn('path: "NO_PRIOR_ADVANCE"', gate)
