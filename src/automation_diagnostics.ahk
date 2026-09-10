@@ -411,6 +411,20 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     for line in snapshotViewerFailures
         lines.Push(line)
     lines.Push("RecentViewerFailuresEnd")
+    ; Montage checkpoints are independent of the latest screenshot/action.
+    ; Keep only this assistant session so old runs cannot masquerade as new.
+    lines.Push("RecentMontageProgressBegin")
+    try {
+        montageLines := ReadRecentAutomationDiagnosticLines(
+            DefaultMxNMMontageProgressLogPath(), 30
+        )
+        for line in montageLines {
+            if AutomationDiagnosticLineField(line, "sessionId", "")
+                = AutomationDiagnosticSession.SessionId
+                lines.Push(line)
+        }
+    }
+    lines.Push("RecentMontageProgressEnd")
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
