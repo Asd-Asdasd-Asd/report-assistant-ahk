@@ -419,53 +419,30 @@ MxNMMontageComboSelect(controlId, optionName, session) {
     resolved := MxNMMontageResolveControl(session, controlId, "ComboBox")
     if !resolved.ok
         return resolved
+    resolved.controlId := controlId
+    resolved.controlClass := "ComboBox"
     try combo := UIA.ElementFromHandle(resolved.hwnd)
     catch
-        return MxNMMontageResult(false, "COMBO_UIA_ELEMENT_FAILED")
+        return MxNMMontageResult(false, "COMBO_UIA_ELEMENT_FAILED", resolved)
     try {
         if combo.ProcessId != session.viewerPid || !combo.IsExpandCollapsePatternAvailable
             throw Error()
         combo.ExpandCollapsePattern.Expand()
     } catch {
-        return MxNMMontageResult(false, "COMBO_EXPAND_FAILED")
+        return MxNMMontageResult(false, "COMBO_EXPAND_FAILED", resolved)
     }
-    deadline := A_TickCount + MxNMMontageTiming.ComboOptionTimeoutMs
-    loop {
-        options := MxNMMontageCollectComboOptions(combo, optionName, session)
-        if options.matches.Length = 1 || A_TickCount >= deadline
-            break
-        Sleep MxNMMontageTiming.ComboPollMs
-    }
-    if options.matches.Length != 1 {
+    ready := MxNMMontageWaitForComboOption(combo, optionName, session, resolved)
+    if !ready.ok {
         try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_NOT_UNIQUE")
+        return ready
     }
-    option := options.matches[1]
-    try optionRect := option.BoundingRectangle
-    catch {
+    ; UIA calls may yield while the foreground changes. Recheck before input.
+    if !MxNMMontageViewerStillActive(session) {
         try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_GEOMETRY_FAILED")
+        return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED", ready)
     }
-    if !IsObject(optionRect) || optionRect.r - optionRect.l < 4 || optionRect.b - optionRect.t < 4 {
-        try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_RECT_INVALID")
-    }
-    x := Round((optionRect.l + optionRect.r) / 2), y := Round((optionRect.t + optionRect.b) / 2)
-    pointHwnd := MxNMMontageWindowFromPoint(x, y)
-    try pointPid := WinGetPID("ahk_id " pointHwnd)
-    catch {
-        pointPid := 0
-    }
-    try pointClass := WinGetClass("ahk_id " pointHwnd)
-    catch {
-        pointClass := ""
-    }
-    if !pointHwnd || pointPid != session.viewerPid || StrLower(pointClass) != "combolbox" {
-        try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_POINT_MISMATCH")
-    }
-    if !MxNMMontagePhysicalClick(x, y)
-        return MxNMMontageResult(false, "COMBO_OPTION_PHYSICAL_CLICK_FAILED")
+    if !MxNMMontagePhysicalClick(ready.optionPointX, ready.optionPointY)
+        return MxNMMontageResult(false, "COMBO_OPTION_PHYSICAL_CLICK_FAILED", ready)
     startedAt := A_TickCount
     deadline := startedAt + MxNMMontageTiming.ComboValueTimeoutMs
     collapseFallbackAt := startedAt
@@ -489,17 +466,82 @@ MxNMMontageComboSelect(controlId, optionName, session) {
         Sleep MxNMMontageTiming.ComboPollMs
     }
     try combo.ExpandCollapsePattern.Collapse()
-    return MxNMMontageResult(false, "COMBO_VALUE_NOT_CONFIRMED")
+    return MxNMMontageResult(false, "COMBO_VALUE_NOT_CONFIRMED", ready)
+}
+
+MxNMMontageWaitForComboOption(combo, optionName, session, details) {
+    startedAt := A_TickCount
+    deadline := startedAt + MxNMMontageTiming.ComboOptionTimeoutMs
+    probeCount := 0
+    loop {
+        if !MxNMMontageViewerStillActive(session)
+            return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED", details)
+        ; Rediscover the unique item and its current rectangle together: UIA
+        ; can expose an item before the popup is ready at that screen point.
+        options := MxNMMontageCollectComboOptions(combo, optionName, session)
+        ready := MxNMMontageProbeComboOption(options, session, details)
+        probeCount += 1
+        ready.pointProbeCount := probeCount
+        ready.comboReadyElapsedMs := A_TickCount - startedAt
+        if ready.ok || A_TickCount >= deadline
+            return ready
+        ; No input or re-expansion is replayed. The shared deadline also covers
+        ; geometry/hit-test failures, not just missing items. A blocking UIA
+        ; call itself cannot be interrupted by this polling deadline.
+        Sleep MxNMMontageTiming.ComboPollMs
+    }
+}
+
+MxNMMontageProbeComboOption(options, session, details) {
+    result := MxNMMontageResult(false, "COMBO_OPTION_NOT_UNIQUE", details)
+    result.optionQuerySucceeded := options.querySucceeded
+    result.optionRawCandidateCount := options.rawCount
+    result.optionCandidateCount := options.matches.Length
+    if options.matches.Length != 1
+        return result
+    option := options.matches[1]
+    result.code := "COMBO_OPTION_GEOMETRY_FAILED"
+    try optionRect := option.BoundingRectangle
+    catch
+        return result
+    result.code := "COMBO_OPTION_RECT_INVALID"
+    if !IsObject(optionRect) || optionRect.r - optionRect.l < 4 || optionRect.b - optionRect.t < 4
+        return result
+    x := Round((optionRect.l + optionRect.r) / 2), y := Round((optionRect.t + optionRect.b) / 2)
+    result.optionPointX := x
+    result.optionPointY := y
+    pointHwnd := MxNMMontageWindowFromPoint(x, y)
+    result.optionPointHwnd := pointHwnd
+    try pointPid := WinGetPID("ahk_id " pointHwnd)
+    catch {
+        pointPid := 0
+    }
+    try pointClass := WinGetClass("ahk_id " pointHwnd)
+    catch {
+        pointClass := ""
+    }
+    result.optionPointPid := pointPid
+    ; Log only fixed class categories, never arbitrary UI text.
+    result.optionPointClass := pointClass = "" ? "UNKNOWN"
+        : StrLower(pointClass) = "combolbox" ? "COMBOLBOX" : "OTHER"
+    result.code := "COMBO_OPTION_POINT_MISMATCH"
+    if !pointHwnd || pointPid != session.viewerPid || StrLower(pointClass) != "combolbox"
+        return result
+    result.ok := true
+    result.code := "COMBO_OPTION_READY"
+    return result
 }
 
 MxNMMontageCollectComboOptions(combo, optionName, session) {
-    result := {matches: []}
+    result := {matches: [], querySucceeded: false, rawCount: 0}
     try desktop := UIA.GetRootElement()
     catch
         return result
     try candidates := desktop.FindElements({Name: optionName, Type: "ListItem", cs: 0})
     catch
         return result
+    result.querySucceeded := true
+    result.rawCount := candidates.Length
     for candidate in candidates {
         try {
             if candidate.ProcessId != session.viewerPid || !candidate.IsEnabled || candidate.IsOffscreen || !candidate.IsSelectionItemPatternAvailable
@@ -836,7 +878,17 @@ MxNMMontageResult(ok, code, details := 0) {
             "uiaCandidateCount",
             "uiaQuerySucceeded",
             "mergedCandidateCount",
-            "runtimeCandidateCount"
+            "runtimeCandidateCount",
+            "pointProbeCount",
+            "comboReadyElapsedMs",
+            "optionQuerySucceeded",
+            "optionRawCandidateCount",
+            "optionCandidateCount",
+            "optionPointX",
+            "optionPointY",
+            "optionPointHwnd",
+            "optionPointPid",
+            "optionPointClass"
         ] {
             if details.HasOwnProp(name)
                 result.%name% := details.%name%

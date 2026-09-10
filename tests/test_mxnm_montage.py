@@ -113,6 +113,35 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertNotIn("WinGetTitle", static_click)
         self.assertNotIn("MonitorGet", static_click)
 
+    def test_combo_wait_includes_geometry_and_hit_test_without_replaying_input(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        wait = module.split("MxNMMontageWaitForComboOption(combo, optionName, session, details) {", 1)[1].split("\nMxNMMontageProbeComboOption", 1)[0]
+        self.assertLess(wait.index("deadline :="), wait.index("loop {"))
+        self.assertLess(wait.index("loop {"), wait.index("MxNMMontageCollectComboOptions("))
+        self.assertLess(wait.index("MxNMMontageCollectComboOptions("), wait.index("MxNMMontageProbeComboOption("))
+        self.assertIn("if ready.ok || A_TickCount >= deadline", wait)
+        self.assertIn("MxNMMontageViewerStillActive(session)", wait)
+        for forbidden in ("PhysicalClick(", ".Expand()", ".Collapse()", "MxNMMontageRun("):
+            self.assertNotIn(forbidden, wait)
+        probe = module.split("MxNMMontageProbeComboOption(options, session, details) {", 1)[1].split("\nMxNMMontageCollectComboOptions", 1)[0]
+        for guard in ("options.matches.Length != 1", "option.BoundingRectangle", "pointPid != session.viewerPid", 'StrLower(pointClass) != "combolbox"'):
+            self.assertLess(probe.index(guard), probe.index("result.ok := true"))
+        select = module.split("MxNMMontageComboSelect(controlId, optionName, session) {", 1)[1].split("\nMxNMMontageWaitForComboOption", 1)[0]
+        self.assertEqual(select.count("MxNMMontagePhysicalClick("), 1)
+        self.assertLess(select.index("if !ready.ok"), select.index("MxNMMontagePhysicalClick("))
+        self.assertLess(select.index("if !MxNMMontageViewerStillActive(session)"), select.index("MxNMMontagePhysicalClick("))
+
+    def test_combo_failure_evidence_survives_result_copy_and_log_format(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        copy = module.split("MxNMMontageResult(ok, code, details := 0) {", 1)[1].split("\nMxNMMontageAttachFailureContext", 1)[0]
+        log = source("src/diagnostics.ahk")
+        for key in ("pointProbeCount", "comboReadyElapsedMs", "optionQuerySucceeded", "optionRawCandidateCount", "optionCandidateCount", "optionPointX", "optionPointY", "optionPointHwnd", "optionPointPid", "optionPointClass"):
+            self.assertIn(f'"{key}"', copy)
+            self.assertIn(f'"{key}"', log)
+        self.assertIn("resolved.controlId := controlId", module)
+        self.assertIn('resolved.controlClass := "ComboBox"', module)
+        self.assertIn('"COMBOLBOX" : "OTHER"', module)
+
     def test_failure_log_preserves_control_candidate_evidence(self) -> None:
         module = source("src/mxnm_montage.ahk")
         for required in (
