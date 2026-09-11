@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import unittest
+import ctypes
 from pathlib import Path
 
 
@@ -112,6 +113,73 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("MxNMMontageWaitForControl(", static_click)
         self.assertNotIn("WinGetTitle", static_click)
         self.assertNotIn("MonitorGet", static_click)
+
+    def test_combo_wait_includes_geometry_and_hit_test_without_replaying_input(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        wait = module.split("MxNMMontageWaitForComboOption(combo, optionName, session, details) {", 1)[1].split("\nMxNMMontageProbeComboOption", 1)[0]
+        self.assertLess(wait.index("deadline :="), wait.index("loop {"))
+        self.assertLess(wait.index("loop {"), wait.index("MxNMMontageCollectComboOptions("))
+        self.assertLess(wait.index("MxNMMontageCollectComboOptions("), wait.index("MxNMMontageProbeComboOption("))
+        self.assertIn("if ready.ok || A_TickCount >= deadline", wait)
+        self.assertIn("MxNMMontageViewerStillActive(session)", wait)
+        for forbidden in ("PhysicalClick(", ".Expand()", ".Collapse()", "MxNMMontageRun("):
+            self.assertNotIn(forbidden, wait)
+        probe = module.split("MxNMMontageProbeComboOption(options, session, details) {", 1)[1].split("\nMxNMMontageCollectComboOptions", 1)[0]
+        for guard in ("options.matches.Length != 1", "option.BoundingRectangle", "pointPid != session.viewerPid", 'StrLower(pointClass) != "combolbox"'):
+            self.assertLess(probe.index(guard), probe.index("result.ok := true"))
+        select = module.split("MxNMMontageComboSelect(controlId, optionName, session) {", 1)[1].split("\nMxNMMontageWaitForComboOption", 1)[0]
+        self.assertEqual(select.count("MxNMMontagePhysicalClick("), 1)
+        self.assertLess(select.index("if !ready.ok"), select.index("MxNMMontagePhysicalClick("))
+        self.assertLess(select.index("if !MxNMMontageViewerStillActive(session)"), select.index("MxNMMontagePhysicalClick("))
+
+    def test_combo_failure_evidence_survives_result_copy_and_log_format(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        copy = module.split("MxNMMontageResult(ok, code, details := 0) {", 1)[1].split("\nMxNMMontageAttachFailureContext", 1)[0]
+        log = source("src/diagnostics.ahk")
+        for key in ("pointProbeCount", "comboReadyElapsedMs", "optionQuerySucceeded", "optionRawCandidateCount", "optionCandidateCount", "optionPointX", "optionPointY", "optionPointHwnd", "optionPointPid", "optionPointClass"):
+            self.assertIn(f'"{key}"', copy)
+            self.assertIn(f'"{key}"', log)
+        self.assertIn("resolved.controlId := controlId", module)
+        self.assertIn('resolved.controlClass := "ComboBox"', module)
+        self.assertIn('"COMBOLBOX" : "OTHER"', module)
+
+    def test_combo_search_is_confined_to_the_native_associated_list(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        search = module.split("MxNMMontageCollectComboOptions(combo, optionName, session, comboHwnd) {", 1)[1].split("\nMxNMMontageOptionBelongsToCombo", 1)[0]
+        self.assertNotIn("UIA.GetRootElement", search)
+        self.assertIn("UIA.ElementFromHandle(listHwnd)", search)
+        self.assertIn("listElement.FindElements(", search)
+        self.assertIn("MxNMMontageOptionBelongsToCombo(candidate, combo)", search)
+        for check in ('NumGet(info, 40, "Ptr") != comboHwnd', '"User32\\IsWindowVisible"', "session.viewerPid", "session.viewerRootOwner", '!= "combolbox"'):
+            self.assertIn(check, search)
+        self.assertIn("pointHwnd != options.listHwnd", module)
+        self.assertIn("COMBO_OPTION_CHANGED_BEFORE_CLICK", module)
+
+    def test_comboboxinfo_layout_matches_32_and_64_bit_windows_abi(self) -> None:
+        class Rect(ctypes.Structure):
+            _fields_ = [(name, ctypes.c_int32) for name in ("left", "top", "right", "bottom")]
+        for pointer, expected_size in ((ctypes.c_uint32, 52), (ctypes.c_uint64, 64)):
+            class ComboInfo(ctypes.Structure):
+                _fields_ = [("cbSize", ctypes.c_uint32), ("rcItem", Rect), ("rcButton", Rect), ("stateButton", ctypes.c_uint32), ("hwndCombo", pointer), ("hwndItem", pointer), ("hwndList", pointer)]
+            self.assertEqual(ctypes.sizeof(ComboInfo), expected_size)
+            self.assertEqual(ComboInfo.hwndCombo.offset, 40)
+            self.assertEqual(ComboInfo.hwndList.offset, 40 + 2 * ctypes.sizeof(pointer))
+
+    def test_montage_checkpoints_are_immediate_and_exceptions_are_logged(self) -> None:
+        module = source("src/mxnm_montage.ahk")
+        self.assertIn('"recordType=montage-checkpoint"', module)
+        self.assertIn('"\\montage-progress.log"', module)
+        self.assertIn("WriteAutomationDiagnosticLines(", module)
+        handler = module.split("InvokeMxNMMontageHotkey(profileId, chord, settings, *) {", 1)[1].split("\nMxNMMontageWaitForHotkeyRelease", 1)[0]
+        self.assertLess(handler.index("MxNMMontageTrace.Begin(profileId)"), handler.index("MxNMMontageRun("))
+        self.assertIn("catch as montageErr", handler)
+        self.assertIn("Type(montageErr)", handler)
+        self.assertNotIn("montageErr.Message", handler)
+        self.assertIn('MxNMMontageTrace.Stage("OPERATION_RETURNED"', handler)
+        select = module.split("MxNMMontageComboSelect(controlId, optionName, session) {", 1)[1].split("\nMxNMMontageWaitForComboOption", 1)[0]
+        self.assertLess(select.index('"COMBO_OPTIONS_BEGIN"'), select.index("ready := MxNMMontageWaitForComboOption("))
+        self.assertLess(select.index('"COMBO_CLICK_BEGIN"'), select.index("if !MxNMMontageViewerStillActive(session)"))
+        self.assertLess(select.index("COMBO_OPTION_CHANGED_BEFORE_CLICK"), select.index("MxNMMontagePhysicalClick("))
 
     def test_failure_log_preserves_control_candidate_evidence(self) -> None:
         module = source("src/mxnm_montage.ahk")

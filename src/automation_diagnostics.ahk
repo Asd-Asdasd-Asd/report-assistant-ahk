@@ -429,6 +429,20 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", col
         lines.Push(colorEvent.summary)
         lines.Push("RecentColorResetFailureEnd")
     }
+    ; Montage checkpoints are independent of the latest screenshot/action.
+    ; Keep only this assistant session so old runs cannot masquerade as new.
+    lines.Push("RecentMontageProgressBegin")
+    try {
+        montageLines := ReadRecentAutomationDiagnosticLines(
+            DefaultMxNMMontageProgressLogPath(), 30
+        )
+        for line in montageLines {
+            if AutomationDiagnosticLineField(line, "sessionId", "")
+                = AutomationDiagnosticSession.SessionId
+                lines.Push(line)
+        }
+    }
+    lines.Push("RecentMontageProgressEnd")
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line

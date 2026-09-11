@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 644469e869cc0d58a04a9417698907499b9f439c-dirty
-; Generated at: 2026-09-07 02:13:47 UTC
+; Source revision: 15293cb9e89f39cf92d9f8c5a3f584b53b587761-dirty
+; Generated at: 2026-09-11 01:23:47 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-09-07"
-    static SourceRevision := "644469e869cc0d58a04a9417698907499b9f439c-dirty"
+    static BuildDate := "2026-09-11"
+    static SourceRevision := "15293cb9e89f39cf92d9f8c5a3f584b53b587761-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -534,6 +534,20 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", col
         lines.Push(colorEvent.summary)
         lines.Push("RecentColorResetFailureEnd")
     }
+    ; Montage checkpoints are independent of the latest screenshot/action.
+    ; Keep only this assistant session so old runs cannot masquerade as new.
+    lines.Push("RecentMontageProgressBegin")
+    try {
+        montageLines := ReadRecentAutomationDiagnosticLines(
+            DefaultMxNMMontageProgressLogPath(), 30
+        )
+        for line in montageLines {
+            if AutomationDiagnosticLineField(line, "sessionId", "")
+                = AutomationDiagnosticSession.SessionId
+                lines.Push(line)
+        }
+    }
+    lines.Push("RecentMontageProgressEnd")
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
@@ -16635,6 +16649,17 @@ FormatMxNMViewerFailureDiagnostic(action, resultCode, details := 0) {
         "viewerProcessCount=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "viewerProcessCount", 0)),
         "sessionCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "sessionCandidateCount", 0)),
         "pointProbes=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "pointProbeCount", 0)),
+        "comboReadyElapsedMs=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "comboReadyElapsedMs", 0)),
+        "optionQuerySucceeded=" FormatDiagnosticBoolean(MxNMViewerFailureDetail(details, "optionQuerySucceeded", false)),
+        "optionRawCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionRawCandidateCount", 0)),
+        "optionCandidates=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionCandidateCount", 0)),
+        "optionPointX=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionPointX", 0)),
+        "optionPointY=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionPointY", 0)),
+        "optionPointHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionPointHwnd", 0)),
+        "optionPointPid=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionPointPid", 0)),
+        "optionPointClass=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionPointClass", "UNKNOWN")),
+        "optionListHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionListHwnd", 0)),
+        "optionSearchScope=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionSearchScope", "")),
         "popupDiscovery=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupDiscovery", "")),
         "popupHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupHwnd", 0)),
         "commandControlHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "commandControlHwnd", 0)),
@@ -20432,6 +20457,57 @@ class MxNMMontageColdRecovery {
     static Consumed := false
 }
 
+; Persist checkpoints before potentially blocking calls. Failure-only logging
+; cannot distinguish a hung call, an exception, and an apparent success.
+class MxNMMontageTrace {
+    static OperationId := 0
+    static ProfileId := ""
+    static LastStage := ""
+    static ControlId := 0
+    static StartTick := 0
+
+    static Begin(profileId) {
+        this.OperationId += 1
+        this.ProfileId := profileId
+        this.StartTick := A_TickCount
+        this.Stage("HOTKEY_ENTERED")
+    }
+
+    static Stage(stage, controlId := 0, code := "PROGRESS", details := 0) {
+        this.LastStage := stage
+        this.ControlId := controlId
+        try {
+            fields := [
+                "schema=1", "recordType=montage-checkpoint", "action=Montage",
+                "timestamp=" FormatTime(, "yyyy-MM-ddTHH:mm:ss"),
+                "sessionId=" AutomationDiagnosticSession.EnsureStarted(),
+                "montageOperationId=" this.OperationId,
+                "sourceRevision=" AppMetadata.SourceRevision,
+                "profileId=" this.ProfileId,
+                "stage=" stage, "resultCode=" code, "controlId=" controlId,
+                "operationElapsedMs=" (A_TickCount - this.StartTick)
+            ]
+            if IsObject(details) {
+                for key in ["pointProbeCount", "comboReadyElapsedMs",
+                    "optionQuerySucceeded", "optionCandidateCount", "optionListHwnd",
+                    "optionPointHwnd", "optionPointPid", "optionPointClass",
+                    "optionPointX", "optionPointY", "failureReason"] {
+                    if details.HasOwnProp(key)
+                        fields.Push(key "=" AutomationDiagnosticSafeValue(details.%key%))
+                }
+            }
+            WriteAutomationDiagnosticLines(
+                [JoinAutomationDiagnosticFields(fields)], DefaultMxNMMontageProgressLogPath()
+            )
+        }
+    }
+}
+
+DefaultMxNMMontageProgressLogPath() {
+    SplitPath DefaultMxNMViewerFailureLogPath(), , &logDirectory
+    return logDirectory "\montage-progress.log"
+}
+
 MxNMMontageProfileDefaults() {
     return [
         {Id: "body", Label: "Body", Preset: "default", ThicknessKey: "BodyThickness", Thickness: "8.5", SliceKey: "BodySlice", Slice: "8", ZoomKey: "BodyZoom", Zoom: "0.7"},
@@ -20582,13 +20658,16 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
         return
     busy := true
     startedAt := A_TickCount
+    MxNMMontageTrace.Begin(profileId)
     try {
         viewerHwnd := WinExist("A")
         if !MxNMMontageWaitForHotkeyRelease(chord) {
             result := MxNMMontageResult(false, "HOTKEY_RELEASE_TIMEOUT")
         } else {
+            MxNMMontageTrace.Stage("KEYS_RELEASED")
             result := MxNMMontageRun(profileId, settings, viewerHwnd)
         }
+        MxNMMontageTrace.Stage("OPERATION_RETURNED", 0, result.code, result)
         if result.ok {
             if result.HasOwnProp("coldRecoveryAttempted")
                 && result.coldRecoveryAttempted {
@@ -20608,6 +20687,16 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
             )
             Flash(MxNMMontageFailureMessage(result.code), 2200)
         }
+    } catch as montageErr {
+        result := MxNMMontageResult(false, "UNEXPECTED_ERROR")
+        result.profileId := profileId
+        result.stage := MxNMMontageTrace.LastStage
+        result.controlId := MxNMMontageTrace.ControlId
+        result.failureReason := Type(montageErr)
+        result.elapsedMs := A_TickCount - startedAt
+        WriteMxNMViewerFailureDiagnostic("Montage", result.code, result)
+        MxNMMontageTrace.Stage("OPERATION_EXCEPTION", result.controlId, result.code, result)
+        Flash("Montage 执行异常，已记录停止阶段；请复制诊断信息。", 2200)
     } finally {
         busy := false
     }
@@ -20795,56 +20884,45 @@ MxNMMontageStaticClick(controlId, className, xRatio, yRatio, effectId, effectCla
 }
 
 MxNMMontageComboSelect(controlId, optionName, session) {
+    MxNMMontageTrace.Stage("COMBO_RESOLVE_BEGIN", controlId)
     resolved := MxNMMontageResolveControl(session, controlId, "ComboBox")
     if !resolved.ok
         return resolved
+    resolved.controlId := controlId
+    resolved.controlClass := "ComboBox"
+    MxNMMontageTrace.Stage("COMBO_UIA_BEGIN", controlId)
     try combo := UIA.ElementFromHandle(resolved.hwnd)
     catch
-        return MxNMMontageResult(false, "COMBO_UIA_ELEMENT_FAILED")
+        return MxNMMontageResult(false, "COMBO_UIA_ELEMENT_FAILED", resolved)
     try {
         if combo.ProcessId != session.viewerPid || !combo.IsExpandCollapsePatternAvailable
             throw Error()
+        MxNMMontageTrace.Stage("COMBO_EXPAND_BEGIN", controlId)
         combo.ExpandCollapsePattern.Expand()
     } catch {
-        return MxNMMontageResult(false, "COMBO_EXPAND_FAILED")
+        return MxNMMontageResult(false, "COMBO_EXPAND_FAILED", resolved)
     }
-    deadline := A_TickCount + MxNMMontageTiming.ComboOptionTimeoutMs
-    loop {
-        options := MxNMMontageCollectComboOptions(combo, optionName, session)
-        if options.matches.Length = 1 || A_TickCount >= deadline
-            break
-        Sleep MxNMMontageTiming.ComboPollMs
-    }
-    if options.matches.Length != 1 {
+    MxNMMontageTrace.Stage("COMBO_OPTIONS_BEGIN", controlId)
+    ready := MxNMMontageWaitForComboOption(combo, optionName, session, resolved)
+    MxNMMontageTrace.Stage("COMBO_OPTIONS_RETURNED", controlId, ready.code, ready)
+    if !ready.ok {
         try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_NOT_UNIQUE")
+        return ready
     }
-    option := options.matches[1]
-    try optionRect := option.BoundingRectangle
-    catch {
+    MxNMMontageTrace.Stage("COMBO_CLICK_BEGIN", controlId, ready.code, ready)
+    ; UIA calls may yield while the foreground changes. Recheck before input.
+    if !MxNMMontageViewerStillActive(session) {
         try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_GEOMETRY_FAILED")
+        return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED", ready)
     }
-    if !IsObject(optionRect) || optionRect.r - optionRect.l < 4 || optionRect.b - optionRect.t < 4 {
+    if MxNMMontageComboListHwnd(resolved.hwnd, session) != ready.optionListHwnd
+        || MxNMMontageWindowFromPoint(ready.optionPointX, ready.optionPointY) != ready.optionListHwnd {
         try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_RECT_INVALID")
+        return MxNMMontageResult(false, "COMBO_OPTION_CHANGED_BEFORE_CLICK", ready)
     }
-    x := Round((optionRect.l + optionRect.r) / 2), y := Round((optionRect.t + optionRect.b) / 2)
-    pointHwnd := MxNMMontageWindowFromPoint(x, y)
-    try pointPid := WinGetPID("ahk_id " pointHwnd)
-    catch {
-        pointPid := 0
-    }
-    try pointClass := WinGetClass("ahk_id " pointHwnd)
-    catch {
-        pointClass := ""
-    }
-    if !pointHwnd || pointPid != session.viewerPid || StrLower(pointClass) != "combolbox" {
-        try combo.ExpandCollapsePattern.Collapse()
-        return MxNMMontageResult(false, "COMBO_OPTION_POINT_MISMATCH")
-    }
-    if !MxNMMontagePhysicalClick(x, y)
-        return MxNMMontageResult(false, "COMBO_OPTION_PHYSICAL_CLICK_FAILED")
+    if !MxNMMontagePhysicalClick(ready.optionPointX, ready.optionPointY)
+        return MxNMMontageResult(false, "COMBO_OPTION_PHYSICAL_CLICK_FAILED", ready)
+    MxNMMontageTrace.Stage("COMBO_CLICK_RETURNED", controlId)
     startedAt := A_TickCount
     deadline := startedAt + MxNMMontageTiming.ComboValueTimeoutMs
     collapseFallbackAt := startedAt
@@ -20857,6 +20935,7 @@ MxNMMontageComboSelect(controlId, optionName, session) {
         }
         if StrLower(Trim(currentValue, " `t`r`n")) = StrLower(optionName) {
             try combo.ExpandCollapsePattern.Collapse()
+            MxNMMontageTrace.Stage("COMBO_VALUE_CONFIRMED", controlId)
             return MxNMMontageResult(true, "COMBO_PHYSICAL_SELECTION_CONFIRMED")
         }
         if !collapseAttempted && A_TickCount >= collapseFallbackAt {
@@ -20868,17 +20947,93 @@ MxNMMontageComboSelect(controlId, optionName, session) {
         Sleep MxNMMontageTiming.ComboPollMs
     }
     try combo.ExpandCollapsePattern.Collapse()
-    return MxNMMontageResult(false, "COMBO_VALUE_NOT_CONFIRMED")
+    return MxNMMontageResult(false, "COMBO_VALUE_NOT_CONFIRMED", ready)
 }
 
-MxNMMontageCollectComboOptions(combo, optionName, session) {
-    result := {matches: []}
-    try desktop := UIA.GetRootElement()
+MxNMMontageWaitForComboOption(combo, optionName, session, details) {
+    startedAt := A_TickCount
+    deadline := startedAt + MxNMMontageTiming.ComboOptionTimeoutMs
+    probeCount := 0
+    loop {
+        if !MxNMMontageViewerStillActive(session)
+            return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED", details)
+        ; Rediscover the unique item and its current rectangle together: UIA
+        ; can expose an item before the popup is ready at that screen point.
+        options := MxNMMontageCollectComboOptions(combo, optionName, session, details.hwnd)
+        ready := MxNMMontageProbeComboOption(options, session, details)
+        probeCount += 1
+        ready.pointProbeCount := probeCount
+        ready.comboReadyElapsedMs := A_TickCount - startedAt
+        if ready.ok || A_TickCount >= deadline
+            return ready
+        ; No input or re-expansion is replayed. The shared deadline also covers
+        ; geometry/hit-test failures, not just missing items. A blocking UIA
+        ; call itself cannot be interrupted by this polling deadline.
+        Sleep MxNMMontageTiming.ComboPollMs
+    }
+}
+
+MxNMMontageProbeComboOption(options, session, details) {
+    result := MxNMMontageResult(false, "COMBO_OPTION_NOT_UNIQUE", details)
+    result.optionQuerySucceeded := options.querySucceeded
+    result.optionRawCandidateCount := options.rawCount
+    result.optionCandidateCount := options.matches.Length
+    result.optionListHwnd := options.listHwnd
+    result.optionSearchScope := "COMBO_LIST"
+    if !options.listHwnd {
+        result.code := "COMBO_LIST_NOT_READY"
+        return result
+    }
+    if options.matches.Length != 1
+        return result
+    option := options.matches[1]
+    result.code := "COMBO_OPTION_GEOMETRY_FAILED"
+    try optionRect := option.BoundingRectangle
     catch
         return result
-    try candidates := desktop.FindElements({Name: optionName, Type: "ListItem", cs: 0})
+    result.code := "COMBO_OPTION_RECT_INVALID"
+    if !IsObject(optionRect) || optionRect.r - optionRect.l < 4 || optionRect.b - optionRect.t < 4
+        return result
+    x := Round((optionRect.l + optionRect.r) / 2), y := Round((optionRect.t + optionRect.b) / 2)
+    result.optionPointX := x
+    result.optionPointY := y
+    pointHwnd := MxNMMontageWindowFromPoint(x, y)
+    result.optionPointHwnd := pointHwnd
+    try pointPid := WinGetPID("ahk_id " pointHwnd)
+    catch {
+        pointPid := 0
+    }
+    try pointClass := WinGetClass("ahk_id " pointHwnd)
+    catch {
+        pointClass := ""
+    }
+    result.optionPointPid := pointPid
+    ; Log only fixed class categories, never arbitrary UI text.
+    result.optionPointClass := pointClass = "" ? "UNKNOWN"
+        : StrLower(pointClass) = "combolbox" ? "COMBOLBOX" : "OTHER"
+    result.code := "COMBO_OPTION_POINT_MISMATCH"
+    if !pointHwnd || pointHwnd != options.listHwnd
+        || pointPid != session.viewerPid || StrLower(pointClass) != "combolbox"
+        return result
+    result.ok := true
+    result.code := "COMBO_OPTION_READY"
+    return result
+}
+
+MxNMMontageCollectComboOptions(combo, optionName, session, comboHwnd) {
+    result := {matches: [], querySucceeded: false, rawCount: 0, listHwnd: 0}
+    listHwnd := MxNMMontageComboListHwnd(comboHwnd, session)
+    if !listHwnd
+        return result
+    result.listHwnd := listHwnd
+    try listElement := UIA.ElementFromHandle(listHwnd)
     catch
         return result
+    try candidates := listElement.FindElements({Name: optionName, Type: "ListItem", cs: 0})
+    catch
+        return result
+    result.querySucceeded := true
+    result.rawCount := candidates.Length
     for candidate in candidates {
         try {
             if candidate.ProcessId != session.viewerPid || !candidate.IsEnabled || candidate.IsOffscreen || !candidate.IsSelectionItemPatternAvailable
@@ -20888,6 +21043,30 @@ MxNMMontageCollectComboOptions(combo, optionName, session) {
         }
     }
     return result
+}
+
+MxNMMontageComboListHwnd(comboHwnd, session) {
+    ; COMBOBOXINFO: DWORD, two RECTs, DWORD, then three HWNDs.
+    ; HWND fields begin at offset 40 on both Win32 and Win64.
+    info := Buffer(40 + 3 * A_PtrSize, 0)
+    NumPut("UInt", info.Size, info, 0)
+    if !DllCall("User32\GetComboBoxInfo", "Ptr", comboHwnd, "Ptr", info, "Int")
+        return 0
+    if NumGet(info, 40, "Ptr") != comboHwnd
+        return 0
+    listHwnd := NumGet(info, 40 + 2 * A_PtrSize, "Ptr")
+    if !listHwnd || !DllCall("User32\IsWindowVisible", "Ptr", listHwnd, "Int")
+        return 0
+    try {
+        if WinGetPID("ahk_id " comboHwnd) != session.viewerPid
+            || MxNMMontageRootOwner(comboHwnd) != session.viewerRootOwner
+            || WinGetPID("ahk_id " listHwnd) != session.viewerPid
+            || StrLower(WinGetClass("ahk_id " listHwnd)) != "combolbox"
+            return 0
+    } catch {
+        return 0
+    }
+    return listHwnd
 }
 
 MxNMMontageOptionBelongsToCombo(option, combo) {
@@ -21215,7 +21394,21 @@ MxNMMontageResult(ok, code, details := 0) {
             "uiaCandidateCount",
             "uiaQuerySucceeded",
             "mergedCandidateCount",
-            "runtimeCandidateCount"
+            "runtimeCandidateCount",
+            "pointProbeCount",
+            "comboReadyElapsedMs",
+            "optionQuerySucceeded",
+            "optionRawCandidateCount",
+            "optionCandidateCount",
+            "optionPointX",
+            "optionPointY",
+            "optionPointHwnd",
+            "optionPointPid",
+            "optionPointClass",
+            "optionListHwnd",
+            "optionSearchScope",
+            "failureReason",
+            "elapsedMs"
         ] {
             if details.HasOwnProp(name)
                 result.%name% := details.%name%

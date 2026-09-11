@@ -174,6 +174,13 @@ class AutomationDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("SAVE_CONFIRMED", self.caption)
         self.assertNotIn("PERSISTED", self.caption)
 
+    def test_snapshot_keeps_current_session_montage_checkpoints_independently(self) -> None:
+        block = self.diagnostics.split('lines.Push("RecentMontageProgressBegin")', 1)[1].split('lines.Push("RecentMontageProgressEnd")', 1)[0]
+        self.assertIn("DefaultMxNMMontageProgressLogPath(), 30", block)
+        self.assertIn('AutomationDiagnosticLineField(line, "sessionId", "")', block)
+        self.assertIn("= AutomationDiagnosticSession.SessionId", block)
+        self.assertNotIn("recommendation", block)
+
     def test_snapshot_keeps_failures_but_drops_duplicate_stage_events(self) -> None:
         for required in (
             "SelectAutomationDiagnosticSnapshotLines",
