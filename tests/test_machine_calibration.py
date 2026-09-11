@@ -94,9 +94,14 @@ class MachineCalibrationTests(unittest.TestCase):
         )
         self.assertLess(activation, reacquire)
         self.assertLess(reacquire, exact_query)
-        self.assertIn("AnchorReadyTimeoutMs := 400", calibration)
+        self.assertIn("AnchorReadyTimeoutMs := 1500", calibration)
         self.assertIn("AnchorReadyPollIntervalMs := 40", calibration)
         self.assertNotIn("Children.Length", readiness)
+        # A ready anchor returns before the deadline/poll sleep; no fixed settle.
+        self.assertLess(readiness.index('reason: "exactAnchorReady"'),
+                        readiness.index("if A_TickCount >= deadline"))
+        self.assertEqual(readiness.count("Sleep MedExCalibrationDefaults.AnchorReadyPollIntervalMs"), 1)
+
 
     def test_preflight_reasons_are_distinct_and_only_calibration_is_actionable(self) -> None:
         calibration = source("src/medex_calibration.ahk")

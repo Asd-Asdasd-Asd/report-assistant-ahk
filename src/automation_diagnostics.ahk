@@ -345,7 +345,7 @@ CopyAutomationDiagnosticInformation(*) {
     return false
 }
 
-BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
+BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", colorFailureLogPath := "") {
     AutomationDiagnosticSession.EnsureStarted()
     if logPath = "" {
         try logPath := DefaultAutomationDiagnosticLogPath()
@@ -365,12 +365,24 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
         viewerFailureLogPath,
         AutomationDiagnosticDefaults.SnapshotScanLineCount
     )
+    if colorFailureLogPath = "" {
+        try colorFailureLogPath := DefaultMedExColorResetFailureLogPath()
+        catch
+            colorFailureLogPath := ""
+    }
+    colorEvent := FindRecentColorResetFailureEvent(
+        ReadRecentAutomationDiagnosticLines(
+            colorFailureLogPath,
+            AutomationDiagnosticDefaults.SnapshotScanLineCount
+        )
+    )
     automationEvent := FindRecentAutomationDiagnosticEvent(recentLines)
     viewerEvent := FindRecentViewerFailureEvent(recentViewerFailures)
     recentEvent := NewerAutomationDiagnosticEvent(
         automationEvent,
         viewerEvent
     )
+    recentEvent := NewerAutomationDiagnosticEvent(recentEvent, colorEvent)
     recentAction := recentEvent.action
     recommendation := AutomationDiagnosticRecommendation(recentAction)
     snapshotEvents := SelectAutomationDiagnosticSnapshotLines(
@@ -395,6 +407,7 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
             SysGet(78) "," SysGet(79),
         "DetailedModeActive=" AutomationDiagnosticBoolean(AutomationDiagnosticSession.DetailedModeActive()),
         "RecentEventSource=" AutomationDiagnosticSafeValue(recentEvent.source),
+        "RecentEventTimestamp=" AutomationDiagnosticSafeValue(recentEvent.timestamp),
         "RecentRelevantAction=" AutomationDiagnosticSafeValue(recentAction),
         "RecommendedDiagnostic=" recommendation,
         "PrivacyContract=NO_PATIENT_TEXT_NO_CLIPBOARD_CONTENT_NO_WINDOW_TITLES"
@@ -411,6 +424,11 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     for line in snapshotViewerFailures
         lines.Push(line)
     lines.Push("RecentViewerFailuresEnd")
+    if recentEvent.source = "COLOR_RESET_FAILURE" {
+        lines.Push("RecentColorResetFailureBegin")
+        lines.Push(colorEvent.summary)
+        lines.Push("RecentColorResetFailureEnd")
+    }
     output := ""
     for line in lines
         output .= (output = "" ? "" : "`r`n") line
@@ -697,6 +715,40 @@ FindRecentViewerFailureEvent(lines) {
     return {action: "NONE", timestamp: "", source: "NONE"}
 }
 
+FindRecentColorResetFailureEvent(lines) {
+    Loop lines.Length {
+        line := lines[lines.Length - A_Index + 1]
+        if ColorResetDiagnosticLineField(line, "action") != "MedExColorReset"
+            continue
+        timestamp := ColorResetDiagnosticLineField(line, "timestamp")
+        if timestamp = ""
+            continue
+        summary := "action=MedExColorReset"
+        ; The legacy log uses spaces, not pipes. Copy only useful metadata,
+        ; never the raw legacy line or unrelated historical failures.
+        for field in ["timestamp", "resultCode", "preflightStage",
+            "readinessReason", "readinessElapsedMs", "exactAnchorQueryCount",
+            "exactAnchorCandidateCount", "foregroundGuardReason"] {
+            value := ColorResetDiagnosticLineField(line, field)
+            if value != "" && value != "UNKNOWN"
+                summary .= "|" field "=" AutomationDiagnosticSafeValue(value)
+        }
+        return {
+            action: "MedExColorReset",
+            timestamp: timestamp,
+            source: "COLOR_RESET_FAILURE",
+            summary: summary
+        }
+    }
+    return {action: "NONE", timestamp: "", source: "NONE", summary: ""}
+}
+
+ColorResetDiagnosticLineField(line, fieldName) {
+    if RegExMatch(line, "(?:^|\s)" fieldName "=([^\s]*)", &match)
+        return match[1]
+    return ""
+}
+
 NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {
     if viewerEvent.timestamp != ""
         && (automationEvent.timestamp = ""
@@ -717,6 +769,8 @@ AutomationDiagnosticLineField(line, fieldName, fallback := "") {
 }
 
 AutomationDiagnosticRecommendation(action) {
+    if action = "MedExColorReset"
+        return "REPORT_COLOR_RESET"
     if action = "ReportImageCaption"
         return "REPORT_IMAGE_CAPTION"
     if InStr(action, "Viewer")

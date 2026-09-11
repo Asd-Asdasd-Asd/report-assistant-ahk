@@ -199,6 +199,25 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             self.diagnostics,
         )
 
+    def test_color_reset_failure_participates_in_latest_event_selection(self) -> None:
+        for required in (
+            "DefaultMedExColorResetFailureLogPath()",
+            "FindRecentColorResetFailureEvent(",
+            "NewerAutomationDiagnosticEvent(recentEvent, colorEvent)",
+            '"RecentEventTimestamp="',
+            '"RecentColorResetFailureBegin"',
+            'return "REPORT_COLOR_RESET"',
+        ):
+            self.assertIn(required, self.diagnostics)
+        snapshot = self.diagnostics.split("BuildAutomationDiagnosticSnapshot(logPath :=", 1)[1].split(
+            "\nSelectAutomationDiagnosticSnapshotLines(lines, recentAction) {", 1)[0]
+        self.assertIn('if recentEvent.source = "COLOR_RESET_FAILURE" {', snapshot)
+        self.assertIn("lines.Push(colorEvent.summary)", snapshot)
+        parser = self.diagnostics.split("FindRecentColorResetFailureEvent(lines) {", 1)[1].split(
+            "\nNewerAutomationDiagnosticEvent(", 1)[0]
+        self.assertIn("AutomationDiagnosticSafeValue(value)", parser)
+        self.assertNotIn("summary: line", parser)
+
     def test_modules_and_tray_support_workflow_are_production_owned(self) -> None:
         main = source("src/main.ahk")
         builder = source("scripts/build_release.py")

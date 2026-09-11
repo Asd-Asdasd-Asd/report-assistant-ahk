@@ -1,49 +1,22 @@
 # 路线图
 
-本文只记录当前方向和未来边界。已完成版本及用户可见变化由
-`CHANGELOG.md` 和发布说明保存，不在路线图重复展开。
+本文只记录尚未完成且可能影响后续决策的方向；已完成事项放在 CHANGELOG 或现场记录中。
 
-## 当前 v0.6.x
+## 当前优先事项
 
-- 完成 Viewer native command-control resolver 和 measurement target 的跨机器
-  回归，以原工作站作为最终验收环境之一。
-- 继续验证其他 resolution、DPI/scaling、Viewer layout、multi-monitor 和
-  workstation profile；未知结构保持 fail closed。
-- 补充 SUVMax、尺寸和清除链的 failure injection、privacy-safe field evidence
-  与尾延迟记录。
-- 完成单修饰键、Viewer-only 无修饰字母/数字、Win modifier 持久化和 F12
-  dispatch pulse 的 release smoke test。
-- 保持 Manual measurement/caret fallback；同一模板暂不混用
-  `{{suvmax}}` 与 `{{size}}`。
+- 完成当前 Viewer 测量、快捷键、颜色恢复和 Montage 修改的 Windows/MedEx 验收。
+- 补充 failure injection、隐私安全现场证据和延迟记录。
+- 验证额外 DPI/scaling、multi-monitor、Viewer layout 和 workstation profile；未知结构保持 fail closed。
+- 保留人工测量、人工输入和人工确认回退；不得为了覆盖率放宽目标唯一性检查。
 
 ## 后续候选
 
-- 在获得单独授权后评估 per-machine Candidate G layout calibration。校准只能
-  保存本机 profile 与环境 metadata，不能引入无校验绝对坐标 fallback。
-- 逐项迁移 `medex_legacy_compat.ahk` 尚存的 montage、caption/advance 和 cover
-  actions；每项都需独立 window guard、现场验证和可停止的人工回退。Montage
-  已完成 Lung 字段测试 0.7，后续从
-  [MxNM montage 迁移交接](mxnm-montage-migration-handoff.md) 的 production 分支清单继续。
-- 仅在有稳定公开接口或充分被动证据时评估新的 Viewer provider；不得用协议
-  猜测替换现有 validated provider。
-- 是否需要 installer、更新支持或更正式集成，必须作为独立产品阶段评估；
-  当前 portable release 不扩展这些职责。
+- 逐项迁移仍由 `legacy/medex_legacy_compat.ahk` 提供的功能；每项都需要独立 window guard、现场验证和可停止的人工回退。
+- 只有在有稳定公开接口或充分的被动证据时，才评估新的 Viewer provider；不得用协议猜测替换已验证路径。
+- installer、更新支持和更正式的系统集成属于独立产品阶段，当前 portable release 不扩展这些职责。
 
-## 长期交付策略
+## 长期边界
 
-- 模块化 `src/` 是源码真相；`release/report_assistant.ahk` 是可复现生成物。
-- 普通用户交付 portable single EXE，配置保存在
-  `%LOCALAPPDATA%\MedExReportAssistant\config.ini`。
-- Source、Windows runtime 和用户现场观察是不同证据层；静态测试不能替代
-  AHK/UIA/MedEx 现场验收。
-- 每个可交付版本同步维护中文用户说明、维护说明、CHANGELOG 和 release
-  checklist。
-
-## 长期安全边界
-
-- 不访问数据库，不绕过权限，不自动审核或提交报告。
-- 不提交患者信息、医院敏感信息、真实用户配置、截图、凭据或临床日志。
-- Clipboard 必须事务性恢复；报告失败不得误用旧测量值。
-- Window、PID、native control、geometry 或 popup 证据不唯一时停止，不猜测。
-- 不自动终止、替换、备份、清理或回滚其他 EXE。
-- 不静默删除用户配置、模板、legacy 脚本或人工工作流。
+- 不自动提交/审核报告，不访问数据库，不绕过权限。
+- 不把静态测试当作 Windows runtime acceptance。
+- 不提交患者信息、医院敏感信息、真实配置、截图、凭据或临床日志。

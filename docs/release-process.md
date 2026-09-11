@@ -1,29 +1,11 @@
 # 内部发布流程
 
-1. 只修改 `src/` 和对应文档，不手改 generated release。
-2. 运行 tests，并执行 `python scripts/build_release.py`。
-3. 审查 `release/report_assistant.ahk` 与 source modules 一致。
-4. 在安装 AutoHotkey v2 和 Ahk2Exe 的 Windows 构建机上双击根目录 `Build EXE.cmd`。
-5. 确认脚本在仓库同级 `report-assistant-build/` 中生成 release source、将 `assets/icon/generated/medex-icon.ico` 嵌入临时 EXE、同步 `assets/publish/`，并最终输出 `..\report-assistant-build\publish\麦旋风.exe`；checkout 的 `git status` 不变化。
-6. 确认 user config 位于 `%LocalAppData%\MedExReportAssistant\config.ini`，替换 EXE 不会覆盖它。
-7. 按 `tests/manual-test-checklist.md` 和 `docs/internal/release-checklist.md` 在 Windows 工作站测试。
-8. 核对 compatibility script 与新 build 没有 hotkey/hotstring conflicts。
-9. 更新 `CHANGELOG.md`、maintainer notes 和 `assets/publish/更新说明.md`。
-10. 核对 `assets/publish/首次使用.md`、`配置指南.md`、`更新说明.md`；明确 ZIP 先复制到本地再解压运行。
-11. 确认 source revision 不是 `UNSTAMPED` 或 `-dirty`，再 Tag version。
-12. 双击根目录 `Package Release.cmd`；确认它从五个正式文件白名单生成
-    `..\report-assistant-build\dist\麦旋风-v<版本>.zip` 和对应 SHA256。
-13. 只上传 `dist/` 中的版本化 ZIP，不分发 `publish/`、仓库根目录或构建脚本。
+1. 只修改 `src/` 和对应文档；不要手改 `release/report_assistant.ahk`。
+2. 从 clean Git commit 开始，确认 `src/app_metadata.ahk` 版本正确。
+3. 运行 Python 测试和 `python scripts/build_release.py`，确认 generated release 与 source 一致。
+4. 在 Windows 构建机运行 `Build EXE.cmd`，确认 EXE、版本信息和静态发布文件写入仓库同级 `report-assistant-build/`，checkout 状态不变化。
+5. 按 `tests/manual-test-checklist.md` 和 `docs/internal/release-checklist.md` 完成 Windows/MedEx 现场验收。
+6. 更新 `CHANGELOG.md` 及 `assets/publish/` 中的用户可见说明。
+7. 通过验收后运行 `Package Release.cmd`，只分发版本化 ZIP 及对应 SHA256。
 
-Executable 没有固定安装目录。发布流程不得创建 installer、shortcut、registry state、旧 EXE backup、rollback package、self-update 或历史 EXE cleanup。维护者不应要求应用查找或处理其他目录中的 EXE。
-
-Release artifacts 不得包含 patient data、hospital identifiers、credentials、screenshots、真实 user config 或包含临床内容的 logs。
-
-`assets/publish/` 到外部 `report-assistant-build/publish/` 采用 overlay 同步，不删除其中的手工文档或图标。删除或重命名静态资源后，正式发布前应手工清空该外部目录再构建。构建失败时保留构建开始前已有的 last-known-good `麦旋风.exe`，并以非零退出码明确报告失败；不得把旧修改时间当作本轮成功。
-
-`publish/` 是固定名称的构建工作区，不按版本重命名。正式打包使用独立
-`dist/`：打包器先在干净临时目录中只复制 `麦旋风.exe`、`版本信息.md`、
-`更新说明.md`、`首次使用.md` 和 `配置指南.md`，验证 ZIP 后再事务化替换
-旧的受管版本包。诊断工具位于独立构建目录，不进入正式 ZIP。
-
-Generated release source 和 icon assets 属于需要提交的可复现产物：source 变化后由维护者显式运行 `python scripts/build_release.py` 并提交 `release/report_assistant.ahk`；图标变化后提交 `assets/icon/source/medex-icon.svg`、全部 generated PNG 和 ICO。Windows 一键构建使用外部输出参数，不修改这些 tracked generated files；`report-assistant-build/` 不提交。
+发布物不得包含患者信息、医院敏感信息、凭据、截图、真实用户配置或临床日志。不得创建 installer、self-update、rollback、旧 EXE backup 或历史版本清理机制。

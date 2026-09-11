@@ -10,7 +10,9 @@ class MedExCalibrationDefaults {
     static BlackLookupTimeoutMs := 1200
     static BlackLookupPollIntervalMs := 60
     static MenuCloseValidationDelayMs := 60
-    static AnchorReadyTimeoutMs := 400
+    ; First-use Chromium anchors can miss the former 400 ms window. Poll only
+    ; until ready; this is a ceiling, not a fixed delay or an interaction retry.
+    static AnchorReadyTimeoutMs := 1500
     static AnchorReadyPollIntervalMs := 40
 }
 

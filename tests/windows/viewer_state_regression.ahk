@@ -23,6 +23,7 @@ RunViewerStateRegression() {
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 3000, 3000) = "KEY_RELEASE_TIMEOUT", "held at deadline")
     AssertViewerState(MxNMViewerReleaseDecision(false, true, 0, 3000) = "RELEASED", "next press can release")
     AssertViewerState(MxNMViewerReleaseDecision(false, false, 0, 3000) = "FOREGROUND_CHANGED", "cancel even after release")
+    TestColorResetFailureSelection()
     TestViewerNativePanels()
 }
 
@@ -63,4 +64,19 @@ AddViewerTestButtons(panel) {
 AssertViewerState(condition, label) {
     if !condition
         throw Error(label)
+}
+
+TestColorResetFailureSelection() {
+    oldCaption := {action: "ReportImageCaption", timestamp: "2026-09-04T18:38:57", source: "AUTOMATION"}
+    currentFailure := "timestamp=2026-09-07T09:45:20 appVersion=0.8.0 action=MedExColorReset resultCode=ANCHOR_NOT_READY preflightStage=redResetReadiness readinessReason=exactAnchorNotReady exactAnchorQueryCount=8 exactAnchorCandidateCount=0 readinessElapsedMs=406 unlisted=SENSITIVE_FIXTURE"
+    color := FindRecentColorResetFailureEvent([currentFailure, ""])
+    AssertViewerState(color.timestamp = "2026-09-07T09:45:20", "legacy timestamp parsed")
+    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, color).source = "COLOR_RESET_FAILURE", "current failure beats stale Caption")
+    AssertViewerState(InStr(color.summary, "resultCode=ANCHOR_NOT_READY"), "failure code retained")
+    AssertViewerState(InStr(color.summary, "readinessElapsedMs=406"), "failure timing retained")
+    AssertViewerState(!InStr(color.summary, "SENSITIVE_FIXTURE"), "unlisted content omitted")
+    newerCapture := {action: "ViewerCapture", timestamp: "2026-09-07T09:46:00", source: "AUTOMATION"}
+    AssertViewerState(NewerAutomationDiagnosticEvent(newerCapture, color).action = "ViewerCapture", "old color failure cannot hide new capture")
+    missing := FindRecentColorResetFailureEvent([])
+    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, missing).action = "ReportImageCaption", "missing legacy file does not replace event")
 }

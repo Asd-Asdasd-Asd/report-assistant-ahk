@@ -71,3 +71,11 @@ F12、工具选择和快捷键清除现另接入 `automation-events.log`，动�
 摘要包含松键耗时、物理/逻辑 modifier mask、前台/焦点与工具目标 HWND、Control ID、候选数和派发状态。`KEY_RELEASE_TIMEOUT` 表示持键达到 3 秒而取消；`FOREGROUND_CHANGED`/`WRONG_FOREGROUND` 表示前台取消；`BUTTON_DISABLED` 表示目标原生工具未启用。`DISPATCHED` 仅代表已派发，`viewer.effectState=UNOBSERVABLE` 明确表示尚不能观察截图产物或工具切换结果。物理/逻辑 mask 位顺序为 Control、Alt、Shift、LWin、RWin。
 
 故障发生后先复制诊断再重新加载，以保留当次进程内状态。没有进入 handler 的键位仍需靠实际配置和 Windows 输入状态调查；日志不读取患者信息、窗口标题、图像或剪贴板内容。
+
+## 2026-09-07：红字预检查失败也进入托盘快照
+
+现场 09:45:20 的记录为 `ANCHOR_NOT_READY` / `exactAnchorNotReady`：8 次 exact-anchor 查询均为零候选，406 ms 后停止。默认 `;fzg` 在需要恢复红字颜色时，会先完成此检查再输入正文，因此这条记录解释了当次“没有展开且出现错误提示”。它不能证明锚点在第二次操作前的具体哪个时刻就绪，也不解释 F12。
+
+现有 anchor readiness 轮询的上限由 400 ms 改为 1500 ms，轮询间隔保持 40 ms；锚点一旦出现立即返回，前台变化仍立即取消。没有增加文字/点击重放、独立冷启动状态机或固定 1.5 秒 Sleep。这个上限属于修复候选，仍需 Windows 首次操作验收。
+
+托盘快照现在也读取 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log`，与原有两类日志比较事件时间。当红字错误最新时，显示 `RecentEventSource=COLOR_RESET_FAILURE`、`RecentEventTimestamp` 和一条字段白名单摘要，推荐项为 `REPORT_COLOR_RESET`；不复制整段旧日志，也不把历史 Caption 成功当作本次结果。原始日志不迁移、不删除。

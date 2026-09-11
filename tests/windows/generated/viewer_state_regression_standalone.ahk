@@ -66,6 +66,73 @@ MxNMViewerReleaseDecision(pressed, foregroundMatches, elapsedMs, timeoutMs) {
 
 
 
+FindRecentColorResetFailureEvent(lines) {
+    Loop lines.Length {
+        line := lines[lines.Length - A_Index + 1]
+        if ColorResetDiagnosticLineField(line, "action") != "MedExColorReset"
+            continue
+        timestamp := ColorResetDiagnosticLineField(line, "timestamp")
+        if timestamp = ""
+            continue
+        summary := "action=MedExColorReset"
+        ; The legacy log uses spaces, not pipes. Copy only useful metadata,
+        ; never the raw legacy line or unrelated historical failures.
+        for field in ["timestamp", "resultCode", "preflightStage",
+            "readinessReason", "readinessElapsedMs", "exactAnchorQueryCount",
+            "exactAnchorCandidateCount", "foregroundGuardReason"] {
+            value := ColorResetDiagnosticLineField(line, field)
+            if value != "" && value != "UNKNOWN"
+                summary .= "|" field "=" AutomationDiagnosticSafeValue(value)
+        }
+        return {
+            action: "MedExColorReset",
+            timestamp: timestamp,
+            source: "COLOR_RESET_FAILURE",
+            summary: summary
+        }
+    }
+    return {action: "NONE", timestamp: "", source: "NONE", summary: ""}
+}
+
+ColorResetDiagnosticLineField(line, fieldName) {
+    if RegExMatch(line, "(?:^|\s)" fieldName "=([^\s]*)", &match)
+        return match[1]
+    return ""
+}
+
+NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {
+    if viewerEvent.timestamp != ""
+        && (automationEvent.timestamp = ""
+            || StrCompare(
+                viewerEvent.timestamp,
+                automationEvent.timestamp
+            ) > 0) {
+        return viewerEvent
+    }
+    return automationEvent
+}
+
+
+
+AutomationDiagnosticSafeValue(value) {
+    text := String(value)
+    text := StrReplace(text, "`r", " ")
+    text := StrReplace(text, "`n", " ")
+    text := StrReplace(text, "|", "/")
+    if StrLen(text) > 160
+        text := SubStr(text, 1, 160)
+    return text
+}
+
+JoinAutomationDiagnosticFields(fields) {
+    output := ""
+    for field in fields
+        output .= (output = "" ? "" : "|") field
+    return output
+}
+
+
+
 class MxNMViewerToolCommand {
     static Arrow := 21043
     static Length := 21048
@@ -589,6 +656,7 @@ RunViewerStateRegression() {
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 3000, 3000) = "KEY_RELEASE_TIMEOUT", "held at deadline")
     AssertViewerState(MxNMViewerReleaseDecision(false, true, 0, 3000) = "RELEASED", "next press can release")
     AssertViewerState(MxNMViewerReleaseDecision(false, false, 0, 3000) = "FOREGROUND_CHANGED", "cancel even after release")
+    TestColorResetFailureSelection()
     TestViewerNativePanels()
 }
 
@@ -629,4 +697,19 @@ AddViewerTestButtons(panel) {
 AssertViewerState(condition, label) {
     if !condition
         throw Error(label)
+}
+
+TestColorResetFailureSelection() {
+    oldCaption := {action: "ReportImageCaption", timestamp: "2026-09-04T18:38:57", source: "AUTOMATION"}
+    currentFailure := "timestamp=2026-09-07T09:45:20 appVersion=0.8.0 action=MedExColorReset resultCode=ANCHOR_NOT_READY preflightStage=redResetReadiness readinessReason=exactAnchorNotReady exactAnchorQueryCount=8 exactAnchorCandidateCount=0 readinessElapsedMs=406 unlisted=SENSITIVE_FIXTURE"
+    color := FindRecentColorResetFailureEvent([currentFailure, ""])
+    AssertViewerState(color.timestamp = "2026-09-07T09:45:20", "legacy timestamp parsed")
+    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, color).source = "COLOR_RESET_FAILURE", "current failure beats stale Caption")
+    AssertViewerState(InStr(color.summary, "resultCode=ANCHOR_NOT_READY"), "failure code retained")
+    AssertViewerState(InStr(color.summary, "readinessElapsedMs=406"), "failure timing retained")
+    AssertViewerState(!InStr(color.summary, "SENSITIVE_FIXTURE"), "unlisted content omitted")
+    newerCapture := {action: "ViewerCapture", timestamp: "2026-09-07T09:46:00", source: "AUTOMATION"}
+    AssertViewerState(NewerAutomationDiagnosticEvent(newerCapture, color).action = "ViewerCapture", "old color failure cannot hide new capture")
+    missing := FindRecentColorResetFailureEvent([])
+    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, missing).action = "ReportImageCaption", "missing legacy file does not replace event")
 }

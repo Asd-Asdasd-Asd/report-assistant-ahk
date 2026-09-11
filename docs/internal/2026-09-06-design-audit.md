@@ -121,3 +121,9 @@ pulse 为了覆盖整块 Viewer，会选择同 owner-family 中更大的窗口�
 验证：364 项 Python 测试通过，`git diff --check` 通过；重新生成的 release 与当前源码完全一致，构建日期为 2026-09-06，revision 标记为 `05c62e9-dirty`。没有提交或推送。版本仍为 0.8.0，本次尚非正式发布。
 
 Windows 验收尚未执行：当前环境为 macOS，未提供 Windows AHK/Ahk2Exe 运行入口。需运行生成的状态回归脚本，再通过 `Build EXE.cmd` 构建，测试实际配置键位的首次/连续调用、持键超时、前台切换、Viewer 重启及麦旋风重载。F12 首张失败与“直径/SUV 失效但箭头正常”的唯一根因仍待当前工作机证据，不应把本次静态通过标记成现场修复成功。
+
+## 2026-09-07 现场证据与追加修改
+
+用户提供的当日 09:45:20 红字失败记录：`ANCHOR_NOT_READY`，`readinessReason=exactAnchorNotReady`，`exactAnchorQueryCount=8`，`exactAnchorCandidateCount=0`，`readinessElapsedMs=406`。与其描述的“第一次 ;fzg 没展开且报错”时间相符，定位到正文写入前的红字锚点预检查。旧快照只选到了 9 月 4 日 Caption 操作，是未纳入第三类日志的覆盖缺口；并非当天成功证据。
+
+追加修改仅涉及现有 readiness 轮询上限（400 → 1500 ms，ready 时立即返回）和托盘快照对红字失败日志的精简合并。没有修改 F12 派发方式，也没有增加自动补发。365 项 Python 测试通过；生成发布脚本同步，Windows 合成回归脚本增加历史 Caption / 当前红字错误 / 更新截图事件的选择与字段过滤场景。Windows AHK/EXE 与真实首次操作尚未验收，1.5 秒上限是否充分仍待现场结果。
