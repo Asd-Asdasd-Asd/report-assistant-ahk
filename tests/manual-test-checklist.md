@@ -117,6 +117,9 @@
 
 ## Montage
 
+本轮首次/偶发失败专项验收见
+`docs/internal/automation-readiness.md`，含合成回归命令和现场情景。
+
 - [ ] Montage 在 root-owner 仅作为 owner、其矩形不覆盖实际控件的布局中，仍从
   同 PID、同 root-owner 的完整 owner family 唯一解析 `21112/Static`；不得要求
   控件矩形位于 root-owner 的小客户区内。

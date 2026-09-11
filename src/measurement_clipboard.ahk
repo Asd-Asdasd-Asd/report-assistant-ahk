@@ -104,7 +104,7 @@ CaptureMeasurementClipboardText(actionCallback, options := 0,
         result.sequenceAfterCommand := update.sequence
         result.clipboardOwnerHwnd := update.ownerHwnd
         if !update.ok {
-            result.failureReason := MeasurementFailureReason.CLIPBOARD_NOT_UPDATED
+            result.failureReason := update.failureReason
             return result
         }
 
@@ -169,13 +169,24 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
     lastSequence := sequenceBeforeCommand
     emptySequence := 0
     emptyDeadline := 0
+    readFailed := false
     loop {
         sequence := GetMeasurementClipboardSequenceNumber()
         if sequence != sequenceBeforeCommand {
             lastSequence := sequence
-            try rawText := A_Clipboard
+            try {
+                rawText := A_Clipboard
+                readFailed := false
+            }
             catch {
-                rawText := ""
+                readFailed := true
+                ; An inaccessible clipboard is not a successfully read empty result.
+                emptySequence := 0
+                emptyDeadline := 0
+                if A_TickCount >= deadline
+                    break
+                Sleep Max(1, Integer(pollIntervalMs))
+                continue
             }
             if rawText != "" && rawText != sentinel {
                 ownerHwnd := DllCall("User32\GetClipboardOwner", "Ptr")
@@ -212,6 +223,8 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
         ok: false,
         rawText: "",
         sequence: lastSequence,
-        ownerHwnd: 0
+        ownerHwnd: 0,
+        failureReason: readFailed ? MeasurementFailureReason.CLIPBOARD_READ_FAILED
+            : MeasurementFailureReason.CLIPBOARD_NOT_UPDATED
     }
 }

@@ -13,8 +13,8 @@ class MxNMContextTargetPolicy {
 class MxNMContextTargetSessionProvider {
     static CachedSession := 0
     static Generation := 0
-    static ColdRecoveryConsumed := false
-    static ColdRecoveryDelayMs := 350
+    static ReadinessTimeoutMs := 1500
+    static ReadinessPollMs := 30
 
     static Resolve(viewerExe := "", options := 0) {
         try return this.ResolveInternal(viewerExe, options)
@@ -55,18 +55,28 @@ class MxNMContextTargetSessionProvider {
             this.Generation + 1
         )
         coldRecoveryAttempted := false
-        if !discovery.ok
-            && discovery.code
-                = MxNMContextTargetSessionCode.DISCOVERY_FAILED
-            && !this.ColdRecoveryConsumed {
-            this.ColdRecoveryConsumed := true
+        readinessStartedAt := A_TickCount
+        recoveryPid := discovery.HasOwnProp("pid") ? discovery.pid : 0
+        recoveryRoot := discovery.HasOwnProp("rootHwnd") ? discovery.rootHwnd : 0
+        while !discovery.ok
+            && discovery.code = MxNMContextTargetSessionCode.DISCOVERY_FAILED
+            && recoveryPid && recoveryRoot
+            && A_TickCount - readinessStartedAt < this.ReadinessTimeoutMs {
             coldRecoveryAttempted := true
-            Sleep this.ColdRecoveryDelayMs
+            Sleep this.ReadinessPollMs
+            identity := ResolveMxNMContextViewerIdentity(viewerExe, options)
+            if !identity.ok || identity.pid != recoveryPid || identity.rootHwnd != recoveryRoot
+                break
             discovery := DiscoverMxNMContextTargetSession(
                 viewerExe,
                 options,
                 this.Generation + 1
             )
+            if discovery.ok && (discovery.session.pid != recoveryPid
+                || discovery.session.rootHwnd != recoveryRoot) {
+                discovery := {ok: false, code: MxNMContextTargetSessionCode.FAST_VALIDATION_FAILED}
+                break
+            }
         }
         if !discovery.ok {
             failure := MakeMxNMContextTargetFailure(
@@ -76,7 +86,7 @@ class MxNMContextTargetSessionProvider {
             failure.coldRecoveryAttempted := coldRecoveryAttempted
             failure.coldRecoverySucceeded := false
             failure.coldRecoveryDelayMs := coldRecoveryAttempted
-                ? this.ColdRecoveryDelayMs
+                ? A_TickCount - readinessStartedAt
                 : 0
             return failure
         }
@@ -85,7 +95,7 @@ class MxNMContextTargetSessionProvider {
         discovery.session.coldRecoveryAttempted := coldRecoveryAttempted
         discovery.session.coldRecoverySucceeded := coldRecoveryAttempted
         discovery.session.coldRecoveryDelayMs := coldRecoveryAttempted
-            ? this.ColdRecoveryDelayMs
+            ? A_TickCount - readinessStartedAt
             : 0
         this.CachedSession := discovery.session
         return BuildMxNMContextTargetResult(

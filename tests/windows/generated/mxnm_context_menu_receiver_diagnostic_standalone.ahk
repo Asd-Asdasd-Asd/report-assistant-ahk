@@ -38,12 +38,14 @@ class MeasurementFailureReason {
     static COMMAND_NOT_FOUND := "COMMAND_NOT_FOUND"
     static COMMAND_ID_INVALID := "COMMAND_ID_INVALID"
     static COMMAND_INVOKE_FAILED := "COMMAND_INVOKE_FAILED"
+    static COMMAND_RESULT_UNKNOWN := "COMMAND_RESULT_UNKNOWN"
     static CONFIRMATION_REQUIRED := "CONFIRMATION_REQUIRED"
     static CLEANUP_NOT_VERIFIED := "CLEANUP_NOT_VERIFIED"
     static CLIPBOARD_SAVE_FAILED := "CLIPBOARD_SAVE_FAILED"
     static CLIPBOARD_SENTINEL_FAILED := "CLIPBOARD_SENTINEL_FAILED"
     static CLIPBOARD_ACTION_FAILED := "CLIPBOARD_ACTION_FAILED"
     static CLIPBOARD_NOT_UPDATED := "CLIPBOARD_NOT_UPDATED"
+    static CLIPBOARD_READ_FAILED := "CLIPBOARD_READ_FAILED"
     static CLIPBOARD_RESTORE_FAILED := "CLIPBOARD_RESTORE_FAILED"
     static UNEXPECTED_FORMAT := "UNEXPECTED_FORMAT"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
@@ -2947,8 +2949,8 @@ class MxNMContextTargetPolicy {
 class MxNMContextTargetSessionProvider {
     static CachedSession := 0
     static Generation := 0
-    static ColdRecoveryConsumed := false
-    static ColdRecoveryDelayMs := 350
+    static ReadinessTimeoutMs := 1500
+    static ReadinessPollMs := 30
 
     static Resolve(viewerExe := "", options := 0) {
         try return this.ResolveInternal(viewerExe, options)
@@ -2989,18 +2991,28 @@ class MxNMContextTargetSessionProvider {
             this.Generation + 1
         )
         coldRecoveryAttempted := false
-        if !discovery.ok
-            && discovery.code
-                = MxNMContextTargetSessionCode.DISCOVERY_FAILED
-            && !this.ColdRecoveryConsumed {
-            this.ColdRecoveryConsumed := true
+        readinessStartedAt := A_TickCount
+        recoveryPid := discovery.HasOwnProp("pid") ? discovery.pid : 0
+        recoveryRoot := discovery.HasOwnProp("rootHwnd") ? discovery.rootHwnd : 0
+        while !discovery.ok
+            && discovery.code = MxNMContextTargetSessionCode.DISCOVERY_FAILED
+            && recoveryPid && recoveryRoot
+            && A_TickCount - readinessStartedAt < this.ReadinessTimeoutMs {
             coldRecoveryAttempted := true
-            Sleep this.ColdRecoveryDelayMs
+            Sleep this.ReadinessPollMs
+            identity := ResolveMxNMContextViewerIdentity(viewerExe, options)
+            if !identity.ok || identity.pid != recoveryPid || identity.rootHwnd != recoveryRoot
+                break
             discovery := DiscoverMxNMContextTargetSession(
                 viewerExe,
                 options,
                 this.Generation + 1
             )
+            if discovery.ok && (discovery.session.pid != recoveryPid
+                || discovery.session.rootHwnd != recoveryRoot) {
+                discovery := {ok: false, code: MxNMContextTargetSessionCode.FAST_VALIDATION_FAILED}
+                break
+            }
         }
         if !discovery.ok {
             failure := MakeMxNMContextTargetFailure(
@@ -3010,7 +3022,7 @@ class MxNMContextTargetSessionProvider {
             failure.coldRecoveryAttempted := coldRecoveryAttempted
             failure.coldRecoverySucceeded := false
             failure.coldRecoveryDelayMs := coldRecoveryAttempted
-                ? this.ColdRecoveryDelayMs
+                ? A_TickCount - readinessStartedAt
                 : 0
             return failure
         }
@@ -3019,7 +3031,7 @@ class MxNMContextTargetSessionProvider {
         discovery.session.coldRecoveryAttempted := coldRecoveryAttempted
         discovery.session.coldRecoverySucceeded := coldRecoveryAttempted
         discovery.session.coldRecoveryDelayMs := coldRecoveryAttempted
-            ? this.ColdRecoveryDelayMs
+            ? A_TickCount - readinessStartedAt
             : 0
         this.CachedSession := discovery.session
         return BuildMxNMContextTargetResult(

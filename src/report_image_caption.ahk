@@ -2,6 +2,8 @@ class ReportImageCaptionDefaults {
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
+    static TargetReadyTimeoutMs := 1500
+    static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
     ; The first paste into a newly observed renderer can be visible before its
@@ -248,7 +250,7 @@ class ReportImageCaptionProvider {
             )
             : {ok: false}
         if !target.ok {
-            target := ResolveReportImageCaptionTarget(
+            target := WaitForReportImageCaptionTarget(
                 sourceHwnd,
                 sourcePid
             )
@@ -295,7 +297,9 @@ class ReportImageCaptionProvider {
             ),
             captionPoint: target.captionPoint,
             savePoint: target.savePoint,
-            imagePoint: target.imagePoint
+            imagePoint: target.imagePoint,
+            descriptionAnchor: target.descriptionAnchor,
+            saveAnchor: target.saveAnchor
         }
         return ExecuteReportImageCaptionAction(
             REPORT_IMAGE_CAPTION_CACHE,
@@ -323,6 +327,21 @@ class ReportImageCaptionProvider {
             cache,
             targetHwnd
         )
+        if !target.ok {
+            target := WaitForReportImageCaptionTarget(
+                cache.sourceHwnd, cache.sourcePid, targetHwnd
+            )
+            if target.ok {
+                cache.captionPoint := target.captionPoint
+                cache.savePoint := target.savePoint
+                cache.imagePoint := target.imagePoint
+                cache.targetClientRectKey := ReportImageCaptionRectKey(
+                    ReportImageCaptionClientRect(targetHwnd)
+                )
+                cache.descriptionAnchor := target.descriptionAnchor
+                cache.saveAnchor := target.saveAnchor
+            }
+        }
         if IsObject(operation)
             operation.SetField(
                 "caption.targetCandidateCount",
@@ -512,6 +531,24 @@ ReportImageCaptionSequenceChangeCode(before, after) {
     return before = after ? "0" : "1"
 }
 
+WaitForReportImageCaptionTarget(sourceHwnd, sourcePid, boundTarget := 0) {
+    startedAt := A_TickCount
+    foreground := WinExist("A")
+    loop {
+        if WinExist("A") != foreground
+            || ReportImageCaptionWindowPid(sourceHwnd) != sourcePid
+            return {ok: false, candidateCount: 0}
+        target := boundTarget
+            ? BuildReportImageCaptionTargetCandidate(boundTarget, sourcePid)
+            : ResolveReportImageCaptionTarget(sourceHwnd, sourcePid)
+        if target.ok || target.candidateCount > 1
+            || A_TickCount - startedAt >= ReportImageCaptionDefaults.TargetReadyTimeoutMs
+            return target
+        ; Read-only readiness polling; no input is replayed.
+        Sleep ReportImageCaptionDefaults.TargetReadyPollMs
+    }
+}
+
 ResolveReportImageCaptionTarget(sourceHwnd, sourcePid) {
     matches := []
     try windows := WinGetList("ahk_pid " sourcePid)
@@ -558,6 +595,7 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         || !cache.HasOwnProp("savePoint")
         || !cache.HasOwnProp("imagePoint")
         || !cache.HasOwnProp("targetClientRectKey")
+        || !ReportImageCaptionCachedAnchorsValid(cache)
         || cache.targetClientRectKey
             != ReportImageCaptionRectKey(
                 ReportImageCaptionClientRect(targetHwnd)
@@ -583,7 +621,23 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         candidateCount: 1,
         captionPoint: cache.captionPoint,
         savePoint: cache.savePoint,
-        imagePoint: cache.imagePoint
+        imagePoint: cache.imagePoint,
+        descriptionAnchor: cache.descriptionAnchor,
+        saveAnchor: cache.saveAnchor
+    }
+}
+
+ReportImageCaptionCachedAnchorsValid(cache) {
+    try {
+        for field in ["descriptionAnchor", "saveAnchor"] {
+            anchor := cache.%field%
+            if !ReportImageCaptionElementUsable(anchor.element, cache.targetPid)
+                || ReportImageCaptionRectKey(ReportImageCaptionElementRect(anchor.element)) != anchor.rectKey
+                return false
+        }
+        return true
+    } catch {
+        return false
     }
 }
 
@@ -612,6 +666,8 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         savePoint: 0,
         imagePoint: 0
     }
+    if !ReportImageCaptionTopLevelWindowEligible(hwnd, expectedPid)
+        return failure
     try {
         clientRect := ReportImageCaptionClientRect(hwnd)
         if !IsObject(clientRect)
@@ -635,6 +691,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         })
         if descriptionElements.Length != 1
             || saveElements.Length != 1 {
+            failure.candidateCount := Max(descriptionElements.Length, saveElements.Length)
             return failure
         }
         description := descriptionElements[1]
@@ -711,7 +768,9 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             candidateCount: 1,
             captionPoint: captionPoint,
             savePoint: savePoint,
-            imagePoint: imageResult.point
+            imagePoint: imageResult.point,
+            descriptionAnchor: {element: description, rectKey: ReportImageCaptionRectKey(descriptionRect)},
+            saveAnchor: {element: saveButton, rectKey: ReportImageCaptionRectKey(saveRect)}
         }
     } catch {
         return failure

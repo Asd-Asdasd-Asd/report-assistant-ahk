@@ -151,6 +151,7 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
             result.failureReason,
             Map(
                 "stage", "CONTEXT_COMMAND",
+                "commandElapsedMs", MedExContextValue(result.context, "commandElapsedMs", 0),
                 "measurementType", requestedMeasurementType,
                 "failureReason", result.failureReason,
                 "viewerPid", target.actionPid,

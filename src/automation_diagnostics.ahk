@@ -741,7 +741,7 @@ FindRecentColorResetFailureEvent(lines) {
         ; The legacy log uses spaces, not pipes. Copy only useful metadata,
         ; never the raw legacy line or unrelated historical failures.
         for field in ["timestamp", "resultCode", "preflightStage",
-            "readinessReason", "readinessElapsedMs", "exactAnchorQueryCount",
+            "readinessReason", "readinessElapsedMs", "anchorRootMaxMs", "anchorQueryMaxMs", "exactAnchorQueryCount",
             "exactAnchorCandidateCount", "foregroundGuardReason"] {
             value := ColorResetDiagnosticLineField(line, field)
             if value != "" && value != "UNKNOWN"

@@ -209,7 +209,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"User32\\PostMessageW"',
             "0x0204",
             "0x0205",
-            '"User32\\SendMessageW"',
+            '"User32\\SendMessageTimeoutW"',
             "0x0111",
             '"User32\\GetDlgCtrlID"',
             "WinGetControlsHwnd",
@@ -445,10 +445,11 @@ class MeasurementCaptureTests(unittest.TestCase):
             resolve_internal,
         )
         self.assertNotIn("retryResult :=", resolve_internal)
-        self.assertIn("static ColdRecoveryConsumed := false", session)
-        self.assertIn("static ColdRecoveryDelayMs := 350", session)
-        self.assertIn("&& !this.ColdRecoveryConsumed", resolve_internal)
-        self.assertIn("Sleep this.ColdRecoveryDelayMs", resolve_internal)
+        self.assertNotIn("ColdRecoveryConsumed", session)
+        self.assertIn("static ReadinessTimeoutMs := 1500", session)
+        self.assertIn("identity.pid != recoveryPid", resolve_internal)
+        self.assertIn("identity.rootHwnd != recoveryRoot", resolve_internal)
+        self.assertIn("Sleep this.ReadinessPollMs", resolve_internal)
         self.assertIn("coldRecoveryAttempted", session + provider)
         self.assertIn(
             'WriteMxNMViewerFailureDiagnostic(\n                "ContextTarget"',

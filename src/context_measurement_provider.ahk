@@ -598,6 +598,7 @@ PrepareMxNMContextCommand(viewer, clientPoint, commandText,
         "Int"
     )
     actionContext["commandRuntimeId"] := runtimeId
+    actionContext["expectedPid"] := viewer.pid
     if runtimeId <= 0 {
         actionContext["failureReason"] := MeasurementFailureReason.COMMAND_ID_INVALID
         return false
@@ -618,6 +619,15 @@ InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {
         return false
     }
     try {
+        ; Revalidate the exact prepared command immediately before dispatch.
+        if !DllCall("User32\IsWindowVisible", "Ptr", popupHwnd, "Int")
+            || !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
+            || !DllCall("User32\IsWindowEnabled", "Ptr", controlHwnd, "Int")
+            || !DllCall("User32\IsChild", "Ptr", popupHwnd, "Ptr", controlHwnd, "Int")
+            || WinGetPID("ahk_id " popupHwnd) != actionContext["expectedPid"]
+            || WinGetPID("ahk_id " controlHwnd) != actionContext["expectedPid"]
+            || DllCall("User32\GetDlgCtrlID", "Ptr", controlHwnd, "Int") != runtimeId
+            throw Error("Prepared context command changed")
         if asynchronous {
             dispatched := DllCall(
                 "User32\PostMessageW",
@@ -630,14 +640,25 @@ InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {
             if !dispatched
                 throw Error("Context command post failed")
         } else {
-            DllCall(
-                "User32\SendMessageW",
+            commandResult := Buffer(A_PtrSize, 0)
+            commandStartedAt := A_TickCount
+            dispatched := DllCall(
+                "User32\SendMessageTimeoutW",
                 "Ptr", popupHwnd,
                 "UInt", 0x0111,
                 "UPtr", runtimeId,
                 "Ptr", controlHwnd,
+                "UInt", 0x0002,
+                "UInt", 1000,
+                "Ptr", commandResult.Ptr,
                 "Ptr"
             )
+            actionContext["commandElapsedMs"] := A_TickCount - commandStartedAt
+            if !dispatched {
+                ; The receiver may already have acted. Never replay this command.
+                actionContext["failureReason"] := MeasurementFailureReason.COMMAND_RESULT_UNKNOWN
+                return false
+            }
         }
     } catch {
         actionContext["failureReason"] :=
@@ -767,6 +788,7 @@ WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
     candidatePopupHwnd := 0
     candidateDiscovery := ""
     loop {
+        readyPopups := []
         for popupHwnd in ListContextMeasurementPopupWindows(viewerPid) {
             currentState := CaptureContextMeasurementPopupState(
                 popupHwnd,
@@ -785,16 +807,20 @@ WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
             candidatePopupHwnd := popupHwnd
             candidateDiscovery := discovery
             controlHwnd := currentState.commandControlHwnd
-            if !controlHwnd
+            if !currentState.visible || !controlHwnd
+                || !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
+                || !DllCall("User32\IsWindowEnabled", "Ptr", controlHwnd, "Int")
                 continue
-            return {
+            readyPopups.Push({
                 ok: true,
                 popupHwnd: popupHwnd,
                 controlHwnd: controlHwnd,
                 discovery: discovery,
                 failureReason: MeasurementFailureReason.NONE
-            }
+            })
         }
+        if readyPopups.Length = 1
+            return readyPopups[1]
         if A_TickCount >= deadline
             break
         Sleep Max(1, Integer(pollIntervalMs))
@@ -819,6 +845,7 @@ FindContextMeasurementCommandControl(
     catch {
         controls := []
     }
+    matches := []
     for controlHwnd in controls {
         if requireVisible
             && !DllCall(
@@ -833,9 +860,9 @@ FindContextMeasurementCommandControl(
             controlText := ""
         }
         if controlText = commandText
-            return controlHwnd
+            matches.Push(controlHwnd)
     }
-    return 0
+    return matches.Length = 1 ? matches[1] : 0
 }
 
 CloseContextMeasurementPopup(popupHwnd) {
@@ -856,6 +883,8 @@ MergeContextMeasurementMetadata(context, actionContext, capture) {
     context["popupDiscovery"] := actionContext["popupDiscovery"]
     context["commandControlHwnd"] := actionContext["commandControlHwnd"]
     context["commandRuntimeId"] := actionContext["commandRuntimeId"]
+    context["commandElapsedMs"] := actionContext.Has("commandElapsedMs")
+        ? actionContext["commandElapsedMs"] : 0
     context["requestId"] := capture.requestId
     context["clipboardSequenceBeforeCommand"] := capture.sequenceBeforeCommand
     context["clipboardSequenceAfterCommand"] := capture.sequenceAfterCommand

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Bound measurement command dispatch; distinguish unreadable clipboard from an
+  explicitly empty measurement, and require unique, ready menu commands.
+- Add read-only Caption target readiness and cached-anchor validation; refresh
+  stale target geometry before input without replaying copy/save/advance.
+- Allow Viewer surface readiness after each lifecycle change, with identity
+  checks and an unchanged cache-hit path. Record red-anchor query/root timing.
+
 ## [0.8.0] - 2026-08-13
 
 ### Added

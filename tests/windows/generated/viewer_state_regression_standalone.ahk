@@ -10,6 +10,8 @@ class ReportImageCaptionDefaults {
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
+    static TargetReadyTimeoutMs := 1500
+    static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
     ; The first paste into a newly observed renderer can be visible before its
@@ -78,7 +80,7 @@ FindRecentColorResetFailureEvent(lines) {
         ; The legacy log uses spaces, not pipes. Copy only useful metadata,
         ; never the raw legacy line or unrelated historical failures.
         for field in ["timestamp", "resultCode", "preflightStage",
-            "readinessReason", "readinessElapsedMs", "exactAnchorQueryCount",
+            "readinessReason", "readinessElapsedMs", "anchorRootMaxMs", "anchorQueryMaxMs", "exactAnchorQueryCount",
             "exactAnchorCandidateCount", "foregroundGuardReason"] {
             value := ColorResetDiagnosticLineField(line, field)
             if value != "" && value != "UNKNOWN"

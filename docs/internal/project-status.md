@@ -23,7 +23,9 @@
 - 已完成的验证以当前源码、测试和现场证据为准，不在此重复逐项历史测试记录。
 - 其他 DPI/scaling、multi-monitor、Viewer layout 和 workstation profile 不得默认视为支持。
 - 重新编译后首次颜色下拉菜单的偶发残留仍需在正式 EXE 验收时记录；不得用 blind retry 掩盖。
-- 单修饰键、无修饰 Viewer-only 按键、Win modifier 持久化、F12 pulse 和最新 Montage 修改均需按对应的 Windows/MedEx 验收记录确认。
+- 用户于 2026-09-11 确认 scoped popup Montage 修复消除了半路卡住并改善整体速度；
+  该反馈限定于实际测试环境，不扩展为所有机器验收。
+- 本轮其他自动化就绪优化及待验收场景见 [automation-readiness.md](automation-readiness.md)。
 
 ## 读取规则
 

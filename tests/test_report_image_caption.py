@@ -177,7 +177,7 @@ class ReportImageCaptionTests(unittest.TestCase):
             capture,
         )
         self.assertIn(
-            "ResolveReportImageCaptionTarget(",
+            "WaitForReportImageCaptionTarget(",
             capture,
         )
         self.assertIn("targetClientRectKey", capture)

@@ -511,6 +511,8 @@ WaitForMedExCalibrationAnchor(hwnd, process) {
         "exactAnchorCandidateCount", 0,
         "readinessElapsedMs", 0
     )
+    context["anchorRootMaxMs"] := 0
+    context["anchorQueryMaxMs"] := 0
     try UIA.ActivateChromiumAccessibility(hwnd, false, 0)
     catch {
         context["readinessElapsedMs"] := A_TickCount - startedAt
@@ -537,18 +539,22 @@ WaitForMedExCalibrationAnchor(hwnd, process) {
         }
 
         windowElement := 0
+        rootStartedAt := A_TickCount
         try {
             windowElement := UIA.ElementFromHandle(hwnd, , false)
             rootAcquired := true
             context["uiaRootReacquireCount"] += 1
         }
+        context["anchorRootMaxMs"] := Max(context["anchorRootMaxMs"], A_TickCount - rootStartedAt)
         if windowElement {
+            queryStartedAt := A_TickCount
             try {
                 context["exactAnchorQueryCount"] += 1
                 regionElements := windowElement.FindElements({
                     Type: "Text",
                     Name: CandidateGRelativeMouseProfile.RegionAnchorName
                 })
+                context["anchorQueryMaxMs"] := Max(context["anchorQueryMaxMs"], A_TickCount - queryStartedAt)
                 exactQuerySucceeded := true
                 conversion := UiaTextElementsToAnchors(regionElements, false)
                 textAnchors := conversion.anchors
