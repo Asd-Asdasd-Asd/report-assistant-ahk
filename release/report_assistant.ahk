@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 15293cb9e89f39cf92d9f8c5a3f584b53b587761-dirty
-; Generated at: 2026-09-11 01:23:47 UTC
+; Source revision: 37718cf396754d5fc18ac1ccf70603827f77e7c8
+; Generated at: 2026-09-11 01:31:24 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-09-11"
-    static SourceRevision := "15293cb9e89f39cf92d9f8c5a3f584b53b587761-dirty"
+    static SourceRevision := "37718cf396754d5fc18ac1ccf70603827f77e7c8"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -846,7 +846,7 @@ FindRecentColorResetFailureEvent(lines) {
         ; The legacy log uses spaces, not pipes. Copy only useful metadata,
         ; never the raw legacy line or unrelated historical failures.
         for field in ["timestamp", "resultCode", "preflightStage",
-            "readinessReason", "readinessElapsedMs", "exactAnchorQueryCount",
+            "readinessReason", "readinessElapsedMs", "anchorRootMaxMs", "anchorQueryMaxMs", "exactAnchorQueryCount",
             "exactAnchorCandidateCount", "foregroundGuardReason"] {
             value := ColorResetDiagnosticLineField(line, field)
             if value != "" && value != "UNKNOWN"
@@ -9759,12 +9759,14 @@ class MeasurementFailureReason {
     static COMMAND_NOT_FOUND := "COMMAND_NOT_FOUND"
     static COMMAND_ID_INVALID := "COMMAND_ID_INVALID"
     static COMMAND_INVOKE_FAILED := "COMMAND_INVOKE_FAILED"
+    static COMMAND_RESULT_UNKNOWN := "COMMAND_RESULT_UNKNOWN"
     static CONFIRMATION_REQUIRED := "CONFIRMATION_REQUIRED"
     static CLEANUP_NOT_VERIFIED := "CLEANUP_NOT_VERIFIED"
     static CLIPBOARD_SAVE_FAILED := "CLIPBOARD_SAVE_FAILED"
     static CLIPBOARD_SENTINEL_FAILED := "CLIPBOARD_SENTINEL_FAILED"
     static CLIPBOARD_ACTION_FAILED := "CLIPBOARD_ACTION_FAILED"
     static CLIPBOARD_NOT_UPDATED := "CLIPBOARD_NOT_UPDATED"
+    static CLIPBOARD_READ_FAILED := "CLIPBOARD_READ_FAILED"
     static CLIPBOARD_RESTORE_FAILED := "CLIPBOARD_RESTORE_FAILED"
     static UNEXPECTED_FORMAT := "UNEXPECTED_FORMAT"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
@@ -10077,7 +10079,7 @@ CaptureMeasurementClipboardText(actionCallback, options := 0,
         result.sequenceAfterCommand := update.sequence
         result.clipboardOwnerHwnd := update.ownerHwnd
         if !update.ok {
-            result.failureReason := MeasurementFailureReason.CLIPBOARD_NOT_UPDATED
+            result.failureReason := update.failureReason
             return result
         }
 
@@ -10142,13 +10144,24 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
     lastSequence := sequenceBeforeCommand
     emptySequence := 0
     emptyDeadline := 0
+    readFailed := false
     loop {
         sequence := GetMeasurementClipboardSequenceNumber()
         if sequence != sequenceBeforeCommand {
             lastSequence := sequence
-            try rawText := A_Clipboard
+            try {
+                rawText := A_Clipboard
+                readFailed := false
+            }
             catch {
-                rawText := ""
+                readFailed := true
+                ; An inaccessible clipboard is not a successfully read empty result.
+                emptySequence := 0
+                emptyDeadline := 0
+                if A_TickCount >= deadline
+                    break
+                Sleep Max(1, Integer(pollIntervalMs))
+                continue
             }
             if rawText != "" && rawText != sentinel {
                 ownerHwnd := DllCall("User32\GetClipboardOwner", "Ptr")
@@ -10185,7 +10198,9 @@ WaitForMeasurementClipboardUpdate(sequenceBeforeCommand, sentinel, options := 0)
         ok: false,
         rawText: "",
         sequence: lastSequence,
-        ownerHwnd: 0
+        ownerHwnd: 0,
+        failureReason: readFailed ? MeasurementFailureReason.CLIPBOARD_READ_FAILED
+            : MeasurementFailureReason.CLIPBOARD_NOT_UPDATED
     }
 }
 
@@ -11668,6 +11683,7 @@ PrepareMxNMContextCommand(viewer, clientPoint, commandText,
         "Int"
     )
     actionContext["commandRuntimeId"] := runtimeId
+    actionContext["expectedPid"] := viewer.pid
     if runtimeId <= 0 {
         actionContext["failureReason"] := MeasurementFailureReason.COMMAND_ID_INVALID
         return false
@@ -11688,6 +11704,15 @@ InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {
         return false
     }
     try {
+        ; Revalidate the exact prepared command immediately before dispatch.
+        if !DllCall("User32\IsWindowVisible", "Ptr", popupHwnd, "Int")
+            || !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
+            || !DllCall("User32\IsWindowEnabled", "Ptr", controlHwnd, "Int")
+            || !DllCall("User32\IsChild", "Ptr", popupHwnd, "Ptr", controlHwnd, "Int")
+            || WinGetPID("ahk_id " popupHwnd) != actionContext["expectedPid"]
+            || WinGetPID("ahk_id " controlHwnd) != actionContext["expectedPid"]
+            || DllCall("User32\GetDlgCtrlID", "Ptr", controlHwnd, "Int") != runtimeId
+            throw Error("Prepared context command changed")
         if asynchronous {
             dispatched := DllCall(
                 "User32\PostMessageW",
@@ -11700,14 +11725,25 @@ InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {
             if !dispatched
                 throw Error("Context command post failed")
         } else {
-            DllCall(
-                "User32\SendMessageW",
+            commandResult := Buffer(A_PtrSize, 0)
+            commandStartedAt := A_TickCount
+            dispatched := DllCall(
+                "User32\SendMessageTimeoutW",
                 "Ptr", popupHwnd,
                 "UInt", 0x0111,
                 "UPtr", runtimeId,
                 "Ptr", controlHwnd,
+                "UInt", 0x0002,
+                "UInt", 1000,
+                "Ptr", commandResult.Ptr,
                 "Ptr"
             )
+            actionContext["commandElapsedMs"] := A_TickCount - commandStartedAt
+            if !dispatched {
+                ; The receiver may already have acted. Never replay this command.
+                actionContext["failureReason"] := MeasurementFailureReason.COMMAND_RESULT_UNKNOWN
+                return false
+            }
         }
     } catch {
         actionContext["failureReason"] :=
@@ -11837,6 +11873,7 @@ WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
     candidatePopupHwnd := 0
     candidateDiscovery := ""
     loop {
+        readyPopups := []
         for popupHwnd in ListContextMeasurementPopupWindows(viewerPid) {
             currentState := CaptureContextMeasurementPopupState(
                 popupHwnd,
@@ -11855,16 +11892,20 @@ WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
             candidatePopupHwnd := popupHwnd
             candidateDiscovery := discovery
             controlHwnd := currentState.commandControlHwnd
-            if !controlHwnd
+            if !currentState.visible || !controlHwnd
+                || !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
+                || !DllCall("User32\IsWindowEnabled", "Ptr", controlHwnd, "Int")
                 continue
-            return {
+            readyPopups.Push({
                 ok: true,
                 popupHwnd: popupHwnd,
                 controlHwnd: controlHwnd,
                 discovery: discovery,
                 failureReason: MeasurementFailureReason.NONE
-            }
+            })
         }
+        if readyPopups.Length = 1
+            return readyPopups[1]
         if A_TickCount >= deadline
             break
         Sleep Max(1, Integer(pollIntervalMs))
@@ -11889,6 +11930,7 @@ FindContextMeasurementCommandControl(
     catch {
         controls := []
     }
+    matches := []
     for controlHwnd in controls {
         if requireVisible
             && !DllCall(
@@ -11903,9 +11945,9 @@ FindContextMeasurementCommandControl(
             controlText := ""
         }
         if controlText = commandText
-            return controlHwnd
+            matches.Push(controlHwnd)
     }
-    return 0
+    return matches.Length = 1 ? matches[1] : 0
 }
 
 CloseContextMeasurementPopup(popupHwnd) {
@@ -11926,6 +11968,8 @@ MergeContextMeasurementMetadata(context, actionContext, capture) {
     context["popupDiscovery"] := actionContext["popupDiscovery"]
     context["commandControlHwnd"] := actionContext["commandControlHwnd"]
     context["commandRuntimeId"] := actionContext["commandRuntimeId"]
+    context["commandElapsedMs"] := actionContext.Has("commandElapsedMs")
+        ? actionContext["commandElapsedMs"] : 0
     context["requestId"] := capture.requestId
     context["clipboardSequenceBeforeCommand"] := capture.sequenceBeforeCommand
     context["clipboardSequenceAfterCommand"] := capture.sequenceAfterCommand
@@ -13303,8 +13347,8 @@ class MxNMContextTargetPolicy {
 class MxNMContextTargetSessionProvider {
     static CachedSession := 0
     static Generation := 0
-    static ColdRecoveryConsumed := false
-    static ColdRecoveryDelayMs := 350
+    static ReadinessTimeoutMs := 1500
+    static ReadinessPollMs := 30
 
     static Resolve(viewerExe := "", options := 0) {
         try return this.ResolveInternal(viewerExe, options)
@@ -13345,18 +13389,28 @@ class MxNMContextTargetSessionProvider {
             this.Generation + 1
         )
         coldRecoveryAttempted := false
-        if !discovery.ok
-            && discovery.code
-                = MxNMContextTargetSessionCode.DISCOVERY_FAILED
-            && !this.ColdRecoveryConsumed {
-            this.ColdRecoveryConsumed := true
+        readinessStartedAt := A_TickCount
+        recoveryPid := discovery.HasOwnProp("pid") ? discovery.pid : 0
+        recoveryRoot := discovery.HasOwnProp("rootHwnd") ? discovery.rootHwnd : 0
+        while !discovery.ok
+            && discovery.code = MxNMContextTargetSessionCode.DISCOVERY_FAILED
+            && recoveryPid && recoveryRoot
+            && A_TickCount - readinessStartedAt < this.ReadinessTimeoutMs {
             coldRecoveryAttempted := true
-            Sleep this.ColdRecoveryDelayMs
+            Sleep this.ReadinessPollMs
+            identity := ResolveMxNMContextViewerIdentity(viewerExe, options)
+            if !identity.ok || identity.pid != recoveryPid || identity.rootHwnd != recoveryRoot
+                break
             discovery := DiscoverMxNMContextTargetSession(
                 viewerExe,
                 options,
                 this.Generation + 1
             )
+            if discovery.ok && (discovery.session.pid != recoveryPid
+                || discovery.session.rootHwnd != recoveryRoot) {
+                discovery := {ok: false, code: MxNMContextTargetSessionCode.FAST_VALIDATION_FAILED}
+                break
+            }
         }
         if !discovery.ok {
             failure := MakeMxNMContextTargetFailure(
@@ -13366,7 +13420,7 @@ class MxNMContextTargetSessionProvider {
             failure.coldRecoveryAttempted := coldRecoveryAttempted
             failure.coldRecoverySucceeded := false
             failure.coldRecoveryDelayMs := coldRecoveryAttempted
-                ? this.ColdRecoveryDelayMs
+                ? A_TickCount - readinessStartedAt
                 : 0
             return failure
         }
@@ -13375,7 +13429,7 @@ class MxNMContextTargetSessionProvider {
         discovery.session.coldRecoveryAttempted := coldRecoveryAttempted
         discovery.session.coldRecoverySucceeded := coldRecoveryAttempted
         discovery.session.coldRecoveryDelayMs := coldRecoveryAttempted
-            ? this.ColdRecoveryDelayMs
+            ? A_TickCount - readinessStartedAt
             : 0
         this.CachedSession := discovery.session
         return BuildMxNMContextTargetResult(
@@ -14244,6 +14298,7 @@ ReadMxNMMeasurementWithTarget(spec, options := 0) {
             result.failureReason,
             Map(
                 "stage", "CONTEXT_COMMAND",
+                "commandElapsedMs", MedExContextValue(result.context, "commandElapsedMs", 0),
                 "measurementType", requestedMeasurementType,
                 "failureReason", result.failureReason,
                 "viewerPid", target.actionPid,
@@ -16661,6 +16716,7 @@ FormatMxNMViewerFailureDiagnostic(action, resultCode, details := 0) {
         "optionListHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionListHwnd", 0)),
         "optionSearchScope=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "optionSearchScope", "")),
         "popupDiscovery=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupDiscovery", "")),
+        "commandElapsedMs=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "commandElapsedMs", 0)),
         "popupHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "popupHwnd", 0)),
         "commandControlHwnd=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "commandControlHwnd", 0)),
         "clipboardSequenceBefore=" SafeDiagnosticValue(MxNMViewerFailureDetail(details, "clipboardSequenceBefore", 0)),
@@ -16730,6 +16786,8 @@ FormatMedExColorResetFailureLogLine(result) {
         "exactAnchorQueryCount=" SafeDiagnosticValue(MedExContextValue(context, "exactAnchorQueryCount", 0)),
         "exactAnchorCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "exactAnchorCandidateCount", 0)),
         "readinessElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "readinessElapsedMs", "UNKNOWN")),
+        "anchorRootMaxMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorRootMaxMs", "UNKNOWN")),
+        "anchorQueryMaxMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorQueryMaxMs", "UNKNOWN")),
         "processName=" SafeDiagnosticValue(MedExContextValue(context, "foregroundProcess", "UNKNOWN")),
         "windowHandle=" SafeDiagnosticValue(MedExContextValue(context, "foregroundWindowHandle", "UNKNOWN")),
         "medExVersion=" SafeDiagnosticValue(MedExContextValue(context, "medExVersion", "UNKNOWN")),
@@ -18723,6 +18781,8 @@ WaitForMedExCalibrationAnchor(hwnd, process) {
         "exactAnchorCandidateCount", 0,
         "readinessElapsedMs", 0
     )
+    context["anchorRootMaxMs"] := 0
+    context["anchorQueryMaxMs"] := 0
     try UIA.ActivateChromiumAccessibility(hwnd, false, 0)
     catch {
         context["readinessElapsedMs"] := A_TickCount - startedAt
@@ -18749,18 +18809,22 @@ WaitForMedExCalibrationAnchor(hwnd, process) {
         }
 
         windowElement := 0
+        rootStartedAt := A_TickCount
         try {
             windowElement := UIA.ElementFromHandle(hwnd, , false)
             rootAcquired := true
             context["uiaRootReacquireCount"] += 1
         }
+        context["anchorRootMaxMs"] := Max(context["anchorRootMaxMs"], A_TickCount - rootStartedAt)
         if windowElement {
+            queryStartedAt := A_TickCount
             try {
                 context["exactAnchorQueryCount"] += 1
                 regionElements := windowElement.FindElements({
                     Type: "Text",
                     Name: CandidateGRelativeMouseProfile.RegionAnchorName
                 })
+                context["anchorQueryMaxMs"] := Max(context["anchorQueryMaxMs"], A_TickCount - queryStartedAt)
                 exactQuerySucceeded := true
                 conversion := UiaTextElementsToAnchors(regionElements, false)
                 textAnchors := conversion.anchors
@@ -23753,6 +23817,8 @@ class ReportImageCaptionDefaults {
     static CopyTimeoutSeconds := 1
     static ClipboardSettleSeconds := 0.5
     static TargetActivationTimeoutSeconds := 1
+    static TargetReadyTimeoutMs := 1500
+    static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
     static PasteSettleMs := 20
     ; The first paste into a newly observed renderer can be visible before its
@@ -23999,7 +24065,7 @@ class ReportImageCaptionProvider {
             )
             : {ok: false}
         if !target.ok {
-            target := ResolveReportImageCaptionTarget(
+            target := WaitForReportImageCaptionTarget(
                 sourceHwnd,
                 sourcePid
             )
@@ -24046,7 +24112,9 @@ class ReportImageCaptionProvider {
             ),
             captionPoint: target.captionPoint,
             savePoint: target.savePoint,
-            imagePoint: target.imagePoint
+            imagePoint: target.imagePoint,
+            descriptionAnchor: target.descriptionAnchor,
+            saveAnchor: target.saveAnchor
         }
         return ExecuteReportImageCaptionAction(
             REPORT_IMAGE_CAPTION_CACHE,
@@ -24074,6 +24142,21 @@ class ReportImageCaptionProvider {
             cache,
             targetHwnd
         )
+        if !target.ok {
+            target := WaitForReportImageCaptionTarget(
+                cache.sourceHwnd, cache.sourcePid, targetHwnd
+            )
+            if target.ok {
+                cache.captionPoint := target.captionPoint
+                cache.savePoint := target.savePoint
+                cache.imagePoint := target.imagePoint
+                cache.targetClientRectKey := ReportImageCaptionRectKey(
+                    ReportImageCaptionClientRect(targetHwnd)
+                )
+                cache.descriptionAnchor := target.descriptionAnchor
+                cache.saveAnchor := target.saveAnchor
+            }
+        }
         if IsObject(operation)
             operation.SetField(
                 "caption.targetCandidateCount",
@@ -24263,6 +24346,24 @@ ReportImageCaptionSequenceChangeCode(before, after) {
     return before = after ? "0" : "1"
 }
 
+WaitForReportImageCaptionTarget(sourceHwnd, sourcePid, boundTarget := 0) {
+    startedAt := A_TickCount
+    foreground := WinExist("A")
+    loop {
+        if WinExist("A") != foreground
+            || ReportImageCaptionWindowPid(sourceHwnd) != sourcePid
+            return {ok: false, candidateCount: 0}
+        target := boundTarget
+            ? BuildReportImageCaptionTargetCandidate(boundTarget, sourcePid)
+            : ResolveReportImageCaptionTarget(sourceHwnd, sourcePid)
+        if target.ok || target.candidateCount > 1
+            || A_TickCount - startedAt >= ReportImageCaptionDefaults.TargetReadyTimeoutMs
+            return target
+        ; Read-only readiness polling; no input is replayed.
+        Sleep ReportImageCaptionDefaults.TargetReadyPollMs
+    }
+}
+
 ResolveReportImageCaptionTarget(sourceHwnd, sourcePid) {
     matches := []
     try windows := WinGetList("ahk_pid " sourcePid)
@@ -24309,6 +24410,7 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         || !cache.HasOwnProp("savePoint")
         || !cache.HasOwnProp("imagePoint")
         || !cache.HasOwnProp("targetClientRectKey")
+        || !ReportImageCaptionCachedAnchorsValid(cache)
         || cache.targetClientRectKey
             != ReportImageCaptionRectKey(
                 ReportImageCaptionClientRect(targetHwnd)
@@ -24334,7 +24436,23 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         candidateCount: 1,
         captionPoint: cache.captionPoint,
         savePoint: cache.savePoint,
-        imagePoint: cache.imagePoint
+        imagePoint: cache.imagePoint,
+        descriptionAnchor: cache.descriptionAnchor,
+        saveAnchor: cache.saveAnchor
+    }
+}
+
+ReportImageCaptionCachedAnchorsValid(cache) {
+    try {
+        for field in ["descriptionAnchor", "saveAnchor"] {
+            anchor := cache.%field%
+            if !ReportImageCaptionElementUsable(anchor.element, cache.targetPid)
+                || ReportImageCaptionRectKey(ReportImageCaptionElementRect(anchor.element)) != anchor.rectKey
+                return false
+        }
+        return true
+    } catch {
+        return false
     }
 }
 
@@ -24363,6 +24481,8 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         savePoint: 0,
         imagePoint: 0
     }
+    if !ReportImageCaptionTopLevelWindowEligible(hwnd, expectedPid)
+        return failure
     try {
         clientRect := ReportImageCaptionClientRect(hwnd)
         if !IsObject(clientRect)
@@ -24386,6 +24506,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         })
         if descriptionElements.Length != 1
             || saveElements.Length != 1 {
+            failure.candidateCount := Max(descriptionElements.Length, saveElements.Length)
             return failure
         }
         description := descriptionElements[1]
@@ -24462,7 +24583,9 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             candidateCount: 1,
             captionPoint: captionPoint,
             savePoint: savePoint,
-            imagePoint: imageResult.point
+            imagePoint: imageResult.point,
+            descriptionAnchor: {element: description, rectKey: ReportImageCaptionRectKey(descriptionRect)},
+            saveAnchor: {element: saveButton, rectKey: ReportImageCaptionRectKey(saveRect)}
         }
     } catch {
         return failure
