@@ -108,15 +108,41 @@ def validate_zip(zip_path: Path, package_root_name: str) -> None:
             raise ValueError(f"release ZIP CRC failed: {bad_member}")
 
 
+def validate_package_pair(zip_path: Path, hash_path: Path) -> None:
+    assert_nonempty_file(zip_path, "release ZIP")
+    assert_nonempty_file(hash_path, "SHA256 file")
+    expected = f"{hashlib.sha256(zip_path.read_bytes()).hexdigest()}  {zip_path.name}"
+    if hash_path.read_text(encoding="utf-8").strip() != expected:
+        raise ValueError(f"release ZIP and SHA256 file do not match: {zip_path.name}")
+
+
 def recover_interrupted_promotion(dist: Path, backup: Path) -> None:
     if not backup.is_dir():
         return
+    pairs = set()
     for source in backup.iterdir():
-        if not source.is_file():
-            continue
-        destination = dist / source.name
-        if not destination.exists():
-            source.replace(destination)
+        if not source.is_file() or not MANAGED_ARTIFACT_PATTERN.fullmatch(source.name):
+            raise ValueError(f"unexpected interrupted-package backup entry: {source.name}")
+        pairs.add(source.name.removesuffix(".zip").removesuffix(".sha256.txt"))
+
+    # An interruption can occur while moving the old pair into backup, or
+    # after installing only the new ZIP. Prefer the old backed-up component,
+    # and validate every recoverable pair before modifying any final file.
+    recoveries = []
+    for name in sorted(pairs):
+        zip_name, hash_name = f"{name}.zip", f"{name}.sha256.txt"
+        old_zip = backup / zip_name if (backup / zip_name).is_file() else dist / zip_name
+        old_hash = backup / hash_name if (backup / hash_name).is_file() else dist / hash_name
+        validate_package_pair(old_zip, old_hash)
+        recoveries.append((old_zip, old_hash, dist / zip_name, dist / hash_name))
+
+    for old_zip, old_hash, final_zip, final_hash in recoveries:
+        for source, destination in ((old_zip, final_zip), (old_hash, final_hash)):
+            if source != destination:
+                shutil.copy2(source, destination)
+        validate_package_pair(final_zip, final_hash)
+    # Keep backup intact until all pairs are restored and verified, so a
+    # second interruption or I/O error does not destroy the recovery source.
     shutil.rmtree(backup)
 
 
@@ -221,7 +247,7 @@ def package_release(build_root: Path = DEFAULT_BUILD_ROOT) -> PackageResult:
         building_hash.replace(final_hash)
         new_final_hash_created = True
         validate_zip(final_zip, package_root_name)
-        assert_nonempty_file(final_hash, "final SHA256 file")
+        validate_package_pair(final_zip, final_hash)
         shutil.rmtree(backup)
         promotion_started = False
         return PackageResult(

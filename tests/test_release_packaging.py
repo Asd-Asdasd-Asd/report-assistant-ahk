@@ -206,6 +206,83 @@ class ReleasePackagingWorkflowTests(unittest.TestCase):
             ):
                 packaging.package_release(build_root)
 
+    def test_interrupted_promotion_restores_a_matching_old_pair(self) -> None:
+        for moved in ("zip", "hash", "both"):
+            for new_final in (False, True):
+                if moved != "both" and new_final:
+                    continue
+                with self.subTest(moved=moved, new_final=new_final):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        write_publish_fixture(root)
+                        old = packaging.package_release(root)
+                        old_bytes = old.zip_path.read_bytes()
+                        backup = old.zip_path.parent / ".package-previous"
+                        backup.mkdir()
+                        if moved in ("zip", "both"):
+                            old.zip_path.replace(backup / old.zip_path.name)
+                        if moved in ("hash", "both"):
+                            old.hash_path.replace(backup / old.hash_path.name)
+                        if new_final:
+                            old.zip_path.write_bytes(b"interrupted new ZIP")
+
+                        packaging.recover_interrupted_promotion(old.zip_path.parent, backup)
+
+                        self.assertEqual(old.zip_path.read_bytes(), old_bytes)
+                        packaging.validate_package_pair(old.zip_path, old.hash_path)
+                        self.assertFalse(backup.exists())
+
+    def test_failed_recovery_keeps_backup_and_can_be_retried(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_publish_fixture(root)
+            old = packaging.package_release(root)
+            backup = old.zip_path.parent / ".package-previous"
+            backup.mkdir()
+            old.zip_path.replace(backup / old.zip_path.name)
+            old.hash_path.replace(backup / old.hash_path.name)
+            real_copy = packaging.shutil.copy2
+
+            def fail_hash_copy(source, destination):
+                if Path(source).name.endswith(".sha256.txt"):
+                    raise OSError("simulated interrupted recovery")
+                return real_copy(source, destination)
+
+            with mock.patch.object(packaging.shutil, "copy2", side_effect=fail_hash_copy):
+                with self.assertRaisesRegex(OSError, "interrupted recovery"):
+                    packaging.recover_interrupted_promotion(old.zip_path.parent, backup)
+            self.assertEqual(len(list(backup.iterdir())), 2)
+            packaging.recover_interrupted_promotion(old.zip_path.parent, backup)
+            packaging.validate_package_pair(old.zip_path, old.hash_path)
+            self.assertFalse(backup.exists())
+
+    def test_mismatched_recovery_pair_preserves_all_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_publish_fixture(root)
+            old = packaging.package_release(root)
+            backup = old.zip_path.parent / ".package-previous"
+            backup.mkdir()
+            old.zip_path.replace(backup / old.zip_path.name)
+            old.hash_path.replace(backup / old.hash_path.name)
+            (backup / old.hash_path.name).write_text("wrong hash", encoding="utf-8")
+            old.zip_path.write_bytes(b"new ZIP")
+            with self.assertRaisesRegex(ValueError, "do not match"):
+                packaging.recover_interrupted_promotion(old.zip_path.parent, backup)
+            self.assertEqual(old.zip_path.read_bytes(), b"new ZIP")
+            self.assertEqual(len(list(backup.iterdir())), 2)
+
+    def test_unknown_backup_entry_is_not_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            dist = Path(directory)
+            backup = dist / ".package-previous"
+            backup.mkdir()
+            note = backup / "maintainer-note.txt"
+            note.write_text("keep", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unexpected"):
+                packaging.recover_interrupted_promotion(dist, backup)
+            self.assertEqual(note.read_text(encoding="utf-8"), "keep")
+
 
 if __name__ == "__main__":
     unittest.main()
