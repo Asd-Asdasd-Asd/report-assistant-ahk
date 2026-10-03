@@ -10,6 +10,7 @@
 ## 验证
 
 - Python 测试：`python3 -m unittest discover -s tests -p 'test_*.py'`
+- Windows 上的 `test_maintenance_windows.py` 会用 AutoHotkey v2 在独立进程中验证快捷键和配置启动失败路径；只使用永不激活的快捷键条件和模拟配置入口，不操作 MedEx、剪贴板或用户配置。可通过 `AUTOHOTKEY_EXE` 指定 v2 解释器；缺少运行环境时明确跳过。
 - 静态检查：`git diff --check`
 - source 变化后按影响范围运行测试，并按需运行 `python3 scripts/build_release.py`。
 - AHK/Viewer/MedEx 行为必须在 Windows 目标环境现场验证；macOS 静态检查不能替代现场验收。

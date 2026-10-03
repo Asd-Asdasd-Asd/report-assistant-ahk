@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Use explicit UTF-8 in the Windows regression generators and tests.
+- Reject unknown configurable hotkey names, report registration failures, and
+  keep template hotstrings disabled when configuration startup fails.
+- Restore interrupted release ZIP/SHA256 pairs together, retaining backups
+  until verification succeeds; cover recovery errors with temporary fixtures.
 - Bound measurement command dispatch; distinguish unreadable clipboard from an
   explicitly empty measurement, and require unique, ready menu commands.
 - Add read-only Caption target readiness and cached-anchor validation; refresh

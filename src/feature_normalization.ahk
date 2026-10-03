@@ -108,7 +108,7 @@ ValidateFeatureHotkeySettings(settings) {
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键" requirement
+                "“" definition.label "”快捷键无效，请选择有效按键。" requirement
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -126,8 +126,13 @@ ValidateFeatureHotkeySettings(settings) {
 
 ViewerToolHotkeyChordIsSafe(chord) {
     normalized := Trim(String(chord), " `t`r`n")
-    if RegExMatch(normalized, "^([!+^#]+)([^!+^#].*)$", &match)
-        return match[2] != ""
+    if RegExMatch(normalized, "^([!+^#]+)([^!+^#].*)$", &match) {
+        ; Resolve the key without registering it or changing active hotkeys.
+        ; Keep named, mouse, virtual-key and scan-code forms supported by AHK.
+        try return GetKeyVK(match[2]) != 0 || GetKeySC(match[2]) != 0
+        catch
+            return false
+    }
     return ViewerHotkeyIsSafeBareChord(normalized)
 }
 

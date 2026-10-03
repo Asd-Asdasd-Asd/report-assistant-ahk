@@ -1,7 +1,9 @@
-RegisterReportHotstrings(
-    LoadReportHotstringConfig(),
-    RunConfiguredReportHotstring
-)
+if ReportAssistantConfigStartupResult.Ok {
+    RegisterReportHotstrings(
+        LoadReportHotstringConfig(),
+        RunConfiguredReportHotstring
+    )
+}
 
 class ReportTemplateWriteCode {
     static OK := "OK"

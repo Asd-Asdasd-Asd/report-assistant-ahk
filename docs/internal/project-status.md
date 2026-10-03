@@ -1,10 +1,10 @@
 # 项目状态与交接
 
-更新时间：2026-09-11。当前版本以 `src/app_metadata.ahk` 为准。
+更新时间：2026-10-04。当前版本以 `src/app_metadata.ahk` 为准。
 
 ## 当前状态
 
-- 源码版本为 `0.8.0`，当前工作区含未发布修改；Windows EXE 是否通过本轮验收需单独确认。
+- 源码版本为 `0.8.0`。本轮维护包含 Windows 测试编码、快捷键校验/注册反馈、配置失败时停用模板和打包中断恢复；尚未部署新的 Windows EXE。
 - Viewer 测量目标使用 `MxNMMeasurementProvider.ResolveTarget` → `MxNMContextTargetSessionProvider`，按当前 Viewer 身份发现并验证图像 surface。
 - 当前 production 路径不依赖旧的 config-only 几何计划；旧实现和 checkpoint 仅作历史审计材料。
 - Viewer 快捷键、测量、颜色恢复和 Caption 首次保存均要求明确的窗口/进程/控件/目标证据；证据不唯一时 fail closed。
@@ -20,6 +20,8 @@
 
 ## 当前验证与未决事项
 
+- 2026-10-04 现场反馈仍待验证：Windows 重启后首次 Ctrl+P 截图有闪光但未保存；搜狗输入法下 `;fzg` 偶发删除前一个已有字符；Caption 偶发保存完成前切图。
+- Caption 剪贴板事务恢复及不同功能之间的操作互斥仍待后续验证。本轮维护不调整截图派发、hotstring 自动退格、Caption 保存等待、测量、颜色恢复或 Montage 操作链路。
 - 已完成的验证以当前源码、测试和现场证据为准，不在此重复逐项历史测试记录。
 - 其他 DPI/scaling、multi-monitor、Viewer layout 和 workstation profile 不得默认视为支持。
 - 重新编译后首次颜色下拉菜单的偶发残留仍需在正式 EXE 验收时记录；不得用 blind retry 掩盖。
