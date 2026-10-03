@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 37718cf396754d5fc18ac1ccf70603827f77e7c8
-; Generated at: 2026-09-11 01:31:24 UTC
+; Source revision: f626f13be1196ac08f6337a400733230817b1cdb
+; Generated at: 2026-10-03 19:59:09 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -14,8 +14,8 @@
 class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-09-11"
-    static SourceRevision := "37718cf396754d5fc18ac1ccf70603827f77e7c8"
+    static BuildDate := "2026-10-04"
+    static SourceRevision := "f626f13be1196ac08f6337a400733230817b1cdb"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -22756,10 +22756,12 @@ RegisterReportHotstrings(entries, executor) {
 ; --- END hotstring_registration.ahk ---
 
 ; --- BEGIN hotstrings.ahk ---
-RegisterReportHotstrings(
-    LoadReportHotstringConfig(),
-    RunConfiguredReportHotstring
-)
+if ReportAssistantConfigStartupResult.Ok {
+    RegisterReportHotstrings(
+        LoadReportHotstringConfig(),
+        RunConfiguredReportHotstring
+    )
+}
 
 class ReportTemplateWriteCode {
     static OK := "OK"
@@ -23185,7 +23187,7 @@ ValidateFeatureHotkeySettings(settings) {
             return MakeViewerToolHotkeyValidation(
                 false,
                 definition.field,
-                "“" definition.label "”快捷键" requirement
+                "“" definition.label "”快捷键无效，请选择有效按键。" requirement
             )
         }
         chordKey := NormalizeHotkeyChord(chord)
@@ -23203,8 +23205,13 @@ ValidateFeatureHotkeySettings(settings) {
 
 ViewerToolHotkeyChordIsSafe(chord) {
     normalized := Trim(String(chord), " `t`r`n")
-    if RegExMatch(normalized, "^([!+^#]+)([^!+^#].*)$", &match)
-        return match[2] != ""
+    if RegExMatch(normalized, "^([!+^#]+)([^!+^#].*)$", &match) {
+        ; Resolve the key without registering it or changing active hotkeys.
+        ; Keep named, mouse, virtual-key and scan-code forms supported by AHK.
+        try return GetKeyVK(match[2]) != 0 || GetKeySC(match[2]) != 0
+        catch
+            return false
+    }
     return ViewerHotkeyIsSafeBareChord(normalized)
 }
 
@@ -23282,6 +23289,7 @@ RegisterHotkeyDefinitions(
     for registeredChord, _ in registeredChords
         seenChords[registeredChord] := true
     registeredIds := []
+    failedChords := []
     useContext := HasMethod(contextCallback, "Call")
     if useContext
         HotIf(contextCallback)
@@ -23292,16 +23300,29 @@ RegisterHotkeyDefinitions(
                 continue
             try {
                 Hotkey(definition.Chord, definition.Handler)
-                seenChords[chordKey] := true
-                registeredChords[chordKey] := true
-                registeredIds.Push(definition.Id)
+            } catch {
+                failedChords.Push(definition.Chord)
+                continue
             }
+            seenChords[chordKey] := true
+            registeredChords[chordKey] := true
+            registeredIds.Push(definition.Id)
         }
     } finally {
         if useContext
             HotIf()
     }
+    if failedChords.Length > 0
+        ReportHotkeyRegistrationFailures(failedChords)
     return registeredIds
+}
+
+ReportHotkeyRegistrationFailures(chords) {
+    message := "以下快捷键未能启用："
+    for chord in chords
+        message .= "`n" chord
+    message .= "`n`n请在设置中检查并重新选择按键。其他已启用的快捷键可继续使用。"
+    MsgBox(message, "MedEx Report Assistant", "Icon!")
 }
 
 BuildHotkeyChordSet(chords := 0) {
