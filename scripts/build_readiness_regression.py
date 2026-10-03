@@ -10,9 +10,9 @@ def between(text, start, end):
 
 
 def build():
-    clipboard = (ROOT / "src/measurement_clipboard.ahk").read_text()
-    model = (ROOT / "src/measurement_model.ahk").read_text()
-    provider = (ROOT / "src/context_measurement_provider.ahk").read_text()
+    clipboard = (ROOT / "src/measurement_clipboard.ahk").read_text(encoding="utf-8")
+    model = (ROOT / "src/measurement_model.ahk").read_text(encoding="utf-8")
+    provider = (ROOT / "src/context_measurement_provider.ahk").read_text(encoding="utf-8")
     # Substitute only the clipboard read boundary. The polling/empty/error
     # control flow is the production function, not a Python reimplementation.
     wait = clipboard.split("WaitForMeasurementClipboardUpdate(sequenceBeforeCommand,", 1)[1]
@@ -26,7 +26,7 @@ def build():
         wait,
         between(provider, "InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {",
                 "PackContextMeasurementClientPoint("),
-        (ROOT / "tests/windows/readiness_regression.ahk").read_text(),
+        (ROOT / "tests/windows/readiness_regression.ahk").read_text(encoding="utf-8"),
     ])
 
 

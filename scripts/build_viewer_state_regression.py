@@ -11,10 +11,10 @@ def section(text: str, start: str, end: str) -> str:
 
 
 def build() -> str:
-    caption = (ROOT / 'src/report_image_caption.ahk').read_text()
-    hotkeys = (ROOT / 'src/viewer_tool_hotkeys.ahk').read_text()
-    tools = (ROOT / 'src/mxnm_viewer_tool_commands.ahk').read_text()
-    diagnostics = (ROOT / 'src/automation_diagnostics.ahk').read_text()
+    caption = (ROOT / 'src/report_image_caption.ahk').read_text(encoding="utf-8")
+    hotkeys = (ROOT / 'src/viewer_tool_hotkeys.ahk').read_text(encoding="utf-8")
+    tools = (ROOT / 'src/mxnm_viewer_tool_commands.ahk').read_text(encoding="utf-8")
+    diagnostics = (ROOT / 'src/automation_diagnostics.ahk').read_text(encoding="utf-8")
     parts = [
         '; Generated regression. Uses synthetic windows only; does not operate MedEx.',
         '#Requires AutoHotkey v2.0', '#SingleInstance Force', '#Warn',
@@ -25,7 +25,7 @@ def build() -> str:
         section(diagnostics, 'AutomationDiagnosticSafeValue(value) {', 'DefaultAutomationDiagnosticLogPath() {'),
         tools.split('class MxNMViewerToolCommandProvider {', 1)[0],
         'ResolveMxNMViewerToolControlSet(' + tools.split('\nResolveMxNMViewerToolControlSet(', 1)[1],
-        (ROOT / 'tests/windows/viewer_state_regression.ahk').read_text(),
+        (ROOT / 'tests/windows/viewer_state_regression.ahk').read_text(encoding="utf-8"),
     ]
     return '\n\n'.join(parts)
 
