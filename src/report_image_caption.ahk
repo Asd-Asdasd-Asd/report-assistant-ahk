@@ -97,16 +97,7 @@ ReportImageCaptionHotkeyDefinitions(settings) {
 }
 
 ReportImageCaptionForegroundActive(*) {
-    try foregroundHwnd := WinExist("A")
-    catch
-        return false
-    if !foregroundHwnd
-        return false
-    try processName := WinGetProcessName("ahk_id " foregroundHwnd)
-    catch
-        return false
-    return MedExProcessNameIsApproved(
-        processName,
+    return Win32ForegroundProcessIs(
         MedExColorResetDefaults.ProvisionalProcessNames
     )
 }

@@ -33,6 +33,7 @@ ORDER = [
     "Lib/UIA.ahk",
     "utils.ahk",
     "core/win32_window.ahk",
+    "core/log_file.ahk",
     "visual_feedback.ahk",
     "clipboard_html.ahk",
     "measurement_model.ahk",

@@ -442,11 +442,11 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         hotkeys = source("src/viewer_tool_hotkeys.ahk")
         self.assertIn('static LogFileName := "viewer-failures.log"', diagnostics)
         self.assertIn("static MaxFileBytes := 524288", diagnostics)
-        self.assertIn("RotateMxNMViewerFailureDiagnostic(logPath)", diagnostics)
+        self.assertIn("static RotatedFileCount := 1", diagnostics)
+        self.assertIn("AppendRotatedLogBlock(", diagnostics)
         self.assertIn(
-            'return configDirectory "\\" '
-            'MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\\" '
-            "MxNMViewerFailureDiagnosticDefaults.LogFileName",
+            "return ReportAssistantLogPath("
+            "MxNMViewerFailureDiagnosticDefaults.LogFileName)",
             diagnostics,
         )
         for required_field in (

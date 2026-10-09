@@ -200,16 +200,10 @@ class MxNMViewerToolCommandProvider {
 }
 
 MedExViewerToolForegroundActive(*) {
-    try foregroundHwnd := WinExist("A")
-    catch
-        return false
-    if !foregroundHwnd
-        return false
-    try processName := WinGetProcessName("ahk_id " foregroundHwnd)
-    catch
-        return false
-    return StrLower(processName) = StrLower(TargetProcessDefaults.ReportEditorExe)
-        || StrLower(processName) = StrLower(TargetProcessDefaults.ViewerExe)
+    return Win32ForegroundProcessIs([
+        TargetProcessDefaults.ReportEditorExe,
+        TargetProcessDefaults.ViewerExe
+    ])
 }
 
 ; Historical config checkpoint only; production uses live ResolvePlan above.

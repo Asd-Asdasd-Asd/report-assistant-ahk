@@ -100,8 +100,7 @@ class MxNMMontageTrace {
 }
 
 DefaultMxNMMontageProgressLogPath() {
-    SplitPath DefaultMxNMViewerFailureLogPath(), , &logDirectory
-    return logDirectory "\montage-progress.log"
+    return ReportAssistantLogPath("montage-progress.log")
 }
 
 MxNMMontageProfileDefaults() {
@@ -938,13 +937,10 @@ MxNMMontagePhysicalClick(x, y) {
 }
 
 MxNMMontageViewerStillActive(session) {
-    foreground := WinExist("A")
-    if !foreground
-        return false
-    try {
-        return WinGetPID("ahk_id " foreground) = session.viewerPid && MxNMMontageRootOwner(foreground) = session.viewerRootOwner
-    } catch
-        return false
+    foreground := Win32ForegroundHwnd()
+    return foreground
+        && Win32WindowPid(foreground) = session.viewerPid
+        && MxNMMontageRootOwner(foreground) = session.viewerRootOwner
 }
 
 MxNMMontageWindowFromPoint(x, y) {

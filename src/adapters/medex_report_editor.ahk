@@ -926,10 +926,9 @@ MedExForegroundWindowMatches(expectedHwnd) {
 MedExForegroundTargetMatches(expectedHwnd, expectedProcess) {
     if WinExist("A") != expectedHwnd
         return false
-    try currentProcess := WinGetProcessName("ahk_id " expectedHwnd)
-    catch
-        return false
-    return StrLower(currentProcess) = StrLower(expectedProcess)
+    currentProcess := Win32WindowProcessName(expectedHwnd)
+    return currentProcess != ""
+        && StrLower(currentProcess) = StrLower(expectedProcess)
 }
 
 CollectMedExTextAnchorSnapshot(windowElement, useCachedProperties := false) {

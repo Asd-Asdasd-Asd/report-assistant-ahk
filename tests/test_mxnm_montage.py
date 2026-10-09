@@ -168,7 +168,7 @@ class MxNMMontageTests(unittest.TestCase):
     def test_montage_checkpoints_are_immediate_and_exceptions_are_logged(self) -> None:
         module = source("src/mxnm_montage.ahk")
         self.assertIn('"recordType=montage-checkpoint"', module)
-        self.assertIn('"\\montage-progress.log"', module)
+        self.assertIn('ReportAssistantLogPath("montage-progress.log")', module)
         self.assertIn("WriteAutomationDiagnosticLines(", module)
         handler = module.split("InvokeMxNMMontageHotkey(profileId, chord, settings, *) {", 1)[1].split("\nMxNMMontageWaitForHotkeyRelease", 1)[0]
         self.assertLess(handler.index("MxNMMontageTrace.Begin(profileId)"), handler.index("MxNMMontageRun("))

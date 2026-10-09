@@ -36,6 +36,21 @@ Win32ForegroundProcessName() {
     return Win32WindowProcessName(Win32ForegroundHwnd())
 }
 
+; True when the foreground window belongs to one of the given executables
+; (a name or an array of names, compared case-insensitively).
+Win32ForegroundProcessIs(processNames) {
+    processName := StrLower(Win32ForegroundProcessName())
+    if processName = ""
+        return false
+    if Type(processNames) != "Array"
+        processNames := [processNames]
+    for candidate in processNames {
+        if processName = StrLower(String(candidate))
+            return true
+    }
+    return false
+}
+
 Win32WindowProcessName(hwnd) {
     if !hwnd
         return ""
