@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Generate release/report_assistant.ahk and assets/publish/版本信息.md."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,8 +9,13 @@ from pathlib import Path
 import re
 import subprocess
 
+try:
+    from scripts import ahk_bundle
+except ModuleNotFoundError:  # executed directly from scripts/
+    import ahk_bundle
 
-ROOT = Path(__file__).resolve().parents[1]
+
+ROOT = ahk_bundle.ROOT
 SRC = ROOT / "src"
 OUTPUT = ROOT / "release" / "report_assistant.ahk"
 VERSION_INFO_OUTPUT = ROOT / "assets" / "publish" / "版本信息.md"
@@ -70,16 +77,8 @@ ORDER = [
 ]
 
 
-UIA_STANDALONE_ENTRYPOINT = (
-    "if !A_IsCompiled && A_LineFile = A_ScriptFullPath\n"
-    "    UIA.Viewer()\n"
-)
-
-RELEASE_DIRECTIVES = (
-    "#Requires AutoHotkey v2.0",
-    "#SingleInstance Off",
-    "#Warn",
-)
+UIA_STANDALONE_ENTRYPOINT = ahk_bundle.UIA_STANDALONE_ENTRYPOINT
+RELEASE_DIRECTIVES = ahk_bundle.RELEASE_DIRECTIVES
 
 VERSION_PATTERN = re.compile(
     r"^(?P<major>0|[1-9]\d*)\."
@@ -89,13 +88,8 @@ VERSION_PATTERN = re.compile(
 )
 
 
-def strip_leading_component_bom(text: str) -> str:
-    """Remove only a component's leading U+FEFF byte-order mark."""
-    return text[1:] if text.startswith("\ufeff") else text
-
-
-def read_component(path: Path) -> str:
-    return strip_leading_component_bom(path.read_text(encoding="utf-8"))
+strip_leading_component_bom = ahk_bundle.strip_bom
+read_component = ahk_bundle.read_component
 
 
 def extract_app_version(metadata: str) -> str:
@@ -217,19 +211,11 @@ def resolve_source_revision(root: Path = ROOT) -> str:
 
 
 def prepare_source(text: str, relative_name: str) -> str:
-    if relative_name == "Lib/UIA.ahk":
-        if UIA_STANDALONE_ENTRYPOINT not in text:
-            raise ValueError("UIA standalone entrypoint was not found")
-        text = text.replace(UIA_STANDALONE_ENTRYPOINT, "", 1)
-
-    lines = []
-    for line in text.splitlines():
-        if line.lstrip().lower().startswith("#include"):
-            continue
-        if line.strip().lower() in {directive.lower() for directive in RELEASE_DIRECTIVES}:
-            continue
-        lines.append(line.rstrip())
-    return "\n".join(lines).rstrip() + "\n"
+    if ahk_bundle.is_uia_component(relative_name):
+        text = ahk_bundle.strip_uia_entrypoint(text)
+    return ahk_bundle.strip_includes_and_directives(
+        text, RELEASE_DIRECTIVES, strip_leading=False
+    )
 
 
 def build_release_text(
@@ -246,7 +232,7 @@ def build_release_text(
     version = extract_app_version(metadata)
     file_version = windows_file_version(version)
 
-    parts = [
+    header = (
         "; Generated file. Edit src/*.ahk instead.",
         f"; Application version: {version}",
         f"; Source revision: {source_revision}",
@@ -254,34 +240,33 @@ def build_release_text(
         f";@Ahk2Exe-SetFileVersion {file_version}",
         f";@Ahk2Exe-SetProductVersion {version}",
         ";@Ahk2Exe-SetName MedEx Report Assistant",
-        "",
-        *RELEASE_DIRECTIVES,
-        "",
-    ]
+    )
 
-    for name in order:
+    def stamp(component: str, name: str) -> str:
+        if name == "app_metadata.ahk":
+            component = stamp_source_revision(component, source_revision)
+            component = stamp_build_date(component, build_date)
+        return component
+
+    def echo(name: str) -> None:
         path = source_dir / name
-        if not path.exists():
-            raise FileNotFoundError(f"Missing source file: {path}")
-
         try:
             display_path = path.relative_to(ROOT)
         except ValueError:
             display_path = path
         print(f"Adding {display_path}")
-        parts.append(f"; --- BEGIN {name} ---")
-        component = read_component(path)
-        if name == "app_metadata.ahk":
-            component = stamp_source_revision(component, source_revision)
-            component = stamp_build_date(component, build_date)
-        parts.append(prepare_source(component, name))
-        parts.append(f"; --- END {name} ---")
-        parts.append("")
 
-    release_text = "\n".join(parts)
-    if "\ufeff" in release_text:
-        raise ValueError("Generated release contains an embedded U+FEFF character")
-    return release_text
+    return ahk_bundle.bundle(
+        header,
+        order,
+        root=source_dir,
+        directives=RELEASE_DIRECTIVES,
+        transform=stamp,
+        strip_leading=False,
+        label="release",
+        missing_message="Missing source file",
+        echo=echo,
+    )
 
 
 def write_release_outputs(

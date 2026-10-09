@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HARNESS = (
     ROOT / "tests" / "windows" / "mxnm_context_menu_receiver_diagnostic.ahk"
 )
-POWERSHELL = ROOT / "scripts" / "build_viewer_context_diagnostic_exe.ps1"
+POWERSHELL = ROOT / "scripts" / "build_tool_exe.ps1"
 CMD = (
     ROOT
     / "tools"
@@ -69,10 +69,10 @@ class MxNMContextMenuDiagnosticBuildTests(unittest.TestCase):
         self.assertIn('discovery := "STATE_CHANGED"', harness)
 
     def test_windows_builder_targets_only_diagnostic(self) -> None:
-        powershell = POWERSHELL.read_text(encoding="utf-8")
+        powershell = POWERSHELL.read_text(encoding="utf-8-sig")
         cmd = CMD.read_text(encoding="utf-8")
-        self.assertIn("build_mxnm_context_menu_diagnostic.py", powershell)
-        self.assertIn("MxNM-Viewer-Context-Diagnostic.exe", powershell)
+        self.assertIn("-Generator build_mxnm_context_menu_diagnostic.py", cmd)
+        self.assertIn("-ToolName MxNM-Viewer-Context-Diagnostic", cmd)
         self.assertIn("'/Validate'", powershell)
         self.assertIn("Start-Process", powershell)
         self.assertIn("-Wait", powershell)
@@ -80,10 +80,7 @@ class MxNMContextMenuDiagnosticBuildTests(unittest.TestCase):
         self.assertIn("Ahk2Exe error output", powershell)
         self.assertIn("Get-FileHash", powershell)
         self.assertNotIn("build_release.py", powershell)
-        self.assertIn(
-            "build_viewer_context_diagnostic_exe.ps1",
-            cmd,
-        )
+        self.assertIn("build_tool_exe.ps1", cmd)
         self.assertIn("exit /b %BUILD_EXIT_CODE%", cmd)
 
 

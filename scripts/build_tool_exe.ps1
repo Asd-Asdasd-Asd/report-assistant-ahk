@@ -1,8 +1,19 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
+    # Python generator in scripts/ that writes the standalone .ahk (accepts --output).
+    [Parameter(Mandatory = $true)][string]$Generator,
+    # File name of the generated standalone script.
+    [Parameter(Mandatory = $true)][string]$InputScriptName,
+    # Base name of the produced EXE and its .sha256.txt.
+    [Parameter(Mandatory = $true)][string]$ToolName,
+    # Sub-directory under ..\report-assistant-build that holds source/ and publish/.
+    [Parameter(Mandatory = $true)][string]$BuildSubdirectory,
     [string]$CompilerPath = 'C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe',
     [string]$BasePath = 'C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe'
 )
+
+# Builds one field tool (diagnostic, checkpoint or regression) EXE.
+# It never runs the release generator or touches the product EXE.
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -11,14 +22,14 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $buildRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $repositoryRoot '..\report-assistant-build')
 )
-$checkpointRoot = Join-Path $buildRoot 'viewer-checkpoint'
-$checkpointSourceDirectory = Join-Path $checkpointRoot 'source'
-$checkpointBuilder = Join-Path $PSScriptRoot 'build_mxnm_viewer_adaptive_checkpoint.py'
-$inputScript = Join-Path $checkpointSourceDirectory 'mxnm_viewer_adaptive_checkpoint1_standalone.ahk'
-$outputDirectory = Join-Path $checkpointRoot 'publish'
-$buildingExe = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.building.exe'
-$finalExe = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.exe'
-$hashFile = Join-Path $outputDirectory 'MxNM-Viewer-Checkpoint1.sha256.txt'
+$toolRoot = Join-Path $buildRoot $BuildSubdirectory
+$sourceDirectory = Join-Path $toolRoot 'source'
+$publishDirectory = Join-Path $toolRoot 'publish'
+$generatorPath = Join-Path $PSScriptRoot $Generator
+$inputScript = Join-Path $sourceDirectory $InputScriptName
+$buildingExe = Join-Path $publishDirectory "$ToolName.building.exe"
+$finalExe = Join-Path $publishDirectory "$ToolName.exe"
+$hashFile = Join-Path $publishDirectory "$ToolName.sha256.txt"
 $iconPath = Join-Path $repositoryRoot 'assets\icon\generated\medex-icon.ico'
 $validationStdoutLog = $null
 $validationStderrLog = $null
@@ -93,7 +104,7 @@ try {
     foreach ($required in @(
         [pscustomobject]@{ Path = $CompilerPath; Name = 'Ahk2Exe compiler' },
         [pscustomobject]@{ Path = $BasePath; Name = 'AutoHotkey v2 base executable' },
-        [pscustomobject]@{ Path = $checkpointBuilder; Name = 'Checkpoint generator' },
+        [pscustomobject]@{ Path = $generatorPath; Name = 'Tool generator' },
         [pscustomobject]@{ Path = $iconPath; Name = 'Application icon' }
     )) {
         if (-not (Test-Path -LiteralPath $required.Path -PathType Leaf)) {
@@ -106,21 +117,21 @@ try {
 
     $python = Resolve-PythonCommand
     $pythonArguments = @($python.PrefixArguments) + @(
-        $checkpointBuilder,
+        $generatorPath,
         '--output',
         $inputScript
     )
     & $python.Executable @pythonArguments
     if ($LASTEXITCODE -ne 0) {
-        throw "Checkpoint generator failed with exit code $LASTEXITCODE."
+        throw "Tool generator failed with exit code $LASTEXITCODE."
     }
     if (-not (Test-Path -LiteralPath $inputScript -PathType Leaf) -or
         (Get-Item -LiteralPath $inputScript).Length -le 0) {
-        throw "Standalone checkpoint script was not generated: $inputScript"
+        throw "Standalone script was not generated: $inputScript"
     }
 
-    if (-not (Test-Path -LiteralPath $outputDirectory -PathType Container)) {
-        New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $publishDirectory -PathType Container)) {
+        New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
     }
     Remove-BuildFile -Path $buildingExe
 
@@ -168,30 +179,30 @@ try {
         throw "Ahk2Exe failed with exit code $($compilerProcess.ExitCode)."
     }
     if (-not (Test-Path -LiteralPath $buildingExe -PathType Leaf)) {
-        throw "Checkpoint executable was not created: $buildingExe"
+        throw "Tool executable was not created: $buildingExe"
     }
     $buildingItem = Get-Item -LiteralPath $buildingExe
     if ($buildingItem.Length -le 0) {
-        throw "Checkpoint executable is empty: $buildingExe"
+        throw "Tool executable is empty: $buildingExe"
     }
     if ($buildingItem.LastWriteTimeUtc -lt $compileStartedUtc.AddSeconds(-2)) {
-        throw "Checkpoint executable has a stale modification time: $buildingExe"
+        throw "Tool executable has a stale modification time: $buildingExe"
     }
 
     Move-Item -LiteralPath $buildingExe -Destination $finalExe -Force
     $finalItem = Get-Item -LiteralPath $finalExe
     if ($finalItem.Length -le 0) {
-        throw "Final checkpoint executable is empty: $finalExe"
+        throw "Final tool executable is empty: $finalExe"
     }
     $hash = (Get-FileHash -LiteralPath $finalExe -Algorithm SHA256).Hash.ToLowerInvariant()
     [System.IO.File]::WriteAllText(
         $hashFile,
-        "$hash  MxNM-Viewer-Checkpoint1.exe`r`n",
+        "$hash  $ToolName.exe`r`n",
         [System.Text.UTF8Encoding]::new($false)
     )
 
     Write-Host '================================'
-    Write-Host 'Viewer checkpoint EXE build succeeded.' -ForegroundColor Green
+    Write-Host "$ToolName build succeeded." -ForegroundColor Green
     Write-Host "Artifact: $finalExe"
     Write-Host "SHA256:   $hash"
     Write-Host 'Only the EXE needs to be copied to target machines.'
@@ -213,7 +224,7 @@ catch {
     Remove-TemporaryLog -Path $compilerStdoutLog
     Remove-TemporaryLog -Path $compilerStderrLog
     Write-Host '================================'
-    Write-Host 'Viewer checkpoint EXE build failed.' -ForegroundColor Red
+    Write-Host "$ToolName build failed." -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     Write-Host '================================'
     exit 1

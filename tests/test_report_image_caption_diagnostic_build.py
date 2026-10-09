@@ -14,9 +14,7 @@ from scripts.build_report_image_caption_diagnostic import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-POWERSHELL = (
-    ROOT / "scripts" / "build_report_image_caption_diagnostic_exe.ps1"
-)
+POWERSHELL = ROOT / "scripts" / "build_tool_exe.ps1"
 CMD = (
     ROOT
     / "tools"
@@ -49,12 +47,17 @@ class ReportImageCaptionDiagnosticBuildTests(unittest.TestCase):
             self.assertIn(required, generated)
 
     def test_windows_builder_outputs_only_the_diagnostic(self) -> None:
-        powershell = POWERSHELL.read_text(encoding="utf-8")
+        powershell = POWERSHELL.read_text(encoding="utf-8-sig")
         cmd = CMD.read_text(encoding="utf-8")
         for required in (
-            "build_report_image_caption_diagnostic.py",
-            "report-image-caption-diagnostic",
-            "MedEx-Report-Image-Caption-Diagnostic.exe",
+            "-Generator build_report_image_caption_diagnostic.py",
+            "-BuildSubdirectory report-image-caption-diagnostic",
+            "-ToolName MedEx-Report-Image-Caption-Diagnostic",
+            "build_tool_exe.ps1",
+            "exit /b %BUILD_EXIT_CODE%",
+        ):
+            self.assertIn(required, cmd)
+        for required in (
             "'/Validate'",
             "Start-Process",
             "-Wait",
@@ -64,11 +67,6 @@ class ReportImageCaptionDiagnosticBuildTests(unittest.TestCase):
         ):
             self.assertIn(required, powershell)
         self.assertNotIn("build_release.py", powershell)
-        self.assertIn(
-            "build_report_image_caption_diagnostic_exe.ps1",
-            cmd,
-        )
-        self.assertIn("exit /b %BUILD_EXIT_CODE%", cmd)
 
 
 if __name__ == "__main__":

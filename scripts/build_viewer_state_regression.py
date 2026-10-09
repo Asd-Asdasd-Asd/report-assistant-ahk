@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """Build isolated AHK state and native-control regression from production code."""
-from pathlib import Path
+try:
+    from scripts.ahk_bundle import ROOT, between as section
+except ModuleNotFoundError:  # executed directly from scripts/
+    from ahk_bundle import ROOT, between as section
 
-ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'tests/windows/generated/viewer_state_regression_standalone.ahk'
-
-
-def section(text: str, start: str, end: str) -> str:
-    return start + text.split(start, 1)[1].split(end, 1)[0]
 
 
 def build() -> str:
