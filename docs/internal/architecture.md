@@ -1,6 +1,6 @@
 # 当前架构与安全边界
 
-本文只描述当前实现，不记录已经废弃的调用链和实验过程。历史证据按需读取 `docs/technical-investigations/`、`docs/field-tests/` 和 `experiments/`。
+本文只描述当前实现，不记录已经废弃的调用链和实验过程。历史证据按需读取 `docs/history/`、`docs/technical-investigations/`、`docs/field-tests/` 和 `experiments/`。
 
 ## 代码边界
 

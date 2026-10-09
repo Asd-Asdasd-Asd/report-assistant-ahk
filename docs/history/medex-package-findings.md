@@ -34,9 +34,9 @@ MxNMSoft 有本地 ZMQ/protobuf 线索，但第一轮未确认 `SendLabelText`�
 - SUVMax：从当前图像 context menu 复制 SUVMax。
 - 自动读取失败时必须 false negative，不复用旧剪贴板或旧 log 值。
 
-后续静态调查确认 `MxNMSoft*.ini` 和 `MxPetCtTemp.ini` 保存了窗口、图像区、按钮、面板和候选子窗格的几何信息。若能可靠取得当前配置路径并完成坐标语义验证，应优先用配置生成命名锚点，再由 runtime HWND 校验；这比 UIA 全布局定位或固定屏幕坐标更适合作为通用基础。配置不能单独证明当前活动布局、菜单 command ID 或当前测量状态，完整结论见 `docs/internal/mxnmsoft-config-driven-automation.md`。
+后续静态调查确认 `MxNMSoft*.ini` 和 `MxPetCtTemp.ini` 保存了窗口、图像区、按钮、面板和候选子窗格的几何信息。若能可靠取得当前配置路径并完成坐标语义验证，应优先用配置生成命名锚点，再由 runtime HWND 校验；这比 UIA 全布局定位或固定屏幕坐标更适合作为通用基础。配置不能单独证明当前活动布局、菜单 command ID 或当前测量状态，完整结论见 `docs/history/mxnmsoft-config-driven-automation.md`。
 
-ZeroMQ 保留为 v0.6.0 稳定后的独立被动勘察支线。它只回答现有广播中是否包含可安全复用的运行状态，不以替换 context-menu provider 为默认目标；时间盒、安全边界和 provider 准入条件见 `docs/internal/passive-zmq-exploration.md`。
+ZeroMQ 保留为 v0.6.0 稳定后的独立被动勘察支线。它只回答现有广播中是否包含可安全复用的运行状态，不以替换 context-menu provider 为默认目标；时间盒、安全边界和 provider 准入条件见 `docs/history/passive-zmq-exploration.md`。
 
 ## Local command experiment boundary
 

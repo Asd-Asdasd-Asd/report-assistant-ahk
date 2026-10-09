@@ -8,7 +8,7 @@
 - Viewer 测量目标使用 `MxNMMeasurementProvider.ResolveTarget` → `MxNMContextTargetSessionProvider`，按当前 Viewer 身份发现并验证图像 surface。
 - 当前 production 路径不依赖旧的 config-only 几何计划；旧实现和 checkpoint 仅作历史审计材料。
 - Viewer 快捷键、测量、颜色恢复和 Caption 首次保存均要求明确的窗口/进程/控件/目标证据；证据不唯一时 fail closed。
-- 详细设计审计和待现场确认的问题见 `2026-09-06-design-audit.md` 及对应的 `mxnm-*` 文档。
+- 详细设计审计和待现场确认的问题见 `../history/2026-09-06-design-audit.md` 及对应的 `mxnm-*` 文档。
 
 ## 已确认的项目边界
 
@@ -27,10 +27,10 @@
 - 重新编译后首次颜色下拉菜单的偶发残留仍需在正式 EXE 验收时记录；不得用 blind retry 掩盖。
 - 用户于 2026-09-11 确认 scoped popup Montage 修复消除了半路卡住并改善整体速度；
   该反馈限定于实际测试环境，不扩展为所有机器验收。
-- 本轮其他自动化就绪优化及待验收场景见 [automation-readiness.md](automation-readiness.md)。
+- 本轮其他自动化就绪优化及待验收场景见 [automation-readiness.md](../history/automation-readiness.md)。
 
 ## 读取规则
 
 - 先读本文件和 `AGENTS.md`，再读源码/测试。
-- 只有处理对应问题时才读取 `docs/technical-investigations/`、`docs/field-tests/` 和 `experiments/`。
+- 只有处理对应问题时才读取 `docs/history/`、`docs/technical-investigations/`、`docs/field-tests/` 和 `experiments/`。
 - 历史文档中的候选方案、旧调用链和“已完成”描述不能覆盖当前源码与最新现场证据。

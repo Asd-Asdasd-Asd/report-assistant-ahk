@@ -118,7 +118,7 @@
 ## Montage
 
 本轮首次/偶发失败专项验收见
-`docs/internal/automation-readiness.md`，含合成回归命令和现场情景。
+`docs/history/automation-readiness.md`，含合成回归命令和现场情景。
 
 - [ ] Montage 在 root-owner 仅作为 owner、其矩形不覆盖实际控件的布局中，仍从
   同 PID、同 root-owner 的完整 owner family 唯一解析 `21112/Static`；不得要求
@@ -127,7 +127,7 @@
   保留 Win32、UIA raw、UIA filtered、merged 与 owner-family 候选数。
 
 跨机器 target resolver 的现场顺序与判据见
-`docs/internal/viewer-adaptive-runtime-checkpoints.md`。
+`docs/history/viewer-adaptive-runtime-checkpoints.md`。
 
 ## Portable release 与 singleton
 
