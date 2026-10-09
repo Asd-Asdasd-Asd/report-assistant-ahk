@@ -3,6 +3,7 @@
 #Warn
 
 #Include ..\..\src\app_metadata.ahk
+#Include ..\..\src\core\win32_window.ahk
 #Include ..\..\src\app_config.ahk
 #Include ..\..\src\feature_model.ahk
 #Include ..\..\src\hotstring_model.ahk

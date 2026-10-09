@@ -2,6 +2,7 @@
 #SingleInstance Force
 #Warn
 
+#Include ..\..\src\core\win32_window.ahk
 #Include ..\..\src\app_config.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_config_path_cache.ahk
@@ -161,7 +162,7 @@ BuildMxNMViewerToolResolverAudit() {
                 controls,
                 group.parentRect
             )
-        frameHwnd := MxNMViewerToolGetRootOwnerHwnd(
+        frameHwnd := Win32RootOwner(
             group.parentHwnd
         )
         output .=

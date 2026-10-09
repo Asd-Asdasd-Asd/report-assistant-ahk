@@ -218,8 +218,8 @@ class ReportImageCaptionProvider {
             operation.SetField("caption.capturePath", "FRESH_CAPTURE")
         }
 
-        sourcePid := ReportImageCaptionWindowPid(sourceHwnd)
-        sourceProcess := ReportImageCaptionWindowProcess(sourceHwnd)
+        sourcePid := Win32WindowPid(sourceHwnd)
+        sourceProcess := Win32WindowProcessName(sourceHwnd)
         if !sourcePid
             || !MedExProcessNameIsApproved(
                 sourceProcess,
@@ -292,8 +292,8 @@ class ReportImageCaptionProvider {
             sourcePid: sourcePid,
             targetHwnd: target.hwnd,
             targetPid: target.pid,
-            targetClientRectKey: ReportImageCaptionRectKey(
-                ReportImageCaptionClientRect(target.hwnd)
+            targetClientRectKey: RectKey(
+                RectLTRB(Win32ClientRectScreen(target.hwnd))
             ),
             captionPoint: target.captionPoint,
             savePoint: target.savePoint,
@@ -335,8 +335,8 @@ class ReportImageCaptionProvider {
                 cache.captionPoint := target.captionPoint
                 cache.savePoint := target.savePoint
                 cache.imagePoint := target.imagePoint
-                cache.targetClientRectKey := ReportImageCaptionRectKey(
-                    ReportImageCaptionClientRect(targetHwnd)
+                cache.targetClientRectKey := RectKey(
+                    RectLTRB(Win32ClientRectScreen(targetHwnd))
                 )
                 cache.descriptionAnchor := target.descriptionAnchor
                 cache.saveAnchor := target.saveAnchor
@@ -536,7 +536,7 @@ WaitForReportImageCaptionTarget(sourceHwnd, sourcePid, boundTarget := 0) {
     foreground := WinExist("A")
     loop {
         if WinExist("A") != foreground
-            || ReportImageCaptionWindowPid(sourceHwnd) != sourcePid
+            || Win32WindowPid(sourceHwnd) != sourcePid
             return {ok: false, candidateCount: 0}
         target := boundTarget
             ? BuildReportImageCaptionTargetCandidate(boundTarget, sourcePid)
@@ -597,8 +597,8 @@ ResolveCachedReportImageCaptionTarget(cache, targetHwnd) {
         || !cache.HasOwnProp("targetClientRectKey")
         || !ReportImageCaptionCachedAnchorsValid(cache)
         || cache.targetClientRectKey
-            != ReportImageCaptionRectKey(
-                ReportImageCaptionClientRect(targetHwnd)
+            != RectKey(
+                RectLTRB(Win32ClientRectScreen(targetHwnd))
             )
         || !ReportImageCaptionPointBelongsToTarget(
             targetHwnd,
@@ -632,7 +632,7 @@ ReportImageCaptionCachedAnchorsValid(cache) {
         for field in ["descriptionAnchor", "saveAnchor"] {
             anchor := cache.%field%
             if !ReportImageCaptionElementUsable(anchor.element, cache.targetPid)
-                || ReportImageCaptionRectKey(ReportImageCaptionElementRect(anchor.element)) != anchor.rectKey
+                || RectKey(ReportImageCaptionElementRect(anchor.element)) != anchor.rectKey
                 return false
         }
         return true
@@ -646,14 +646,14 @@ ReportImageCaptionTopLevelWindowEligible(hwnd, expectedPid) {
         return false
     if !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int")
         return false
-    if ReportImageCaptionWindowPid(hwnd) != expectedPid
+    if Win32WindowPid(hwnd) != expectedPid
         return false
     try className := WinGetClass("ahk_id " hwnd)
     catch
         return false
     if className != "Chrome_WidgetWin_1"
         return false
-    return ReportImageCaptionRootOwner(hwnd) = hwnd
+    return Win32RootOwner(hwnd) = hwnd
 }
 
 BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
@@ -669,7 +669,7 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
     if !ReportImageCaptionTopLevelWindowEligible(hwnd, expectedPid)
         return failure
     try {
-        clientRect := ReportImageCaptionClientRect(hwnd)
+        clientRect := RectLTRB(Win32ClientRectScreen(hwnd))
         if !IsObject(clientRect)
             return failure
         clientWidth := ReportImageCaptionRectWidth(clientRect)
@@ -711,11 +711,11 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
         saveRect := ReportImageCaptionElementRect(saveButton)
         if !IsObject(descriptionRect)
             || !IsObject(saveRect)
-            || !ReportImageCaptionRectContainsRect(
+            || !RectEncloses(
                 clientRect,
                 descriptionRect
             )
-            || !ReportImageCaptionRectContainsRect(
+            || !RectEncloses(
                 clientRect,
                 saveRect
             ) {
@@ -769,8 +769,8 @@ BuildReportImageCaptionTargetCandidate(hwnd, expectedPid) {
             captionPoint: captionPoint,
             savePoint: savePoint,
             imagePoint: imageResult.point,
-            descriptionAnchor: {element: description, rectKey: ReportImageCaptionRectKey(descriptionRect)},
-            saveAnchor: {element: saveButton, rectKey: ReportImageCaptionRectKey(saveRect)}
+            descriptionAnchor: {element: description, rectKey: RectKey(descriptionRect)},
+            saveAnchor: {element: saveButton, rectKey: RectKey(saveRect)}
         }
     } catch {
         return failure
@@ -795,11 +795,11 @@ ResolveReportImageCaptionPane(
             continue
         paneRect := ReportImageCaptionElementRect(pane)
         if !IsObject(paneRect)
-            || !ReportImageCaptionRectContainsRect(
+            || !RectEncloses(
                 clientRect,
                 paneRect
             )
-            || !ReportImageCaptionRectContainsPoint(
+            || !RectHasPoint(
                 paneRect,
                 captionPoint
             )
@@ -838,8 +838,8 @@ ResolveReportImageCaptionImagePoint(
         x: Round((captionPaneRect.l + captionPaneRect.r) / 2),
         y: Round(clientRect.t + imageRegionHeight * 0.5)
     }
-    if !ReportImageCaptionRectContainsPoint(clientRect, point)
-        || !ReportImageCaptionRectContainsPoint(
+    if !RectHasPoint(clientRect, point)
+        || !RectHasPoint(
             {
                 l: captionPaneRect.l,
                 t: clientRect.t,
@@ -926,7 +926,7 @@ ExecuteReportImageCaptionAction(
                 )
             }
         }
-        if ReportImageCaptionWindowPid(target.hwnd) != target.pid {
+        if Win32WindowPid(target.hwnd) != target.pid {
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.TARGET_INVALID
@@ -1169,13 +1169,13 @@ ReportImageCaptionCacheBindingValid(cache, foregroundHwnd) {
         return false
     }
     if foregroundHwnd != cache.targetHwnd
-        || ReportImageCaptionWindowPid(cache.targetHwnd)
+        || Win32WindowPid(cache.targetHwnd)
             != cache.targetPid
-        || ReportImageCaptionRootOwner(cache.targetHwnd)
+        || Win32RootOwner(cache.targetHwnd)
             != cache.targetHwnd {
         return false
     }
-    return ReportImageCaptionWindowPid(cache.sourceHwnd)
+    return Win32WindowPid(cache.sourceHwnd)
         = cache.sourcePid
 }
 
@@ -1190,20 +1190,20 @@ ReportImageCaptionSourceBindingValid(cache, sourceHwnd) {
         && cache.HasOwnProp("savePoint")
         && cache.HasOwnProp("imagePoint")
         && sourceHwnd = cache.sourceHwnd
-        && ReportImageCaptionWindowPid(sourceHwnd)
+        && Win32WindowPid(sourceHwnd)
             = cache.sourcePid
-        && ReportImageCaptionWindowPid(cache.targetHwnd)
+        && Win32WindowPid(cache.targetHwnd)
             = cache.targetPid
 }
 
 ReportImageCaptionFeedbackOrigin(cache, mouseX, mouseY) {
     sourceRect := IsObject(cache)
         && cache.HasOwnProp("sourceHwnd")
-        ? ReportImageCaptionClientRect(cache.sourceHwnd)
+        ? RectLTRB(Win32ClientRectScreen(cache.sourceHwnd))
         : 0
     if IsObject(sourceRect) {
         mousePoint := {x: mouseX, y: mouseY}
-        if ReportImageCaptionRectContainsPoint(sourceRect, mousePoint)
+        if RectHasPoint(sourceRect, mousePoint)
             return mousePoint
         return {
             x: Round((sourceRect.l + sourceRect.r) / 2),
@@ -1250,66 +1250,15 @@ ReportImageCaptionElementRect(element) {
     }
 }
 
-ReportImageCaptionClientRect(hwnd) {
-    try {
-        WinGetClientPos(
-            &x,
-            &y,
-            &width,
-            &height,
-            "ahk_id " hwnd
-        )
-        return {l: x, t: y, r: x + width, b: y + height}
-    }
-    return 0
-}
-
 ReportImageCaptionPointBelongsToTarget(targetHwnd, point) {
-    clientRect := ReportImageCaptionClientRect(targetHwnd)
+    clientRect := RectLTRB(Win32ClientRectScreen(targetHwnd))
     if !IsObject(clientRect)
-        || !ReportImageCaptionRectContainsPoint(clientRect, point) {
+        || !RectHasPoint(clientRect, point) {
         return false
     }
-    pointHwnd := ReportImageCaptionWindowFromPoint(point)
+    pointHwnd := Win32WindowFromPoint(point)
     return pointHwnd
-        && ReportImageCaptionRootOwner(pointHwnd) = targetHwnd
-}
-
-ReportImageCaptionWindowFromPoint(point) {
-    packedPoint := point.y << 32 | (point.x & 0xFFFFFFFF)
-    return DllCall(
-        "User32\WindowFromPoint",
-        "Int64",
-        packedPoint,
-        "Ptr"
-    )
-}
-
-ReportImageCaptionRootOwner(hwnd) {
-    if !hwnd
-        return 0
-    return DllCall(
-        "User32\GetAncestor",
-        "Ptr",
-        hwnd,
-        "UInt",
-        3,
-        "Ptr"
-    )
-}
-
-ReportImageCaptionWindowPid(hwnd) {
-    if !hwnd
-        return 0
-    try return WinGetPID("ahk_id " hwnd)
-    return 0
-}
-
-ReportImageCaptionWindowProcess(hwnd) {
-    if !hwnd
-        return ""
-    try return WinGetProcessName("ahk_id " hwnd)
-    return ""
+        && Win32RootOwner(pointHwnd) = targetHwnd
 }
 
 ReportImageCaptionRectWidth(rect) {
@@ -1318,28 +1267,6 @@ ReportImageCaptionRectWidth(rect) {
 
 ReportImageCaptionRectHeight(rect) {
     return Max(0, rect.b - rect.t)
-}
-
-ReportImageCaptionRectKey(rect) {
-    return IsObject(rect)
-        ? rect.l "," rect.t "," rect.r "," rect.b
-        : ""
-}
-
-ReportImageCaptionRectContainsPoint(rect, point) {
-    return point.x >= rect.l
-        && point.x < rect.r
-        && point.y >= rect.t
-        && point.y < rect.b
-}
-
-ReportImageCaptionRectContainsRect(outer, inner) {
-    return inner.l >= outer.l
-        && inner.t >= outer.t
-        && inner.r <= outer.r
-        && inner.b <= outer.b
-        && inner.r > inner.l
-        && inner.b > inner.t
 }
 
 MakeReportImageCaptionResult(

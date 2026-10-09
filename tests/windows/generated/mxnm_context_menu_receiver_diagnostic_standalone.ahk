@@ -9,6 +9,396 @@
 #SingleInstance Force
 #Warn
 
+; --- BEGIN src/core/win32_window.ahk ---
+; Exception-safe wrappers around User32 window queries plus small rectangle
+; helpers. Modules that need a window's PID, root owner, class name or screen
+; rectangle call these instead of repeating DllCall boilerplate.
+;
+; Conventions:
+; - Every Win32* query returns 0 / "" / false on failure and never throws.
+; - Win32* rectangles are {left, top, right, bottom} in screen coordinates.
+;   RectLTRB() converts to the short {l, t, r, b} form that some modules keep;
+;   the Rect* predicates accept both forms and Map("l", ...) rects.
+; - Point containment is half-open: left/top inclusive, right/bottom exclusive.
+
+class Win32Ancestor {
+    static ROOT := 2
+    static ROOT_OWNER := 3
+}
+
+Win32ForegroundHwnd() {
+    try return WinExist("A")
+    catch
+        return 0
+}
+
+Win32ForegroundProcessName() {
+    return Win32WindowProcessName(Win32ForegroundHwnd())
+}
+
+Win32WindowProcessName(hwnd) {
+    if !hwnd
+        return ""
+    try return WinGetProcessName("ahk_id " hwnd)
+    catch
+        return ""
+}
+
+Win32WindowPid(hwnd) {
+    if !hwnd
+        return 0
+    pid := 0
+    try DllCall(
+        "User32\GetWindowThreadProcessId",
+        "Ptr", hwnd,
+        "UInt*", &pid,
+        "UInt"
+    )
+    catch
+        return 0
+    return pid
+}
+
+Win32WindowFromPoint(point) {
+    if !IsObject(point)
+        return 0
+    packedPoint := ((Round(point.y) & 0xFFFFFFFF) << 32)
+        | (Round(point.x) & 0xFFFFFFFF)
+    try return DllCall(
+        "User32\WindowFromPoint",
+        "Int64", packedPoint,
+        "Ptr"
+    )
+    catch
+        return 0
+}
+
+Win32RootOwner(hwnd) {
+    return Win32Ancestor_(hwnd, Win32Ancestor.ROOT_OWNER)
+}
+
+Win32RootWindow(hwnd) {
+    return Win32Ancestor_(hwnd, Win32Ancestor.ROOT)
+}
+
+Win32Ancestor_(hwnd, flag) {
+    if !hwnd
+        return 0
+    try return DllCall(
+        "User32\GetAncestor",
+        "Ptr", hwnd,
+        "UInt", flag,
+        "Ptr"
+    )
+    catch
+        return 0
+}
+
+Win32RootOwnerFromPoint(point) {
+    pointHwnd := Win32WindowFromPoint(point)
+    return pointHwnd ? Win32RootOwner(pointHwnd) : 0
+}
+
+Win32ParentHwnd(hwnd) {
+    if !hwnd
+        return 0
+    try return DllCall(
+        "User32\GetParent",
+        "Ptr", hwnd,
+        "Ptr"
+    )
+    catch
+        return 0
+}
+
+Win32WindowClass(hwnd) {
+    if !hwnd
+        return ""
+    classNameBuffer := Buffer(512 * 2, 0)
+    try length := DllCall(
+        "User32\GetClassNameW",
+        "Ptr", hwnd,
+        "Ptr", classNameBuffer.Ptr,
+        "Int", 512,
+        "Int"
+    )
+    catch
+        return ""
+    return length > 0
+        ? StrGet(classNameBuffer, length, "UTF-16")
+        : ""
+}
+
+Win32IsWindow(hwnd) {
+    if !hwnd
+        return false
+    try return DllCall("User32\IsWindow", "Ptr", hwnd, "Int") != 0
+    catch
+        return false
+}
+
+Win32IsWindowVisible(hwnd) {
+    if !hwnd
+        return false
+    try return DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int") != 0
+    catch
+        return false
+}
+
+Win32IsWindowEnabled(hwnd) {
+    if !hwnd
+        return false
+    try return DllCall("User32\IsWindowEnabled", "Ptr", hwnd, "Int") != 0
+    catch
+        return false
+}
+
+Win32IsChild(parentHwnd, hwnd) {
+    if !parentHwnd || !hwnd
+        return false
+    try return DllCall(
+        "User32\IsChild",
+        "Ptr", parentHwnd,
+        "Ptr", hwnd,
+        "Int"
+    ) != 0
+    catch
+        return false
+}
+
+Win32WindowRect(hwnd) {
+    if !hwnd
+        return 0
+    rectBuffer := Buffer(16, 0)
+    try ok := DllCall(
+        "User32\GetWindowRect",
+        "Ptr", hwnd,
+        "Ptr", rectBuffer.Ptr,
+        "Int"
+    )
+    catch
+        return 0
+    if !ok
+        return 0
+    return {
+        left: NumGet(rectBuffer, 0, "Int"),
+        top: NumGet(rectBuffer, 4, "Int"),
+        right: NumGet(rectBuffer, 8, "Int"),
+        bottom: NumGet(rectBuffer, 12, "Int")
+    }
+}
+
+Win32ClientRectScreen(hwnd) {
+    if !hwnd
+        return 0
+    rectBuffer := Buffer(16, 0)
+    topLeft := Buffer(8, 0)
+    bottomRight := Buffer(8, 0)
+    try {
+        if !DllCall(
+            "User32\GetClientRect",
+            "Ptr", hwnd,
+            "Ptr", rectBuffer.Ptr,
+            "Int"
+        ) {
+            return 0
+        }
+        NumPut("Int", NumGet(rectBuffer, 0, "Int"), topLeft, 0)
+        NumPut("Int", NumGet(rectBuffer, 4, "Int"), topLeft, 4)
+        NumPut("Int", NumGet(rectBuffer, 8, "Int"), bottomRight, 0)
+        NumPut("Int", NumGet(rectBuffer, 12, "Int"), bottomRight, 4)
+        if !DllCall(
+            "User32\ClientToScreen",
+            "Ptr", hwnd,
+            "Ptr", topLeft.Ptr,
+            "Int"
+        ) {
+            return 0
+        }
+        if !DllCall(
+            "User32\ClientToScreen",
+            "Ptr", hwnd,
+            "Ptr", bottomRight.Ptr,
+            "Int"
+        ) {
+            return 0
+        }
+    } catch {
+        return 0
+    }
+    return {
+        left: NumGet(topLeft, 0, "Int"),
+        top: NumGet(topLeft, 4, "Int"),
+        right: NumGet(bottomRight, 0, "Int"),
+        bottom: NumGet(bottomRight, 4, "Int")
+    }
+}
+
+Win32ScreenToClient(hwnd, screenPoint) {
+    if !hwnd || !IsObject(screenPoint)
+        return 0
+    pointBuffer := Buffer(8, 0)
+    NumPut("Int", screenPoint.x, pointBuffer, 0)
+    NumPut("Int", screenPoint.y, pointBuffer, 4)
+    try ok := DllCall(
+        "User32\ScreenToClient",
+        "Ptr", hwnd,
+        "Ptr", pointBuffer.Ptr,
+        "Int"
+    )
+    catch
+        return 0
+    if !ok
+        return 0
+    return {
+        x: NumGet(pointBuffer, 0, "Int"),
+        y: NumGet(pointBuffer, 4, "Int")
+    }
+}
+
+Win32WindowIsSameOrDescendant(hwnd, ancestorHwnd) {
+    if !hwnd || !ancestorHwnd
+        return false
+    seen := Map()
+    while hwnd && !seen.Has(hwnd) {
+        if hwnd = ancestorHwnd
+            return true
+        seen[hwnd] := true
+        hwnd := Win32ParentHwnd(hwnd)
+    }
+    return false
+}
+
+; Parent-chain distance from hwnd up to rootHwnd; 32 when unreachable.
+Win32WindowDepth(hwnd, rootHwnd) {
+    if hwnd = rootHwnd
+        return 0
+    depth := 0
+    seen := Map()
+    while hwnd && !seen.Has(hwnd) && depth < 32 {
+        seen[hwnd] := true
+        hwnd := Win32ParentHwnd(hwnd)
+        depth += 1
+        if hwnd = rootHwnd
+            return depth
+    }
+    return 32
+}
+
+Win32VirtualScreenRect() {
+    left := SysGet(76)
+    top := SysGet(77)
+    width := SysGet(78)
+    height := SysGet(79)
+    return {
+        left: left,
+        top: top,
+        right: left + width,
+        bottom: top + height,
+        width: width,
+        height: height
+    }
+}
+
+PointInsideVirtualScreen(point) {
+    if !IsObject(point)
+        return false
+    screen := Win32VirtualScreenRect()
+    return screen.width > 0
+        && screen.height > 0
+        && point.x >= screen.left
+        && point.x < screen.right
+        && point.y >= screen.top
+        && point.y < screen.bottom
+}
+
+; Normalise any supported rect form to {left, top, right, bottom}; 0 otherwise.
+RectEdges(rect) {
+    if !IsObject(rect)
+        return 0
+    if Type(rect) = "Map" {
+        if !rect.Has("l")
+            return 0
+        return {
+            left: rect["l"],
+            top: rect["t"],
+            right: rect["r"],
+            bottom: rect["b"]
+        }
+    }
+    if rect.HasOwnProp("left")
+        return rect
+    if rect.HasOwnProp("l")
+        return {left: rect.l, top: rect.t, right: rect.r, bottom: rect.b}
+    return 0
+}
+
+RectLTRB(rect) {
+    edges := RectEdges(rect)
+    if !IsObject(edges)
+        return 0
+    return {l: edges.left, t: edges.top, r: edges.right, b: edges.bottom}
+}
+
+RectIsEmpty(rect) {
+    edges := RectEdges(rect)
+    return !IsObject(edges)
+        || edges.right <= edges.left
+        || edges.bottom <= edges.top
+}
+
+RectKey(rect) {
+    edges := RectEdges(rect)
+    return IsObject(edges)
+        ? edges.left "," edges.top "," edges.right "," edges.bottom
+        : ""
+}
+
+RectHasPoint(rect, point) {
+    edges := RectEdges(rect)
+    return IsObject(edges)
+        && IsObject(point)
+        && point.x >= edges.left
+        && point.x < edges.right
+        && point.y >= edges.top
+        && point.y < edges.bottom
+}
+
+; True when inner is non-empty and lies entirely inside outer.
+RectEncloses(outer, inner) {
+    outerEdges := RectEdges(outer)
+    innerEdges := RectEdges(inner)
+    return IsObject(outerEdges)
+        && IsObject(innerEdges)
+        && innerEdges.right > innerEdges.left
+        && innerEdges.bottom > innerEdges.top
+        && innerEdges.left >= outerEdges.left
+        && innerEdges.top >= outerEdges.top
+        && innerEdges.right <= outerEdges.right
+        && innerEdges.bottom <= outerEdges.bottom
+}
+
+RectVisibleScreenArea(rect) {
+    edges := RectEdges(rect)
+    if !IsObject(edges)
+        return 0
+    screen := Win32VirtualScreenRect()
+    width := Max(0, Min(edges.right, screen.right) - Max(edges.left, screen.left))
+    height := Max(0, Min(edges.bottom, screen.bottom) - Max(edges.top, screen.top))
+    return width * height
+}
+
+RectIntersectsScreen(rect) {
+    edges := RectEdges(rect)
+    if !IsObject(edges) || edges.right <= edges.left || edges.bottom <= edges.top
+        return false
+    screen := Win32VirtualScreenRect()
+    return Min(edges.right, screen.right) > Max(edges.left, screen.left)
+        && Min(edges.bottom, screen.bottom) > Max(edges.top, screen.top)
+}
+
+; --- END src/core/win32_window.ahk ---
+
 ; --- BEGIN src/measurement_model.ahk ---
 class MeasurementState {
     static FOUND := "FOUND"
@@ -1236,7 +1626,7 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         if !rootsMatch || !actionRootHwnd
             continue
         validGroups.Push({
-            frameHwnd: MxNMViewerToolGetRootOwnerHwnd(
+            frameHwnd: Win32RootOwner(
                 group.parentHwnd
             ),
             actionRootHwnd: actionRootHwnd,
@@ -1360,30 +1750,19 @@ CollectMxNMViewerToolControlCandidate(
         return true
     if !commandKeyById.Has(controlId)
         return true
-    if !DllCall(
-        "User32\IsWindowVisible",
-        "Ptr", hwnd,
-        "Int"
-    ) {
+    if !Win32IsWindowVisible(hwnd)
         return true
-    }
     try candidatePid := WinGetPID("ahk_id " hwnd)
     catch
         candidatePid := 0
     if candidatePid != runtimePid
         return true
-    className := MxNMViewerToolWindowClass(hwnd)
+    className := Win32WindowClass(hwnd)
     if StrLower(className)
         != StrLower(MxNMViewerToolCommand.NativeClassName) {
         return true
     }
-    try parentHwnd := DllCall(
-        "User32\GetParent",
-        "Ptr", hwnd,
-        "Ptr"
-    )
-    catch
-        parentHwnd := 0
+    parentHwnd := Win32ParentHwnd(hwnd)
     if !parentHwnd
         return true
     try parentPid := WinGetPID("ahk_id " parentHwnd)
@@ -1391,17 +1770,17 @@ CollectMxNMViewerToolControlCandidate(
         parentPid := 0
     if parentPid != runtimePid
         return true
-    rect := MxNMViewerToolWindowRectScreen(hwnd)
-    parentRect := MxNMViewerToolWindowRectScreen(parentHwnd)
+    rect := Win32WindowRect(hwnd)
+    parentRect := Win32WindowRect(parentHwnd)
     if !IsObject(rect)
         || !IsObject(parentRect)
-        || !MxNMViewerToolRectInside(rect, parentRect) {
+        || !RectEncloses(rect, parentRect) {
         return true
     }
     candidates.Push({
         hwnd: hwnd,
         parentHwnd: parentHwnd,
-        rootHwnd: MxNMViewerToolGetRootHwnd(hwnd),
+        rootHwnd: Win32RootWindow(hwnd),
         controlId: controlId,
         commandKey: commandKeyById[controlId],
         className: className,
@@ -1420,11 +1799,7 @@ MxNMViewerToolPanelMatchesPadOrigin(
 ) {
     if !panelHwnd
         || !IsObject(panelRect)
-        || !DllCall(
-            "User32\IsWindowVisible",
-            "Ptr", panelHwnd,
-            "Int"
-        ) {
+        || !Win32IsWindowVisible(panelHwnd) {
         return false
     }
     try panelPid := WinGetPID("ahk_id " panelHwnd)
@@ -1480,7 +1855,7 @@ ValidateMxNMViewerToolControlLayout(
         if !IsObject(control)
             || control.controlId != command.commandId
             || !IsObject(control.rect)
-            || !MxNMViewerToolRectInside(
+            || !RectEncloses(
                 control.rect,
                 panelRect
             ) {
@@ -1507,77 +1882,10 @@ ValidateMxNMViewerToolControlLayout(
     return true
 }
 
-MxNMViewerToolRectInside(innerRect, outerRect) {
-    return innerRect.right > innerRect.left
-        && innerRect.bottom > innerRect.top
-        && outerRect.right > outerRect.left
-        && outerRect.bottom > outerRect.top
-        && innerRect.left >= outerRect.left
-        && innerRect.top >= outerRect.top
-        && innerRect.right <= outerRect.right
-        && innerRect.bottom <= outerRect.bottom
-}
-
 MxNMViewerToolRectCenter(rect) {
     return {
         x: Round((rect.left + rect.right) / 2),
         y: Round((rect.top + rect.bottom) / 2)
-    }
-}
-
-MxNMViewerToolGetRootHwnd(hwnd) {
-    try return DllCall(
-        "User32\GetAncestor",
-        "Ptr", hwnd,
-        "UInt", 2,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMViewerToolGetRootOwnerHwnd(hwnd) {
-    try return DllCall(
-        "User32\GetAncestor",
-        "Ptr", hwnd,
-        "UInt", 3,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMViewerToolWindowClass(hwnd) {
-    classBuffer := Buffer(512, 0)
-    try length := DllCall(
-        "User32\GetClassNameW",
-        "Ptr", hwnd,
-        "Ptr", classBuffer.Ptr,
-        "Int", 255,
-        "Int"
-    )
-    catch
-        length := 0
-    return length > 0
-        ? StrGet(classBuffer, length, "UTF-16")
-        : ""
-}
-
-MxNMViewerToolWindowRectScreen(hwnd) {
-    rectBuffer := Buffer(16, 0)
-    if !DllCall(
-        "User32\GetWindowRect",
-        "Ptr", hwnd,
-        "Ptr", rectBuffer.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    return {
-        left: NumGet(rectBuffer, 0, "Int"),
-        top: NumGet(rectBuffer, 4, "Int"),
-        right: NumGet(rectBuffer, 8, "Int"),
-        bottom: NumGet(rectBuffer, 12, "Int")
     }
 }
 
@@ -1885,9 +2193,9 @@ ResolveMxNMRuntimeImageTarget(
             plan.mainGeometry,
             mappedImage.rect
         )
-        if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
+        if !RectHasPoint(mappedImage.rect, screenPoint)
             continue
-        rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
+        rootOwnerHwnd := Win32RootOwnerFromPoint(
             screenPoint
         )
         if !rootOwnerHwnd
@@ -1944,11 +2252,11 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         || !toolAnchor.actionRootHwnd {
         return failure
     }
-    framePid := MxNMTargetWindowPid(toolAnchor.frameHwnd)
+    framePid := Win32WindowPid(toolAnchor.frameHwnd)
     if !framePid
-        || MxNMTargetWindowPid(toolAnchor.actionRootHwnd)
+        || Win32WindowPid(toolAnchor.actionRootHwnd)
             != framePid
-        || MxNMTargetWindowPid(toolAnchor.panelHwnd)
+        || Win32WindowPid(toolAnchor.panelHwnd)
             != framePid {
         failure.fallbackCode := "ANCHOR_IDENTITY_INVALID"
         return failure
@@ -1988,10 +2296,8 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
                 plan.mainGeometry,
                 configImageRect
             )
-            if MxNMPointInsideRect(
-                configScreenPoint,
-                configImageRect
-            ) && MxNMPointInsideRuntimeFrameClient(
+            if RectHasPoint(configImageRect, configScreenPoint)
+                && MxNMPointInsideRuntimeFrameClient(
                 configScreenPoint,
                 actionFrame
             ) {
@@ -2026,7 +2332,7 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
             failure.fallbackCode := configPointFailureCode
         return failure
     }
-    if !MxNMPointInsideRect(screenPoint, imageRect)
+    if !RectHasPoint(imageRect, screenPoint)
         || !MxNMPointInsideRuntimeFrameClient(screenPoint, actionFrame) {
         failure.fallbackCode := "ANCHOR_POINT_OUT_OF_BOUNDS"
         return failure
@@ -2079,13 +2385,13 @@ ResolveMxNMRuntimeImageSurfaceFromToolAnchor(
             || hwnd = toolAnchor.frameHwnd
             || hwnd = toolAnchor.actionRootHwnd
             || hwnd = toolAnchor.panelHwnd
-            || MxNMTargetWindowPid(hwnd)
-                != MxNMTargetWindowPid(toolAnchor.frameHwnd)
-            || ResolveMxNMRootOwnerHwnd(hwnd)
+            || Win32WindowPid(hwnd)
+                != Win32WindowPid(toolAnchor.frameHwnd)
+            || Win32RootOwner(hwnd)
                 != toolAnchor.frameHwnd
-            || MxNMTargetParentHwnd(hwnd)
+            || Win32ParentHwnd(hwnd)
                 != toolAnchor.frameHwnd
-            || StrLower(MxNMViewerToolWindowClass(hwnd))
+            || StrLower(Win32WindowClass(hwnd))
                 != "#32770"
             || !DllCall(
                 "User32\IsWindowVisible",
@@ -2163,10 +2469,10 @@ SelectMxNMRuntimeSurfaceSafePoint(surfaceFrame, ownerFrame) {
         || surfaceFrame.clientHeight < 200 {
         return failure
     }
-    expectedPid := MxNMTargetWindowPid(ownerFrame.hwnd)
+    expectedPid := Win32WindowPid(ownerFrame.hwnd)
     if !expectedPid
-        || MxNMTargetWindowPid(surfaceFrame.hwnd) != expectedPid
-        || ResolveMxNMRootOwnerHwnd(surfaceFrame.hwnd)
+        || Win32WindowPid(surfaceFrame.hwnd) != expectedPid
+        || Win32RootOwner(surfaceFrame.hwnd)
             != ownerFrame.hwnd {
         return failure
     }
@@ -2189,18 +2495,18 @@ SelectMxNMRuntimeSurfaceSafePoint(surfaceFrame, ownerFrame) {
     bestHwnd := 0
     bestClearance := -1
     for candidate in candidates {
-        pointHwnd := ResolveMxNMWindowFromScreenPoint(candidate)
+        pointHwnd := Win32WindowFromPoint(candidate)
         if !pointHwnd
-            || !MxNMTargetWindowIsSameOrDescendant(
+            || !Win32WindowIsSameOrDescendant(
                 pointHwnd,
                 surfaceFrame.hwnd
             )
-            || MxNMTargetWindowPid(pointHwnd) != expectedPid
-            || ResolveMxNMRootOwnerHwnd(pointHwnd)
+            || Win32WindowPid(pointHwnd) != expectedPid
+            || Win32RootOwner(pointHwnd)
                 != ownerFrame.hwnd {
             continue
         }
-        hitRect := MxNMTargetClientRectScreen(pointHwnd)
+        hitRect := Win32ClientRectScreen(pointHwnd)
         clearance := MxNMPointClearanceInsideRect(
             candidate,
             hitRect
@@ -2253,7 +2559,7 @@ BuildMxNMRuntimeSurfacePointCandidates(surfaceFrame) {
 MxNMPointClearanceInsideRect(point, rect) {
     if !IsObject(point)
         || !IsObject(rect)
-        || !MxNMPointInsideRect(point, rect) {
+        || !RectHasPoint(rect, point) {
         return -1
     }
     return Min(
@@ -2264,27 +2570,17 @@ MxNMPointClearanceInsideRect(point, rect) {
     )
 }
 
-MxNMTargetParentHwnd(hwnd) {
-    try return DllCall(
-        "User32\GetParent",
-        "Ptr", hwnd,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
 BuildMxNMRuntimeOwnerFrameCandidates(viewerWindows) {
     frames := []
     seen := Map()
     for viewerWindow in viewerWindows {
-        ownerHwnd := ResolveMxNMRootOwnerHwnd(viewerWindow.hwnd)
+        ownerHwnd := Win32RootOwner(viewerWindow.hwnd)
         if !ownerHwnd || seen.Has(ownerHwnd)
             continue
-        viewerPid := MxNMTargetWindowPid(viewerWindow.hwnd)
-        if !viewerPid || MxNMTargetWindowPid(ownerHwnd) != viewerPid
+        viewerPid := Win32WindowPid(viewerWindow.hwnd)
+        if !viewerPid || Win32WindowPid(ownerHwnd) != viewerPid
             continue
-        if ResolveMxNMRootOwnerHwnd(ownerHwnd) != ownerHwnd
+        if Win32RootOwner(ownerHwnd) != ownerHwnd
             continue
         ownerFrame := CaptureMxNMRuntimeOwnerFrame(ownerHwnd)
         if !IsObject(ownerFrame)
@@ -2311,7 +2607,7 @@ CaptureMxNMRuntimeOwnerFrame(hwnd) {
     windowHeight := NumGet(windowRect, 12, "Int") - windowY
     if windowWidth <= 0 || windowHeight <= 0
         return 0
-    clientRect := MxNMTargetClientRectScreen(hwnd)
+    clientRect := Win32ClientRectScreen(hwnd)
     if !IsObject(clientRect)
         || clientRect.right <= clientRect.left
         || clientRect.bottom <= clientRect.top {
@@ -2385,7 +2681,7 @@ CountMxNMRuntimeOwnerFamily(viewerWindows, frameHwnd) {
         if seen.Has(viewerWindow.hwnd)
             continue
         seen[viewerWindow.hwnd] := true
-        if ResolveMxNMRootOwnerHwnd(viewerWindow.hwnd)
+        if Win32RootOwner(viewerWindow.hwnd)
             = frameHwnd {
             count += 1
         }
@@ -2400,49 +2696,6 @@ MxNMPointInsideRuntimeFrameClient(point, frame) {
         && point.x < frame.clientX + frame.clientWidth
         && point.y >= frame.clientY
         && point.y < frame.clientY + frame.clientHeight
-}
-
-ResolveMxNMRootOwnerFromPoint(screenPoint) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try pointHwnd := DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch
-        pointHwnd := 0
-    if !pointHwnd
-        return 0
-    return ResolveMxNMRootOwnerHwnd(pointHwnd)
-}
-
-ResolveMxNMRootOwnerHwnd(hwnd) {
-    if !hwnd
-        return 0
-    try return DllCall(
-        "User32\GetAncestor",
-        "Ptr", hwnd,
-        "UInt", 3,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMTargetWindowPid(hwnd) {
-    if !hwnd
-        return 0
-    pid := 0
-    try DllCall(
-        "User32\GetWindowThreadProcessId",
-        "Ptr", hwnd,
-        "UInt*", &pid,
-        "UInt"
-    )
-    catch
-        return 0
-    return pid
 }
 
 IsReusableMxNMMeasurementTargetPlan(plan, viewerExe) {
@@ -2716,15 +2969,6 @@ MapMxNMLogicalPointToRuntimeRect(point, mainGeometry, runtimeRect) {
     }
 }
 
-MxNMPointInsideRect(point, rect) {
-    return IsObject(point)
-        && IsObject(rect)
-        && point.x >= rect.left
-        && point.x < rect.right
-        && point.y >= rect.top
-        && point.y < rect.bottom
-}
-
 ResolveMxNMActionWindowFromPoint(
     viewerExe,
     screenPoint,
@@ -2757,7 +3001,7 @@ ResolveMxNMActionWindowFromPoint(
     }
     if !rootHwnd
         rootHwnd := pointHwnd
-    rootOwnerHwnd := ResolveMxNMRootOwnerHwnd(pointHwnd)
+    rootOwnerHwnd := Win32RootOwner(pointHwnd)
     if !rootOwnerHwnd
         rootOwnerHwnd := rootHwnd
 
@@ -2776,9 +3020,9 @@ ResolveMxNMActionWindowFromAnchor(
     runtimeFrameHwnd,
     actionRootHwnd
 ) {
-    pointHwnd := ResolveMxNMWindowFromScreenPoint(screenPoint)
+    pointHwnd := Win32WindowFromPoint(screenPoint)
     if !pointHwnd
-        || !MxNMTargetWindowIsSameOrDescendant(
+        || !Win32WindowIsSameOrDescendant(
             pointHwnd,
             actionRootHwnd
         ) {
@@ -2792,33 +3036,8 @@ ResolveMxNMActionWindowFromAnchor(
         screenPoint,
         runtimeFrameHwnd,
         pointHwnd,
-        ResolveMxNMRootOwnerHwnd(pointHwnd)
+        Win32RootOwner(pointHwnd)
     )
-}
-
-ResolveMxNMWindowFromScreenPoint(screenPoint) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try return DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMTargetWindowIsSameOrDescendant(hwnd, ancestorHwnd) {
-    if !hwnd || !ancestorHwnd
-        return false
-    seen := Map()
-    while hwnd && !seen.Has(hwnd) {
-        if hwnd = ancestorHwnd
-            return true
-        seen[hwnd] := true
-        hwnd := MxNMTargetParentHwnd(hwnd)
-    }
-    return false
 }
 
 ValidateMxNMActionWindow(
@@ -2836,7 +3055,7 @@ ValidateMxNMActionWindow(
     catch {
         actionPid := 0
     }
-    runtimePid := MxNMTargetWindowPid(runtimeFrameHwnd)
+    runtimePid := Win32WindowPid(runtimeFrameHwnd)
     if StrLower(processName) != StrLower(viewerExe)
         || !actionPid
         || actionPid != runtimePid
@@ -2846,15 +3065,15 @@ ValidateMxNMActionWindow(
             code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
         }
     }
-    clientRect := MxNMTargetClientRectScreen(rootHwnd)
+    clientRect := Win32ClientRectScreen(rootHwnd)
     if !IsObject(clientRect)
-        || !MxNMPointInsideRect(screenPoint, clientRect) {
+        || !RectHasPoint(clientRect, screenPoint) {
         return {
             ok: false,
             code: MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
         }
     }
-    clientPoint := MxNMTargetScreenToClient(
+    clientPoint := Win32ScreenToClient(
         rootHwnd,
         screenPoint
     )
@@ -2870,64 +3089,6 @@ ValidateMxNMActionWindow(
         hwnd: rootHwnd,
         pid: actionPid,
         clientPoint: clientPoint
-    }
-}
-
-MxNMTargetScreenToClient(hwnd, screenPoint) {
-    pointBuffer := Buffer(8, 0)
-    NumPut("Int", screenPoint.x, pointBuffer, 0)
-    NumPut("Int", screenPoint.y, pointBuffer, 4)
-    if !DllCall(
-        "User32\ScreenToClient",
-        "Ptr", hwnd,
-        "Ptr", pointBuffer.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    return {
-        x: NumGet(pointBuffer, 0, "Int"),
-        y: NumGet(pointBuffer, 4, "Int")
-    }
-}
-
-MxNMTargetClientRectScreen(hwnd) {
-    rectBuffer := Buffer(16, 0)
-    if !DllCall(
-        "User32\GetClientRect",
-        "Ptr", hwnd,
-        "Ptr", rectBuffer.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    topLeft := Buffer(8, 0)
-    bottomRight := Buffer(8, 0)
-    NumPut("Int", NumGet(rectBuffer, 0, "Int"), topLeft, 0)
-    NumPut("Int", NumGet(rectBuffer, 4, "Int"), topLeft, 4)
-    NumPut("Int", NumGet(rectBuffer, 8, "Int"), bottomRight, 0)
-    NumPut("Int", NumGet(rectBuffer, 12, "Int"), bottomRight, 4)
-    if !DllCall(
-        "User32\ClientToScreen",
-        "Ptr", hwnd,
-        "Ptr", topLeft.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    if !DllCall(
-        "User32\ClientToScreen",
-        "Ptr", hwnd,
-        "Ptr", bottomRight.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    return {
-        left: NumGet(topLeft, 0, "Int"),
-        top: NumGet(topLeft, 4, "Int"),
-        right: NumGet(bottomRight, 0, "Int"),
-        bottom: NumGet(bottomRight, 4, "Int")
     }
 }
 
@@ -3071,7 +3232,7 @@ DiscoverMxNMContextTargetSession(viewerExe, options, generation) {
     }
     point := surfaceResult.point
     surfaceRect := surfaceResult.surfaceRect
-    actionClientPoint := MxNMTargetScreenToClient(
+    actionClientPoint := Win32ScreenToClient(
         surfaceResult.actionHwnd,
         point
     )
@@ -3174,7 +3335,7 @@ ResolveMxNMContextViewerIdentity(viewerExe, options := 0) {
     best := 0
     bestArea := -1
     for _, identity in identities {
-        rootRect := MxNMTargetClientRectScreen(identity.rootHwnd)
+        rootRect := Win32ClientRectScreen(identity.rootHwnd)
         area := IsObject(rootRect)
             ? Max(0, rootRect.right - rootRect.left)
                 * Max(0, rootRect.bottom - rootRect.top)
@@ -3197,7 +3358,7 @@ CaptureMxNMContextViewerIdentity(hwnd, viewerExe) {
         processPath: "",
         discoveryMethod: ""
     }
-    if !hwnd || !DllCall("User32\IsWindow", "Ptr", hwnd, "Int")
+    if !Win32IsWindow(hwnd)
         return failure
     try processName := WinGetProcessName("ahk_id " hwnd)
     catch
@@ -3210,10 +3371,10 @@ CaptureMxNMContextViewerIdentity(hwnd, viewerExe) {
     try processPath := WinGetProcessPath("ahk_id " hwnd)
     catch
         processPath := ""
-    rootHwnd := ResolveMxNMRootOwnerHwnd(hwnd)
+    rootHwnd := Win32RootOwner(hwnd)
     if !pid || !rootHwnd || processPath = ""
         return failure
-    if MxNMTargetWindowPid(rootHwnd) != pid
+    if Win32WindowPid(rootHwnd) != pid
         return failure
     failure.ok := true
     failure.code := MxNMContextTargetSessionCode.READY
@@ -3234,7 +3395,7 @@ DiscoverMxNMContextSurface(identity) {
         pointProbeCount: 0,
         discoveryMethod: ""
     }
-    rootRect := MxNMTargetClientRectScreen(identity.rootHwnd)
+    rootRect := Win32ClientRectScreen(identity.rootHwnd)
     if !IsObject(rootRect)
         return failure
     candidates := []
@@ -3256,7 +3417,7 @@ DiscoverMxNMContextSurface(identity) {
         if topLevelWindows.Length = 0
             topLevelWindows := [identity.rootHwnd]
         for topHwnd in topLevelWindows {
-            if ResolveMxNMRootOwnerHwnd(topHwnd)
+            if Win32RootOwner(topHwnd)
                 != identity.rootHwnd {
                 continue
             }
@@ -3303,7 +3464,7 @@ DiscoverMxNMContextSurface(identity) {
         totalProbeCount += pointResult.probeCount
         if !pointResult.ok
             continue
-        receiverRect := MxNMTargetClientRectScreen(
+        receiverRect := Win32ClientRectScreen(
             pointResult.actionHwnd
         )
         if !IsObject(receiverRect)
@@ -3335,20 +3496,20 @@ CollectMxNMContextSurfaceCandidate(
     if !hwnd || seen.Has(hwnd)
         return true
     seen[hwnd] := true
-    if !DllCall("User32\IsWindow", "Ptr", hwnd, "Int")
-        || !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int")
-        || MxNMTargetWindowPid(hwnd) != identity.pid
-        || ResolveMxNMRootOwnerHwnd(hwnd) != identity.rootHwnd {
+    if !Win32IsWindow(hwnd)
+        || !Win32IsWindowVisible(hwnd)
+        || Win32WindowPid(hwnd) != identity.pid
+        || Win32RootOwner(hwnd) != identity.rootHwnd {
         return true
     }
-    rect := MxNMTargetClientRectScreen(hwnd)
+    rect := Win32ClientRectScreen(hwnd)
     if !IsObject(rect)
         return true
     width := rect.right - rect.left
     height := rect.bottom - rect.top
     if width <= 0 || height <= 0
         return true
-    visibleArea := MxNMContextVisibleScreenArea(rect)
+    visibleArea := RectVisibleScreenArea(rect)
     if visibleArea <= 0
         return true
     rootArea := Max(
@@ -3364,12 +3525,12 @@ CollectMxNMContextSurfaceCandidate(
     score += aspectBalance >= 0.18 ? 100 : -500
     if hwnd = identity.rootHwnd
         score -= 600
-    className := MxNMContextWindowClass(hwnd)
+    className := Win32WindowClass(hwnd)
     if StrLower(className) = "#32770"
         score += 60
     if MxNMContextClassLooksLikeToolChrome(className)
         score -= 800
-    depth := MxNMContextWindowDepth(hwnd, identity.rootHwnd)
+    depth := Win32WindowDepth(hwnd, identity.rootHwnd)
     score -= Min(200, depth * 20)
     candidates.Push({
         hwnd: hwnd,
@@ -3451,21 +3612,21 @@ ValidateMxNMContextSurfacePoint(
         < minimumClearance {
         return {ok: false, point: 0, actionHwnd: 0}
     }
-    actionHwnd := ResolveMxNMWindowFromScreenPoint(point)
+    actionHwnd := Win32WindowFromPoint(point)
     if !actionHwnd
         || actionHwnd = identity.rootHwnd
-        || !MxNMTargetWindowIsSameOrDescendant(
+        || !Win32WindowIsSameOrDescendant(
             actionHwnd,
             candidate.hwnd
         )
-        || MxNMTargetWindowPid(actionHwnd) != identity.pid
-        || ResolveMxNMRootOwnerHwnd(actionHwnd)
+        || Win32WindowPid(actionHwnd) != identity.pid
+        || Win32RootOwner(actionHwnd)
             != identity.rootHwnd {
         return {ok: false, point: 0, actionHwnd: 0}
     }
-    actionRect := MxNMTargetClientRectScreen(actionHwnd)
+    actionRect := Win32ClientRectScreen(actionHwnd)
     if !IsObject(actionRect)
-        || !MxNMPointInsideRect(point, actionRect) {
+        || !RectHasPoint(actionRect, point) {
         return {ok: false, point: 0, actionHwnd: 0}
     }
     if !MxNMContextPointInLeftViewerHalf(point, actionRect)
@@ -3485,18 +3646,14 @@ ValidateMxNMContextTargetSession(session, viewerExe, options := 0) {
         || StrLower(session.viewerExe) != StrLower(viewerExe)
         || !session.rootHwnd
         || !session.surfaceHwnd
-        || !DllCall("User32\IsWindow", "Ptr", session.rootHwnd, "Int")
-        || !DllCall("User32\IsWindow", "Ptr", session.surfaceHwnd, "Int")
-        || !DllCall(
-            "User32\IsWindowVisible",
-            "Ptr", session.surfaceHwnd,
-            "Int"
-        ) {
+        || !Win32IsWindow(session.rootHwnd)
+        || !Win32IsWindow(session.surfaceHwnd)
+        || !Win32IsWindowVisible(session.surfaceHwnd) {
         return failure
     }
-    if MxNMTargetWindowPid(session.rootHwnd) != session.pid
-        || MxNMTargetWindowPid(session.surfaceHwnd) != session.pid
-        || ResolveMxNMRootOwnerHwnd(session.surfaceHwnd)
+    if Win32WindowPid(session.rootHwnd) != session.pid
+        || Win32WindowPid(session.surfaceHwnd) != session.pid
+        || Win32RootOwner(session.surfaceHwnd)
             != session.rootHwnd {
         return failure
     }
@@ -3537,8 +3694,8 @@ ValidateMxNMContextTargetSession(session, viewerExe, options := 0) {
         return failure
     }
 
-    surfaceRect := MxNMTargetClientRectScreen(session.surfaceHwnd)
-    rootRect := MxNMTargetClientRectScreen(session.rootHwnd)
+    surfaceRect := Win32ClientRectScreen(session.surfaceHwnd)
+    rootRect := Win32ClientRectScreen(session.rootHwnd)
     if !IsObject(surfaceRect)
         || !IsObject(rootRect)
         || surfaceRect.right <= surfaceRect.left
@@ -3563,7 +3720,7 @@ ValidateMxNMContextTargetSession(session, viewerExe, options := 0) {
     )
     if !validated.ok
         return failure
-    clientPoint := MxNMTargetScreenToClient(
+    clientPoint := Win32ScreenToClient(
         validated.actionHwnd,
         validated.point
     )
@@ -3676,31 +3833,12 @@ MxNMContextPointFromNormalized(rect, normalized) {
     }
 }
 
-MxNMContextRectContainsPoint(rect, point) {
-    return IsObject(rect)
-        && IsObject(point)
-        && point.x >= rect.left
-        && point.x < rect.right
-        && point.y >= rect.top
-        && point.y < rect.bottom
-}
-
 MxNMContextPointInLeftViewerHalf(point, receiverRect) {
-    if !MxNMContextRectContainsPoint(receiverRect, point)
+    if !RectHasPoint(receiverRect, point)
         return false
     midpointX := receiverRect.left
         + Floor((receiverRect.right - receiverRect.left) / 2)
     return point.x < midpointX
-}
-
-MxNMContextVisibleScreenArea(rect) {
-    left := SysGet(76)
-    top := SysGet(77)
-    right := left + SysGet(78)
-    bottom := top + SysGet(79)
-    width := Max(0, Min(rect.right, right) - Max(rect.left, left))
-    height := Max(0, Min(rect.bottom, bottom) - Max(rect.top, top))
-    return width * height
 }
 
 MxNMContextClassLooksLikeToolChrome(className) {
@@ -3709,39 +3847,6 @@ MxNMContextClassLooksLikeToolChrome(className) {
         || normalized = "toolbarwindow32"
         || normalized = "msctls_statusbar32"
         || normalized = "rebarwindow32"
-}
-
-MxNMContextWindowClass(hwnd) {
-    if !hwnd
-        return ""
-    classNameBuffer := Buffer(512 * 2, 0)
-    try length := DllCall(
-        "User32\GetClassNameW",
-        "Ptr", hwnd,
-        "Ptr", classNameBuffer.Ptr,
-        "Int", 512,
-        "Int"
-    )
-    catch
-        return ""
-    return length > 0
-        ? StrGet(classNameBuffer, length, "UTF-16")
-        : ""
-}
-
-MxNMContextWindowDepth(hwnd, rootHwnd) {
-    if hwnd = rootHwnd
-        return 0
-    depth := 0
-    seen := Map()
-    while hwnd && !seen.Has(hwnd) && depth < 32 {
-        seen[hwnd] := true
-        hwnd := MxNMTargetParentHwnd(hwnd)
-        depth += 1
-        if hwnd = rootHwnd
-            return depth
-    }
-    return 32
 }
 
 ; --- END src/mxnm_context_target_session.ahk ---
@@ -3881,7 +3986,7 @@ BuildMxNMContextMenuReceiverDiagnostic(manualPoint, foregroundBefore) {
             ? toolAnchor.frameHwnd
             : (
             target.actionHwnd
-                ? ResolveMxNMRootOwnerHwnd(target.actionHwnd)
+                ? Win32RootOwner(target.actionHwnd)
                 : 0
             )
         )
@@ -4022,16 +4127,16 @@ FormatMxNMContextDiagnosticPointChain(
             "PointChain." label "." depth ".PidMatches=" .
                 MxNMContextDiagnosticBool(pid = expectedPid) "`r`n" .
             "PointChain." label "." depth ".Class=" .
-                MxNMViewerToolWindowClass(hwnd) "`r`n" .
+                Win32WindowClass(hwnd) "`r`n" .
             "PointChain." label "." depth ".Parent=" .
                 MxNMContextDiagnosticParent(hwnd) "`r`n" .
             "PointChain." label "." depth ".Root=" .
-                MxNMViewerToolGetRootHwnd(hwnd) "`r`n" .
+                Win32RootWindow(hwnd) "`r`n" .
             "PointChain." label "." depth ".RootOwner=" .
-                MxNMViewerToolGetRootOwnerHwnd(hwnd) "`r`n" .
+                Win32RootOwner(hwnd) "`r`n" .
             "PointChain." label "." depth ".ClientRect=" .
                 MxNMContextDiagnosticRect(
-                    MxNMTargetClientRectScreen(hwnd)
+                    Win32ClientRectScreen(hwnd)
                 ) "`r`n"
         hwnd := MxNMContextDiagnosticParent(hwnd)
         depth += 1
@@ -4194,13 +4299,13 @@ AddMxNMContextDiagnosticCandidate(
         return
     }
     pid := MxNMContextDiagnosticPid(hwnd)
-    rootOwner := MxNMViewerToolGetRootOwnerHwnd(hwnd)
-    clientRect := MxNMTargetClientRectScreen(hwnd)
+    rootOwner := Win32RootOwner(hwnd)
+    clientRect := Win32ClientRectScreen(hwnd)
     if pid != expectedPid
         || !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int")
         || !DllCall("User32\IsWindowEnabled", "Ptr", hwnd, "Int")
         || !IsObject(clientRect)
-        || !MxNMPointInsideRect(point, clientRect) {
+        || !RectHasPoint(clientRect, point) {
         return
     }
     area := Max(
@@ -4212,9 +4317,9 @@ AddMxNMContextDiagnosticCandidate(
         hwnd: hwnd,
         sources: source,
         pid: pid,
-        className: MxNMViewerToolWindowClass(hwnd),
+        className: Win32WindowClass(hwnd),
         parentHwnd: MxNMContextDiagnosticParent(hwnd),
-        rootHwnd: MxNMViewerToolGetRootHwnd(hwnd),
+        rootHwnd: Win32RootWindow(hwnd),
         rootOwnerHwnd: rootOwner,
         ownerMatches: rootOwner = expectedOwner,
         clientRect: clientRect,
@@ -4282,7 +4387,7 @@ ProbeMxNMContextDiagnosticCandidate(
         elapsedMs: 0
     }
     before := SnapshotMxNMContextDiagnosticWindows(expectedPid)
-    clientPoint := MxNMTargetScreenToClient(
+    clientPoint := Win32ScreenToClient(
         candidate.hwnd,
         screenPoint
     )
@@ -4370,7 +4475,7 @@ SnapshotMxNMContextDiagnosticWindows(expectedPid) {
                 "Ptr", hwnd,
                 "Int"
             ) = true,
-            rect: MxNMViewerToolWindowRectScreen(hwnd),
+            rect: Win32WindowRect(hwnd),
             controlCount: flags.controlCount,
             hasDeleteAll: flags.hasDeleteAll,
             hasSuvMax: flags.hasSuvMax,
@@ -4392,16 +4497,16 @@ FindNewMxNMContextDiagnosticWindows(
     for hwnd in windows {
         if MxNMContextDiagnosticPid(hwnd) != expectedPid
             continue
-        rootOwner := MxNMViewerToolGetRootOwnerHwnd(hwnd)
+        rootOwner := Win32RootOwner(hwnd)
         owner := MxNMContextDiagnosticOwner(hwnd)
         flags := MxNMContextDiagnosticKnownCommandFlags(hwnd)
-        className := MxNMViewerToolWindowClass(hwnd)
+        className := Win32WindowClass(hwnd)
         visible := DllCall(
             "User32\IsWindowVisible",
             "Ptr", hwnd,
             "Int"
         ) = true
-        rect := MxNMViewerToolWindowRectScreen(hwnd)
+        rect := Win32WindowRect(hwnd)
         discovery := "NEW_HANDLE"
         if snapshot.Has(hwnd) {
             before := snapshot[hwnd]

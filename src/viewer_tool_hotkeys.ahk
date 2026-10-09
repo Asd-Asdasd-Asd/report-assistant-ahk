@@ -240,7 +240,7 @@ ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {
         return viewerHwnd
     if !viewerPid
         return viewerHwnd
-    try ownerHwnd := ResolveMxNMRootOwnerHwnd(viewerHwnd)
+    try ownerHwnd := Win32RootOwner(viewerHwnd)
     catch
         ownerHwnd := 0
     if !ownerHwnd
@@ -252,16 +252,9 @@ ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {
     catch
         candidates := []
     for candidateHwnd in candidates {
-        try visible := DllCall(
-            "User32\IsWindowVisible",
-            "Ptr", candidateHwnd,
-            "Int"
-        ) != 0
-        catch
-            visible := false
-        if !visible
+        if !Win32IsWindowVisible(candidateHwnd)
             continue
-        try candidateOwner := ResolveMxNMRootOwnerHwnd(candidateHwnd)
+        try candidateOwner := Win32RootOwner(candidateHwnd)
         catch
             candidateOwner := 0
         if candidateOwner != ownerHwnd

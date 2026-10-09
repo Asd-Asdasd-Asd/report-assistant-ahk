@@ -568,24 +568,10 @@ BuildCurrentMxNMContextTargetCacheSnapshot() {
     surfaceVisible := false
     liveRect := 0
     if surfaceHwnd {
-        try surfaceExists := DllCall(
-            "User32\IsWindow",
-            "Ptr", surfaceHwnd,
-            "Int"
-        ) != 0
-        catch
-            surfaceExists := false
+        surfaceExists := Win32IsWindow(surfaceHwnd)
         if surfaceExists {
-            try surfaceVisible := DllCall(
-                "User32\IsWindowVisible",
-                "Ptr", surfaceHwnd,
-                "Int"
-            ) != 0
-            catch
-                surfaceVisible := false
-            try liveRect := MxNMTargetClientRectScreen(surfaceHwnd)
-            catch
-                liveRect := 0
+            surfaceVisible := Win32IsWindowVisible(surfaceHwnd)
+            liveRect := Win32ClientRectScreen(surfaceHwnd)
         }
     }
     lines.Push("CachePresent=true")

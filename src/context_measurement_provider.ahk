@@ -248,7 +248,7 @@ ResolveContextMeasurementViewer(viewerExe, options := 0) {
 
     screenPoint := GetContextMeasurementConfiguredScreenPoint(options)
     if IsContextMeasurementPoint(screenPoint)
-        && ContextMeasurementPointInsideVirtualScreen(screenPoint) {
+        && PointInsideVirtualScreen(screenPoint) {
         pointViewer := ResolveContextMeasurementViewerFromPoint(
             viewerExe,
             screenPoint
@@ -341,16 +341,7 @@ ResolveExpectedContextMeasurementViewer(
 }
 
 ResolveContextMeasurementViewerFromPoint(viewerExe, screenPoint) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try pointHwnd := DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch {
-        pointHwnd := 0
-    }
+    pointHwnd := Win32WindowFromPoint(screenPoint)
     if !pointHwnd {
         return {
             ok: false,
@@ -360,15 +351,7 @@ ResolveContextMeasurementViewerFromPoint(viewerExe, screenPoint) {
         }
     }
 
-    try rootHwnd := DllCall(
-        "User32\GetAncestor",
-        "Ptr", pointHwnd,
-        "UInt", 2,
-        "Ptr"
-    )
-    catch {
-        rootHwnd := 0
-    }
+    rootHwnd := Win32RootWindow(pointHwnd)
     if !rootHwnd
         rootHwnd := pointHwnd
 
@@ -436,7 +419,7 @@ ResolveContextMeasurementImagePoint(viewerHwnd, options := 0) {
         x: Round(point.x),
         y: Round(point.y)
     }
-    if !ContextMeasurementPointInsideVirtualScreen(screenPoint) {
+    if !PointInsideVirtualScreen(screenPoint) {
         return {
             ok: false,
             screenPoint: screenPoint,
@@ -445,7 +428,7 @@ ResolveContextMeasurementImagePoint(viewerHwnd, options := 0) {
         }
     }
 
-    clientRectScreen := GetContextMeasurementClientRectScreen(viewerHwnd)
+    clientRectScreen := RectLTRB(Win32ClientRectScreen(viewerHwnd))
     if !clientRectScreen
         || screenPoint.x < clientRectScreen.l
         || screenPoint.x >= clientRectScreen.r
@@ -459,7 +442,7 @@ ResolveContextMeasurementImagePoint(viewerHwnd, options := 0) {
         }
     }
 
-    clientPoint := ContextMeasurementScreenToClient(viewerHwnd, screenPoint)
+    clientPoint := Win32ScreenToClient(viewerHwnd, screenPoint)
     if !clientPoint {
         return {
             ok: false,
@@ -483,54 +466,6 @@ IsContextMeasurementPoint(point) {
         && point.HasOwnProp("y")
         && IsNumber(point.x)
         && IsNumber(point.y)
-}
-
-ContextMeasurementPointInsideVirtualScreen(point) {
-    left := SysGet(76)
-    top := SysGet(77)
-    width := SysGet(78)
-    height := SysGet(79)
-    return width > 0
-        && height > 0
-        && point.x >= left
-        && point.x < left + width
-        && point.y >= top
-        && point.y < top + height
-}
-
-GetContextMeasurementClientRectScreen(hwnd) {
-    rectBuffer := Buffer(16, 0)
-    if !DllCall("User32\GetClientRect", "Ptr", hwnd, "Ptr", rectBuffer.Ptr, "Int")
-        return 0
-
-    topLeft := Buffer(8, 0)
-    bottomRight := Buffer(8, 0)
-    NumPut("Int", NumGet(rectBuffer, 0, "Int"), topLeft, 0)
-    NumPut("Int", NumGet(rectBuffer, 4, "Int"), topLeft, 4)
-    NumPut("Int", NumGet(rectBuffer, 8, "Int"), bottomRight, 0)
-    NumPut("Int", NumGet(rectBuffer, 12, "Int"), bottomRight, 4)
-    if !DllCall("User32\ClientToScreen", "Ptr", hwnd, "Ptr", topLeft.Ptr, "Int")
-        return 0
-    if !DllCall("User32\ClientToScreen", "Ptr", hwnd, "Ptr", bottomRight.Ptr, "Int")
-        return 0
-    return {
-        l: NumGet(topLeft, 0, "Int"),
-        t: NumGet(topLeft, 4, "Int"),
-        r: NumGet(bottomRight, 0, "Int"),
-        b: NumGet(bottomRight, 4, "Int")
-    }
-}
-
-ContextMeasurementScreenToClient(hwnd, screenPoint) {
-    pointBuffer := Buffer(8, 0)
-    NumPut("Int", screenPoint.x, pointBuffer, 0)
-    NumPut("Int", screenPoint.y, pointBuffer, 4)
-    if !DllCall("User32\ScreenToClient", "Ptr", hwnd, "Ptr", pointBuffer.Ptr, "Int")
-        return 0
-    return {
-        x: NumGet(pointBuffer, 0, "Int"),
-        y: NumGet(pointBuffer, 4, "Int")
-    }
 }
 
 PrepareContextMeasurementCopyCommand(viewer, clientPoint, commandText,
@@ -613,10 +548,10 @@ InvokePreparedMxNMContextCommand(actionContext, asynchronous := false) {
     }
     try {
         ; Revalidate the exact prepared command immediately before dispatch.
-        if !DllCall("User32\IsWindowVisible", "Ptr", popupHwnd, "Int")
-            || !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
-            || !DllCall("User32\IsWindowEnabled", "Ptr", controlHwnd, "Int")
-            || !DllCall("User32\IsChild", "Ptr", popupHwnd, "Ptr", controlHwnd, "Int")
+        if !Win32IsWindowVisible(popupHwnd)
+            || !Win32IsWindowVisible(controlHwnd)
+            || !Win32IsWindowEnabled(controlHwnd)
+            || !Win32IsChild(popupHwnd, controlHwnd)
             || WinGetPID("ahk_id " popupHwnd) != actionContext["expectedPid"]
             || WinGetPID("ahk_id " controlHwnd) != actionContext["expectedPid"]
             || DllCall("User32\GetDlgCtrlID", "Ptr", controlHwnd, "Int") != runtimeId
@@ -725,36 +660,12 @@ CaptureContextMeasurementPopupState(popupHwnd, commandText := "") {
     } finally {
         DetectHiddenWindows detectHiddenBefore
     }
-    rect := GetContextMeasurementWindowRect(popupHwnd)
+    rect := RectLTRB(Win32WindowRect(popupHwnd))
     return {
-        visible: DllCall(
-            "User32\IsWindowVisible",
-            "Ptr", popupHwnd,
-            "Int"
-        ) = true,
-        rectKey: IsObject(rect)
-            ? rect.l "," rect.t "," rect.r "," rect.b
-            : "",
+        visible: Win32IsWindowVisible(popupHwnd),
+        rectKey: RectKey(rect),
         controlCount: controls.Length,
         commandControlHwnd: commandControlHwnd
-    }
-}
-
-GetContextMeasurementWindowRect(hwnd) {
-    rectBuffer := Buffer(16, 0)
-    if !DllCall(
-        "User32\GetWindowRect",
-        "Ptr", hwnd,
-        "Ptr", rectBuffer.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    return {
-        l: NumGet(rectBuffer, 0, "Int"),
-        t: NumGet(rectBuffer, 4, "Int"),
-        r: NumGet(rectBuffer, 8, "Int"),
-        b: NumGet(rectBuffer, 12, "Int")
     }
 }
 
@@ -801,8 +712,8 @@ WaitForContextMeasurementPopup(viewerPid, existingPopups, commandText,
             candidateDiscovery := discovery
             controlHwnd := currentState.commandControlHwnd
             if !currentState.visible || !controlHwnd
-                || !DllCall("User32\IsWindowVisible", "Ptr", controlHwnd, "Int")
-                || !DllCall("User32\IsWindowEnabled", "Ptr", controlHwnd, "Int")
+                || !Win32IsWindowVisible(controlHwnd)
+                || !Win32IsWindowEnabled(controlHwnd)
                 continue
             readyPopups.Push({
                 ok: true,
@@ -840,14 +751,8 @@ FindContextMeasurementCommandControl(
     }
     matches := []
     for controlHwnd in controls {
-        if requireVisible
-            && !DllCall(
-                "User32\IsWindowVisible",
-                "Ptr", controlHwnd,
-                "Int"
-            ) {
+        if requireVisible && !Win32IsWindowVisible(controlHwnd)
             continue
-        }
         try controlText := ControlGetText(controlHwnd)
         catch {
             controlText := ""

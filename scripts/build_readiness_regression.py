@@ -21,6 +21,7 @@ def build():
     return "\n\n".join([
         "; Generated synthetic regression; never operates MedEx.",
         "#Requires AutoHotkey v2.0\n#SingleInstance Off\n#Warn",
+        (ROOT / "src/core/win32_window.ahk").read_text(encoding="utf-8"),
         between(model, "class MeasurementFailureReason {", "class MeasurementCommandSpec {"),
         between(clipboard, "class MeasurementClipboardDefaults {", "CaptureMeasurementClipboardText("),
         wait,

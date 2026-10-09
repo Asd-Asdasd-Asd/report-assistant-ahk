@@ -18,6 +18,7 @@ read_component = ahk_bundle.read_component
 OUTPUT = ROOT / "tests/windows/generated/mxnm_context_menu_receiver_diagnostic_standalone.ahk"
 
 COMPONENTS = (
+    "src/core/win32_window.ahk",
     "src/measurement_model.ahk",
     "src/mxnm_config_geometry_provider.ahk",
     "src/mxnm_viewer_tool_commands.ahk",

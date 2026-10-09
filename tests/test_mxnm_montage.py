@@ -208,9 +208,9 @@ class MxNMMontageTests(unittest.TestCase):
         self.assertIn("AutomationId: String(controlId)", module)
         self.assertIn("MxNMMontageOwnerFamilyWindows(session)", resolver)
         self.assertIn('WinGetList("ahk_pid " session.viewerPid)', module)
-        self.assertIn("MxNMMontageRectVisible(rect)", module)
+        self.assertIn("RectIntersectsScreen(rect)", module)
         self.assertNotIn(
-            "MxNMMontageRectInside(rect, viewerRect)",
+            "RectEncloses(viewerRect, rect)",
             module,
         )
 

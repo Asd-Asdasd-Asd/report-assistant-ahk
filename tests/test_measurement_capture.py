@@ -352,13 +352,13 @@ class MeasurementCaptureTests(unittest.TestCase):
             "safePointScreen",
             "discoveryMethod",
             "session.surfaceClientRect := surfaceRect",
-            "WindowFromScreenPoint",
-            "ResolveMxNMRootOwnerHwnd",
+            "Win32WindowFromPoint",
+            "Win32RootOwner",
             "pointProbeCount",
         ):
             self.assertIn(required, session)
         self.assertIn(
-            "receiverRect := MxNMTargetClientRectScreen(\n"
+            "receiverRect := Win32ClientRectScreen(\n"
             "            pointResult.actionHwnd",
             session,
         )
@@ -392,7 +392,7 @@ class MeasurementCaptureTests(unittest.TestCase):
         )[1].split("\n}\n\nValidateMxNMContextTargetSession", 1)[0]
         self.assertGreater(
             surface_validation.index("MxNMContextPointInLeftViewerHalf"),
-            surface_validation.index("MxNMTargetClientRectScreen(actionHwnd)"),
+            surface_validation.index("Win32ClientRectScreen(actionHwnd)"),
         )
         self.assertNotIn(
             "MxNMContextPointInLeftViewerHalf(point, rootRect)",
@@ -430,7 +430,7 @@ class MeasurementCaptureTests(unittest.TestCase):
             '"targetHorizontalRegion", MxNMViewerFailureDetail(',
             cleaner,
         )
-        self.assertIn("classNameBuffer := Buffer(512 * 2, 0)", session)
+        self.assertIn("Win32WindowClass(", session)
         self.assertNotIn("\n    buffer := Buffer(", session)
         resolve_internal = session.split(
             "static ResolveInternal(viewerExe := \"\", options := 0) {", 1
@@ -473,8 +473,8 @@ class MeasurementCaptureTests(unittest.TestCase):
         )
         self.assertIn("return expectedViewer", resolver)
         self.assertIn("ResolveContextMeasurementViewerFromPoint(", provider)
-        self.assertIn('"User32\\WindowFromPoint"', provider)
-        self.assertIn('"User32\\GetAncestor"', provider)
+        self.assertIn("Win32WindowFromPoint(", provider)
+        self.assertIn("Win32RootWindow(", provider)
         self.assertIn("WinGetProcessName", provider)
         self.assertIn('"imagePointResolver"', provider)
         self.assertIn('"imageScreenPoint"', provider)

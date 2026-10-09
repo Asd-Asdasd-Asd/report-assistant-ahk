@@ -870,8 +870,8 @@ MxNMMontageCollectUiaControls(
                 hwnd := element.NativeWindowHandle
                 if !hwnd || seen.Has(hwnd) || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
                     continue
-                rect := MxNMMontageWindowRect(hwnd)
-                if !MxNMMontageRectVisible(rect)
+                rect := RectLTRB(Win32WindowRect(hwnd))
+                if !RectIntersectsScreen(rect)
                     continue
                 seen[hwnd] := true
                 candidates.Push({hwnd: hwnd, rect: rect})
@@ -900,10 +900,10 @@ MxNMMontageCollectNativeControl(
     try {
         if DllCall("User32\GetDlgCtrlID", "Ptr", hwnd, "Int") != controlId || StrLower(WinGetClass("ahk_id " hwnd)) != StrLower(className) || WinGetPID("ahk_id " hwnd) != session.viewerPid
             return true
-        if !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int") || !DllCall("User32\IsWindowEnabled", "Ptr", hwnd, "Int") || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
+        if !Win32IsWindowVisible(hwnd) || !Win32IsWindowEnabled(hwnd) || MxNMMontageRootOwner(hwnd) != session.viewerRootOwner
             return true
-        rect := MxNMMontageWindowRect(hwnd)
-        if MxNMMontageRectVisible(rect)
+        rect := RectLTRB(Win32WindowRect(hwnd))
+        if RectIntersectsScreen(rect)
             candidates.Push({hwnd: hwnd, rect: rect})
     }
     return true
@@ -947,36 +947,15 @@ MxNMMontageViewerStillActive(session) {
         return false
 }
 
-MxNMMontageWindowRect(hwnd) {
-    try {
-        WinGetPos &x, &y, &width, &height, "ahk_id " hwnd
-        return {l: x, t: y, r: x + width, b: y + height}
-    }
-    return 0
-}
-
 MxNMMontageWindowFromPoint(x, y) {
-    return DllCall("User32\WindowFromPoint", "Int64", y << 32 | (x & 0xFFFFFFFF), "Ptr")
+    return Win32WindowFromPoint({x: x, y: y})
 }
 
+; Montage compares owners of its own windows; a window without an owner chain
+; is treated as its own root.
 MxNMMontageRootOwner(hwnd) {
-    root := DllCall("User32\GetAncestor", "Ptr", hwnd, "UInt", 3, "Ptr")
+    root := Win32RootOwner(hwnd)
     return root ? root : hwnd
-}
-
-MxNMMontageRectInside(inner, outer) {
-    return inner.l >= outer.l && inner.t >= outer.t && inner.r <= outer.r && inner.b <= outer.b && inner.r > inner.l && inner.b > inner.t
-}
-
-MxNMMontageRectVisible(rect) {
-    if !IsObject(rect) || rect.r <= rect.l || rect.b <= rect.t
-        return false
-    screenLeft := SysGet(76)
-    screenTop := SysGet(77)
-    screenRight := screenLeft + SysGet(78)
-    screenBottom := screenTop + SysGet(79)
-    return Min(rect.r, screenRight) > Max(rect.l, screenLeft)
-        && Min(rect.b, screenBottom) > Max(rect.t, screenTop)
 }
 
 MxNMMontageResult(ok, code, details := 0) {

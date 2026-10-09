@@ -2,6 +2,7 @@
 #SingleInstance Force
 #Warn
 
+#Include ..\..\src\core\win32_window.ahk
 #Include ..\..\src\measurement_model.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_viewer_tool_commands.ahk
@@ -142,7 +143,7 @@ BuildMxNMContextMenuReceiverDiagnostic(manualPoint, foregroundBefore) {
             ? toolAnchor.frameHwnd
             : (
             target.actionHwnd
-                ? ResolveMxNMRootOwnerHwnd(target.actionHwnd)
+                ? Win32RootOwner(target.actionHwnd)
                 : 0
             )
         )
@@ -283,16 +284,16 @@ FormatMxNMContextDiagnosticPointChain(
             "PointChain." label "." depth ".PidMatches=" .
                 MxNMContextDiagnosticBool(pid = expectedPid) "`r`n" .
             "PointChain." label "." depth ".Class=" .
-                MxNMViewerToolWindowClass(hwnd) "`r`n" .
+                Win32WindowClass(hwnd) "`r`n" .
             "PointChain." label "." depth ".Parent=" .
                 MxNMContextDiagnosticParent(hwnd) "`r`n" .
             "PointChain." label "." depth ".Root=" .
-                MxNMViewerToolGetRootHwnd(hwnd) "`r`n" .
+                Win32RootWindow(hwnd) "`r`n" .
             "PointChain." label "." depth ".RootOwner=" .
-                MxNMViewerToolGetRootOwnerHwnd(hwnd) "`r`n" .
+                Win32RootOwner(hwnd) "`r`n" .
             "PointChain." label "." depth ".ClientRect=" .
                 MxNMContextDiagnosticRect(
-                    MxNMTargetClientRectScreen(hwnd)
+                    Win32ClientRectScreen(hwnd)
                 ) "`r`n"
         hwnd := MxNMContextDiagnosticParent(hwnd)
         depth += 1
@@ -455,13 +456,13 @@ AddMxNMContextDiagnosticCandidate(
         return
     }
     pid := MxNMContextDiagnosticPid(hwnd)
-    rootOwner := MxNMViewerToolGetRootOwnerHwnd(hwnd)
-    clientRect := MxNMTargetClientRectScreen(hwnd)
+    rootOwner := Win32RootOwner(hwnd)
+    clientRect := Win32ClientRectScreen(hwnd)
     if pid != expectedPid
         || !DllCall("User32\IsWindowVisible", "Ptr", hwnd, "Int")
         || !DllCall("User32\IsWindowEnabled", "Ptr", hwnd, "Int")
         || !IsObject(clientRect)
-        || !MxNMPointInsideRect(point, clientRect) {
+        || !RectHasPoint(clientRect, point) {
         return
     }
     area := Max(
@@ -473,9 +474,9 @@ AddMxNMContextDiagnosticCandidate(
         hwnd: hwnd,
         sources: source,
         pid: pid,
-        className: MxNMViewerToolWindowClass(hwnd),
+        className: Win32WindowClass(hwnd),
         parentHwnd: MxNMContextDiagnosticParent(hwnd),
-        rootHwnd: MxNMViewerToolGetRootHwnd(hwnd),
+        rootHwnd: Win32RootWindow(hwnd),
         rootOwnerHwnd: rootOwner,
         ownerMatches: rootOwner = expectedOwner,
         clientRect: clientRect,
@@ -543,7 +544,7 @@ ProbeMxNMContextDiagnosticCandidate(
         elapsedMs: 0
     }
     before := SnapshotMxNMContextDiagnosticWindows(expectedPid)
-    clientPoint := MxNMTargetScreenToClient(
+    clientPoint := Win32ScreenToClient(
         candidate.hwnd,
         screenPoint
     )
@@ -631,7 +632,7 @@ SnapshotMxNMContextDiagnosticWindows(expectedPid) {
                 "Ptr", hwnd,
                 "Int"
             ) = true,
-            rect: MxNMViewerToolWindowRectScreen(hwnd),
+            rect: Win32WindowRect(hwnd),
             controlCount: flags.controlCount,
             hasDeleteAll: flags.hasDeleteAll,
             hasSuvMax: flags.hasSuvMax,
@@ -653,16 +654,16 @@ FindNewMxNMContextDiagnosticWindows(
     for hwnd in windows {
         if MxNMContextDiagnosticPid(hwnd) != expectedPid
             continue
-        rootOwner := MxNMViewerToolGetRootOwnerHwnd(hwnd)
+        rootOwner := Win32RootOwner(hwnd)
         owner := MxNMContextDiagnosticOwner(hwnd)
         flags := MxNMContextDiagnosticKnownCommandFlags(hwnd)
-        className := MxNMViewerToolWindowClass(hwnd)
+        className := Win32WindowClass(hwnd)
         visible := DllCall(
             "User32\IsWindowVisible",
             "Ptr", hwnd,
             "Int"
         ) = true
-        rect := MxNMViewerToolWindowRectScreen(hwnd)
+        rect := Win32WindowRect(hwnd)
         discovery := "NEW_HANDLE"
         if snapshot.Has(hwnd) {
             before := snapshot[hwnd]

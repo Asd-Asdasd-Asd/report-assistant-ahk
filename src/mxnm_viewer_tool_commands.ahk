@@ -137,7 +137,7 @@ class MxNMViewerToolCommandProvider {
             screenPoint := MxNMViewerToolRectCenter(target.rect)
             if WinExist("A") != foregroundHwnd
                 return MakeMxNMViewerToolResult(false, MxNMViewerToolCode.WRONG_FOREGROUND)
-            if !DllCall("User32\IsWindowEnabled", "Ptr", target.hwnd, "Int") {
+            if !Win32IsWindowEnabled(target.hwnd) {
                 result := MakeMxNMViewerToolResult(false, MxNMViewerToolCode.BUTTON_DISABLED)
                 result.commandId := command.commandId
                 result.viewerPid := controlSet.pid
@@ -536,7 +536,7 @@ ResolveMxNMViewerToolControlSet(plan, viewerWindows) {
         if !rootsMatch || !actionRootHwnd
             continue
         validGroups.Push({
-            frameHwnd: MxNMViewerToolGetRootOwnerHwnd(
+            frameHwnd: Win32RootOwner(
                 group.parentHwnd
             ),
             actionRootHwnd: actionRootHwnd,
@@ -660,30 +660,19 @@ CollectMxNMViewerToolControlCandidate(
         return true
     if !commandKeyById.Has(controlId)
         return true
-    if !DllCall(
-        "User32\IsWindowVisible",
-        "Ptr", hwnd,
-        "Int"
-    ) {
+    if !Win32IsWindowVisible(hwnd)
         return true
-    }
     try candidatePid := WinGetPID("ahk_id " hwnd)
     catch
         candidatePid := 0
     if candidatePid != runtimePid
         return true
-    className := MxNMViewerToolWindowClass(hwnd)
+    className := Win32WindowClass(hwnd)
     if StrLower(className)
         != StrLower(MxNMViewerToolCommand.NativeClassName) {
         return true
     }
-    try parentHwnd := DllCall(
-        "User32\GetParent",
-        "Ptr", hwnd,
-        "Ptr"
-    )
-    catch
-        parentHwnd := 0
+    parentHwnd := Win32ParentHwnd(hwnd)
     if !parentHwnd
         return true
     try parentPid := WinGetPID("ahk_id " parentHwnd)
@@ -691,17 +680,17 @@ CollectMxNMViewerToolControlCandidate(
         parentPid := 0
     if parentPid != runtimePid
         return true
-    rect := MxNMViewerToolWindowRectScreen(hwnd)
-    parentRect := MxNMViewerToolWindowRectScreen(parentHwnd)
+    rect := Win32WindowRect(hwnd)
+    parentRect := Win32WindowRect(parentHwnd)
     if !IsObject(rect)
         || !IsObject(parentRect)
-        || !MxNMViewerToolRectInside(rect, parentRect) {
+        || !RectEncloses(rect, parentRect) {
         return true
     }
     candidates.Push({
         hwnd: hwnd,
         parentHwnd: parentHwnd,
-        rootHwnd: MxNMViewerToolGetRootHwnd(hwnd),
+        rootHwnd: Win32RootWindow(hwnd),
         controlId: controlId,
         commandKey: commandKeyById[controlId],
         className: className,
@@ -720,11 +709,7 @@ MxNMViewerToolPanelMatchesPadOrigin(
 ) {
     if !panelHwnd
         || !IsObject(panelRect)
-        || !DllCall(
-            "User32\IsWindowVisible",
-            "Ptr", panelHwnd,
-            "Int"
-        ) {
+        || !Win32IsWindowVisible(panelHwnd) {
         return false
     }
     try panelPid := WinGetPID("ahk_id " panelHwnd)
@@ -780,7 +765,7 @@ ValidateMxNMViewerToolControlLayout(
         if !IsObject(control)
             || control.controlId != command.commandId
             || !IsObject(control.rect)
-            || !MxNMViewerToolRectInside(
+            || !RectEncloses(
                 control.rect,
                 panelRect
             ) {
@@ -807,77 +792,10 @@ ValidateMxNMViewerToolControlLayout(
     return true
 }
 
-MxNMViewerToolRectInside(innerRect, outerRect) {
-    return innerRect.right > innerRect.left
-        && innerRect.bottom > innerRect.top
-        && outerRect.right > outerRect.left
-        && outerRect.bottom > outerRect.top
-        && innerRect.left >= outerRect.left
-        && innerRect.top >= outerRect.top
-        && innerRect.right <= outerRect.right
-        && innerRect.bottom <= outerRect.bottom
-}
-
 MxNMViewerToolRectCenter(rect) {
     return {
         x: Round((rect.left + rect.right) / 2),
         y: Round((rect.top + rect.bottom) / 2)
-    }
-}
-
-MxNMViewerToolGetRootHwnd(hwnd) {
-    try return DllCall(
-        "User32\GetAncestor",
-        "Ptr", hwnd,
-        "UInt", 2,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMViewerToolGetRootOwnerHwnd(hwnd) {
-    try return DllCall(
-        "User32\GetAncestor",
-        "Ptr", hwnd,
-        "UInt", 3,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMViewerToolWindowClass(hwnd) {
-    classBuffer := Buffer(512, 0)
-    try length := DllCall(
-        "User32\GetClassNameW",
-        "Ptr", hwnd,
-        "Ptr", classBuffer.Ptr,
-        "Int", 255,
-        "Int"
-    )
-    catch
-        length := 0
-    return length > 0
-        ? StrGet(classBuffer, length, "UTF-16")
-        : ""
-}
-
-MxNMViewerToolWindowRectScreen(hwnd) {
-    rectBuffer := Buffer(16, 0)
-    if !DllCall(
-        "User32\GetWindowRect",
-        "Ptr", hwnd,
-        "Ptr", rectBuffer.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    return {
-        left: NumGet(rectBuffer, 0, "Int"),
-        top: NumGet(rectBuffer, 4, "Int"),
-        right: NumGet(rectBuffer, 8, "Int"),
-        bottom: NumGet(rectBuffer, 12, "Int")
     }
 }
 

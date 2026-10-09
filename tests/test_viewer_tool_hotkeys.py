@@ -22,15 +22,15 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn("static Suv3D := 21193", commands)
         self.assertIn('"User32\\SendMessageTimeoutW"', commands)
         self.assertIn('"UInt", 0x0111', commands)
-        self.assertIn('"User32\\GetParent"', commands)
+        self.assertIn("Win32ParentHwnd(hwnd)", commands)
         self.assertIn('"UPtr", target.controlId', commands)
         self.assertIn('"Ptr", target.hwnd', commands)
         self.assertNotIn('"UInt", 0x00F5', commands)
-        self.assertNotIn('"User32\\WindowFromPoint"', commands)
+        self.assertNotIn("Win32WindowFromPoint(", commands)
         self.assertIn('"User32\\EnumChildWindows"', commands)
         self.assertIn('"User32\\GetDlgCtrlID"', commands)
         self.assertIn("candidatePid != runtimePid", commands)
-        self.assertIn("MxNMViewerToolWindowRectScreen", commands)
+        self.assertIn("Win32WindowRect(", commands)
         self.assertIn("IsWindowVisible", commands)
         self.assertIn("IsWindowEnabled", commands)
         self.assertNotIn("PrepareAtStartup", commands)
@@ -48,7 +48,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertIn("WinGetProcessPath", provider)
         self.assertIn("paths.Count != 1", provider)
         self.assertIn("ResolveMxNMViewerToolControlSet", provider)
-        self.assertIn('"User32\\IsWindowEnabled", "Ptr", target.hwnd', provider)
+        self.assertIn("Win32IsWindowEnabled(target.hwnd)", provider)
         collector = commands.split("\nCollectMxNMViewerToolControlCandidate(\n", 1)[1].split(
             "\nMxNMViewerToolPanelMatchesPadOrigin", 1)[0]
         self.assertNotIn("IsWindowEnabled", collector)
@@ -62,13 +62,12 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "commandKeyById",
             "EnumerateMxNMViewerToolControlCandidates",
             "candidate.parentHwnd",
-            "MxNMViewerToolGetRootOwnerHwnd",
+            "Win32RootOwner",
             "actionRootHwnd",
             "ValidateMxNMViewerToolControlLayout",
             "validGroups.Length != 1",
         ):
             self.assertIn(required, resolver)
-        self.assertIn('"UInt", 3', commands)
         self.assertIn("leftCommand.row < rightCommand.row", commands)
         self.assertIn(
             "leftCommand.column < rightCommand.column",

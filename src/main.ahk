@@ -7,6 +7,7 @@
 #Include automation_diagnostics.ahk
 #Include app_startup.ahk
 #Include utils.ahk
+#Include core\win32_window.ahk
 #Include visual_feedback.ahk
 #Include clipboard_html.ahk
 #Include measurement_model.ahk

@@ -16,6 +16,7 @@ def build() -> str:
     parts = [
         '; Generated regression. Uses synthetic windows only; does not operate MedEx.',
         '#Requires AutoHotkey v2.0', '#SingleInstance Force', '#Warn',
+        (ROOT / 'src/core/win32_window.ahk').read_text(encoding="utf-8"),
         section(caption, 'class ReportImageCaptionDefaults {', 'class ReportImageCaptionCode {'),
         section(caption, 'class ReportImageCaptionPasteGate {', 'SetReportImageCaptionClipboard(payload) {'),
         section(hotkeys, 'MxNMViewerReleaseDecision(pressed, foregroundMatches, elapsedMs, timeoutMs) {', 'MxNMViewerModifierState() {'),

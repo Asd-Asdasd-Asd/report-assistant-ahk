@@ -2,6 +2,7 @@
 #SingleInstance Force
 #Warn
 
+#Include ..\..\src\core\win32_window.ahk
 #Include ..\..\src\measurement_model.ahk
 #Include ..\..\src\measurement_parser.ahk
 #Include ..\..\src\measurement_clipboard.ahk

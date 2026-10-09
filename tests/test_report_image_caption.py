@@ -182,7 +182,7 @@ class ReportImageCaptionTests(unittest.TestCase):
         )
         self.assertIn("targetClientRectKey", capture)
         self.assertIn("targetClientRectKey", cached)
-        self.assertIn("ReportImageCaptionRectKey(", cached)
+        self.assertIn("RectKey(", cached)
 
     def test_target_resolution_uses_unique_structure_not_display_position(self) -> None:
         resolver = self.body(
@@ -232,7 +232,7 @@ class ReportImageCaptionTests(unittest.TestCase):
             image,
         )
         self.assertNotIn('FindElements({Type: "Document"})', image)
-        self.assertIn("ReportImageCaptionRootOwner(pointHwnd) = targetHwnd", self.module)
+        self.assertIn("Win32RootOwner(pointHwnd) = targetHwnd", self.module)
 
     def test_action_keeps_caption_clipboard_and_restores_only_mouse(self) -> None:
         action = self.body(
