@@ -5,7 +5,6 @@ class ContextMeasurementDefaults {
     static PopupClass := "#32770"
     static PopupTimeoutMs := 1000
     static PopupPollIntervalMs := 20
-    static ImagePointKey := "measurement_image_point"
 }
 
 class ContextMeasurementProvider {
@@ -410,12 +409,6 @@ GetContextMeasurementConfiguredScreenPoint(options := 0) {
     point := MeasurementOption(options, "imageScreenPoint", 0)
     if IsContextMeasurementPoint(point)
         return point
-
-    global COORDINATES
-    if IsSet(COORDINATES) && Type(COORDINATES) = "Map"
-        && COORDINATES.Has(ContextMeasurementDefaults.ImagePointKey) {
-        return COORDINATES[ContextMeasurementDefaults.ImagePointKey]
-    }
     return 0
 }
 

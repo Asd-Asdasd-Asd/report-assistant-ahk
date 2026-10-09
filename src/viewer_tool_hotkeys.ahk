@@ -66,8 +66,6 @@ ViewerCaptureHotkeyDefinitions(settings) {
 }
 
 MedExViewerForegroundActive(*) {
-    global VIEWER_EXE
-
     try foregroundHwnd := WinExist("A")
     catch
         return false
@@ -76,7 +74,7 @@ MedExViewerForegroundActive(*) {
     try processName := WinGetProcessName("ahk_id " foregroundHwnd)
     catch
         return false
-    return StrLower(processName) = StrLower(VIEWER_EXE)
+    return StrLower(processName) = StrLower(TargetProcessDefaults.ViewerExe)
 }
 
 InvokeMxNMViewerCaptureHotkey(chord, *) {

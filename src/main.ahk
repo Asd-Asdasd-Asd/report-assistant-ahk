@@ -6,9 +6,6 @@
 #Include app_config.ahk
 #Include automation_diagnostics.ahk
 #Include app_startup.ahk
-#Include config.example.ahk
-#Include *i config.local.ahk
-#Include window_guard.ahk
 #Include utils.ahk
 #Include visual_feedback.ahk
 #Include clipboard_html.ahk
@@ -31,7 +28,6 @@
 #Include adapters\medex_report_editor.ahk
 #Include medex_calibration.ahk
 #Include report_editor.ahk
-#Include viewer_actions.ahk
 #Include feature_model.ahk
 #Include hotstring_model.ahk
 #Include hotstring_config.ahk

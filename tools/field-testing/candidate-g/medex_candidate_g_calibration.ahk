@@ -6,8 +6,6 @@
 ; black swatch, and only after the field-calibrated popup signature matches.
 ; This script never registers production hotstrings.
 #Include ..\..\..\src\app_metadata.ahk
-#Include ..\..\..\src\config.example.ahk
-#Include ..\..\..\src\window_guard.ahk
 #Include ..\..\..\src\utils.ahk
 #Include ..\..\..\src\Lib\UIA.ahk
 #Include ..\..\..\src\clipboard_html.ahk

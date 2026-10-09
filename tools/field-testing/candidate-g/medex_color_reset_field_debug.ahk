@@ -9,8 +9,6 @@
 
 ; Uses the same repository-pinned UIA-v2 dependency as production.
 #Include ..\..\..\src\app_metadata.ahk
-#Include ..\..\..\src\config.example.ahk
-#Include ..\..\..\src\window_guard.ahk
 #Include ..\..\..\src\utils.ahk
 #Include ..\..\..\src\Lib\UIA.ahk
 #Include ..\..\..\src\clipboard_html.ahk
@@ -19,6 +17,7 @@
 #Include ..\..\..\src\diagnostics.ahk
 #Include ..\..\..\src\adapters\medex_report_editor.ahk
 #Include ..\..\..\src\report_editor.ahk
+#Include field_debug_wrappers.ahk
 
 ; Field-test overrides. Production defaults come from MedExColorResetLayoutProfile.
 DEBUG_COLOR_ARROW_OFFSET_X := MedExColorResetLayoutProfile.ColorArrowOffsetX

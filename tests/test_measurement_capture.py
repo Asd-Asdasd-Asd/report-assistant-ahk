@@ -478,7 +478,6 @@ class MeasurementCaptureTests(unittest.TestCase):
         self.assertIn("WinGetProcessName", provider)
         self.assertIn('"imagePointResolver"', provider)
         self.assertIn('"imageScreenPoint"', provider)
-        self.assertIn('ImagePointKey := "measurement_image_point"', provider)
         self.assertIn(
             "MeasurementFailureReason.IMAGE_POINT_UNAVAILABLE", provider
         )

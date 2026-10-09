@@ -5,14 +5,6 @@ class ReportEditorTimingDefaults {
     static RedCaretAfterPasteSettleMs := 60
 }
 
-FocusReportEditor() {
-    return RequireReportEditor()
-}
-
-RunRedInsertion(resetOptions := 0) {
-    return RunRedResetInsertion("（见图）", resetOptions)
-}
-
 RunRedResetInsertion(text, resetOptions := 0) {
     performanceContext := MedExAdapterOption(resetOptions, "performanceContext", 0)
     RecordOptionalPerformanceTimestampAliases(
@@ -40,16 +32,6 @@ RunRedCaretInsertion(text, caretLeftCount, resetOptions := 0) {
     )
     RecordOptionalPerformanceTimestamp(performanceContext, "HotstringReturnMs")
     return operation
-}
-
-; Field-debug compatibility wrapper. Production templates do not dispatch by
-; legacy mode or section identity.
-RunFzgInsertion(resetOptions := 0) {
-    return RunRedCaretInsertion(
-        "放射性摄取增高，SUVmax约（见图）",
-        4,
-        resetOptions
-    )
 }
 
 InsertRedFigureTextForCaretRelocation(text, caretLeftCount,
@@ -221,10 +203,4 @@ ResetRedInsertionColorBeforeClipboardRestore(resetOptions,
     resetResult := ResetMedExInsertionColor(resetOptions)
     RecordOptionalPerformanceTimestamp(performanceContext, "ColorResetReturnedMs")
     return resetResult
-}
-
-ResetReportFormattingPlaceholder() {
-    ; Future: reset editor formatting only after window and focus validation.
-    Flash("Report format reset is not implemented")
-    return false
 }

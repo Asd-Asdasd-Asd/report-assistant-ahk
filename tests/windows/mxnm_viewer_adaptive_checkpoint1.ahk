@@ -2,7 +2,6 @@
 #SingleInstance Force
 #Warn
 
-#Include ..\..\src\config.example.ahk
 #Include ..\..\src\app_config.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_config_path_cache.ahk

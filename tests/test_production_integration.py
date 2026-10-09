@@ -126,7 +126,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         body = function_body(
             report_editor,
             "InsertRedFigureTextAndRestoreState",
-            "ResetReportFormattingPlaceholder",
+            "\n}\n\nResetRedInsertionColorBeforeClipboardRestore",
         )
         paste = body.index("PasteRedFigureTextDetailed(")
         reset = body.index("ResetRedInsertionColorBeforeClipboardRestore(")
@@ -519,11 +519,10 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         wrapper = function_body(
             report_editor, "RunRedResetInsertion", "RunRedCaretInsertion"
         )
-        orchestration = function_body(
-            report_editor,
-            "InsertRedFigureTextAndRestoreState",
-            "ResetReportFormattingPlaceholder",
-        )
+        # Orchestration plus the reset wrapper that records ColorResetStartedMs.
+        orchestration = report_editor.split(
+            "InsertRedFigureTextAndRestoreState(", 1
+        )[1]
         self.assertLess(
             wrapper.index('"HotstringTriggeredMs"'),
             wrapper.index("InsertRedFigureTextAndRestoreState"),
