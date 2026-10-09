@@ -1,6 +1,17 @@
 # 项目状态与交接
 
-更新时间：2026-10-04。当前版本以 `src/app_metadata.ahk` 为准。
+更新时间：2026-10-10。当前版本以 `src/app_metadata.ahk` 为准。
+
+## 2026-10-10 重构分支 `refactor/core-cleanup`
+
+- 已完成且只需静态验证：文档归档到 `docs/history/`、删除 `config.local` 机制与占位代码、
+  共享 `scripts/ahk_bundle.py` 与 `scripts/build_tool_exe.ps1`。
+- 已完成但**尚未在 Windows 验证**：新增 `src/core/win32_window.ahk` 与 `src/core/log_file.ahk`，
+  目标解析、Context session、测量 provider、Caption、Montage、Viewer 工具和诊断模块改为调用它们；
+  行为按逐函数对照保持不变，但 AHK 代码在 macOS 上无法执行。
+- 验收前请先运行 `tests\windows\generated\readiness_regression_standalone.ahk` 与
+  `viewer_state_regression_standalone.ahk`，再构建 EXE 做现场回归；见
+  `docs/internal/2026-10-10-project-review.md` 末尾的验证清单。
 
 ## 当前状态
 

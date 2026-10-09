@@ -5,6 +5,11 @@
 - 修改前先运行 `git status --short`，不要覆盖用户已有改动。
 - 新功能进入 `src/`；不要把逻辑复制到 `release/`、`tools/field-testing/` 或 `legacy/`。
 - `release/report_assistant.ahk` 由 `scripts/build_release.py` 生成；source 变化后重新生成并检查，不手工编辑。
+- 所有生成物（release 和 `tests/windows/generated/` 下的合成回归 / 诊断）都经由 `scripts/ahk_bundle.py` 拼接；
+  新增 builder 只声明组件列表和文件头，不复制拼接逻辑。`tests/test_generated_harnesses_in_sync.py` 要求已提交的
+  生成物与 builder 输出一致，改了被打包的源码后要重新运行对应 builder。
+- 现场工具 EXE 统一用 `scripts/build_tool_exe.ps1` 构建，`tools/field-testing/*.cmd` 只传参数。
+- Candidate G 现场脚本在 `tools/field-testing/candidate-g/`，历史记录在 `docs/history/`。
 - 纯文档修改不需要重写 generated release。
 
 ## 验证

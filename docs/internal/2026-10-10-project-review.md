@@ -215,3 +215,37 @@ Map 拼装、诊断字段复制、字符串处理在 AHK 里是微秒级，**不
 | 12 | feature registry + settings 自动生成 | 2 | 是 |
 | 13 | 拆分四个 >1000 行文件 | 2 | 回归脚本 |
 | 14 | 延迟预算表 → UIA 范围收缩 → 固定 Sleep 替换 → cleanup 异步化评估 | 3 | **是** |
+
+## 7. 进度（2026-10-10，分支 `refactor/core-cleanup`）
+
+| 事项 | 状态 |
+| --- | --- |
+| 1 Git 清理、2 文档归档、3 debug 迁移、4 死代码与 EXE 常量、5 脚本合并 + 生成物一致性测试 | 完成，Python 测试与生成物比对通过 |
+| 6 清理只检查函数名的断言 | 未做整体清扫；本轮只改了因重构必须改的断言，其余留到对应模块重构时一起处理 |
+| 7 `core/win32_window`（含前台判断） | 完成，**待 Windows 验证** |
+| 8 `core/log_file` | 完成，**待 Windows 验证** |
+| 7 中的 `core/result`、`core/wait` | 未开始，等本轮 Windows 验证通过后再做 |
+| 9–14 | 未开始 |
+
+### 本轮 Windows 验证清单
+
+1. 在仓库根目录运行 Python 测试（Windows 下会额外执行 `test_maintenance_windows.py` 的真实 AHK 用例）：
+
+   ```powershell
+   python -m unittest discover -s tests -p "test_*.py"
+   ```
+
+2. 运行两份合成回归，均应输出 PASS 且无 `#Warn` 提示：
+
+   ```powershell
+   AutoHotkey64.exe /ErrorStdOut tests\windows\generated\readiness_regression_standalone.ahk
+   AutoHotkey64.exe /ErrorStdOut tests\windows\generated\viewer_state_regression_standalone.ahk
+   ```
+
+3. 用 `Build EXE.cmd` 构建，启动 EXE，确认托盘出现、`%LocalAppData%\MedExReportAssistant\logs\startup.log` 新增一条 `STARTED`。
+4. 现场回归（非临床测试区），每项做一次首次 + 一次连续：`;fzg`（SUVMax 读取 + 红字）、`;cma`（尺寸）、
+   Viewer 箭头 / 长度 / 3D SUV / 截图 / 清除标注、Shift+Alt+S 快速标图、三种 Montage。
+5. 任一失败后先在托盘"复制诊断信息"，确认 `viewer-failures.log` / `automation-events.log` /
+   `montage-progress.log` 仍写入同一 `logs\` 目录并按原大小轮转。
+6. 现场工具 EXE 至少构建一个（例如 `tools\field-testing\Build Viewer Checkpoint EXE.cmd`），
+   确认新的 `build_tool_exe.ps1` 参数传递正常。

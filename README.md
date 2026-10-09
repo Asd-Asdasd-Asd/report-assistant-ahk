@@ -113,12 +113,13 @@ checkout 内任何文件，因此构建后可直接 `git pull`。构建会 overl
 
 ```text
 assets/    发布文档与图标源/生成物
-docs/      架构、维护、调查和用户文档
+docs/      架构、维护、用户文档；docs/history/ 为已完成的调查与记录
 legacy/    历史脚本与 compatibility reference
 release/   生成的单文件 AHK source
-scripts/   release、EXE 和图标生成工具
-src/       模块化 AutoHotkey v2 source
+scripts/   release、EXE、现场工具和图标生成工具（ahk_bundle.py 为共享拼接器）
+src/       模块化 AutoHotkey v2 source；src/core/ 为与 MedEx 无关的基础层
 tests/     Python static tests 与 Windows/manual harnesses
+tools/     现场测试脚本与 EXE 构建入口
 ```
 
 项目不得提交患者信息、医院敏感信息、真实用户配置、截图、凭据或包含临床内容的日志。

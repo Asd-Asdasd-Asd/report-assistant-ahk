@@ -5,6 +5,11 @@
 ## 代码边界
 
 - `src/` 是源码真相；`release/report_assistant.ahk` 是生成产物；`legacy/` 是历史/兼容来源。
+- `src/core/` 是与 MedEx 无关的基础层：`win32_window.ahk`（窗口 PID、root owner、类名、矩形、前台进程判断，
+  全部不抛异常）和 `log_file.ahk`（配置目录下的日志路径与按大小轮转）。业务模块不得再自行写 `DllCall`
+  查询窗口或自行实现日志轮转；新增同类能力先放进 `core/`。
+- 目标进程名是产品常量 `TargetProcessDefaults`（`app_config.ahk`），不是用户配置；编译后的 EXE 不读取任何
+  `config.local.ahk`。
 - 通用报告模板、剪贴板事务和结构化结果不直接承担 MedEx 特定的窗口定位细节。
 - MedEx 特定 UI 交互必须集中在对应 adapter/provider 中，不能扩散到通用模块。
 
