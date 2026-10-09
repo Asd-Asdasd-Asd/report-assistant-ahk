@@ -819,7 +819,7 @@ CollectMxNMViewerToolControlCandidate(
     parentRect := Win32WindowRect(parentHwnd)
     if !IsObject(rect)
         || !IsObject(parentRect)
-        || !RectEncloses(rect, parentRect) {
+        || !RectEncloses(parentRect, rect) {
         return true
     }
     candidates.Push({
@@ -900,10 +900,7 @@ ValidateMxNMViewerToolControlLayout(
         if !IsObject(control)
             || control.controlId != command.commandId
             || !IsObject(control.rect)
-            || !RectEncloses(
-                control.rect,
-                panelRect
-            ) {
+            || !RectEncloses(panelRect, control.rect) {
             return false
         }
     }

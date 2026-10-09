@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.8.0
-; Source revision: 6e7b4f0ccd3776e762b749f419b497fd06660348-dirty
-; Generated at: 2026-10-09 19:51:19 UTC
+; Source revision: d99c14469ba46a71896a24654a658ac4886fe666-dirty
+; Generated at: 2026-10-09 19:52:30 UTC
 ;@Ahk2Exe-SetFileVersion 0.8.0.0
 ;@Ahk2Exe-SetProductVersion 0.8.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.8.0"
     static Channel := "internal-test"
     static BuildDate := "2026-10-10"
-    static SourceRevision := "6e7b4f0ccd3776e762b749f419b497fd06660348-dirty"
+    static SourceRevision := "d99c14469ba46a71896a24654a658ac4886fe666-dirty"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -15461,7 +15461,7 @@ CollectMxNMViewerToolControlCandidate(
     parentRect := Win32WindowRect(parentHwnd)
     if !IsObject(rect)
         || !IsObject(parentRect)
-        || !RectEncloses(rect, parentRect) {
+        || !RectEncloses(parentRect, rect) {
         return true
     }
     candidates.Push({
@@ -15542,10 +15542,7 @@ ValidateMxNMViewerToolControlLayout(
         if !IsObject(control)
             || control.controlId != command.commandId
             || !IsObject(control.rect)
-            || !RectEncloses(
-                control.rect,
-                panelRect
-            ) {
+            || !RectEncloses(panelRect, control.rect) {
             return false
         }
     }
