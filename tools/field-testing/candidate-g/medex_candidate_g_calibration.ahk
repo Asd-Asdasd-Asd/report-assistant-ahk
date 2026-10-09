@@ -5,16 +5,16 @@
 ; Candidate G calibration and controlled G2 validation. Only F12 may click the
 ; black swatch, and only after the field-calibrated popup signature matches.
 ; This script never registers production hotstrings.
-#Include ..\src\app_metadata.ahk
-#Include ..\src\config.example.ahk
-#Include ..\src\window_guard.ahk
-#Include ..\src\utils.ahk
-#Include ..\src\Lib\UIA.ahk
-#Include ..\src\clipboard_html.ahk
-#Include ..\src\medex_color_reset_logic.ahk
-#Include ..\src\medex_candidate_g_logic.ahk
-#Include ..\src\diagnostics.ahk
-#Include ..\src\adapters\medex_report_editor.ahk
+#Include ..\..\..\src\app_metadata.ahk
+#Include ..\..\..\src\config.example.ahk
+#Include ..\..\..\src\window_guard.ahk
+#Include ..\..\..\src\utils.ahk
+#Include ..\..\..\src\Lib\UIA.ahk
+#Include ..\..\..\src\clipboard_html.ahk
+#Include ..\..\..\src\medex_color_reset_logic.ahk
+#Include ..\..\..\src\medex_candidate_g_logic.ahk
+#Include ..\..\..\src\diagnostics.ahk
+#Include ..\..\..\src\adapters\medex_report_editor.ahk
 
 CANDIDATE_G_RESULT_FILE := A_Temp "\MedExAHK\candidate_g_calibration.txt"
 CANDIDATE_G_PINNED_UIA_VERSION := "v1.1.3"

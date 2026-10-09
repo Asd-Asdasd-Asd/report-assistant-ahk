@@ -4,17 +4,17 @@
 
 ; Candidate G2 controlled test build. Run this script by itself; do not run the
 ; generated release or another field-debug script at the same time.
-#Include ..\src\app_metadata.ahk
-#Include ..\src\config.example.ahk
-#Include ..\src\window_guard.ahk
-#Include ..\src\utils.ahk
-#Include ..\src\Lib\UIA.ahk
-#Include ..\src\clipboard_html.ahk
-#Include ..\src\medex_color_reset_logic.ahk
-#Include ..\src\medex_candidate_g_logic.ahk
-#Include ..\src\diagnostics.ahk
-#Include ..\src\adapters\medex_report_editor.ahk
-#Include ..\src\report_editor.ahk
+#Include ..\..\..\src\app_metadata.ahk
+#Include ..\..\..\src\config.example.ahk
+#Include ..\..\..\src\window_guard.ahk
+#Include ..\..\..\src\utils.ahk
+#Include ..\..\..\src\Lib\UIA.ahk
+#Include ..\..\..\src\clipboard_html.ahk
+#Include ..\..\..\src\medex_color_reset_logic.ahk
+#Include ..\..\..\src\medex_candidate_g_logic.ahk
+#Include ..\..\..\src\diagnostics.ahk
+#Include ..\..\..\src\adapters\medex_report_editor.ahk
+#Include ..\..\..\src\report_editor.ahk
 
 CANDIDATE_G2_TEST_LOG := A_Temp "\MedExAHK\candidate_g2_test.txt"
 

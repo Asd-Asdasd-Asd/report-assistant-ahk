@@ -229,7 +229,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertLess(transaction_return, feedback)
 
     def test_step_three_fast_failure_harness_preserves_clipboard(self) -> None:
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
         self.assertIn("^!F10::", field_debug)
         self.assertIn("RunMedExProductionTimingFieldDebug(true)", field_debug)
         self.assertIn('options["processCandidates"] := ["__step3_fast_failure__.exe"]', field_debug)
@@ -270,7 +270,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
 
     def test_production_and_field_share_core_with_different_diagnostic_modes(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
         self.assertIn('MedExAdapterOption(options, "diagnosticMode", "production")', adapter)
         self.assertIn('"diagnosticMode", "field"', field_debug)
         self.assertIn("ResetMedExInsertionColor(options)", field_debug)
@@ -342,16 +342,16 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
 
     def test_focus_diagnostics_are_explicit_not_production_default(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
         self.assertIn('MedExAdapterOption(options, "collectFocusDiagnostics", false)', adapter)
         self.assertIn('DEBUG_COLLECT_FOCUS_DIAGNOSTICS := false', field_debug)
         self.assertIn('"collectFocusDiagnostics", DEBUG_COLLECT_FOCUS_DIAGNOSTICS', field_debug)
         self.assertNotIn("CaptureMedExFocusedElementContext", source("src/main.ahk"))
 
     def test_field_debug_does_not_register_production_hotstrings(self) -> None:
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
         self.assertNotIn("ApplyMedExFieldDebugRuntimeOverrides", field_debug)
-        self.assertNotIn("#Include ..\\src\\hotstrings.ahk", field_debug)
+        self.assertNotIn("#Include ..\\..\\..\\src\\hotstrings.ahk", field_debug)
         self.assertNotIn(":*?:;red::", field_debug)
         self.assertNotIn(":*?:;fzg::", field_debug)
         self.assertIn("RunRedInsertion(options)", field_debug)
@@ -363,9 +363,9 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertIn("static UseCachedAnchorSnapshot := false", source("src/adapters/medex_report_editor.ahk"))
 
     def test_field_debug_loads_candidate_g_before_adapter(self) -> None:
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
-        candidate_g_include = "#Include ..\\src\\medex_candidate_g_logic.ahk"
-        adapter_include = "#Include ..\\src\\adapters\\medex_report_editor.ahk"
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
+        candidate_g_include = "#Include ..\\..\\..\\src\\medex_candidate_g_logic.ahk"
+        adapter_include = "#Include ..\\..\\..\\src\\adapters\\medex_report_editor.ahk"
         self.assertEqual(field_debug.count(candidate_g_include), 1)
         self.assertLess(
             field_debug.index(candidate_g_include),
@@ -395,7 +395,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertNotIn("RunMedExUiaInvokeColorReset(options)", relative_branch)
 
     def test_field_debug_uses_explicit_uia_strategy_override(self) -> None:
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
         self.assertIn("DEBUG_COLOR_RESET_STRATEGY := MedExColorResetStrategy.UIA_INVOKE", field_debug)
         self.assertGreaterEqual(field_debug.count('"colorResetStrategy", DEBUG_COLOR_RESET_STRATEGY'), 2)
 
@@ -480,7 +480,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
 
     def test_performance_diagnostics_are_explicit_and_privacy_safe(self) -> None:
         diagnostics = source("src/diagnostics.ahk")
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
         for field in (
             "HotstringTriggeredMs",
             "PasteCommandSentMs",
@@ -578,7 +578,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         metadata = source("src/app_metadata.ahk")
         main = source("src/main.ahk")
         build = source("scripts/build_release.py")
-        field_debug = source("debug/medex_color_reset_field_debug.ahk")
+        field_debug = source("tools/field-testing/candidate-g/medex_color_reset_field_debug.ahk")
         version_match = re.search(
             r'static Version := "([^"]+)"',
             metadata,
@@ -596,7 +596,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertTrue((SRC / "Lib" / "UIA.ahk").is_file())
         self.assertFalse((ROOT / "debug" / "Lib" / "UIA.ahk").exists())
         self.assertIn('"Lib/UIA.ahk"', build)
-        self.assertIn("..\\src\\Lib\\UIA.ahk", field_debug)
+        self.assertIn("..\\..\\..\\src\\Lib\\UIA.ahk", field_debug)
 
     def test_step_five_version_metadata_is_bundled_without_exact_gate(self) -> None:
         release = source("release/report_assistant.ahk")

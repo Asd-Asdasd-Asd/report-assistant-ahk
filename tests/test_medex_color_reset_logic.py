@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOGIC_SOURCE = ROOT / "src" / "medex_color_reset_logic.ahk"
 ADAPTER_SOURCE = ROOT / "src" / "adapters" / "medex_report_editor.ahk"
 DIAGNOSTICS_SOURCE = ROOT / "src" / "diagnostics.ahk"
-FIELD_DEBUG_SOURCE = ROOT / "debug" / "medex_color_reset_field_debug.ahk"
+FIELD_DEBUG_SOURCE = ROOT / "tools" / "field-testing" / "candidate-g" / "medex_color_reset_field_debug.ahk"
 
 OK = "COLOR_RESET_OK"
 REGION_NOT_FOUND = "COLOR_RESET_REGION_ANCHOR_NOT_FOUND"

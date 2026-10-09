@@ -58,7 +58,7 @@
 - [ ] 重新编译后的第一次颜色下拉若选中黑色但菜单未关闭，只记录现象；
   不增加 blind retry 或补偿点击。
 
-当前 Candidate G 专用 harness 说明见 `debug/README.md`。
+当前 Candidate G 专用 harness 说明见 `tools/field-testing/candidate-g/README.md`。
 
 ## SUVMax、尺寸与标注清除
 

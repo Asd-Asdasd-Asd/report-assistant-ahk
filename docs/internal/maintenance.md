@@ -3,7 +3,7 @@
 ## 日常修改
 
 - 修改前先运行 `git status --short`，不要覆盖用户已有改动。
-- 新功能进入 `src/`；不要把逻辑复制到 `release/`、`debug/` 或 `legacy/`。
+- 新功能进入 `src/`；不要把逻辑复制到 `release/`、`tools/field-testing/` 或 `legacy/`。
 - `release/report_assistant.ahk` 由 `scripts/build_release.py` 生成；source 变化后重新生成并检查，不手工编辑。
 - 纯文档修改不需要重写 generated release。
 
