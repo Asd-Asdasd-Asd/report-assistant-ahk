@@ -128,7 +128,7 @@ ContextMeasurementProvider
 
 本节是 v0.6.0 首版实现的固定运行契约。后续 remote development 以本节为准；现场证据推翻某项假设时，先更新本节，再修改 production workflow。
 
-配置包静态调查已经发现 `MxNMSoft*.ini` 和 `MxPetCtTemp.ini` 中存在可用于计算 viewer、图像区和候选子窗格的几何字段。当前配置路径与坐标语义通过 Windows 验证后，image-point resolver 应优先使用配置驱动几何；在此之前仍使用本节定义的集中 screen-coordinate profile。通用架构和证据边界见 `docs/internal/mxnmsoft-config-driven-automation.md`。
+配置包静态调查已经发现 `MxNMSoft*.ini` 和 `MxPetCtTemp.ini` 中存在可用于计算 viewer、图像区和候选子窗格的几何字段。当前配置路径与坐标语义通过 Windows 验证后，image-point resolver 应优先使用配置驱动几何；在此之前仍使用本节定义的集中 screen-coordinate profile。通用架构和证据边界见 `docs/history/mxnmsoft-config-driven-automation.md`。
 
 ### Product boundary and assumptions
 

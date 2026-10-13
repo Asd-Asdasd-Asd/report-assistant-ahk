@@ -68,4 +68,4 @@ fallback 绕过 signature。
 ## 尚未实施
 
 Per-machine layout calibration 需要单独授权。相关 profile 字段、漂移失效和
-停止条件见 `docs/internal/performance-optimization-checkpoints.md`。
+停止条件见 `docs/history/performance-optimization-checkpoints.md`。

@@ -1,6 +1,5 @@
 class AutomationDiagnosticDefaults {
     static SchemaVersion := 1
-    static LogDirectoryName := "logs"
     static LogFileName := "automation-events.log"
     static MaxFileBytes := 1048576
     static RotatedFileCount := 3
@@ -282,24 +281,22 @@ JoinAutomationDiagnosticFields(fields) {
 }
 
 DefaultAutomationDiagnosticLogPath() {
-    configPath := ReportAssistantConfig.Path()
-    SplitPath configPath, , &configDirectory
-    return configDirectory "\" AutomationDiagnosticDefaults.LogDirectoryName "\" AutomationDiagnosticDefaults.LogFileName
+    return ReportAssistantLogPath(AutomationDiagnosticDefaults.LogFileName)
 }
 
 WriteAutomationDiagnosticLines(lines, logPath := "") {
     try {
         if logPath = ""
             logPath := DefaultAutomationDiagnosticLogPath()
-        SplitPath logPath, , &logDirectory
-        if !DirExist(logDirectory)
-            DirCreate logDirectory
-        RotateAutomationDiagnosticLog(logPath)
         block := ""
         for line in lines
             block .= AutomationDiagnosticSafeLine(line) "`r`n"
-        FileAppend block, logPath, "UTF-8"
-        return true
+        return AppendRotatedLogBlock(
+            logPath,
+            block,
+            AutomationDiagnosticDefaults.MaxFileBytes,
+            AutomationDiagnosticDefaults.RotatedFileCount
+        ) != ""
     } catch {
         return false
     }
@@ -307,24 +304,6 @@ WriteAutomationDiagnosticLines(lines, logPath := "") {
 
 AutomationDiagnosticSafeLine(line) {
     return StrReplace(StrReplace(String(line), "`r", ""), "`n", " ")
-}
-
-RotateAutomationDiagnosticLog(logPath) {
-    if !FileExist(logPath)
-        return
-    try size := FileGetSize(logPath)
-    catch
-        return
-    if size < AutomationDiagnosticDefaults.MaxFileBytes
-        return
-    Loop AutomationDiagnosticDefaults.RotatedFileCount - 1 {
-        index := AutomationDiagnosticDefaults.RotatedFileCount - A_Index
-        sourcePath := logPath "." index
-        targetPath := logPath "." (index + 1)
-        if FileExist(sourcePath)
-            try FileMove sourcePath, targetPath, true
-    }
-    try FileMove logPath, logPath ".1", true
 }
 
 EnableAutomationDiagnosticsForTenMinutes(*) {
@@ -568,24 +547,10 @@ BuildCurrentMxNMContextTargetCacheSnapshot() {
     surfaceVisible := false
     liveRect := 0
     if surfaceHwnd {
-        try surfaceExists := DllCall(
-            "User32\IsWindow",
-            "Ptr", surfaceHwnd,
-            "Int"
-        ) != 0
-        catch
-            surfaceExists := false
+        surfaceExists := Win32IsWindow(surfaceHwnd)
         if surfaceExists {
-            try surfaceVisible := DllCall(
-                "User32\IsWindowVisible",
-                "Ptr", surfaceHwnd,
-                "Int"
-            ) != 0
-            catch
-                surfaceVisible := false
-            try liveRect := MxNMTargetClientRectScreen(surfaceHwnd)
-            catch
-                liveRect := 0
+            surfaceVisible := Win32IsWindowVisible(surfaceHwnd)
+            liveRect := Win32ClientRectScreen(surfaceHwnd)
         }
     }
     lines.Push("CachePresent=true")

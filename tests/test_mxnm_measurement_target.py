@@ -95,10 +95,10 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "CaptureMxNMRuntimeOwnerFrame",
             "MxNMPointInsideRuntimeFrameClient",
             "ResolveMxNMMeasurementToolAnchor",
-            "ResolveMxNMRootOwnerFromPoint",
+            "Win32RootOwnerFromPoint",
             "ResolveMxNMActionWindowFromPoint",
             "ResolveMxNMActionWindowFromAnchor",
-            "GetAncestor",
+            "Win32RootOwner",
         ):
             self.assertIn(symbol, resolver)
         self.assertIn('"ShowModelSize"', resolver)
@@ -119,7 +119,7 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "\nResolveMxNMRuntimeImageTargetFromToolAnchor(", 1
         )[0]
         self.assertNotIn("preferredFrameHwnd", runtime_resolver)
-        self.assertIn("ResolveMxNMRootOwnerFromPoint", runtime_resolver)
+        self.assertIn("Win32RootOwnerFromPoint", runtime_resolver)
         self.assertIn(
             "SelectMxNMRuntimeImageTargetByOwnerFamily",
             runtime_resolver,
@@ -127,14 +127,14 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("CountMxNMRuntimeOwnerFamily", resolver)
         self.assertIn("bestCount != 1", resolver)
         self.assertIn("bestScore < 2", resolver)
-        self.assertIn("ResolveMxNMRootOwnerHwnd", resolver)
-        self.assertIn("GetWindowThreadProcessId", resolver)
+        self.assertIn("Win32RootOwner", resolver)
+        self.assertIn("Win32WindowPid", resolver)
         self.assertIn("GetWindowRect", resolver)
         action_resolver = resolver.split(
             "ValidateMxNMActionWindow(", 2
         )[-1]
         self.assertIn("rootOwnerHwnd != runtimeFrameHwnd", action_resolver)
-        self.assertIn("MxNMTargetScreenToClient", action_resolver)
+        self.assertIn("Win32ScreenToClient", action_resolver)
         self.assertIn("clientPoint: clientPoint", action_resolver)
         self.assertIn("actionClientPoint", resolver)
         self.assertIn("WindowFromPoint", resolver)
@@ -227,19 +227,19 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
             "\n}\n\nValidateMxNMActionWindow", 1
         )[0]
         self.assertIn(
-            "ResolveMxNMWindowFromScreenPoint(screenPoint)",
+            "Win32WindowFromPoint(screenPoint)",
             anchored_action,
         )
         self.assertIn(
-            "MxNMTargetWindowIsSameOrDescendant(",
+            "Win32WindowIsSameOrDescendant(",
             anchored_action,
         )
         self.assertIn(
-            "ResolveMxNMRootOwnerHwnd(pointHwnd)",
+            "Win32RootOwner(pointHwnd)",
             anchored_action,
         )
         self.assertNotIn(
-            "ResolveMxNMRootOwnerHwnd(actionRootHwnd)",
+            "Win32RootOwner(actionRootHwnd)",
             anchored_action,
         )
         for fallback_code in (
@@ -262,7 +262,7 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         self.assertIn("hwnd = toolAnchor.actionRootHwnd", surface_mapping)
         self.assertIn("hwnd = toolAnchor.panelHwnd", surface_mapping)
         self.assertIn('!= "#32770"', surface_mapping)
-        self.assertIn("MxNMTargetParentHwnd(hwnd)", surface_mapping)
+        self.assertIn("Win32ParentHwnd(hwnd)", surface_mapping)
         self.assertIn("viewerWindow.clientWidth < 200", surface_mapping)
         self.assertIn("ownerArea * 0.10", surface_mapping)
         self.assertIn("best.area < secondArea * 1.25", surface_mapping)
@@ -272,11 +272,11 @@ class MxNMMeasurementTargetTests(unittest.TestCase):
         )
         runtime_point = resolver.split(
             "\nSelectMxNMRuntimeSurfaceSafePoint(", 1
-        )[1].split("\n}\n\nMxNMTargetParentHwnd", 1)[0]
-        self.assertIn("WindowFromScreenPoint", runtime_point)
-        self.assertIn("MxNMTargetWindowPid", runtime_point)
-        self.assertIn("ResolveMxNMRootOwnerHwnd", runtime_point)
-        self.assertIn("MxNMTargetWindowIsSameOrDescendant", runtime_point)
+        )[1].split("\n}\n\nBuildMxNMRuntimeOwnerFrameCandidates", 1)[0]
+        self.assertIn("Win32WindowFromPoint", runtime_point)
+        self.assertIn("Win32WindowPid", runtime_point)
+        self.assertIn("Win32RootOwner", runtime_point)
+        self.assertIn("Win32WindowIsSameOrDescendant", runtime_point)
         self.assertIn("minimumHitClearance", runtime_point)
         self.assertNotIn("UIA", runtime_point)
 

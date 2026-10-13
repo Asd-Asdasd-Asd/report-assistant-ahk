@@ -58,7 +58,7 @@
 - [ ] 重新编译后的第一次颜色下拉若选中黑色但菜单未关闭，只记录现象；
   不增加 blind retry 或补偿点击。
 
-当前 Candidate G 专用 harness 说明见 `debug/README.md`。
+当前 Candidate G 专用 harness 说明见 `tools/field-testing/candidate-g/README.md`。
 
 ## SUVMax、尺寸与标注清除
 
@@ -118,7 +118,7 @@
 ## Montage
 
 本轮首次/偶发失败专项验收见
-`docs/internal/automation-readiness.md`，含合成回归命令和现场情景。
+`docs/history/automation-readiness.md`，含合成回归命令和现场情景。
 
 - [ ] Montage 在 root-owner 仅作为 owner、其矩形不覆盖实际控件的布局中，仍从
   同 PID、同 root-owner 的完整 owner family 唯一解析 `21112/Static`；不得要求
@@ -127,7 +127,7 @@
   保留 Win32、UIA raw、UIA filtered、merged 与 owner-family 候选数。
 
 跨机器 target resolver 的现场顺序与判据见
-`docs/internal/viewer-adaptive-runtime-checkpoints.md`。
+`docs/history/viewer-adaptive-runtime-checkpoints.md`。
 
 ## Portable release 与 singleton
 

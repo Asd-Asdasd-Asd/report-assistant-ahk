@@ -1,13 +1,11 @@
 class MxNMViewerFailureDiagnosticDefaults {
-    static LogDirectoryName := "logs"
     static LogFileName := "viewer-failures.log"
     static MaxFileBytes := 524288
+    static RotatedFileCount := 1
 }
 
 DefaultMxNMViewerFailureLogPath() {
-    configPath := ReportAssistantConfig.Path()
-    SplitPath configPath, , &configDirectory
-    return configDirectory "\" MxNMViewerFailureDiagnosticDefaults.LogDirectoryName "\" MxNMViewerFailureDiagnosticDefaults.LogFileName
+    return ReportAssistantLogPath(MxNMViewerFailureDiagnosticDefaults.LogFileName)
 }
 
 WriteMxNMViewerFailureDiagnostic(action, resultCode, details := 0,
@@ -15,31 +13,15 @@ WriteMxNMViewerFailureDiagnostic(action, resultCode, details := 0,
     try {
         if logPath = ""
             logPath := DefaultMxNMViewerFailureLogPath()
-        SplitPath logPath, , &logDirectory
-        if !DirExist(logDirectory)
-            DirCreate logDirectory
-        RotateMxNMViewerFailureDiagnostic(logPath)
-        FileAppend FormatMxNMViewerFailureDiagnostic(
-            action,
-            resultCode,
-            details
-        ) "`r`n", logPath, "UTF-8"
-        return logPath
+        return AppendRotatedLogBlock(
+            logPath,
+            FormatMxNMViewerFailureDiagnostic(action, resultCode, details) "`r`n",
+            MxNMViewerFailureDiagnosticDefaults.MaxFileBytes,
+            MxNMViewerFailureDiagnosticDefaults.RotatedFileCount
+        )
     } catch {
         return ""
     }
-}
-
-RotateMxNMViewerFailureDiagnostic(logPath) {
-    if !FileExist(logPath)
-        return
-    try size := FileGetSize(logPath)
-    catch
-        return
-    if size < MxNMViewerFailureDiagnosticDefaults.MaxFileBytes
-        return
-    rotatedPath := logPath ".1"
-    try FileMove logPath, rotatedPath, true
 }
 
 FormatMxNMViewerFailureDiagnostic(action, resultCode, details := 0) {

@@ -29,7 +29,7 @@
 
 - 修改前先检查 `git status --short`，保留用户已有改动，不覆盖无关文件。
 - 诊断、调查和规划不等于实现授权；只有用户明确要求修改时才改代码或删除内容。
-- 优先读取当前源码和测试；按需读取 `docs/technical-investigations/`、`docs/field-tests/` 和 `experiments/`，其中的候选方案、历史调用链和未验证结论不得直接当作当前 production 行为。
+- 优先读取当前源码和测试；按需读取 `docs/history/`、`docs/technical-investigations/`、`docs/field-tests/` 和 `experiments/`，其中的候选方案、历史调用链和未验证结论不得直接当作当前 production 行为。
 - 修改 source 后运行相关测试并按需运行 `python3 scripts/build_release.py`；不要为了纯文档修改重写 generated release。
 - Windows 构建和 MedEx 现场验收不能在 macOS 上假设完成。
 
@@ -39,4 +39,4 @@
 - 当前架构与安全边界：`docs/internal/architecture.md`
 - 日常维护与发布：`docs/internal/maintenance.md`、`docs/internal/release-checklist.md`
 - 用户文档：`docs/user/`、`assets/publish/`
-- 历史调查：`docs/technical-investigations/`、`docs/field-tests/`、`experiments/`
+- 历史调查：`docs/history/`、`docs/technical-investigations/`、`docs/field-tests/`、`experiments/`

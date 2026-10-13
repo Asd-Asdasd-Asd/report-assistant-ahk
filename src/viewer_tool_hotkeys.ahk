@@ -66,17 +66,7 @@ ViewerCaptureHotkeyDefinitions(settings) {
 }
 
 MedExViewerForegroundActive(*) {
-    global VIEWER_EXE
-
-    try foregroundHwnd := WinExist("A")
-    catch
-        return false
-    if !foregroundHwnd
-        return false
-    try processName := WinGetProcessName("ahk_id " foregroundHwnd)
-    catch
-        return false
-    return StrLower(processName) = StrLower(VIEWER_EXE)
+    return Win32ForegroundProcessIs(TargetProcessDefaults.ViewerExe)
 }
 
 InvokeMxNMViewerCaptureHotkey(chord, *) {
@@ -242,7 +232,7 @@ ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {
         return viewerHwnd
     if !viewerPid
         return viewerHwnd
-    try ownerHwnd := ResolveMxNMRootOwnerHwnd(viewerHwnd)
+    try ownerHwnd := Win32RootOwner(viewerHwnd)
     catch
         ownerHwnd := 0
     if !ownerHwnd
@@ -254,16 +244,9 @@ ResolveMxNMViewerCapturePulseHwnd(viewerHwnd) {
     catch
         candidates := []
     for candidateHwnd in candidates {
-        try visible := DllCall(
-            "User32\IsWindowVisible",
-            "Ptr", candidateHwnd,
-            "Int"
-        ) != 0
-        catch
-            visible := false
-        if !visible
+        if !Win32IsWindowVisible(candidateHwnd)
             continue
-        try candidateOwner := ResolveMxNMRootOwnerHwnd(candidateHwnd)
+        try candidateOwner := Win32RootOwner(candidateHwnd)
         catch
             candidateOwner := 0
         if candidateOwner != ownerHwnd

@@ -58,7 +58,7 @@ Schema 1 首次启动时执行一次性迁移：先审计旧 `Mode`，再备份�
 
 保存前会检查空值、重复 trigger、模板语法和外部文件变化。写入使用备份、临时文件和最终复读验证；成功后执行全脚本 `Reload()`。
 
-快捷键页提供箭头、长度测量、3D SUV、截图和清除全部标注。默认组合为 `Ctrl+Alt+1/2/3/4/5`，首次升级保持停用；Win 键通过输入框旁的独立选项加入。前三项在报告程序或 Viewer 前台时可用，并已完成当前工作站 Windows 非临床验证；3D SUV 会等待完整组合键松开后单次选择，之后不需要继续按住。截图只在 Viewer 前台时把所配按键映射为 MedEx F12，派发后让整个 Viewer 快速白闪约 90 ms，不声称截图已经完成。清除快捷键复用已经验证的右键菜单“删除全部标注”路径，不依赖工具面板坐标。以上操作不移动鼠标或切换前台窗口，并在目标不满足安全条件时拒绝执行。实现与现场发现见 `docs/internal/mxnm-viewer-tool-hotkeys.md`。
+快捷键页提供箭头、长度测量、3D SUV、截图和清除全部标注。默认组合为 `Ctrl+Alt+1/2/3/4/5`，首次升级保持停用；Win 键通过输入框旁的独立选项加入。前三项在报告程序或 Viewer 前台时可用，并已完成当前工作站 Windows 非临床验证；3D SUV 会等待完整组合键松开后单次选择，之后不需要继续按住。截图只在 Viewer 前台时把所配按键映射为 MedEx F12，派发后让整个 Viewer 快速白闪约 90 ms，不声称截图已经完成。清除快捷键复用已经验证的右键菜单“删除全部标注”路径，不依赖工具面板坐标。以上操作不移动鼠标或切换前台窗口，并在目标不满足安全条件时拒绝执行。实现与现场发现见 `docs/history/mxnm-viewer-tool-hotkeys.md`。
 
 ## Portable build
 
@@ -113,12 +113,13 @@ checkout 内任何文件，因此构建后可直接 `git pull`。构建会 overl
 
 ```text
 assets/    发布文档与图标源/生成物
-docs/      架构、维护、调查和用户文档
+docs/      架构、维护、用户文档；docs/history/ 为已完成的调查与记录
 legacy/    历史脚本与 compatibility reference
 release/   生成的单文件 AHK source
-scripts/   release、EXE 和图标生成工具
-src/       模块化 AutoHotkey v2 source
+scripts/   release、EXE、现场工具和图标生成工具（ahk_bundle.py 为共享拼接器）
+src/       模块化 AutoHotkey v2 source；src/core/ 为与 MedEx 无关的基础层
 tests/     Python static tests 与 Windows/manual harnesses
+tools/     现场测试脚本与 EXE 构建入口
 ```
 
 项目不得提交患者信息、医院敏感信息、真实用户配置、截图、凭据或包含临床内容的日志。

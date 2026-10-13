@@ -2,6 +2,7 @@
 #SingleInstance Force
 #Warn
 
+#Include ..\..\src\core\win32_window.ahk
 #Include ..\..\src\mxnm_config_geometry_provider.ahk
 #Include ..\..\src\mxnm_config_path_cache.ahk
 #Include ..\..\src\mxnm_viewer_tool_commands.ahk

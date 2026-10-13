@@ -11,8 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LOGIC = ROOT / "src" / "medex_candidate_g_logic.ahk"
 ADAPTER = ROOT / "src" / "adapters" / "medex_report_editor.ahk"
-DEBUG = ROOT / "debug" / "medex_candidate_g_calibration.ahk"
-G2_TEST = ROOT / "debug" / "medex_candidate_g2_test.ahk"
+DEBUG = ROOT / "tools" / "field-testing" / "candidate-g" / "medex_candidate_g_calibration.ahk"
+G2_TEST = ROOT / "tools" / "field-testing" / "candidate-g" / "medex_candidate_g2_test.ahk"
 BUILD = ROOT / "scripts" / "build_release.py"
 RELEASE = ROOT / "release" / "report_assistant.ahk"
 

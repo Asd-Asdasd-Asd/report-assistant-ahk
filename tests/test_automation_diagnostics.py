@@ -52,19 +52,20 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             'static LogFileName := "automation-events.log"',
             "static MaxFileBytes := 1048576",
             "static RotatedFileCount := 3",
-            "RotateAutomationDiagnosticLog(logPath)",
-            'FileMove logPath, logPath ".1", true',
+            "AutomationDiagnosticDefaults.RotatedFileCount",
         ):
             self.assertIn(required, self.diagnostics)
+        core = (ROOT / "src" / "core" / "log_file.ahk").read_text(encoding="utf-8")
+        self.assertIn("RotateLogFile(logPath, maxFileBytes, rotatedFileCount)", core)
+        self.assertIn('FileMove logPath, logPath ".1", true', core)
 
     def test_default_log_path_is_one_valid_ahk_expression(self) -> None:
         path_builder = self.diagnostics.split(
             "DefaultAutomationDiagnosticLogPath() {", 1
         )[1].split("\n}", 1)[0]
         self.assertIn(
-            'return configDirectory "\\" '
-            'AutomationDiagnosticDefaults.LogDirectoryName "\\" '
-            "AutomationDiagnosticDefaults.LogFileName",
+            "return ReportAssistantLogPath("
+            "AutomationDiagnosticDefaults.LogFileName)",
             path_builder,
         )
         self.assertNotIn(

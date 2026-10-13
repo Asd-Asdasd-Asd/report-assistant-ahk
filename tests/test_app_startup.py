@@ -35,11 +35,9 @@ class AppStartupPolicyTests(unittest.TestCase):
         metadata = main.index("#Include app_metadata.ahk")
         path_helper = main.index("#Include app_config.ahk")
         startup = main.index("#Include app_startup.ahk")
-        example = main.index("#Include config.example.ahk")
         bootstrap = main.index("#Include config_bootstrap.ahk")
         self.assertLess(metadata, path_helper)
         self.assertLess(path_helper, startup)
-        self.assertLess(startup, example)
         self.assertLess(startup, bootstrap)
 
     def test_singleton_uses_stable_named_mutex_without_ownership(self) -> None:

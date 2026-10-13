@@ -1,12 +1,12 @@
 """Build synthetic Windows regressions without operating MedEx or its clipboard."""
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+try:
+    from scripts.ahk_bundle import ROOT, between
+except ModuleNotFoundError:  # executed directly from scripts/
+    from ahk_bundle import ROOT, between
+
 OUTPUT = ROOT / "tests/windows/generated/readiness_regression_standalone.ahk"
-
-
-def between(text, start, end):
-    return start + text.split(start, 1)[1].split(end, 1)[0]
 
 
 def build():
@@ -21,6 +21,7 @@ def build():
     return "\n\n".join([
         "; Generated synthetic regression; never operates MedEx.",
         "#Requires AutoHotkey v2.0\n#SingleInstance Off\n#Warn",
+        (ROOT / "src/core/win32_window.ahk").read_text(encoding="utf-8"),
         between(model, "class MeasurementFailureReason {", "class MeasurementCommandSpec {"),
         between(clipboard, "class MeasurementClipboardDefaults {", "CaptureMeasurementClipboardText("),
         wait,

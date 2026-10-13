@@ -20,3 +20,10 @@ class ManagedConfigEntry {
         this.DefaultValue := String(defaultValue)
     }
 }
+
+; Target process names. These are fixed product constants, not user settings;
+; the compiled EXE cannot read a config.local.ahk override.
+class TargetProcessDefaults {
+    static ReportEditorExe := "medexworkstation.exe"
+    static ViewerExe := "MedExNMFusion.exe"
+}

@@ -299,9 +299,9 @@ ResolveMxNMRuntimeImageTarget(
             plan.mainGeometry,
             mappedImage.rect
         )
-        if !MxNMPointInsideRect(screenPoint, mappedImage.rect)
+        if !RectHasPoint(mappedImage.rect, screenPoint)
             continue
-        rootOwnerHwnd := ResolveMxNMRootOwnerFromPoint(
+        rootOwnerHwnd := Win32RootOwnerFromPoint(
             screenPoint
         )
         if !rootOwnerHwnd
@@ -358,11 +358,11 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
         || !toolAnchor.actionRootHwnd {
         return failure
     }
-    framePid := MxNMTargetWindowPid(toolAnchor.frameHwnd)
+    framePid := Win32WindowPid(toolAnchor.frameHwnd)
     if !framePid
-        || MxNMTargetWindowPid(toolAnchor.actionRootHwnd)
+        || Win32WindowPid(toolAnchor.actionRootHwnd)
             != framePid
-        || MxNMTargetWindowPid(toolAnchor.panelHwnd)
+        || Win32WindowPid(toolAnchor.panelHwnd)
             != framePid {
         failure.fallbackCode := "ANCHOR_IDENTITY_INVALID"
         return failure
@@ -402,10 +402,8 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
                 plan.mainGeometry,
                 configImageRect
             )
-            if MxNMPointInsideRect(
-                configScreenPoint,
-                configImageRect
-            ) && MxNMPointInsideRuntimeFrameClient(
+            if RectHasPoint(configImageRect, configScreenPoint)
+                && MxNMPointInsideRuntimeFrameClient(
                 configScreenPoint,
                 actionFrame
             ) {
@@ -440,7 +438,7 @@ ResolveMxNMRuntimeImageTargetFromToolAnchor(
             failure.fallbackCode := configPointFailureCode
         return failure
     }
-    if !MxNMPointInsideRect(screenPoint, imageRect)
+    if !RectHasPoint(imageRect, screenPoint)
         || !MxNMPointInsideRuntimeFrameClient(screenPoint, actionFrame) {
         failure.fallbackCode := "ANCHOR_POINT_OUT_OF_BOUNDS"
         return failure
@@ -493,13 +491,13 @@ ResolveMxNMRuntimeImageSurfaceFromToolAnchor(
             || hwnd = toolAnchor.frameHwnd
             || hwnd = toolAnchor.actionRootHwnd
             || hwnd = toolAnchor.panelHwnd
-            || MxNMTargetWindowPid(hwnd)
-                != MxNMTargetWindowPid(toolAnchor.frameHwnd)
-            || ResolveMxNMRootOwnerHwnd(hwnd)
+            || Win32WindowPid(hwnd)
+                != Win32WindowPid(toolAnchor.frameHwnd)
+            || Win32RootOwner(hwnd)
                 != toolAnchor.frameHwnd
-            || MxNMTargetParentHwnd(hwnd)
+            || Win32ParentHwnd(hwnd)
                 != toolAnchor.frameHwnd
-            || StrLower(MxNMViewerToolWindowClass(hwnd))
+            || StrLower(Win32WindowClass(hwnd))
                 != "#32770"
             || !DllCall(
                 "User32\IsWindowVisible",
@@ -577,10 +575,10 @@ SelectMxNMRuntimeSurfaceSafePoint(surfaceFrame, ownerFrame) {
         || surfaceFrame.clientHeight < 200 {
         return failure
     }
-    expectedPid := MxNMTargetWindowPid(ownerFrame.hwnd)
+    expectedPid := Win32WindowPid(ownerFrame.hwnd)
     if !expectedPid
-        || MxNMTargetWindowPid(surfaceFrame.hwnd) != expectedPid
-        || ResolveMxNMRootOwnerHwnd(surfaceFrame.hwnd)
+        || Win32WindowPid(surfaceFrame.hwnd) != expectedPid
+        || Win32RootOwner(surfaceFrame.hwnd)
             != ownerFrame.hwnd {
         return failure
     }
@@ -603,18 +601,18 @@ SelectMxNMRuntimeSurfaceSafePoint(surfaceFrame, ownerFrame) {
     bestHwnd := 0
     bestClearance := -1
     for candidate in candidates {
-        pointHwnd := ResolveMxNMWindowFromScreenPoint(candidate)
+        pointHwnd := Win32WindowFromPoint(candidate)
         if !pointHwnd
-            || !MxNMTargetWindowIsSameOrDescendant(
+            || !Win32WindowIsSameOrDescendant(
                 pointHwnd,
                 surfaceFrame.hwnd
             )
-            || MxNMTargetWindowPid(pointHwnd) != expectedPid
-            || ResolveMxNMRootOwnerHwnd(pointHwnd)
+            || Win32WindowPid(pointHwnd) != expectedPid
+            || Win32RootOwner(pointHwnd)
                 != ownerFrame.hwnd {
             continue
         }
-        hitRect := MxNMTargetClientRectScreen(pointHwnd)
+        hitRect := Win32ClientRectScreen(pointHwnd)
         clearance := MxNMPointClearanceInsideRect(
             candidate,
             hitRect
@@ -667,7 +665,7 @@ BuildMxNMRuntimeSurfacePointCandidates(surfaceFrame) {
 MxNMPointClearanceInsideRect(point, rect) {
     if !IsObject(point)
         || !IsObject(rect)
-        || !MxNMPointInsideRect(point, rect) {
+        || !RectHasPoint(rect, point) {
         return -1
     }
     return Min(
@@ -678,27 +676,17 @@ MxNMPointClearanceInsideRect(point, rect) {
     )
 }
 
-MxNMTargetParentHwnd(hwnd) {
-    try return DllCall(
-        "User32\GetParent",
-        "Ptr", hwnd,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
 BuildMxNMRuntimeOwnerFrameCandidates(viewerWindows) {
     frames := []
     seen := Map()
     for viewerWindow in viewerWindows {
-        ownerHwnd := ResolveMxNMRootOwnerHwnd(viewerWindow.hwnd)
+        ownerHwnd := Win32RootOwner(viewerWindow.hwnd)
         if !ownerHwnd || seen.Has(ownerHwnd)
             continue
-        viewerPid := MxNMTargetWindowPid(viewerWindow.hwnd)
-        if !viewerPid || MxNMTargetWindowPid(ownerHwnd) != viewerPid
+        viewerPid := Win32WindowPid(viewerWindow.hwnd)
+        if !viewerPid || Win32WindowPid(ownerHwnd) != viewerPid
             continue
-        if ResolveMxNMRootOwnerHwnd(ownerHwnd) != ownerHwnd
+        if Win32RootOwner(ownerHwnd) != ownerHwnd
             continue
         ownerFrame := CaptureMxNMRuntimeOwnerFrame(ownerHwnd)
         if !IsObject(ownerFrame)
@@ -725,7 +713,7 @@ CaptureMxNMRuntimeOwnerFrame(hwnd) {
     windowHeight := NumGet(windowRect, 12, "Int") - windowY
     if windowWidth <= 0 || windowHeight <= 0
         return 0
-    clientRect := MxNMTargetClientRectScreen(hwnd)
+    clientRect := Win32ClientRectScreen(hwnd)
     if !IsObject(clientRect)
         || clientRect.right <= clientRect.left
         || clientRect.bottom <= clientRect.top {
@@ -799,7 +787,7 @@ CountMxNMRuntimeOwnerFamily(viewerWindows, frameHwnd) {
         if seen.Has(viewerWindow.hwnd)
             continue
         seen[viewerWindow.hwnd] := true
-        if ResolveMxNMRootOwnerHwnd(viewerWindow.hwnd)
+        if Win32RootOwner(viewerWindow.hwnd)
             = frameHwnd {
             count += 1
         }
@@ -814,49 +802,6 @@ MxNMPointInsideRuntimeFrameClient(point, frame) {
         && point.x < frame.clientX + frame.clientWidth
         && point.y >= frame.clientY
         && point.y < frame.clientY + frame.clientHeight
-}
-
-ResolveMxNMRootOwnerFromPoint(screenPoint) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try pointHwnd := DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch
-        pointHwnd := 0
-    if !pointHwnd
-        return 0
-    return ResolveMxNMRootOwnerHwnd(pointHwnd)
-}
-
-ResolveMxNMRootOwnerHwnd(hwnd) {
-    if !hwnd
-        return 0
-    try return DllCall(
-        "User32\GetAncestor",
-        "Ptr", hwnd,
-        "UInt", 3,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMTargetWindowPid(hwnd) {
-    if !hwnd
-        return 0
-    pid := 0
-    try DllCall(
-        "User32\GetWindowThreadProcessId",
-        "Ptr", hwnd,
-        "UInt*", &pid,
-        "UInt"
-    )
-    catch
-        return 0
-    return pid
 }
 
 IsReusableMxNMMeasurementTargetPlan(plan, viewerExe) {
@@ -1130,15 +1075,6 @@ MapMxNMLogicalPointToRuntimeRect(point, mainGeometry, runtimeRect) {
     }
 }
 
-MxNMPointInsideRect(point, rect) {
-    return IsObject(point)
-        && IsObject(rect)
-        && point.x >= rect.left
-        && point.x < rect.right
-        && point.y >= rect.top
-        && point.y < rect.bottom
-}
-
 ResolveMxNMActionWindowFromPoint(
     viewerExe,
     screenPoint,
@@ -1171,7 +1107,7 @@ ResolveMxNMActionWindowFromPoint(
     }
     if !rootHwnd
         rootHwnd := pointHwnd
-    rootOwnerHwnd := ResolveMxNMRootOwnerHwnd(pointHwnd)
+    rootOwnerHwnd := Win32RootOwner(pointHwnd)
     if !rootOwnerHwnd
         rootOwnerHwnd := rootHwnd
 
@@ -1190,9 +1126,9 @@ ResolveMxNMActionWindowFromAnchor(
     runtimeFrameHwnd,
     actionRootHwnd
 ) {
-    pointHwnd := ResolveMxNMWindowFromScreenPoint(screenPoint)
+    pointHwnd := Win32WindowFromPoint(screenPoint)
     if !pointHwnd
-        || !MxNMTargetWindowIsSameOrDescendant(
+        || !Win32WindowIsSameOrDescendant(
             pointHwnd,
             actionRootHwnd
         ) {
@@ -1206,33 +1142,8 @@ ResolveMxNMActionWindowFromAnchor(
         screenPoint,
         runtimeFrameHwnd,
         pointHwnd,
-        ResolveMxNMRootOwnerHwnd(pointHwnd)
+        Win32RootOwner(pointHwnd)
     )
-}
-
-ResolveMxNMWindowFromScreenPoint(screenPoint) {
-    packedPoint := ((Round(screenPoint.y) & 0xFFFFFFFF) << 32)
-        | (Round(screenPoint.x) & 0xFFFFFFFF)
-    try return DllCall(
-        "User32\WindowFromPoint",
-        "Int64", packedPoint,
-        "Ptr"
-    )
-    catch
-        return 0
-}
-
-MxNMTargetWindowIsSameOrDescendant(hwnd, ancestorHwnd) {
-    if !hwnd || !ancestorHwnd
-        return false
-    seen := Map()
-    while hwnd && !seen.Has(hwnd) {
-        if hwnd = ancestorHwnd
-            return true
-        seen[hwnd] := true
-        hwnd := MxNMTargetParentHwnd(hwnd)
-    }
-    return false
 }
 
 ValidateMxNMActionWindow(
@@ -1250,7 +1161,7 @@ ValidateMxNMActionWindow(
     catch {
         actionPid := 0
     }
-    runtimePid := MxNMTargetWindowPid(runtimeFrameHwnd)
+    runtimePid := Win32WindowPid(runtimeFrameHwnd)
     if StrLower(processName) != StrLower(viewerExe)
         || !actionPid
         || actionPid != runtimePid
@@ -1260,15 +1171,15 @@ ValidateMxNMActionWindow(
             code: MxNMMeasurementTargetCode.ACTION_WINDOW_INVALID
         }
     }
-    clientRect := MxNMTargetClientRectScreen(rootHwnd)
+    clientRect := Win32ClientRectScreen(rootHwnd)
     if !IsObject(clientRect)
-        || !MxNMPointInsideRect(screenPoint, clientRect) {
+        || !RectHasPoint(clientRect, screenPoint) {
         return {
             ok: false,
             code: MxNMMeasurementTargetCode.POINT_OUT_OF_BOUNDS
         }
     }
-    clientPoint := MxNMTargetScreenToClient(
+    clientPoint := Win32ScreenToClient(
         rootHwnd,
         screenPoint
     )
@@ -1284,63 +1195,5 @@ ValidateMxNMActionWindow(
         hwnd: rootHwnd,
         pid: actionPid,
         clientPoint: clientPoint
-    }
-}
-
-MxNMTargetScreenToClient(hwnd, screenPoint) {
-    pointBuffer := Buffer(8, 0)
-    NumPut("Int", screenPoint.x, pointBuffer, 0)
-    NumPut("Int", screenPoint.y, pointBuffer, 4)
-    if !DllCall(
-        "User32\ScreenToClient",
-        "Ptr", hwnd,
-        "Ptr", pointBuffer.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    return {
-        x: NumGet(pointBuffer, 0, "Int"),
-        y: NumGet(pointBuffer, 4, "Int")
-    }
-}
-
-MxNMTargetClientRectScreen(hwnd) {
-    rectBuffer := Buffer(16, 0)
-    if !DllCall(
-        "User32\GetClientRect",
-        "Ptr", hwnd,
-        "Ptr", rectBuffer.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    topLeft := Buffer(8, 0)
-    bottomRight := Buffer(8, 0)
-    NumPut("Int", NumGet(rectBuffer, 0, "Int"), topLeft, 0)
-    NumPut("Int", NumGet(rectBuffer, 4, "Int"), topLeft, 4)
-    NumPut("Int", NumGet(rectBuffer, 8, "Int"), bottomRight, 0)
-    NumPut("Int", NumGet(rectBuffer, 12, "Int"), bottomRight, 4)
-    if !DllCall(
-        "User32\ClientToScreen",
-        "Ptr", hwnd,
-        "Ptr", topLeft.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    if !DllCall(
-        "User32\ClientToScreen",
-        "Ptr", hwnd,
-        "Ptr", bottomRight.Ptr,
-        "Int"
-    ) {
-        return 0
-    }
-    return {
-        left: NumGet(topLeft, 0, "Int"),
-        top: NumGet(topLeft, 4, "Int"),
-        right: NumGet(bottomRight, 0, "Int"),
-        bottom: NumGet(bottomRight, 4, "Int")
     }
 }

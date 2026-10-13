@@ -184,12 +184,8 @@ SendConfiguredReportText(text, expectedReportHwnd := 0) {
 ReportHotstringTargetMatches(expectedHwnd) {
     if !MedExForegroundWindowMatches(expectedHwnd)
         return false
-    try processName := WinGetProcessName("ahk_id " expectedHwnd)
-    catch {
-        return false
-    }
     return MedExProcessNameIsApproved(
-        processName,
+        Win32WindowProcessName(expectedHwnd),
         MedExColorResetDefaults.ProvisionalProcessNames
     )
 }

@@ -1,10 +1,10 @@
 # MedEx Candidate G Windows 现场工具
 
-`debug/` 下三个 AHK 文件只用于非临床现场诊断，不是 production 入口，不读取
+`tools/field-testing/candidate-g/` 下三个 AHK 文件只用于非临床现场诊断，不是 production 入口，不读取
 或修改正常用户配置。测试时不要同时运行 generated release 与 debug script。
 
 它们共用 repository-pinned `src/Lib/UIA.ahk` 和 production Candidate G
-逻辑；不得在 `debug/` 维护第二份实现。
+逻辑；不得在本目录维护第二份实现。
 
 ## `medex_color_reset_field_debug.ahk`
 

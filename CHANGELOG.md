@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Add `src/core/win32_window.ahk` and `src/core/log_file.ahk`; route window
+  queries, foreground-process checks and diagnostic log rotation through them
+  instead of per-module copies. Behaviour is unchanged; Windows regression
+  pending.
+- Remove the ineffective `config.local.ahk` override, placeholder viewer
+  actions and coordinate helpers; target process names are now constants.
+- Share one AHK bundler (`scripts/ahk_bundle.py`) and one field-tool EXE build
+  script; archive completed investigation docs under `docs/history/`.
 - Use explicit UTF-8 in the Windows regression generators and tests.
 - Reject unknown configurable hotkey names, report registration failures, and
   keep template hotstrings disabled when configuration startup fails.

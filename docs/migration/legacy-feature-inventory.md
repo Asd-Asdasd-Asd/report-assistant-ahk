@@ -54,4 +54,4 @@
 `medex_legacy_compat.ahk` 移除。
 
 Montage 的已验证 transport、可调参数和分支开发顺序见
-[MxNM montage 迁移交接](../internal/mxnm-montage-migration-handoff.md)。
+[MxNM montage 迁移交接](../history/mxnm-montage-migration-handoff.md)。
