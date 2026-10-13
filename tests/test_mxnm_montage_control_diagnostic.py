@@ -23,7 +23,7 @@ class MxNMMontageControlDiagnosticTests(unittest.TestCase):
         self.assertNotIn("#Include", generated)
         self.assertIn("class UIA {", generated)
         self.assertIn("Test=MxNMMontageControlDiagnostic", generated)
-        self.assertIn("DiagnosticVersion=0.1", generated)
+        self.assertIn("DiagnosticVersion=0.2", generated)
         for directive in DIRECTIVES:
             self.assertEqual(generated.count(directive), 1)
 
@@ -45,6 +45,48 @@ class MxNMMontageControlDiagnosticTests(unittest.TestCase):
             '"ExpectedLayoutColumns=4',
         ):
             self.assertIn(required, harness)
+
+    def test_cover_profile_follows_legacy_sequence(self) -> None:
+        harness = HARNESS.read_text(encoding="utf-8")
+        labels = re.findall(r'label: "(COVER_[A-Z_]+)"', harness)
+        self.assertEqual(
+            labels,
+            [
+                "COVER_LAYOUT_BUTTON",
+                "COVER_ANNOTATION_TAB",
+                "COVER_CAPTION_BAR",
+                "COVER_ADD_CAPTION",
+                "COVER_PROJECTION_PANE",
+                "COVER_SAVE_LEFT",
+                "COVER_FUSION_PANE",
+                "COVER_RESET_DEFAULT",
+                "COVER_SAVE_RIGHT",
+            ],
+        )
+        legacy = (ROOT / "legacy" / "karabiner.ahk").read_text(encoding="utf-8")
+        block = legacy[legacy.index("^#+c::"):]
+        block = block[: block.index("MouseMove xpos, ypos")]
+        legacy_points = re.findall(r'MouseClick "left", (\d+), (\d+)', block)
+        harness_points = re.findall(r"legacyX: (\d+), legacyY: (\d+)", harness)
+        self.assertEqual(harness_points, legacy_points)
+        for required in (
+            "^!+F5::StartMxNMMontageDiagnostic(\"cover\")",
+            "^!+F4::MoveToMxNMMontageLegacyPoint()",
+            "\\mxnm_cover_control_diagnostic.txt",
+            "FormatMxNMCoverLayoutConfig(session[\"viewerPid\"])",
+            "LegacyScreenPoint=",
+            "NativeControlRatio=",
+            "MouseMoveOnOperatorRequestOnly=true",
+        ):
+            self.assertIn(required, harness)
+
+    def test_cover_layout_config_is_numeric_and_key_bounded(self) -> None:
+        harness = HARNESS.read_text(encoding="utf-8")
+        body = harness[harness.index("FormatMxNMCoverLayoutConfig(viewerPid) {"):]
+        body = body[: body.index("\nMxNMMontagePointX(")]
+        self.assertIn('"i)^(ShowModel|LowWnd)[A-Za-z0-9_]*$"', body)
+        self.assertIn(r'"^-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)*$"', body)
+        self.assertIn("SubStr(configPath, StrLen(viewerDirectory) + 2)", body)
 
     def test_probe_is_hover_only_and_privacy_bounded(self) -> None:
         harness = HARNESS.read_text(encoding="utf-8")

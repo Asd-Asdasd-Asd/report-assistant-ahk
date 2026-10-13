@@ -21,7 +21,7 @@
 
 | Hotkey | 行为 | 当前风险 |
 | --- | --- | --- |
-| Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续 |
+| Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续；迁移前控件探测见 [封面图控件探测](../field-tests/2026-10-13-cover-control-diagnostic.md) |
 | XButton1 | 一秒 ToolTip notification | 历史测试项，不作为迁移目标 |
 
 这些动作仍是 global hotkeys。启用前必须确认目标工作站布局，不得与原始
