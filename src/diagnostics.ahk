@@ -95,10 +95,6 @@ DefaultMedExColorResetLogPath() {
     return A_Temp "\MedExAHK\field\medex-color-reset-field.log"
 }
 
-DefaultMedExColorResetFailureLogPath() {
-    return A_Temp "\MedExAHK\logs\medex-color-reset-failures.log"
-}
-
 WriteMedExColorResetDiagnostic(result, logPath := "") {
     if logPath = ""
         logPath := DefaultMedExColorResetLogPath()
@@ -109,54 +105,6 @@ WriteMedExColorResetDiagnostic(result, logPath := "") {
 
     FileAppend FormatMedExColorResetLogLine(result) "`r`n", logPath, "UTF-8"
     return logPath
-}
-
-WriteMedExColorResetFailureDiagnostic(result, logPath := "") {
-    if logPath = ""
-        logPath := DefaultMedExColorResetFailureLogPath()
-
-    SplitPath logPath, , &logDirectory
-    if logDirectory != "" && !DirExist(logDirectory)
-        DirCreate logDirectory
-
-    FileAppend FormatMedExColorResetFailureLogLine(result) "`r`n", logPath, "UTF-8"
-    return logPath
-}
-
-FormatMedExColorResetFailureLogLine(result) {
-    context := result.context
-    fields := [
-        "timestamp=" SafeDiagnosticValue(MedExContextValue(context, "timestamp", FormatTime(, "yyyy-MM-ddTHH:mm:ss"))),
-        "appVersion=" SafeDiagnosticValue(MedExContextValue(context, "appVersion", "UNKNOWN")),
-        "action=MedExColorReset",
-        "resultCode=" SafeDiagnosticValue(result.code),
-        "preflightStage=" SafeDiagnosticValue(MedExContextValue(context, "preflightStage", "")),
-        "readinessReason=" SafeDiagnosticValue(MedExContextValue(context, "readinessReason", "")),
-        "uiaActivationAttempted=" FormatDiagnosticBoolean(MedExContextValue(context, "uiaActivationAttempted", false)),
-        "uiaRootReacquireCount=" SafeDiagnosticValue(MedExContextValue(context, "uiaRootReacquireCount", 0)),
-        "exactAnchorQueryCount=" SafeDiagnosticValue(MedExContextValue(context, "exactAnchorQueryCount", 0)),
-        "exactAnchorCandidateCount=" SafeDiagnosticValue(MedExContextValue(context, "exactAnchorCandidateCount", 0)),
-        "readinessElapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "readinessElapsedMs", "UNKNOWN")),
-        "anchorRootMaxMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorRootMaxMs", "UNKNOWN")),
-        "anchorQueryMaxMs=" SafeDiagnosticValue(MedExContextValue(context, "anchorQueryMaxMs", "UNKNOWN")),
-        "processName=" SafeDiagnosticValue(MedExContextValue(context, "foregroundProcess", "UNKNOWN")),
-        "windowHandle=" SafeDiagnosticValue(MedExContextValue(context, "foregroundWindowHandle", "UNKNOWN")),
-        "medExVersion=" SafeDiagnosticValue(MedExContextValue(context, "medExVersion", "UNKNOWN")),
-        "profileValidationMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "profileValidationMedExVersion", "UNKNOWN")),
-        "calibratedMedExVersion=" SafeDiagnosticValue(MedExContextValue(context, "calibratedMedExVersion", "UNKNOWN")),
-        "medExVersionMatchState=" SafeDiagnosticValue(MedExContextValue(context, "medExVersionMatchState", "UNKNOWN")),
-        "candidateGProfileName=" SafeDiagnosticValue(MedExContextValue(context, "candidateGProfileName", "UNKNOWN")),
-        "horizontalGeometryPolicy=" SafeDiagnosticValue(MedExContextValue(context, "horizontalGeometryPolicy", "UNKNOWN")),
-        "regionAnchorScreenX=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorScreenX", "UNKNOWN")),
-        "regionAnchorClientX=" SafeDiagnosticValue(MedExContextValue(context, "regionAnchorClientX", "UNKNOWN")),
-        "processReason=" SafeDiagnosticValue(MedExContextValue(context, "processReason", "")),
-        "anchorSelectionReason=" SafeDiagnosticValue(MedExContextValue(context, "anchorSelectionReason", "")),
-        "geometryReason=" SafeDiagnosticValue(MedExContextValue(context, "geometryReason", "")),
-        "coordinateSpaceReason=" SafeDiagnosticValue(MedExContextValue(context, "coordinateSpaceReason", "")),
-        "foregroundGuardReason=" SafeDiagnosticValue(MedExContextValue(context, "foregroundGuardReason", "")),
-        "elapsedMs=" SafeDiagnosticValue(MedExContextValue(context, "elapsedMs", "UNKNOWN"))
-    ]
-    return JoinDiagnosticFields(fields, " ")
 }
 
 FormatMedExColorResetLogLine(result) {

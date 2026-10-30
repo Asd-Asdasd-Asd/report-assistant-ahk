@@ -1,6 +1,6 @@
 # Automation Diagnostics MVP
 
-更新时间：2026-08-13
+更新时间：2026-10-30
 
 这套基础设施把“真实 Windows 环境失败但事后没有证据”收敛为统一支持流程：
 
@@ -17,9 +17,9 @@
   `operationId`。
 - 同时保留 wall-clock timestamp 与 `A_TickCount` 派生耗时；阶段耗时不使用
   系统时间差。
-- 每次操作正常情况下只写一条 `operation-summary`。
-- 首次 session 使用、首次目标进程使用、失败、recovery 或详细诊断窗口中，追加
-  `stage-event`。
+- 每次操作只写一条 `operation-summary`；阶段耗时内联在
+  `stages=NAME@offsetMs>…` 中（2026-10-30 起取消单独的 `stage-event` 记录和
+  “开启 10 分钟详细诊断”托盘项，因为每条 summary 已含完整时间线）。
 - `targetGeneration` 随同一 action 的 PID/HWND 目标世代变化递增。
 - `automation-events.log` 单文件上限 1 MiB，保留 `.1`、`.2`、`.3` 三份轮转。
 - 日志写入和轮转失败不得改变原自动化结果。
@@ -44,11 +44,37 @@ caption.persistenceState=UNOBSERVABLE
 只有自动化动作全部完成时才写 `automationResult=COMPLETED`；这仍不表示 Caption
 已经保存到 Vendor 数据层。
 
-托盘新增：
+托盘 `复制诊断信息`：复制环境白名单（含 `PrimaryScreen`、`Monitors` 显示器
+几何）、最近 12 条 summary（不按 action 过滤，按时间排列）加最多 4 条更早的
+非 `COMPLETED` summary、最近 action 和推荐专项诊断。
 
-- `复制诊断信息`：复制环境白名单、最近 60 条统一事件、最近 action 和推荐专项
-  诊断；
-- `开启 10 分钟详细诊断`：只设置内存态 deadline，程序重启自动关闭，不持久化。
+## Milestone C：报告快捷语与颜色恢复（2026-10-30）
+
+每次模板快捷语记录一条 `action=ReportHotstring`，成功也记录。此前颜色恢复只在
+失败时写 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log`（无轮转、空格
+分隔、需单独解析），"点击发出但菜单没收起"这类问题没有任何证据。该文件不再写入
+也不再读取；磁盘上的旧文件不删除。
+
+主要字段：
+
+- `report.writeCode`、`report.requiresColorReset`、`report.redPath`、
+  `report.measurementType/State`；
+- 预检：`color.profileSource`（`builtin` / `machineProfile`）、
+  `color.preflightCode/Reason/ElapsedMs`、exact anchor 查询次数与候选数；
+- 颜色恢复：`color.resultCode`、失败时的 `color.failureReason`、
+  `color.popupSampleCount`、`color.popupFirstReason`、
+  `color.resetToArrowMs`、`color.arrowToBlackMs`、`color.blackToReturnMs`、
+  `color.mouseRestored`、`color.clipboardRestored`；
+- 写入后菜单探测：`color.menuAfterWrite=CLOSED|OPEN|UNKNOWN|NOT_CLICKED`、
+  `color.menuProbeReason`、`color.menuProbeDelayMs`（距黑色点击）、
+  `color.menuProbeCount`。
+
+菜单探测在写入返回后、标注清除前执行，复用 popup signature 像素点，只观察不动作：
+不点击、不按键、不重试。首次仍匹配时等到黑色点击后 400 ms 再采样一次，以排除关闭
+动画；仍匹配记为 `OPEN`，summary 记 `automationResult=DEGRADED`、
+`resultCode=COLOR_MENU_LEFT_OPEN`，会进入快照的失败摘要。若鼠标原位置恰在菜单区域，
+hover 高亮可能让开着的菜单被判为 `CLOSED`；`UNKNOWN` 表示前台已变化未采样。
+只记录 reason 和计数，不记录像素值和坐标。
 
 ## 隐私边界
 

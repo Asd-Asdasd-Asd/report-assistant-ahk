@@ -23,7 +23,7 @@ RunViewerStateRegression() {
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 3000, 3000) = "KEY_RELEASE_TIMEOUT", "held at deadline")
     AssertViewerState(MxNMViewerReleaseDecision(false, true, 0, 3000) = "RELEASED", "next press can release")
     AssertViewerState(MxNMViewerReleaseDecision(false, false, 0, 3000) = "FOREGROUND_CHANGED", "cancel even after release")
-    TestColorResetFailureSelection()
+    TestReportHotstringDiagnosticFields()
     TestViewerNativePanels()
 }
 
@@ -66,17 +66,27 @@ AssertViewerState(condition, label) {
         throw Error(label)
 }
 
-TestColorResetFailureSelection() {
+TestReportHotstringDiagnosticFields() {
     oldCaption := {action: "ReportImageCaption", timestamp: "2026-09-04T18:38:57", source: "AUTOMATION"}
-    currentFailure := "timestamp=2026-09-07T09:45:20 appVersion=0.8.0 action=MedExColorReset resultCode=ANCHOR_NOT_READY preflightStage=redResetReadiness readinessReason=exactAnchorNotReady exactAnchorQueryCount=8 exactAnchorCandidateCount=0 readinessElapsedMs=406 unlisted=SENSITIVE_FIXTURE"
-    color := FindRecentColorResetFailureEvent([currentFailure, ""])
-    AssertViewerState(color.timestamp = "2026-09-07T09:45:20", "legacy timestamp parsed")
-    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, color).source = "COLOR_RESET_FAILURE", "current failure beats stale Caption")
-    AssertViewerState(InStr(color.summary, "resultCode=ANCHOR_NOT_READY"), "failure code retained")
-    AssertViewerState(InStr(color.summary, "readinessElapsedMs=406"), "failure timing retained")
-    AssertViewerState(!InStr(color.summary, "SENSITIVE_FIXTURE"), "unlisted content omitted")
-    newerCapture := {action: "ViewerCapture", timestamp: "2026-09-07T09:46:00", source: "AUTOMATION"}
-    AssertViewerState(NewerAutomationDiagnosticEvent(newerCapture, color).action = "ViewerCapture", "old color failure cannot hide new capture")
-    missing := FindRecentColorResetFailureEvent([])
-    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, missing).action = "ReportImageCaption", "missing legacy file does not replace event")
+    newerFailure := {action: "ContextTarget", timestamp: "2026-09-07T09:45:20", source: "VIEWER_FAILURE"}
+    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, newerFailure).source = "VIEWER_FAILURE", "newer viewer failure wins")
+    missing := {action: "NONE", timestamp: "", source: "NONE"}
+    AssertViewerState(NewerAutomationDiagnosticEvent(oldCaption, missing).action = "ReportImageCaption", "missing event does not replace")
+
+    stages := [{name: "OPERATION_STARTED", tickOffsetMs: 0}, {name: "REPORT_WRITE_RETURNED", tickOffsetMs: 412}]
+    AssertViewerState(AutomationDiagnosticStageList(stages) = "OPERATION_STARTED@0>REPORT_WRITE_RETURNED@412", "stage offsets inline")
+
+    perf := Map("ColorResetStartedMs", 1000, "ArrowClickSentMs", 1090, "BlackClickSentMs", 1112, "ColorResetReturnedMs", 1120)
+    context := Map("popupSignatureSampleCount", 1, "popupSignatureFirstReason", "allRequiredPixelsMatched", "mouseRestored", true, "elapsedMs", 120, "arrowPoint", Map("x", 1, "y", 2))
+    fields := ReportColorResetDiagnosticFields({ok: true, code: "RELATIVE_MOUSE_CHAIN_OK", context: context}, perf)
+    AssertViewerState(fields["color.arrowToBlackMs"] = 22, "arrow to black duration")
+    AssertViewerState(fields["color.resetToArrowMs"] = 90, "reset to arrow duration")
+    AssertViewerState(fields["color.blackToReturnMs"] = 8, "black to return duration")
+    AssertViewerState(fields["color.mouseRestored"] = "true", "mouse restore flag")
+    AssertViewerState(!fields.Has("color.failureReason"), "success has no failure reason")
+    AssertViewerState(!fields.Has("color.arrowPoint"), "geometry is not logged")
+
+    failed := ReportColorResetDiagnosticFields({ok: false, code: "COLOR_RESET_POPUP_SIGNATURE_MISMATCH", context: Map("popupSignatureReason", "blueSwatchMismatch")})
+    AssertViewerState(failed["color.failureReason"] = "popupSignatureReason:blueSwatchMismatch", "failure reason kept")
+    AssertViewerState(failed["color.arrowToBlackMs"] = "UNKNOWN", "missing timing is explicit")
 }

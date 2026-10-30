@@ -13,6 +13,8 @@ def build() -> str:
     hotkeys = (ROOT / 'src/viewer_tool_hotkeys.ahk').read_text(encoding="utf-8")
     tools = (ROOT / 'src/mxnm_viewer_tool_commands.ahk').read_text(encoding="utf-8")
     diagnostics = (ROOT / 'src/automation_diagnostics.ahk').read_text(encoding="utf-8")
+    hotstrings = (ROOT / 'src/hotstrings.ahk').read_text(encoding="utf-8")
+    report_diagnostics = (ROOT / 'src/diagnostics.ahk').read_text(encoding="utf-8")
     parts = [
         '; Generated regression. Uses synthetic windows only; does not operate MedEx.',
         '#Requires AutoHotkey v2.0', '#SingleInstance Force', '#Warn',
@@ -20,8 +22,11 @@ def build() -> str:
         section(caption, 'class ReportImageCaptionDefaults {', 'class ReportImageCaptionCode {'),
         section(caption, 'class ReportImageCaptionPasteGate {', 'SetReportImageCaptionClipboard(payload) {'),
         section(hotkeys, 'MxNMViewerReleaseDecision(pressed, foregroundMatches, elapsedMs, timeoutMs) {', 'MxNMViewerModifierState() {'),
-        section(diagnostics, 'FindRecentColorResetFailureEvent(lines) {', 'AutomationDiagnosticLineField(line, fieldName, fallback := "") {'),
-        section(diagnostics, 'AutomationDiagnosticSafeValue(value) {', 'DefaultAutomationDiagnosticLogPath() {'),
+        section(diagnostics, 'NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {', 'AutomationDiagnosticLineField(line, fieldName, fallback := "") {'),
+        section(diagnostics, 'AutomationDiagnosticStageList(stages) {', 'DefaultAutomationDiagnosticLogPath() {'),
+        section(hotstrings, 'ReportColorResetDiagnosticFields(resetResult, performanceContext := 0) {', 'ExecuteReportTemplatePlan(plan, expectedReportHwnd, trace := 0) {'),
+        section(report_diagnostics, 'PerformanceDuration(context, startKey, endKey) {', 'PerformanceDurationToFirstAvailable(context, startKey, endKeys) {'),
+        section(report_diagnostics, 'MedExContextValue(context, key, defaultValue) {', 'FormatDiagnosticRect(rect) {'),
         tools.split('class MxNMViewerToolCommandProvider {', 1)[0],
         'ResolveMxNMViewerToolControlSet(' + tools.split('\nResolveMxNMViewerToolControlSet(', 1)[1],
         (ROOT / 'tests/windows/viewer_state_regression.ahk').read_text(encoding="utf-8"),

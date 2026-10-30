@@ -273,6 +273,7 @@ FailMedExCalibration(message, reason) {
 
 PrepareMedExRedReset() {
     options := 0
+    profileSource := "none"
     environment := CollectCurrentMedExProfileEnvironment()
     if !environment {
         result := MakeMedExRedResetPreflightResult(
@@ -281,15 +282,19 @@ PrepareMedExRedReset() {
             "environmentUnavailable"
         )
         FinishMedExRedResetPreflightFailure(result)
-        return {ok: false, options: 0, code: result.code}
+        return MakeMedExRedResetReadiness(result, 0, profileSource)
     }
     builtinResult := ValidateCandidateGRuntimeProfile(environment)
-    if builtinResult.ok
+    if builtinResult.ok {
         options := Map()
+        profileSource := "builtin"
+    }
     if !options {
         profile := LoadValidatedMedExMachineProfile()
-        if profile
+        if profile {
             options := BuildMedExMachineProfileOptions(profile)
+            profileSource := "machineProfile"
+        }
     }
     if !options {
         unsupportedReason := MedExContextValue(
@@ -307,23 +312,41 @@ PrepareMedExRedReset() {
             builtinResult.context
         )
         FinishMedExRedResetPreflightFailure(result)
-        return {ok: false, options: 0, code: result.code}
+        return MakeMedExRedResetReadiness(result, 0, profileSource)
     }
     contextResult := CollectMedExCalibrationContext(options)
+    result := MakeMedExRedResetPreflightResult(
+        contextResult.ok,
+        contextResult.code,
+        contextResult.reason,
+        contextResult.context
+    )
     if !contextResult.ok {
-        result := MakeMedExRedResetPreflightResult(
-            false,
-            contextResult.code,
-            contextResult.reason,
-            contextResult.context
-        )
         FinishMedExRedResetPreflightFailure(result)
-        return {ok: false, options: 0, code: result.code}
+        return MakeMedExRedResetReadiness(result, 0, profileSource)
     }
+    return MakeMedExRedResetReadiness(result, options, profileSource)
+}
+
+; Readiness plus the privacy-safe scalars the ReportHotstring operation logs.
+MakeMedExRedResetReadiness(result, options, profileSource) {
+    context := result.context
     return {
-        ok: true,
-        options: options,
-        code: MedExRedResetPreflightCode.OK
+        ok: result.ok,
+        options: result.ok ? options : 0,
+        code: result.code,
+        diagnostics: Map(
+            "color.profileSource", profileSource,
+            "color.preflightCode", result.code,
+            "color.preflightReason",
+                MedExContextValue(context, "readinessReason", ""),
+            "color.preflightElapsedMs",
+                MedExContextValue(context, "readinessElapsedMs", ""),
+            "color.exactAnchorQueryCount",
+                MedExContextValue(context, "exactAnchorQueryCount", ""),
+            "color.exactAnchorCandidateCount",
+                MedExContextValue(context, "exactAnchorCandidateCount", "")
+        )
     }
 }
 
@@ -343,10 +366,6 @@ MakeMedExRedResetPreflightResult(ok, code, reason, context := 0) {
 }
 
 FinishMedExRedResetPreflightFailure(result) {
-    try WriteMedExColorResetFailureDiagnostic(result)
-    catch as err
-        OutputDebug "MedEx red-reset preflight diagnostic failed: " Type(err)
-
     if result.code = MedExRedResetPreflightCode.NEED_CALIBRATION {
         ShowMedExCalibrationRequired()
         return

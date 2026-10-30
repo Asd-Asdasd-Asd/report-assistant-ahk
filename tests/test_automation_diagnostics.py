@@ -29,23 +29,22 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             "this.StartTick := A_TickCount",
             "tickOffsetMs: A_TickCount - this.StartTick",
             '"recordType=operation-summary"',
-            '"recordType=stage-event"',
+            '"recoveryAttempted="',
             '"firstSessionUse="',
             '"firstTargetProcessUse="',
             '"targetGeneration="',
         ):
             self.assertIn(required, self.diagnostics)
 
-    def test_logging_policy_is_summary_first_and_detail_is_conditional(self) -> None:
-        self.assertIn("lines := [summary]", self.diagnostics)
-        self.assertIn("if detailed {", self.diagnostics)
-        self.assertIn("this.FirstSessionUse", self.diagnostics)
-        self.assertIn("this.FirstTargetProcessUse", self.diagnostics)
-        self.assertIn('automationResult != "COMPLETED"', self.diagnostics)
-        self.assertIn(
-            "AutomationDiagnosticSession.DetailedModeActive()",
-            self.diagnostics,
-        )
+    def test_each_operation_writes_one_summary_with_inline_stage_offsets(self) -> None:
+        complete = self.diagnostics.split("    Complete(automationResult, resultCode) {", 1)[1].split(
+            "\n    }\n", 1)[0]
+        self.assertEqual(complete.count("FormatAutomationDiagnosticSummary("), 1)
+        self.assertNotIn("stage-event", self.diagnostics)
+        self.assertNotIn("DetailedModeActive", self.diagnostics)
+        self.assertNotIn("detailedTrace", self.diagnostics)
+        stages = self.diagnostics.split("AutomationDiagnosticStageList(stages) {", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn('"@" AutomationDiagnosticSafeValue(stage.tickOffsetMs)', stages)
 
     def test_log_rotation_keeps_three_bounded_files(self) -> None:
         for required in (
@@ -73,12 +72,12 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             path_builder,
         )
 
-    def test_public_snapshot_and_diagnostic_window_are_restart_local(self) -> None:
-        self.assertIn("static DiagnosticUntilTick := 0", self.diagnostics)
-        self.assertIn("A_TickCount < this.DiagnosticUntilTick", self.diagnostics)
-        self.assertIn("static DiagnosticWindowMs := 600000", self.diagnostics)
+    def test_public_snapshot_contract(self) -> None:
         self.assertNotIn("IniWrite", self.diagnostics)
         for required in (
+            '"PrimaryScreen="',
+            '"Monitors=" AutomationDiagnosticMonitorList()',
+            'return "REPORT_HOTSTRING"',
             "CopyAutomationDiagnosticInformation",
             "BuildAutomationDiagnosticSnapshot",
             "RecentRelevantAction=",
@@ -188,12 +187,10 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             'InStr(line, "recordType=operation-summary")',
             "SnapshotRecentSummaryCount",
             "SnapshotFailureSummaryCount",
-            'if recentAction != "ReportImageCaption" {',
-            "SnapshotDetailedEventCount",
         ):
             self.assertIn(required, self.diagnostics)
         selector = self.diagnostics.split(
-            "SelectAutomationDiagnosticSnapshotLines(lines, recentAction) {", 1
+            "SelectAutomationDiagnosticSnapshotLines(lines) {", 1
         )[1].split("\n}\n\nSelectViewerFailureSnapshotLines", 1)[0]
         self.assertNotIn("recordType=stage-event", selector)
 
@@ -207,24 +204,27 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             self.diagnostics,
         )
 
-    def test_color_reset_failure_participates_in_latest_event_selection(self) -> None:
-        for required in (
-            "DefaultMedExColorResetFailureLogPath()",
-            "FindRecentColorResetFailureEvent(",
-            "NewerAutomationDiagnosticEvent(recentEvent, colorEvent)",
-            '"RecentEventTimestamp="',
-            '"RecentColorResetFailureBegin"',
-            'return "REPORT_COLOR_RESET"',
+    def test_legacy_color_reset_failure_log_is_not_read(self) -> None:
+        for removed in (
+            "DefaultMedExColorResetFailureLogPath",
+            "FindRecentColorResetFailureEvent",
+            "RecentColorResetFailureBegin",
+            "COLOR_RESET_FAILURE",
         ):
-            self.assertIn(required, self.diagnostics)
-        snapshot = self.diagnostics.split("BuildAutomationDiagnosticSnapshot(logPath :=", 1)[1].split(
-            "\nSelectAutomationDiagnosticSnapshotLines(lines, recentAction) {", 1)[0]
-        self.assertIn('if recentEvent.source = "COLOR_RESET_FAILURE" {', snapshot)
-        self.assertIn("lines.Push(colorEvent.summary)", snapshot)
-        parser = self.diagnostics.split("FindRecentColorResetFailureEvent(lines) {", 1)[1].split(
-            "\nNewerAutomationDiagnosticEvent(", 1)[0]
-        self.assertIn("AutomationDiagnosticSafeValue(value)", parser)
-        self.assertNotIn("summary: line", parser)
+            self.assertNotIn(removed, self.diagnostics)
+
+    def test_report_hotstring_fields_are_allowlisted(self) -> None:
+        allow = self.diagnostics.split("AutomationDiagnosticFieldAllowed(action, fieldName) {", 1)[1].split(
+            '"ReportImageCaption",', 1)[0]
+        for required in (
+            '"ReportHotstring"',
+            '"color.menuAfterWrite"',
+            '"color.arrowToBlackMs"',
+            '"color.popupSampleCount"',
+            '"color.preflightCode"',
+            '"report.writeCode"',
+        ):
+            self.assertIn(required, allow)
 
     def test_modules_and_tray_support_workflow_are_production_owned(self) -> None:
         main = source("src/main.ahk")
@@ -236,12 +236,9 @@ class AutomationDiagnosticsTests(unittest.TestCase):
             builder.index('"app_startup.ahk"'),
         )
         self.assertIn('static CopyDiagnosticItemName := "复制诊断信息"', tray)
-        self.assertIn(
-            'static EnableDiagnosticItemName := "开启 10 分钟详细诊断"',
-            tray,
-        )
+        self.assertNotIn("EnableDiagnosticItemName", tray)
         self.assertIn("CopyAutomationDiagnosticInformation", tray)
-        self.assertIn("EnableAutomationDiagnosticsForTenMinutes", tray)
+        self.assertNotIn("EnableAutomationDiagnosticsForTenMinutes", tray)
 
 
 if __name__ == "__main__":

@@ -137,7 +137,7 @@ class HotstringConfigTests(unittest.TestCase):
         )
         self.assertIn("MxNMMeasurementProvider.ReadSuvMax()", body)
         self.assertIn("MxNMMeasurementProvider.ReadLineAxes()", body)
-        self.assertIn("ExecuteReportTemplatePlan(plan, reportHwnd)", body)
+        self.assertIn("ExecuteReportTemplatePlan(plan, reportHwnd, trace)", body)
         executor = hotstrings.split("ExecuteReportTemplatePlan(", 1)[1]
         self.assertIn("if plan.RequiresColorReset", executor)
         self.assertIn(

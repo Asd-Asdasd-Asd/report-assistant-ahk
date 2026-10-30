@@ -3,18 +3,15 @@ class AutomationDiagnosticDefaults {
     static LogFileName := "automation-events.log"
     static MaxFileBytes := 1048576
     static RotatedFileCount := 3
-    static DiagnosticWindowMs := 600000
     static SnapshotScanLineCount := 240
     static SnapshotRecentSummaryCount := 12
     static SnapshotFailureSummaryCount := 4
-    static SnapshotDetailedEventCount := 30
     static SnapshotViewerFailureCount := 12
 }
 
 class AutomationDiagnosticSession {
     static SessionId := ""
     static NextOperationId := 0
-    static DiagnosticUntilTick := 0
     static FirstOperationPending := true
     static SeenTargetProcesses := Map()
     static TargetKeys := Map()
@@ -62,18 +59,6 @@ class AutomationDiagnosticSession {
             firstTargetProcessUse: firstTargetProcessUse,
             targetGeneration: generation
         }
-    }
-
-    static DetailedModeActive() {
-        return this.DiagnosticUntilTick > 0
-            && A_TickCount < this.DiagnosticUntilTick
-    }
-
-    static EnableDetailedMode(durationMs := 0) {
-        if durationMs <= 0
-            durationMs := AutomationDiagnosticDefaults.DiagnosticWindowMs
-        this.DiagnosticUntilTick := A_TickCount + durationMs
-        return this.DiagnosticUntilTick
     }
 }
 
@@ -137,24 +122,16 @@ class AutomationDiagnosticOperation {
         this.Stage("OPERATION_COMPLETED")
         this.Completed := true
         elapsedMs := A_TickCount - this.StartTick
-        detailed := this.FirstSessionUse
-            || this.FirstTargetProcessUse
-            || this.RecoveryAttempted
-            || automationResult != "COMPLETED"
-            || AutomationDiagnosticSession.DetailedModeActive()
-        summary := FormatAutomationDiagnosticSummary(
-            this,
-            automationResult,
-            resultCode,
-            elapsedMs,
-            detailed
-        )
-        lines := [summary]
-        if detailed {
-            for stage in this.Stages
-                lines.Push(FormatAutomationDiagnosticStage(this, stage))
-        }
-        return WriteAutomationDiagnosticLines(lines)
+        ; Stage offsets live in the single summary line; there is no separate
+        ; per-stage record or opt-in detailed mode.
+        return WriteAutomationDiagnosticLines([
+            FormatAutomationDiagnosticSummary(
+                this,
+                automationResult,
+                resultCode,
+                elapsedMs
+            )
+        ])
     }
 }
 
@@ -182,6 +159,34 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
         return viewerFields.Has(String(fieldName))
     }
     static allowedByAction := Map(
+        "ReportHotstring",
+        Map(
+            "report.measurementType", true,
+            "report.measurementState", true,
+            "report.requiresColorReset", true,
+            "report.redPath", true,
+            "report.writeCode", true,
+            "color.profileSource", true,
+            "color.preflightCode", true,
+            "color.preflightReason", true,
+            "color.preflightElapsedMs", true,
+            "color.exactAnchorQueryCount", true,
+            "color.exactAnchorCandidateCount", true,
+            "color.resultCode", true,
+            "color.failureReason", true,
+            "color.popupSampleCount", true,
+            "color.popupFirstReason", true,
+            "color.resetToArrowMs", true,
+            "color.arrowToBlackMs", true,
+            "color.blackToReturnMs", true,
+            "color.resetElapsedMs", true,
+            "color.mouseRestored", true,
+            "color.menuAfterWrite", true,
+            "color.menuProbeReason", true,
+            "color.menuProbeDelayMs", true,
+            "color.menuProbeCount", true,
+            "color.clipboardRestored", true
+        ),
         "ReportImageCaption",
         Map(
             "caption.capturePath", true,
@@ -210,8 +215,7 @@ FormatAutomationDiagnosticSummary(
     operation,
     automationResult,
     resultCode,
-    elapsedMs,
-    detailed
+    elapsedMs
 ) {
     fields := [
         "schema=" AutomationDiagnosticDefaults.SchemaVersion,
@@ -229,7 +233,7 @@ FormatAutomationDiagnosticSummary(
         "firstTargetProcessUse=" AutomationDiagnosticBoolean(operation.FirstTargetProcessUse),
         "targetGeneration=" AutomationDiagnosticSafeValue(operation.TargetGeneration),
         "cacheHit=" AutomationDiagnosticBoolean(operation.CacheHit),
-        "detailedTrace=" AutomationDiagnosticBoolean(detailed),
+        "recoveryAttempted=" AutomationDiagnosticBoolean(operation.RecoveryAttempted),
         "stages=" AutomationDiagnosticStageList(operation.Stages),
         "elapsedMs=" AutomationDiagnosticSafeValue(elapsedMs)
     ]
@@ -238,24 +242,13 @@ FormatAutomationDiagnosticSummary(
     return JoinAutomationDiagnosticFields(fields)
 }
 
-FormatAutomationDiagnosticStage(operation, stage) {
-    return JoinAutomationDiagnosticFields([
-        "schema=" AutomationDiagnosticDefaults.SchemaVersion,
-        "recordType=stage-event",
-        "timestamp=" AutomationDiagnosticSafeValue(operation.StartTimestamp),
-        "sessionId=" AutomationDiagnosticSafeValue(operation.SessionId),
-        "operationId=" AutomationDiagnosticSafeValue(operation.OperationId),
-        "action=" AutomationDiagnosticSafeValue(operation.Action),
-        "stage=" AutomationDiagnosticSafeValue(stage.name),
-        "tickOffsetMs=" AutomationDiagnosticSafeValue(stage.tickOffsetMs)
-    ])
-}
-
 AutomationDiagnosticStageList(stages) {
+    ; NAME@offsetMs, so a single summary line carries the whole timeline.
     output := ""
     for stage in stages
         output .= (output = "" ? "" : ">")
             . AutomationDiagnosticSafeValue(stage.name)
+            . "@" AutomationDiagnosticSafeValue(stage.tickOffsetMs)
     return output
 }
 
@@ -306,11 +299,6 @@ AutomationDiagnosticSafeLine(line) {
     return StrReplace(StrReplace(String(line), "`r", ""), "`n", " ")
 }
 
-EnableAutomationDiagnosticsForTenMinutes(*) {
-    AutomationDiagnosticSession.EnableDetailedMode()
-    Flash("详细诊断已开启 10 分钟，重启后自动关闭", 1800)
-}
-
 CopyAutomationDiagnosticInformation(*) {
     snapshot := BuildAutomationDiagnosticSnapshot()
     try {
@@ -324,7 +312,7 @@ CopyAutomationDiagnosticInformation(*) {
     return false
 }
 
-BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", colorFailureLogPath := "") {
+BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "") {
     AutomationDiagnosticSession.EnsureStarted()
     if logPath = "" {
         try logPath := DefaultAutomationDiagnosticLogPath()
@@ -344,30 +332,15 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", col
         viewerFailureLogPath,
         AutomationDiagnosticDefaults.SnapshotScanLineCount
     )
-    if colorFailureLogPath = "" {
-        try colorFailureLogPath := DefaultMedExColorResetFailureLogPath()
-        catch
-            colorFailureLogPath := ""
-    }
-    colorEvent := FindRecentColorResetFailureEvent(
-        ReadRecentAutomationDiagnosticLines(
-            colorFailureLogPath,
-            AutomationDiagnosticDefaults.SnapshotScanLineCount
-        )
-    )
     automationEvent := FindRecentAutomationDiagnosticEvent(recentLines)
     viewerEvent := FindRecentViewerFailureEvent(recentViewerFailures)
     recentEvent := NewerAutomationDiagnosticEvent(
         automationEvent,
         viewerEvent
     )
-    recentEvent := NewerAutomationDiagnosticEvent(recentEvent, colorEvent)
     recentAction := recentEvent.action
     recommendation := AutomationDiagnosticRecommendation(recentAction)
-    snapshotEvents := SelectAutomationDiagnosticSnapshotLines(
-        recentLines,
-        recentAction
-    )
+    snapshotEvents := SelectAutomationDiagnosticSnapshotLines(recentLines)
     snapshotViewerFailures := SelectViewerFailureSnapshotLines(
         recentViewerFailures,
         recommendation
@@ -382,9 +355,10 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", col
         "A_AhkVersion=" AutomationDiagnosticSafeValue(A_AhkVersion),
         "A_PtrSize=" AutomationDiagnosticSafeValue(A_PtrSize),
         "A_ScreenDPI=" AutomationDiagnosticSafeValue(A_ScreenDPI),
+        "PrimaryScreen=" A_ScreenWidth "x" A_ScreenHeight,
         "VirtualScreen=" SysGet(76) "," SysGet(77) ","
             SysGet(78) "," SysGet(79),
-        "DetailedModeActive=" AutomationDiagnosticBoolean(AutomationDiagnosticSession.DetailedModeActive()),
+        "Monitors=" AutomationDiagnosticMonitorList(),
         "RecentEventSource=" AutomationDiagnosticSafeValue(recentEvent.source),
         "RecentEventTimestamp=" AutomationDiagnosticSafeValue(recentEvent.timestamp),
         "RecentRelevantAction=" AutomationDiagnosticSafeValue(recentAction),
@@ -403,11 +377,6 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", col
     for line in snapshotViewerFailures
         lines.Push(line)
     lines.Push("RecentViewerFailuresEnd")
-    if recentEvent.source = "COLOR_RESET_FAILURE" {
-        lines.Push("RecentColorResetFailureBegin")
-        lines.Push(colorEvent.summary)
-        lines.Push("RecentColorResetFailureEnd")
-    }
     ; Montage checkpoints are independent of the latest screenshot/action.
     ; Keep only this assistant session so old runs cannot masquerade as new.
     lines.Push("RecentMontageProgressBegin")
@@ -428,33 +397,14 @@ BuildAutomationDiagnosticSnapshot(logPath := "", viewerFailureLogPath := "", col
     return output
 }
 
-SelectAutomationDiagnosticSnapshotLines(lines, recentAction) {
-    if recentAction != "ReportImageCaption" {
-        matches := []
-        for line in lines {
-            action := AutomationDiagnosticLineField(line, "action", "NONE")
-            if recentAction = "NONE" || action = recentAction
-                matches.Push(line)
-        }
-        output := []
-        startIndex := Max(
-            1,
-            matches.Length
-                - AutomationDiagnosticDefaults.SnapshotDetailedEventCount
-                + 1
-        )
-        Loop matches.Length - startIndex + 1
-            output.Push(matches[startIndex + A_Index - 1])
-        return output
-    }
-
+; Recent summaries of every action, in time order, plus older failures.
+; Not filtered by action: a hotstring's own measurement failure is logged
+; after the hotstring started and would otherwise hide its summary.
+SelectAutomationDiagnosticSnapshotLines(lines) {
     summaries := []
     failureKeys := Map()
     for line in lines {
         if !InStr(line, "recordType=operation-summary")
-            continue
-        action := AutomationDiagnosticLineField(line, "action", "NONE")
-        if recentAction != "NONE" && action != recentAction
             continue
         summaries.Push(line)
         if AutomationDiagnosticLineField(
@@ -658,10 +608,6 @@ ReadRecentAutomationDiagnosticLines(logPath, maxLines) {
     return output
 }
 
-FindRecentAutomationDiagnosticAction(lines) {
-    return FindRecentAutomationDiagnosticEvent(lines).action
-}
-
 FindRecentAutomationDiagnosticEvent(lines) {
     Loop lines.Length {
         line := lines[lines.Length - A_Index + 1]
@@ -694,40 +640,6 @@ FindRecentViewerFailureEvent(lines) {
     return {action: "NONE", timestamp: "", source: "NONE"}
 }
 
-FindRecentColorResetFailureEvent(lines) {
-    Loop lines.Length {
-        line := lines[lines.Length - A_Index + 1]
-        if ColorResetDiagnosticLineField(line, "action") != "MedExColorReset"
-            continue
-        timestamp := ColorResetDiagnosticLineField(line, "timestamp")
-        if timestamp = ""
-            continue
-        summary := "action=MedExColorReset"
-        ; The legacy log uses spaces, not pipes. Copy only useful metadata,
-        ; never the raw legacy line or unrelated historical failures.
-        for field in ["timestamp", "resultCode", "preflightStage",
-            "readinessReason", "readinessElapsedMs", "anchorRootMaxMs", "anchorQueryMaxMs", "exactAnchorQueryCount",
-            "exactAnchorCandidateCount", "foregroundGuardReason"] {
-            value := ColorResetDiagnosticLineField(line, field)
-            if value != "" && value != "UNKNOWN"
-                summary .= "|" field "=" AutomationDiagnosticSafeValue(value)
-        }
-        return {
-            action: "MedExColorReset",
-            timestamp: timestamp,
-            source: "COLOR_RESET_FAILURE",
-            summary: summary
-        }
-    }
-    return {action: "NONE", timestamp: "", source: "NONE", summary: ""}
-}
-
-ColorResetDiagnosticLineField(line, fieldName) {
-    if RegExMatch(line, "(?:^|\s)" fieldName "=([^\s]*)", &match)
-        return match[1]
-    return ""
-}
-
 NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {
     if viewerEvent.timestamp != ""
         && (automationEvent.timestamp = ""
@@ -747,9 +659,23 @@ AutomationDiagnosticLineField(line, fieldName, fallback := "") {
     return fallback
 }
 
+AutomationDiagnosticMonitorList() {
+    ; count=N;primary=P;l,t,r,b;... Screen geometry only, no window data.
+    try {
+        output := "count=" MonitorGetCount() ";primary=" MonitorGetPrimary()
+        Loop MonitorGetCount() {
+            MonitorGet(A_Index, &left, &top, &right, &bottom)
+            output .= ";" left "," top "," right "," bottom
+        }
+    } catch {
+        output := "UNKNOWN"
+    }
+    return AutomationDiagnosticSafeValue(output)
+}
+
 AutomationDiagnosticRecommendation(action) {
-    if action = "MedExColorReset"
-        return "REPORT_COLOR_RESET"
+    if action = "ReportHotstring"
+        return "REPORT_HOTSTRING"
     if action = "ReportImageCaption"
         return "REPORT_IMAGE_CAPTION"
     if InStr(action, "Viewer")

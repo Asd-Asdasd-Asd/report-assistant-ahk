@@ -72,7 +72,7 @@ class MachineCalibrationTests(unittest.TestCase):
     def test_red_reset_preflight_runs_before_any_text(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
         body = hotstrings.split(
-            "ExecuteReportTemplatePlan(plan, expectedReportHwnd)", 1
+            "ExecuteReportTemplatePlan(plan, expectedReportHwnd, trace := 0)", 1
         )[1].split("\n}\n\nMakeReportTemplateWriteResult", 1)[0]
         self.assertLess(body.index("PrepareMedExRedReset()"), body.index("SendConfiguredReportText"))
         self.assertIn("if !resetReadiness.ok", body)
@@ -119,17 +119,22 @@ class MachineCalibrationTests(unittest.TestCase):
         self.assertIn("ShowMedExRedResetPreflightStopped(", feedback)
 
     def test_preflight_diagnostic_contains_only_bounded_readiness_metadata(self) -> None:
-        diagnostics = source("src/diagnostics.ahk")
+        calibration = source("src/medex_calibration.ahk")
+        readiness = calibration.split(
+            "MakeMedExRedResetReadiness(result, options, profileSource) {", 1
+        )[1].split("\n}\n", 1)[0]
         for field in (
-            "preflightStage",
-            "readinessReason",
-            "uiaActivationAttempted",
-            "uiaRootReacquireCount",
-            "exactAnchorQueryCount",
-            "exactAnchorCandidateCount",
-            "readinessElapsedMs",
+            "color.profileSource",
+            "color.preflightCode",
+            "color.preflightReason",
+            "color.preflightElapsedMs",
+            "color.exactAnchorQueryCount",
+            "color.exactAnchorCandidateCount",
         ):
-            self.assertIn(f'"{field}="', diagnostics)
+            self.assertIn(f'"{field}"', readiness)
+        self.assertNotIn("windowElement", readiness)
+        self.assertNotIn("textAnchors", readiness)
+        self.assertNotIn("WriteMedExColorResetFailureDiagnostic", calibration)
 
     def test_calibration_hotkeys_are_suspendable_and_escape_is_scoped(self) -> None:
         main = source("src/main.ahk")

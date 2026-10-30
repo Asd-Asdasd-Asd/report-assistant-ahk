@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Record every template hotstring as a `ReportHotstring` operation in
+  `automation-events.log`, successes included: preflight, color-reset result,
+  arrow/black click timing, popup sample count, and a post-write observation
+  of whether the color menu is still open (`COLOR_MENU_LEFT_OPEN`, no
+  corrective action). Snapshot adds primary screen and monitor geometry.
+- Remove the unrotated `%TEMP%` color-reset failure log and its parser, the
+  separate `stage-event` records (offsets are now inline in `stages=`), the
+  10-minute detailed-diagnostics tray item, and per-action snapshot filtering.
 - Add `src/core/win32_window.ahk` and `src/core/log_file.ahk`; route window
   queries, foreground-process checks and diagnostic log rotation through them
   instead of per-module copies. Behaviour is unchanged; Windows regression

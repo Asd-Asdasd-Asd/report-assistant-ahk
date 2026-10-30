@@ -34,7 +34,7 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
     def test_plain_text_precedes_fixed_red_marker_insertion(self) -> None:
         hotstrings = source("src/hotstrings.ahk")
         dispatcher = hotstrings.split(
-            "ExecuteReportTemplatePlan(plan, expectedReportHwnd)", 1
+            "ExecuteReportTemplatePlan(plan, expectedReportHwnd, trace := 0)", 1
         )[1].split(
             "\n}\n\nMakeReportTemplateWriteResult", 1
         )[0]
@@ -411,27 +411,45 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
         self.assertNotIn('diagnosticMode = "production"', reset)
         self.assertNotIn("FormatMedExFieldDebugResult", reset)
 
-    def test_production_logs_only_lightweight_failures_by_default(self) -> None:
+    def test_production_results_go_to_report_hotstring_operation(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")
         diagnostics = source("src/diagnostics.ahk")
-        self.assertIn('diagnosticMode = "production" && !ok', adapter)
-        self.assertIn("WriteMedExColorResetFailureDiagnostic", adapter)
-        lightweight = function_body(
-            diagnostics,
-            "FormatMedExColorResetFailureLogLine",
-            "FormatMedExColorResetLogLine",
+        hotstrings = source("src/hotstrings.ahk")
+        self.assertNotIn('diagnosticMode = "production" && !ok', adapter)
+        for text in (adapter, diagnostics):
+            self.assertNotIn("WriteMedExColorResetFailureDiagnostic", text)
+            self.assertNotIn("medex-color-reset-failures.log", text)
+        self.assertIn('BeginAutomationDiagnosticOperation("ReportHotstring")', hotstrings)
+        self.assertIn("finally operation.Complete(", hotstrings)
+        fields = hotstrings.split(
+            "ReportColorResetDiagnosticFields(resetResult, performanceContext := 0) {", 1
+        )[1].split("\n}\n", 1)[0]
+        self.assertIn('"color.arrowToBlackMs"', fields)
+        for forbidden in ("arrowPoint", "blackPoint", "Samples", "clientRect"):
+            self.assertNotIn(forbidden, fields)
+
+    def test_menu_probe_is_observation_only(self) -> None:
+        adapter = source("src/adapters/medex_report_editor.ahk")
+        probe = adapter.split(
+            "ProbeMedExColorMenuAfterReset(resetResult, options, expectedHwnd,", 1
+        )[1].split("\nFinishMedExColorReset(", 1)[0]
+        self.assertIn("SampleAndEvaluateCandidateGPopupSignature", probe)
+        self.assertIn("MedExForegroundWindowMatches(expectedHwnd)", probe)
+        self.assertIn("Loop 2", probe)
+        self.assertIsNone(
+            re.search(r"^\s*(Click|Send\w*|MouseMove|ControlClick)\b", probe, re.M)
         )
-        self.assertIn('"appVersion="', lightweight)
-        self.assertIn('"resultCode="', lightweight)
-        self.assertIn('"medExVersion="', lightweight)
-        self.assertIn('"calibratedMedExVersion="', lightweight)
-        self.assertIn('"medExVersionMatchState="', lightweight)
-        self.assertIn('"candidateGProfileName="', lightweight)
-        self.assertIn('"horizontalGeometryPolicy="', lightweight)
-        self.assertIn('"regionAnchorScreenX="', lightweight)
-        self.assertIn('"regionAnchorClientX="', lightweight)
-        for heavy_field in ("uiaRootRect", "regionAnchorRect", "fontSizeAnchorRect", "calculatedScreenPoint"):
-            self.assertNotIn(heavy_field, lightweight)
+        self.assertNotIn("{Esc}", probe)
+        hotstrings = source("src/hotstrings.ahk")
+        observed = hotstrings.split("RunObservedReportHotstring(entry, operation) {", 1)[1]
+        self.assertLess(
+            observed.index("RecordReportHotstringColorDiagnostics("),
+            observed.index("MxNMAnnotationCleaner.DeleteAll("),
+        )
+        self.assertIn('"COLOR_MENU_LEFT_OPEN"', observed)
+
+    def test_field_debug_formatter_remains_for_field_tools(self) -> None:
+        diagnostics = source("src/diagnostics.ahk")
         self.assertIn("FormatMedExFieldDebugResult", diagnostics)
         self.assertIn('"RegionAnchorRect="', diagnostics)
 

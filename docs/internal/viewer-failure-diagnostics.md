@@ -78,4 +78,4 @@ F12、工具选择和快捷键清除现另接入 `automation-events.log`，动�
 
 现有 anchor readiness 轮询的上限由 400 ms 改为 1500 ms，轮询间隔保持 40 ms；锚点一旦出现立即返回，前台变化仍立即取消。没有增加文字/点击重放、独立冷启动状态机或固定 1.5 秒 Sleep。这个上限属于修复候选，仍需 Windows 首次操作验收。
 
-托盘快照现在也读取 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log`，与原有两类日志比较事件时间。当红字错误最新时，显示 `RecentEventSource=COLOR_RESET_FAILURE`、`RecentEventTimestamp` 和一条字段白名单摘要，推荐项为 `REPORT_COLOR_RESET`；不复制整段旧日志，也不把历史 Caption 成功当作本次结果。原始日志不迁移、不删除。
+托盘快照曾读取 `%TEMP%\MedExAHK\logs\medex-color-reset-failures.log`。2026-10-30 起该文件不再写入或读取，预检与颜色恢复结果（含成功）改记在 `automation-events.log` 的 `action=ReportHotstring` summary 中，见 `automation-diagnostics.md` Milestone C。

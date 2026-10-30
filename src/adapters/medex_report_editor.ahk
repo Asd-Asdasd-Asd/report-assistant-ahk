@@ -24,6 +24,9 @@ class MedExColorResetDefaults {
     static EnableFontAnchorRetry := false
     static FontAnchorRetryDelayMs := 20
 
+    ; Diagnostic probe only: a popup still painted this long after the black
+    ; click is reported as left open. The probe never clicks or sends keys.
+    static MenuProbeSettleMs := 400
 }
 
 ResetMedExInsertionColor(options := 0) {
@@ -1037,6 +1040,52 @@ CollectMedExEnvironmentContext(hwnd, context) {
     }
 }
 
+; Diagnostic only. After a relative-mouse reset that sent the black click,
+; report whether the color popup signature is still on screen. A first match
+; may be a closing animation, so it is re-sampled once after the settle time.
+ProbeMedExColorMenuAfterReset(resetResult, options, expectedHwnd,
+    performanceContext := 0) {
+    probe := Map("state", "NOT_CLICKED", "reason", "", "delayMs", "", "count", 0)
+    context := IsObject(resetResult) && resetResult.HasOwnProp("context")
+        ? resetResult.context
+        : 0
+    if !MedExContextValue(context, "blackClickSent", false)
+        return probe
+    arrowPoint := MedExContextValue(context, "arrowPoint", 0)
+    if Type(arrowPoint) != "Map" {
+        probe["state"] := "UNKNOWN"
+        probe["reason"] := "arrowPointUnavailable"
+        return probe
+    }
+    blackTick := PerformanceTimestampValue(performanceContext, "BlackClickSentMs")
+    settleMs := MedExColorResetDefaults.MenuProbeSettleMs
+    Loop 2 {
+        if !MedExForegroundWindowMatches(expectedHwnd) {
+            probe["state"] := "UNKNOWN"
+            probe["reason"] := "foregroundChanged"
+            return probe
+        }
+        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
+        probe["count"] := A_Index
+        if IsNumber(blackTick)
+            probe["delayMs"] := A_TickCount - blackTick
+        probe["reason"] := signature["reason"]
+        if !signature["matched"] {
+            probe["state"] := "CLOSED"
+            return probe
+        }
+        probe["state"] := "OPEN"
+        if A_Index = 1 {
+            remainingMs := IsNumber(blackTick)
+                ? settleMs - (A_TickCount - blackTick)
+                : settleMs
+            if remainingMs > 0
+                Sleep Min(remainingMs, settleMs)
+        }
+    }
+    return probe
+}
+
 FinishMedExColorReset(ok, code, context, startedAt, options) {
     context["elapsedMs"] := A_TickCount - startedAt
     performanceContext := MedExAdapterOption(options, "performanceContext", 0)
@@ -1051,15 +1100,9 @@ FinishMedExColorReset(ok, code, context, startedAt, options) {
             context["diagnosticWriteFailed"] := true
             context["diagnosticErrorType"] := Type(err)
         }
-    } else if diagnosticMode = "production" && !ok {
-        try {
-            logPath := MedExAdapterOption(options, "logPath", "")
-            context["logPath"] := WriteMedExColorResetFailureDiagnostic(result, logPath)
-        } catch as err {
-            context["diagnosticWriteFailed"] := true
-            context["diagnosticErrorType"] := Type(err)
-        }
     }
+    ; Production results are recorded by the calling ReportHotstring
+    ; operation in automation-events.log, successes included.
     return result
 }
 

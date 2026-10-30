@@ -173,8 +173,12 @@
 - [ ] 托盘“复制诊断信息”同时包含最近 Caption operation 和 Viewer failure，按两者
   时间选择 `RecentEventSource` 与 `RecommendedDiagnostic`；不包含所选文字、报告内容、
   患者信息或窗口标题。
-- [ ] 托盘“开启 10 分钟详细诊断”立即使后续成功操作输出 stage trace；重启后自动
-  关闭，不修改 config.ini。
+- [ ] 输入一次需要恢复颜色的快捷语（如 `;fzg`）后复制诊断信息：`RecentEvents`
+  有一条 `action=ReportHotstring`，含 `stages=…@ms`、`color.arrowToBlackMs`、
+  `color.popupSampleCount` 和 `color.menuAfterWrite`；菜单正常收起时为 `CLOSED`。
+  菜单残留时该条为 `automationResult=DEGRADED|resultCode=COLOR_MENU_LEFT_OPEN`，
+  程序不做任何补救点击或按键。
+- [ ] 快照含 `PrimaryScreen=`、`Monitors=`，不含报告正文、像素采样值或窗口标题。
 - [ ] 使用非临床测试文字运行
   `tests/windows/report_image_caption_migration_diagnostic.ahk`，按说明依次采集
   source selection、caption input point 和 image wheel point。
