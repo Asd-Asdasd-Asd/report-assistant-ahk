@@ -1,9 +1,9 @@
 ; Generated file. Edit src/*.ahk instead.
-; Application version: 0.8.0
-; Source revision: 0354c52514124c531bd68e849c8c95b893b2a4fe
-; Generated at: 2026-10-30 15:11:30 UTC
-;@Ahk2Exe-SetFileVersion 0.8.0.0
-;@Ahk2Exe-SetProductVersion 0.8.0
+; Application version: 0.9.0
+; Source revision: dc983e97350ba55a5341ec6df751a51a83f61808
+; Generated at: 2026-11-10 03:56:47 UTC
+;@Ahk2Exe-SetFileVersion 0.9.0.0
+;@Ahk2Exe-SetProductVersion 0.9.0
 ;@Ahk2Exe-SetName MedEx Report Assistant
 
 #Requires AutoHotkey v2.0
@@ -12,10 +12,10 @@
 
 ; --- BEGIN app_metadata.ahk ---
 class AppMetadata {
-    static Version := "0.8.0"
+    static Version := "0.9.0"
     static Channel := "internal-test"
-    static BuildDate := "2026-10-30"
-    static SourceRevision := "0354c52514124c531bd68e849c8c95b893b2a4fe"
+    static BuildDate := "2026-11-10"
+    static SourceRevision := "dc983e97350ba55a5341ec6df751a51a83f61808"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -252,7 +252,7 @@ BeginAutomationDiagnosticOperation(action) {
 }
 
 AutomationDiagnosticFieldAllowed(action, fieldName) {
-    if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" {
+    if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" || action = "ViewerCover" {
         static viewerFields := Map(
             "viewer.command", true,
             "viewer.foregroundHwnd", true,
@@ -20282,6 +20282,11 @@ class MxNMMontageDefaults {
     static BodyChordKey := "BodyChord"
     static HeadChordKey := "HeadChord"
     static LungChordKey := "LungChord"
+    static CoverEnabledKey := "CoverEnabled"
+    static CoverChordKey := "CoverChord"
+    static CoverChordDefault := "^#+c"
+    static CoverLayoutRowKey := "CoverLayoutRow"
+    static CoverLayoutColumnKey := "CoverLayoutColumn"
     static EnabledDefault := "false"
     static LayoutRowDefault := "4"
     static LayoutColumnDefault := "4"
@@ -20296,7 +20301,11 @@ class MxNMMontageDefaults {
             ManagedConfigEntry(this.Section, this.LayoutColumnKey, this.LayoutColumnDefault),
             ManagedConfigEntry(this.Section, this.BodyChordKey, this.BodyChordDefault),
             ManagedConfigEntry(this.Section, this.HeadChordKey, this.HeadChordDefault),
-            ManagedConfigEntry(this.Section, this.LungChordKey, this.LungChordDefault)
+            ManagedConfigEntry(this.Section, this.LungChordKey, this.LungChordDefault),
+            ManagedConfigEntry(this.Section, this.CoverEnabledKey, "false"),
+            ManagedConfigEntry(this.Section, this.CoverChordKey, this.CoverChordDefault),
+            ManagedConfigEntry(this.Section, this.CoverLayoutRowKey, "2"),
+            ManagedConfigEntry(this.Section, this.CoverLayoutColumnKey, "3")
         ]
         for profile in MxNMMontageProfileDefaults() {
             defaults.Push(ManagedConfigEntry(this.Section, profile.ThicknessKey, profile.Thickness))
@@ -20386,7 +20395,7 @@ MxNMMontageProfileDefaults() {
 }
 
 LoadMxNMMontageSettings(configPath := "") {
-    settings := {ok: false, enabled: false, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, chords: Map(), profiles: Map()}
+    settings := {ok: false, enabled: false, coverEnabled: false, coverChord: MxNMMontageDefaults.CoverChordDefault, coverLayoutRow: 2, coverLayoutColumn: 3, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, chords: Map(), profiles: Map()}
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
         catch
@@ -20398,6 +20407,10 @@ LoadMxNMMontageSettings(configPath := "") {
         if IniRead(configPath, "Config", "SchemaVersion", "") != String(ReportAssistantConfigDefaults.SchemaVersion)
             return settings
         settings.enabled := ParseOptionalFeatureEnabled(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.EnabledKey, MxNMMontageDefaults.EnabledDefault))
+        settings.coverEnabled := ParseOptionalFeatureEnabled(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverEnabledKey, "false"))
+        settings.coverChord := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverChordKey, MxNMMontageDefaults.CoverChordDefault))
+        settings.coverLayoutRow := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverLayoutRowKey, "2"), 1, 5)
+        settings.coverLayoutColumn := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverLayoutColumnKey, "3"), 1, 4)
         settings.layoutRow := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutRowKey, MxNMMontageDefaults.LayoutRowDefault), 1, 5)
         settings.layoutColumn := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutColumnKey, MxNMMontageDefaults.LayoutColumnDefault), 1, 4)
         settings.chords["body"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.BodyChordKey, MxNMMontageDefaults.BodyChordDefault))
@@ -20445,7 +20458,7 @@ MxNMMontageDecimal(value, minimum, maximum) {
 ValidateMxNMMontageSettings(settings, featureSettings := 0) {
     if !IsObject(settings) || !settings.ok {
         return MakeViewerToolHotkeyValidation(
-            false, "MontageConfig", "Montage Beta 配置无法读取。"
+            false, "MontageConfig", "排版配置无法读取。"
         )
     }
     if settings.layoutRow < 1 || settings.layoutRow > 5 {
@@ -20458,9 +20471,10 @@ ValidateMxNMMontageSettings(settings, featureSettings := 0) {
             false, "MontageLayoutColumn", "Montage 布局列数必须为 1–4。"
         )
     }
-    if !settings.enabled
-        return MakeViewerToolHotkeyValidation(true)
-
+    if settings.coverLayoutRow < 1 || settings.coverLayoutRow > 5
+        return MakeViewerToolHotkeyValidation(false, "CoverLayoutRow", "封面图布局行数必须为 1–5。")
+    if settings.coverLayoutColumn < 1 || settings.coverLayoutColumn > 4
+        return MakeViewerToolHotkeyValidation(false, "CoverLayoutColumn", "封面图布局列数必须为 1–4。")
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
     if IsObject(featureSettings) {
         for definition in [
@@ -20475,16 +20489,19 @@ ValidateMxNMMontageSettings(settings, featureSettings := 0) {
                 seen[NormalizeHotkeyChord(definition.chord)] := true
         }
     }
-    for definition in [
+    definitions := settings.enabled ? [
         {id: "body", field: "MontageBodyChord", label: "Body 排版"},
         {id: "head", field: "MontageHeadChord", label: "Head 排版"},
         {id: "lung", field: "MontageLungChord", label: "Lung 排版"}
-    ] {
-        chord := NormalizeOptionalHotkeyChord(settings.chords[definition.id])
+    ] : []
+    if settings.HasOwnProp("coverEnabled") && settings.coverEnabled
+        definitions.Push({id: "cover", field: "CoverChord", label: "封面图", chord: settings.coverChord})
+    for definition in definitions {
+        chord := NormalizeOptionalHotkeyChord(definition.HasOwnProp("chord") ? definition.chord : settings.chords[definition.id])
         if chord = "" || InStr(chord, Chr(13)) || InStr(chord, Chr(10))
             return MakeViewerToolHotkeyValidation(
                 false, definition.field,
-                "启用 Montage Beta 前必须设置“" definition.label "”快捷键。"
+                "启用前必须设置“" definition.label "”快捷键。"
             )
         if !ViewerToolHotkeyChordIsSafe(chord)
             return MakeViewerToolHotkeyValidation(
@@ -20506,6 +20523,10 @@ MxNMMontageSettingsMatch(expected, actual) {
     if !IsObject(expected) || !IsObject(actual)
         return false
     return expected.enabled = actual.enabled
+        && expected.coverEnabled = actual.coverEnabled
+        && expected.coverChord = actual.coverChord
+        && expected.coverLayoutRow = actual.coverLayoutRow
+        && expected.coverLayoutColumn = actual.coverLayoutColumn
         && expected.layoutRow = actual.layoutRow
         && expected.layoutColumn = actual.layoutColumn
         && expected.chords["body"] = actual.chords["body"]
@@ -20524,6 +20545,8 @@ MxNMMontageHotkeyDefinitions(settings) {
 InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
     static busy := false
     if busy || !settings.ok || !settings.profiles.Has(profileId)
+        return
+    if !MxNMViewerWorkflowLock.Acquire()
         return
     busy := true
     startedAt := A_TickCount
@@ -20568,6 +20591,22 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
         Flash("Montage 执行异常，已记录停止阶段；请复制诊断信息。", 2200)
     } finally {
         busy := false
+        MxNMViewerWorkflowLock.Release()
+    }
+}
+
+; Shared by Montage and cover export. A second workflow must never interrupt
+; a partially dispatched save sequence.
+class MxNMViewerWorkflowLock {
+    static Busy := false
+    static Acquire() {
+        if this.Busy
+            return false
+        this.Busy := true
+        return true
+    }
+    static Release() {
+        this.Busy := false
     }
 }
 
@@ -20742,6 +20781,8 @@ MxNMMontageStaticClick(controlId, className, xRatio, yRatio, effectId, effectCla
     x := rect.l + Round(width * xRatio), y := rect.t + Round(height * yRatio)
     if MxNMMontageWindowFromPoint(x, y) != resolved.hwnd
         return MxNMMontageResult(false, "POINT_HWND_MISMATCH")
+    if !MxNMMontageViewerStillActive(session)
+        return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED")
     if !MxNMMontagePhysicalClick(x, y)
         return MxNMMontageResult(false, "STATIC_PHYSICAL_CLICK_FAILED")
     if effectId {
@@ -21295,6 +21336,311 @@ MxNMMontageFailureMessage(code) {
 }
 
 ; --- END mxnm_montage.ahk ---
+
+; --- BEGIN mxnm_cover.ahk ---
+; Cover workflow, field profile R2C3: bottom-right MIP -> report left,
+; bottom-left coronal fusion -> reset slice -> report right.
+; Reuses Montage transports, never its thickness/zoom/null-caption workflow.
+MxNMCoverHotkeyDefinitions(settings) {
+    return [HotkeyDefinition("viewer-cover", settings.coverChord,
+        InvokeMxNMCoverHotkey.Bind(settings.coverChord, settings))]
+}
+
+InvokeMxNMCoverHotkey(chord, settings, *) {
+    operation := BeginAutomationDiagnosticOperation("ViewerCover")
+    operation.SetField("viewer.command", "cover")
+    operation.SetField("viewer.effectState", "UNOBSERVABLE")
+    if !MxNMViewerWorkflowLock.Acquire() {
+        operation.Complete("CANCELLED", "BUSY")
+        return
+    }
+    saved := false
+    mouseSaved := false
+    result := {ok: false, code: "UNEXPECTED_ERROR"}
+    try {
+        CoordMode "Mouse", "Screen"
+        MouseGetPos &mouseX, &mouseY
+        mouseSaved := true
+        foreground := WinExist("A")
+        operation.SetField("viewer.foregroundHwnd", foreground)
+        release := WaitMxNMViewerHotkeyRelease(chord, foreground)
+        if release != "RELEASED" {
+            result := {ok: false, code: release}
+        } else {
+            session := MxNMMontageCreateSession(foreground)
+            if !session.ok {
+                result := session
+            } else {
+                ; Preserve even an incidental clipboard change made by Viewer.
+                payload := ClipboardAll()
+                saved := true
+                session.operation := operation
+                session.coverLayoutRow := settings.coverLayoutRow
+                session.coverLayoutColumn := settings.coverLayoutColumn
+                result := MxNMCoverRun(session)
+            }
+        }
+    } catch as err {
+        operation.SetField("viewer.errorType", Type(err))
+        result := {ok: false, code: "UNEXPECTED_ERROR"}
+    } finally {
+        if saved {
+            try A_Clipboard := payload
+            catch
+                result := {ok: false, code: "CLIPBOARD_RESTORE_FAILED"}
+        }
+        if mouseSaved {
+            try MouseMove mouseX, mouseY, 0
+            catch
+                result := {ok: false, code: "MOUSE_RESTORE_FAILED"}
+        }
+        MxNMViewerWorkflowLock.Release()
+        operation.Complete(result.ok ? "COMPLETED" : "FAILED", result.code)
+    }
+    if result.ok
+        Flash("封面图左右保存指令已执行，请检查报告草稿。", 2400)
+    else
+        Flash("封面图已停止（" result.code "）。请先检查草稿，避免重复保存；可复制诊断信息。", 3500)
+}
+
+; Injectable transport lets Windows regressions exercise the actual stop/order
+; decisions without clicking Viewer, saving reports, or touching clipboard.
+MxNMCoverRun(session, transport := 0) {
+    if !IsObject(transport)
+        transport := MxNMCoverTransport()
+    steps := ["PREFLIGHT", "SELECT_LAYOUT", "ANNOTATION_TAB", "CAPTION_DEFAULT",
+        "BIND_SURFACE", "SELECT_MIP", "SAVE_LEFT", "SELECT_FUSION",
+        "RESET_DEFAULT", "SAVE_RIGHT"]
+    leftDispatched := false
+    for step in steps {
+        if session.HasOwnProp("operation")
+            session.operation.Stage(step)
+        result := transport.Execute(step, session)
+        if !result.ok {
+            result.stage := step
+            result.leftSaveDispatched := leftDispatched
+            return result
+        }
+        if step = "SAVE_LEFT"
+            leftDispatched := true
+    }
+    return {ok: true, code: "SAVE_COMMANDS_DISPATCHED", leftSaveDispatched: true}
+}
+
+class MxNMCoverTransport {
+    Execute(step, session) {
+        if !MxNMMontageViewerStillActive(session)
+            return {ok: false, code: "VIEWER_FOREGROUND_CHANGED"}
+        if step = "PREFLIGHT"
+            return MxNMCoverPreflight(session)
+        if !MxNMCoverControlsUnchanged(session)
+            return {ok: false, code: "COVER_CONTROLS_CHANGED"}
+        if step = "SELECT_LAYOUT" {
+            point := MxNMMontageLayoutPoint(session.coverLayoutRow, session.coverLayoutColumn)
+            result := MxNMMontageStaticClick(21112, "Static", point.xRatio, point.yRatio, 0, "", 0, session)
+            if result.ok
+                Sleep MxNMMontageTiming.LayoutSettleMs
+            return result
+        }
+        if step = "ANNOTATION_TAB"
+            return MxNMMontageStaticClick(21007, "Static", .479866, .5, 21155, "ComboBox", 0, session)
+        if step = "CAPTION_DEFAULT"
+            return MxNMMontageComboSelect(21155, "default", session)
+        if step = "BIND_SURFACE" {
+            surface := MxNMCoverResolveSurface(session)
+            if session.HasOwnProp("operation") && surface.HasOwnProp("candidateCount")
+                session.operation.SetField("viewer.candidateCount", surface.candidateCount)
+            if surface.ok
+                session.coverSurface := surface
+            return surface
+        }
+        if !MxNMCoverSurfaceUnchanged(session)
+            return {ok: false, code: "COVER_SURFACE_CHANGED"}
+        if step = "SELECT_MIP" || step = "SELECT_FUSION"
+            return MxNMCoverSelectPane(session, step = "SELECT_MIP" ? .75 : .25)
+        if step != "SAVE_LEFT" && step != "SAVE_RIGHT" && step != "RESET_DEFAULT"
+            return {ok: false, code: "COVER_STEP_UNKNOWN"}
+        controlId := step = "SAVE_LEFT" ? 21104 : step = "SAVE_RIGHT" ? 21105 : 21102
+        result := MxNMCoverInvokeButton(controlId, session)
+        if result.ok {
+            ; No save-completion/slice-position signal was exposed in the probe.
+            ; Bounded settle is field-testable; never label this persistence proof.
+            Sleep step = "RESET_DEFAULT" ? 350 : 550
+            if session.HasOwnProp("operation")
+                session.operation.SetField("viewer.dispatchResult", step "_DISPATCHED")
+        }
+        return result
+    }
+}
+
+MxNMCoverPreflight(session) {
+    ; Bind config to this process, never newest-file/alternate-directory guessing.
+    try processPath := WinGetProcessPath("ahk_id " session.viewerHwnd)
+    catch
+        return {ok: false, code: "VIEWER_PATH_UNAVAILABLE"}
+    paths := ResolveMxNMConfigPathsFromProcessPath("MedExNMFusion.exe", processPath)
+    if !paths.ok
+        return {ok: false, code: "COVER_CONFIG_UNAVAILABLE"}
+    if !MxNMCoverLayoutSupported(paths.layoutConfigPath, session.coverLayoutRow, session.coverLayoutColumn)
+        return {ok: false, code: "COVER_LAYOUT_UNSUPPORTED"}
+    session.coverConfigPath := paths.layoutConfigPath
+    session.coverControls := Map()
+    for spec in [
+        {id: 21112, className: "Static"}, {id: 21007, className: "Static"},
+        {id: 21104, className: "Button"}, {id: 21102, className: "Button"},
+        {id: 21105, className: "Button"}
+    ] {
+        resolved := MxNMMontageResolveControl(session, spec.id, spec.className)
+        if !resolved.ok
+            return {ok: false, code: "COVER_CONTROL_NOT_UNIQUE"}
+        session.coverControls[spec.id] := {hwnd: resolved.hwnd, className: spec.className}
+    }
+    return {ok: true, code: "PREFLIGHT_READY"}
+}
+
+MxNMCoverControlsUnchanged(session) {
+    if !MxNMMontageViewerStillActive(session)
+        || !MxNMCoverLayoutSupported(session.coverConfigPath, session.coverLayoutRow, session.coverLayoutColumn)
+        return false
+    for id, control in session.coverControls {
+        resolved := MxNMMontageResolveControl(session, id, control.className)
+        if !resolved.ok || resolved.hwnd != control.hwnd
+            return false
+    }
+    return true
+}
+
+MxNMCoverLayoutSupported(path, row := 2, column := 3) {
+    ; First-page row-major layout matrix. Default R2C3 maps to ShowModel7.
+    ; Config confirms semantics, NOT the currently selected layout.
+    ; The layout selection still uses the validated Montage physical transport.
+    try {
+        if !MxNMMontagePositiveInteger(row, 1, 5) || !MxNMMontagePositiveInteger(column, 1, 4)
+            return false
+        section := "ShowModel" ((row - 1) * 4 + column)
+        if IniRead(path, section, "LowWndSize", "") != "4"
+            || IniRead(path, section, "ShowModelPage", "") != "0"
+            return false
+        panes := []
+        for index in [1, 2, 3, 4] {
+            pane := Map()
+            for key in ["Left", "Top", "Width", "Height", "ImageType", "ImageOrient", "ImageOrigin"] {
+                value := IniRead(path, section, "LowWnd" key "_" index, "")
+                if !RegExMatch(value, "^\d+$")
+                    return false
+                pane[key] := Integer(value)
+            }
+            panes.Push(pane)
+        }
+        return MxNMCoverFourPaneProfileMatches(panes)
+    } catch {
+        return false
+    }
+}
+
+MxNMCoverFourPaneProfileMatches(panes) {
+    if panes.Length != 4
+        return false
+    width := panes[1]["Width"], height := panes[1]["Height"]
+    if width < 20 || height < 20
+        return false
+    for index, pane in panes {
+        if pane["Left"] != (Mod(index - 1, 2) * width)
+            || pane["Top"] != ((index > 2 ? 1 : 0) * height)
+            || pane["Width"] != width || pane["Height"] != height
+            || pane["ImageType"] != [1, 2, 3, 1][index]
+            || pane["ImageOrient"] != 2
+            || pane["ImageOrigin"] != (index = 4 ? 2 : 1)
+            return false
+    }
+    return true
+}
+
+MxNMCoverResolveSurface(session) {
+    ; Owned drawing dialogs may extend over the root's non-client border.
+    ; Enclose their screen-space client rect in the root WINDOW rect, not its
+    ; inset client rect. No tolerance expansion or candidate ranking is used.
+    rootRect := Win32WindowRect(session.viewerRootOwner)
+    if !IsObject(rootRect)
+        return {ok: false, code: "COVER_ROOT_RECT_INVALID"}
+    identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
+    candidates := [], seen := Map()
+    callback := CallbackCreate(CollectMxNMContextSurfaceCandidate.Bind(identity, rootRect, seen, candidates), "Fast", 2)
+    try {
+        for topHwnd in MxNMMontageOwnerFamilyWindows(session) {
+            CollectMxNMContextSurfaceCandidate(identity, rootRect, seen, candidates, topHwnd)
+            DllCall("User32\EnumChildWindows", "Ptr", topHwnd, "Ptr", callback, "Ptr", 0, "Int")
+        }
+    } finally CallbackFree(callback)
+    return MxNMCoverChooseSurface(candidates, rootRect, session.viewerRootOwner)
+}
+
+MxNMCoverChooseSurface(candidates, rootRect, rootHwnd) {
+    matches := []
+    for candidate in candidates {
+        if candidate.hwnd = rootHwnd || candidate.className != "#32770"
+            || candidate.width < (rootRect.right - rootRect.left) * .4
+            || candidate.height < (rootRect.bottom - rootRect.top) * .65
+            || !RectEncloses(rootRect, candidate.rect)
+            continue
+        matches.Push(candidate)
+    }
+    ; Do not rank or guess between large canvas candidates.
+    if matches.Length != 1
+        return {ok: false, code: "COVER_SURFACE_NOT_UNIQUE", candidateCount: matches.Length}
+    candidate := matches[1]
+    return {ok: true, code: "COVER_SURFACE_READY", hwnd: candidate.hwnd, rect: candidate.rect, candidateCount: 1}
+}
+
+MxNMCoverSurfaceUnchanged(session) {
+    if !MxNMMontageViewerStillActive(session)
+        return false
+    current := MxNMCoverResolveSurface(session)
+    bound := session.coverSurface
+    if !current.ok || current.hwnd != bound.hwnd
+        return false
+    for edge in ["left", "top", "right", "bottom"] {
+        if current.rect.%edge% != bound.rect.%edge%
+            return false
+    }
+    return Win32WindowPid(bound.hwnd) = session.viewerPid
+        && MxNMMontageRootOwner(bound.hwnd) = session.viewerRootOwner
+}
+
+MxNMCoverSelectPane(session, xRatio) {
+    rect := session.coverSurface.rect
+    x := rect.left + Round((rect.right - rect.left) * xRatio)
+    y := rect.top + Round((rect.bottom - rect.top) * .75)
+    if !MxNMCoverSurfaceUnchanged(session)
+        || MxNMMontageWindowFromPoint(x, y) != session.coverSurface.hwnd
+        return {ok: false, code: "COVER_PANE_POINT_MISMATCH"}
+    ; Only one click; never retry an ambiguous selection.
+    if !MxNMMontagePhysicalClick(x, y)
+        return {ok: false, code: "COVER_PANE_CLICK_FAILED"}
+    Sleep 100
+    return {ok: true, code: "COVER_PANE_CLICK_DISPATCHED"}
+}
+
+MxNMCoverInvokeButton(controlId, session) {
+    resolved := MxNMMontageResolveControl(session, controlId, "Button")
+    if !resolved.ok || resolved.hwnd != session.coverControls[controlId].hwnd
+        return {ok: false, code: "COVER_BUTTON_CHANGED"}
+    try {
+        element := UIA.ElementFromHandle(resolved.hwnd)
+        if element.ProcessId != session.viewerPid || !element.IsEnabled
+            || element.IsOffscreen || !element.IsInvokePatternAvailable
+            return {ok: false, code: "COVER_BUTTON_NOT_READY"}
+        ; UIA may yield. Recheck at the dispatch boundary, with no replay.
+        if !MxNMCoverControlsUnchanged(session) || !MxNMCoverSurfaceUnchanged(session)
+            return {ok: false, code: "COVER_TARGET_CHANGED"}
+        element.InvokePattern.Invoke()
+        return {ok: true, code: "COVER_BUTTON_INVOKED"}
+    } catch {
+        return {ok: false, code: "COVER_BUTTON_INVOKE_FAILED"}
+    }
+}
+
+; --- END mxnm_cover.ahk ---
 
 ; --- BEGIN hotstring_config_migration.ahk ---
 class LegacyReportHotstringEntry {
@@ -22290,6 +22636,10 @@ WriteFeatureHotkeySettings(configPath, settings) {
 
 WriteMxNMMontageSettings(configPath, settings) {
     section := MxNMMontageDefaults.Section
+    IniWrite(settings.coverEnabled ? "true" : "false", configPath, section, MxNMMontageDefaults.CoverEnabledKey)
+    IniWrite(settings.coverChord, configPath, section, MxNMMontageDefaults.CoverChordKey)
+    IniWrite(settings.coverLayoutRow, configPath, section, MxNMMontageDefaults.CoverLayoutRowKey)
+    IniWrite(settings.coverLayoutColumn, configPath, section, MxNMMontageDefaults.CoverLayoutColumnKey)
     IniWrite(
         settings.enabled ? "true" : "false",
         configPath,
@@ -23377,6 +23727,10 @@ RunMxNMViewerHotkey(commandName, chord) {
     operation.SetField("viewer.command", commandName)
     operation.SetField("viewer.dispatchResult", "NOT_DISPATCHED")
     operation.SetField("viewer.effectState", "UNOBSERVABLE")
+    if MxNMViewerWorkflowLock.Busy {
+        operation.Complete("CANCELLED", "BUSY")
+        return false
+    }
     if active {
         operation.Complete("CANCELLED", "BUSY")
         return false
@@ -25054,6 +25408,14 @@ RegisterConfiguredFeatures(settings, montageSettings := 0) {
             MedExViewerForegroundActive
         )
     }
+    if IsObject(montageSettings) && montageSettings.ok
+        && montageSettings.coverEnabled && montageValidation.Ok {
+        RegisterHotkeyDefinitions(
+            MxNMCoverHotkeyDefinitions(montageSettings),
+            ReservedApplicationHotkeyChords(),
+            MedExViewerForegroundActive
+        )
+    }
     RegisterHotkeyDefinitions(
         ReportImageCaptionHotkeyDefinitions(settings),
         ReservedApplicationHotkeyChords(),
@@ -25174,7 +25536,7 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs := this.Window.Add(
             "Tab3", "x12 y12 w876 h690",
-            ["报告模板", "快捷键", "其他"]
+            ["报告模板", "快捷键"]
         )
 
         this.Tabs.UseTab(1)
@@ -25243,123 +25605,110 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs.UseTab(2)
         this.Window.Add(
-            "Text", "x40 y64 w820 h38",
+            "Text", "x40 y52 w820 h38",
             "快速标图必须含修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
         )
-        this.Window.Add("Text", "x72 y126 w170", "功能")
-        this.Window.Add("Text", "x276 y126 w90", "状态")
-        this.Window.Add("Text", "x402 y126 w220", "快捷键")
-        this.Window.Add("Text", "x648 y126 w70", "Win")
+        this.Window.Add("Text", "x72 y96 w170", "功能")
+        this.Window.Add("Text", "x276 y96 w90", "状态")
+        this.Window.Add("Text", "x402 y96 w220", "快捷键")
+        this.Window.Add("Text", "x648 y96 w70", "Win")
 
-        this.Window.Add("Text", "x72 y174 w170", "快速标图")
+        this.Window.Add("Text", "x72 y132 w170", "快速标图")
         this.ReportImageCaptionEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y166 w90 h26", "启用"
+            "CheckBox", "x276 y124 w90 h26", "启用"
         )
         this.ReportImageCaptionChordInput := this.Window.Add(
-            "Hotkey", "x402 y166 w220 h26"
+            "Hotkey", "x402 y124 w220 h26"
         )
         this.ReportImageCaptionWinInput := this.Window.Add(
-            "CheckBox", "x648 y166 w70 h26", "使用"
+            "CheckBox", "x648 y124 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y222 w170", "箭头")
+        this.Window.Add("Text", "x72 y170 w170", "箭头")
         this.ViewerArrowEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y214 w90 h26", "启用"
+            "CheckBox", "x276 y162 w90 h26", "启用"
         )
         this.ViewerArrowChordInput := this.Window.Add(
-            "Hotkey", "x402 y214 w220 h26"
+            "Hotkey", "x402 y162 w220 h26"
         )
         this.ViewerArrowWinInput := this.Window.Add(
-            "CheckBox", "x648 y214 w70 h26", "使用"
+            "CheckBox", "x648 y162 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y270 w170", "长度测量")
+        this.Window.Add("Text", "x72 y208 w170", "长度测量")
         this.ViewerLengthEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y262 w90 h26", "启用"
+            "CheckBox", "x276 y200 w90 h26", "启用"
         )
         this.ViewerLengthChordInput := this.Window.Add(
-            "Hotkey", "x402 y262 w220 h26"
+            "Hotkey", "x402 y200 w220 h26"
         )
         this.ViewerLengthWinInput := this.Window.Add(
-            "CheckBox", "x648 y262 w70 h26", "使用"
+            "CheckBox", "x648 y200 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y318 w170", "3D SUV测量")
+        this.Window.Add("Text", "x72 y246 w170", "3D SUV测量")
         this.ViewerSuv3DEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y310 w90 h26", "启用"
+            "CheckBox", "x276 y238 w90 h26", "启用"
         )
         this.ViewerSuv3DChordInput := this.Window.Add(
-            "Hotkey", "x402 y310 w220 h26"
+            "Hotkey", "x402 y238 w220 h26"
         )
         this.ViewerSuv3DWinInput := this.Window.Add(
-            "CheckBox", "x648 y310 w70 h26", "使用"
+            "CheckBox", "x648 y238 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y366 w170", "截图（发送 F12）")
+        this.Window.Add("Text", "x72 y284 w170", "截图（发送 F12）")
         this.ViewerCaptureEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y358 w90 h26", "启用"
+            "CheckBox", "x276 y276 w90 h26", "启用"
         )
         this.ViewerCaptureChordInput := this.Window.Add(
-            "Hotkey", "x402 y358 w220 h26"
+            "Hotkey", "x402 y276 w220 h26"
         )
         this.ViewerCaptureWinInput := this.Window.Add(
-            "CheckBox", "x648 y358 w70 h26", "使用"
+            "CheckBox", "x648 y276 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y414 w170", "清除全部标注")
+        this.Window.Add("Text", "x72 y322 w170", "清除全部标注")
         this.ViewerClearEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y406 w90 h26", "启用"
+            "CheckBox", "x276 y314 w90 h26", "启用"
         )
         this.ViewerClearChordInput := this.Window.Add(
-            "Hotkey", "x402 y406 w220 h26"
+            "Hotkey", "x402 y314 w220 h26"
         )
         this.ViewerClearWinInput := this.Window.Add(
-            "CheckBox", "x648 y406 w70 h26", "使用"
+            "CheckBox", "x648 y314 w70 h26", "使用"
         )
 
-        this.Window.Add(
-            "Text", "x72 y456 w170", "Montage 排版（Beta）"
-        )
-        this.MontageEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y448 w110 h26", "启用全部"
-        )
+        this.Window.Add("GroupBox", "x40 y356 w812 h192", "Montage 排版")
+        this.MontageEnabledInput := this.Window.Add("CheckBox", "x276 y364 w110 h26", "启用全部")
+        this.Window.Add("Text", "x72 y412 w170", "Body 排版")
+        this.MontageBodyChordInput := this.Window.Add("Hotkey", "x402 y404 w220 h26")
+        this.MontageBodyWinInput := this.Window.Add("CheckBox", "x648 y404 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y448 w170", "Head 排版")
+        this.MontageHeadChordInput := this.Window.Add("Hotkey", "x402 y440 w220 h26")
+        this.MontageHeadWinInput := this.Window.Add("CheckBox", "x648 y440 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y484 w170", "Lung 排版")
+        this.MontageLungChordInput := this.Window.Add("Hotkey", "x402 y476 w220 h26")
+        this.MontageLungWinInput := this.Window.Add("CheckBox", "x648 y476 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y524 w170", "Montage 布局位置")
+        this.Window.Add("Text", "x276 y524 w28", "行")
+        this.MontageLayoutRowInput := this.Window.Add("DropDownList", "x308 y516 w70", ["1", "2", "3", "4", "5"])
+        this.Window.Add("Text", "x402 y524 w28", "列")
+        this.MontageLayoutColumnInput := this.Window.Add("DropDownList", "x434 y516 w70", ["1", "2", "3", "4"])
+        this.Window.Add("Text", "x520 y524 w300", "默认第 4 行、第 4 列；第 5 行可能被遮挡。")
 
-        this.Window.Add("Text", "x72 y504 w170", "Body 排版（Beta）")
-        this.MontageBodyChordInput := this.Window.Add(
-            "Hotkey", "x402 y496 w220 h26"
-        )
-        this.MontageBodyWinInput := this.Window.Add(
-            "CheckBox", "x648 y496 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y552 w170", "Head 排版（Beta）")
-        this.MontageHeadChordInput := this.Window.Add(
-            "Hotkey", "x402 y544 w220 h26"
-        )
-        this.MontageHeadWinInput := this.Window.Add(
-            "CheckBox", "x648 y544 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y600 w170", "Lung 排版（Beta）")
-        this.MontageLungChordInput := this.Window.Add(
-            "Hotkey", "x402 y592 w220 h26"
-        )
-        this.MontageLungWinInput := this.Window.Add(
-            "CheckBox", "x648 y592 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y648 w170", "图片布局位置（Beta）")
-        this.Window.Add("Text", "x276 y648 w28", "行")
-        this.MontageLayoutRowInput := this.Window.Add(
-            "DropDownList", "x308 y640 w70", ["1", "2", "3", "4", "5"]
-        )
-        this.Window.Add("Text", "x402 y648 w28", "列")
-        this.MontageLayoutColumnInput := this.Window.Add(
-            "DropDownList", "x434 y640 w70", ["1", "2", "3", "4"]
-        )
-        this.Window.Add(
-            "Text", "x520 y648 w300", "默认第 4 行、第 4 列；第 5 行可能被遮挡。"
-        )
+        this.Window.Add("GroupBox", "x40 y560 w812 h128", "封面图")
+        this.Window.Add("Text", "x72 y590 w170", "左右封面")
+        this.CoverEnabledInput := this.Window.Add("CheckBox", "x276 y582 w90 h26", "启用")
+        this.CoverChordInput := this.Window.Add("Hotkey", "x402 y582 w220 h26")
+        this.CoverWinInput := this.Window.Add("CheckBox", "x648 y582 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y632 w170", "封面图布局位置")
+        this.Window.Add("Text", "x276 y632 w28", "行")
+        this.CoverLayoutRowInput := this.Window.Add("DropDownList", "x308 y624 w70", ["1", "2", "3", "4", "5"])
+        this.Window.Add("Text", "x402 y632 w28", "列")
+        this.CoverLayoutColumnInput := this.Window.Add("DropDownList", "x434 y624 w70", ["1", "2", "3", "4"])
+        this.Window.Add("Text", "x520 y632 w300", "默认第 2 行、第 3 列；与 Montage 独立。")
+        this.Window.Add("Text", "x72 y660 w740", "MIP 保存为报告左图，冠状位融合图恢复默认层面后保存为报告右图。")
         for control in [
             this.ReportImageCaptionEnabledInput,
             this.ViewerArrowEnabledInput,
@@ -25376,7 +25725,9 @@ class ReportAssistantSettingsWindow {
             this.MontageEnabledInput,
             this.MontageBodyWinInput,
             this.MontageHeadWinInput,
-            this.MontageLungWinInput
+            this.MontageLungWinInput,
+            this.CoverEnabledInput,
+            this.CoverWinInput
         ] {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -25391,17 +25742,15 @@ class ReportAssistantSettingsWindow {
             this.MontageHeadChordInput,
             this.MontageLungChordInput,
             this.MontageLayoutRowInput,
-            this.MontageLayoutColumnInput
+            this.MontageLayoutColumnInput,
+            this.CoverChordInput,
+            this.CoverLayoutRowInput,
+            this.CoverLayoutColumnInput
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
         this.LoadFeatureHotkeyControls()
         this.LoadMontageHotkeyControls()
-
-        this.Tabs.UseTab(3)
-        this.Window.Add(
-            "Text", "x40 y70 w820 h30 Center", "其他设置将在后续版本开放。"
-        )
 
         this.Tabs.UseTab()
         this.SaveButton := this.Window.Add(
@@ -25619,6 +25968,11 @@ class ReportAssistantSettingsWindow {
     LoadMontageHotkeyControls() {
         this.LoadingControls := true
         try {
+            this.CoverEnabledInput.Value := this.MontageSettings.coverEnabled ? 1 : 0
+            this.CoverChordInput.Value := ViewerHotkeyNativeChord(this.MontageSettings.coverChord)
+            this.CoverWinInput.Value := ViewerHotkeyUsesWin(this.MontageSettings.coverChord) ? 1 : 0
+            this.CoverLayoutRowInput.Choose(this.MontageSettings.coverLayoutRow)
+            this.CoverLayoutColumnInput.Choose(this.MontageSettings.coverLayoutColumn)
             this.MontageEnabledInput.Value :=
                 this.MontageSettings.enabled ? 1 : 0
             this.MontageBodyChordInput.Value :=
@@ -25657,6 +26011,10 @@ class ReportAssistantSettingsWindow {
     }
 
     StoreMontageHotkeyControls() {
+        this.MontageSettings.coverLayoutRow := this.CoverLayoutRowInput.Value
+        this.MontageSettings.coverLayoutColumn := this.CoverLayoutColumnInput.Value
+        this.MontageSettings.coverEnabled := this.CoverEnabledInput.Value = 1
+        this.MontageSettings.coverChord := MergeViewerHotkeyChord(this.CoverChordInput.Value, this.CoverWinInput.Value = 1)
         this.MontageSettings.enabled :=
             this.MontageEnabledInput.Value = 1
         this.MontageSettings.layoutRow :=
@@ -25876,7 +26234,13 @@ class ReportAssistantSettingsWindow {
     }
 
     FocusMontageValidationError(field) {
-        if field = "MontageBodyChord"
+        if field = "CoverChord" {
+            this.CoverChordInput.Focus()
+        } else if field = "CoverLayoutRow" {
+            this.CoverLayoutRowInput.Focus()
+        } else if field = "CoverLayoutColumn" {
+            this.CoverLayoutColumnInput.Focus()
+        } else if field = "MontageBodyChord"
             this.MontageBodyChordInput.Focus()
         else if field = "MontageHeadChord"
             this.MontageHeadChordInput.Focus()

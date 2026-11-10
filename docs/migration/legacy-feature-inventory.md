@@ -15,16 +15,18 @@
 | SUVMax 与尺寸读取 | 严格区分 `FOUND`、`NOT_ANNOTATED`、automation failure；不复用旧 clipboard 值 |
 | 红字与后续黑字 | CF_HTML + Candidate G；只支持已验证 profile，其他环境 fail closed |
 | Shift+Alt+S 快速标图 | 唯一同 PID target signature；首次 fresh copy，随后只在绑定 target 前台复用；有意保留 caption clipboard 并恢复鼠标 |
-| Body/Head/Lung Montage（Beta） | production 独占；设置页可启用并修改三组快捷键及 5×4 布局行列；compatibility 不再注册 |
+| Body/Head/Lung Montage | production 独占；设置页可启用并修改三组快捷键及 5×4 布局行列；compatibility 不再注册 |
+| Ctrl+Win+Shift+C 封面图 | 2026-11-10 用户现场验收通过；MIP 保存为报告左图，冠状位融合复位后保存为报告右图；独立布局设置；compatibility 不再注册 |
 
 ## Compatibility 仍保留
 
+业务功能均已迁移。只保留以下历史通知测试项，不再需要运行 compatibility 完成报告工作。
+
 | Hotkey | 行为 | 当前风险 |
 | --- | --- | --- |
-| Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续；迁移前控件探测见 [封面图控件探测](../field-tests/2026-10-13-cover-control-diagnostic.md) |
 | XButton1 | 一秒 ToolTip notification | 历史测试项，不作为迁移目标 |
 
-这些动作仍是 global hotkeys。启用前必须确认目标工作站布局，不得与原始
+通知测试仍是 global hotkey，不得与原始
 `karabiner.ahk` 同时运行。
 
 ## 明确不再迁移的旧入口
@@ -41,7 +43,7 @@
 
 - 两个 AHK 进程不共享 suspend state、配置、clipboard lock 或 mouse lock。
 - 麦旋风的暂停/退出不控制 compatibility。
-- Compatibility 剩余动作仍可能在错误前台窗口执行固定坐标动作。
+- 当前 compatibility 不再执行固定坐标动作；旧运行实例仍可能保留被删除的快捷键，需要人工退出。
 - 旧 compatibility 运行实例若尚未重启，可能仍注册 Shift+Alt+S；测试新版本前
   必须退出旧实例并启动本 branch 的新版脚本。
 - 原始 legacy hotstrings 与当前报告 hotstrings 同名，不能并行注册。

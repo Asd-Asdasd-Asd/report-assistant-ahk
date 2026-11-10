@@ -47,7 +47,7 @@ class GeneratedHarnessSyncTests(unittest.TestCase):
             text=True,
             check=True,
         ).stdout.split()
-        covered = {str(path.relative_to(ROOT)) for path in BUILDERS}
+        covered = {path.relative_to(ROOT).as_posix() for path in BUILDERS}
         self.assertEqual(set(tracked), covered)
 
 

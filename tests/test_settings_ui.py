@@ -19,7 +19,7 @@ class SettingsUiTests(unittest.TestCase):
         ui = source("src/settings_ui.ahk")
         self.assertIn('Gui(, ReportAssistantSettingsDefaults.WindowTitle)', ui)
         self.assertIn('"Tab3"', ui)
-        self.assertIn('["报告模板", "快捷键", "其他"]', ui)
+        self.assertIn('["报告模板", "快捷键"]', ui)
         self.assertIn('"ListView"', ui)
         for label in (
             "模板名称",
@@ -170,15 +170,16 @@ class SettingsUiTests(unittest.TestCase):
             )
             self.assertLess(text.index("settings_ui.ahk"), text.index("tray_menu.ahk"))
 
-    def test_montage_beta_hotkeys_and_layout_are_user_configurable(self) -> None:
+    def test_montage_and_cover_have_independent_layout_controls_on_shortcuts_tab(self) -> None:
         ui = source("src/settings_ui.ahk")
         editor = source("src/hotstring_config_editor.ahk")
         for label in (
-            "Montage 排版（Beta）",
-            "Body 排版（Beta）",
-            "Head 排版（Beta）",
-            "Lung 排版（Beta）",
-            "图片布局位置（Beta）",
+            "Montage 排版",
+            "Body 排版",
+            "Head 排版",
+            "Lung 排版",
+            "Montage 布局位置",
+            "封面图布局位置",
         ):
             self.assertIn(label, ui)
         self.assertIn("MontageBodyChordInput", ui)
@@ -186,6 +187,10 @@ class SettingsUiTests(unittest.TestCase):
         self.assertIn("MontageLungChordInput", ui)
         self.assertIn("MontageLayoutRowInput", ui)
         self.assertIn("MontageLayoutColumnInput", ui)
+        self.assertIn("CoverLayoutRowInput", ui)
+        self.assertIn("CoverLayoutColumnInput", ui)
+        self.assertNotIn("Beta", ui)
+        self.assertNotIn("UseTab(3)", ui)
         self.assertIn("LoadMxNMMontageSettings(this.ConfigPath)", ui)
         self.assertIn("ValidateMxNMMontageSettings(", ui)
         self.assertIn("WriteMxNMMontageSettings(", editor)

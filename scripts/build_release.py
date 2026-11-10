@@ -61,6 +61,7 @@ ORDER = [
     "hotstring_normalization.ahk",
     "config_reconciliation.ahk",
     "mxnm_montage.ahk",
+    "mxnm_cover.ahk",
     "hotstring_config_migration.ahk",
     "hotstring_config_editor.ahk",
     "config_bootstrap.ahk",

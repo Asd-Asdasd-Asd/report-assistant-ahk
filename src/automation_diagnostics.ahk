@@ -140,7 +140,7 @@ BeginAutomationDiagnosticOperation(action) {
 }
 
 AutomationDiagnosticFieldAllowed(action, fieldName) {
-    if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" {
+    if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" || action = "ViewerCover" {
         static viewerFields := Map(
             "viewer.command", true,
             "viewer.foregroundHwnd", true,

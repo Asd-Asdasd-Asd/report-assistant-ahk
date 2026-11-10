@@ -8,6 +8,11 @@ class MxNMMontageDefaults {
     static BodyChordKey := "BodyChord"
     static HeadChordKey := "HeadChord"
     static LungChordKey := "LungChord"
+    static CoverEnabledKey := "CoverEnabled"
+    static CoverChordKey := "CoverChord"
+    static CoverChordDefault := "^#+c"
+    static CoverLayoutRowKey := "CoverLayoutRow"
+    static CoverLayoutColumnKey := "CoverLayoutColumn"
     static EnabledDefault := "false"
     static LayoutRowDefault := "4"
     static LayoutColumnDefault := "4"
@@ -22,7 +27,11 @@ class MxNMMontageDefaults {
             ManagedConfigEntry(this.Section, this.LayoutColumnKey, this.LayoutColumnDefault),
             ManagedConfigEntry(this.Section, this.BodyChordKey, this.BodyChordDefault),
             ManagedConfigEntry(this.Section, this.HeadChordKey, this.HeadChordDefault),
-            ManagedConfigEntry(this.Section, this.LungChordKey, this.LungChordDefault)
+            ManagedConfigEntry(this.Section, this.LungChordKey, this.LungChordDefault),
+            ManagedConfigEntry(this.Section, this.CoverEnabledKey, "false"),
+            ManagedConfigEntry(this.Section, this.CoverChordKey, this.CoverChordDefault),
+            ManagedConfigEntry(this.Section, this.CoverLayoutRowKey, "2"),
+            ManagedConfigEntry(this.Section, this.CoverLayoutColumnKey, "3")
         ]
         for profile in MxNMMontageProfileDefaults() {
             defaults.Push(ManagedConfigEntry(this.Section, profile.ThicknessKey, profile.Thickness))
@@ -112,7 +121,7 @@ MxNMMontageProfileDefaults() {
 }
 
 LoadMxNMMontageSettings(configPath := "") {
-    settings := {ok: false, enabled: false, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, chords: Map(), profiles: Map()}
+    settings := {ok: false, enabled: false, coverEnabled: false, coverChord: MxNMMontageDefaults.CoverChordDefault, coverLayoutRow: 2, coverLayoutColumn: 3, code: "CONFIG_UNAVAILABLE", layoutRow: 0, layoutColumn: 0, chords: Map(), profiles: Map()}
     if configPath = "" {
         try configPath := ReportAssistantConfig.Path()
         catch
@@ -124,6 +133,10 @@ LoadMxNMMontageSettings(configPath := "") {
         if IniRead(configPath, "Config", "SchemaVersion", "") != String(ReportAssistantConfigDefaults.SchemaVersion)
             return settings
         settings.enabled := ParseOptionalFeatureEnabled(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.EnabledKey, MxNMMontageDefaults.EnabledDefault))
+        settings.coverEnabled := ParseOptionalFeatureEnabled(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverEnabledKey, "false"))
+        settings.coverChord := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverChordKey, MxNMMontageDefaults.CoverChordDefault))
+        settings.coverLayoutRow := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverLayoutRowKey, "2"), 1, 5)
+        settings.coverLayoutColumn := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.CoverLayoutColumnKey, "3"), 1, 4)
         settings.layoutRow := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutRowKey, MxNMMontageDefaults.LayoutRowDefault), 1, 5)
         settings.layoutColumn := MxNMMontagePositiveInteger(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.LayoutColumnKey, MxNMMontageDefaults.LayoutColumnDefault), 1, 4)
         settings.chords["body"] := NormalizeOptionalHotkeyChord(IniRead(configPath, MxNMMontageDefaults.Section, MxNMMontageDefaults.BodyChordKey, MxNMMontageDefaults.BodyChordDefault))
@@ -171,7 +184,7 @@ MxNMMontageDecimal(value, minimum, maximum) {
 ValidateMxNMMontageSettings(settings, featureSettings := 0) {
     if !IsObject(settings) || !settings.ok {
         return MakeViewerToolHotkeyValidation(
-            false, "MontageConfig", "Montage Beta 配置无法读取。"
+            false, "MontageConfig", "排版配置无法读取。"
         )
     }
     if settings.layoutRow < 1 || settings.layoutRow > 5 {
@@ -184,9 +197,10 @@ ValidateMxNMMontageSettings(settings, featureSettings := 0) {
             false, "MontageLayoutColumn", "Montage 布局列数必须为 1–4。"
         )
     }
-    if !settings.enabled
-        return MakeViewerToolHotkeyValidation(true)
-
+    if settings.coverLayoutRow < 1 || settings.coverLayoutRow > 5
+        return MakeViewerToolHotkeyValidation(false, "CoverLayoutRow", "封面图布局行数必须为 1–5。")
+    if settings.coverLayoutColumn < 1 || settings.coverLayoutColumn > 4
+        return MakeViewerToolHotkeyValidation(false, "CoverLayoutColumn", "封面图布局列数必须为 1–4。")
     seen := BuildHotkeyChordSet(ReservedApplicationHotkeyChords())
     if IsObject(featureSettings) {
         for definition in [
@@ -201,16 +215,19 @@ ValidateMxNMMontageSettings(settings, featureSettings := 0) {
                 seen[NormalizeHotkeyChord(definition.chord)] := true
         }
     }
-    for definition in [
+    definitions := settings.enabled ? [
         {id: "body", field: "MontageBodyChord", label: "Body 排版"},
         {id: "head", field: "MontageHeadChord", label: "Head 排版"},
         {id: "lung", field: "MontageLungChord", label: "Lung 排版"}
-    ] {
-        chord := NormalizeOptionalHotkeyChord(settings.chords[definition.id])
+    ] : []
+    if settings.HasOwnProp("coverEnabled") && settings.coverEnabled
+        definitions.Push({id: "cover", field: "CoverChord", label: "封面图", chord: settings.coverChord})
+    for definition in definitions {
+        chord := NormalizeOptionalHotkeyChord(definition.HasOwnProp("chord") ? definition.chord : settings.chords[definition.id])
         if chord = "" || InStr(chord, Chr(13)) || InStr(chord, Chr(10))
             return MakeViewerToolHotkeyValidation(
                 false, definition.field,
-                "启用 Montage Beta 前必须设置“" definition.label "”快捷键。"
+                "启用前必须设置“" definition.label "”快捷键。"
             )
         if !ViewerToolHotkeyChordIsSafe(chord)
             return MakeViewerToolHotkeyValidation(
@@ -232,6 +249,10 @@ MxNMMontageSettingsMatch(expected, actual) {
     if !IsObject(expected) || !IsObject(actual)
         return false
     return expected.enabled = actual.enabled
+        && expected.coverEnabled = actual.coverEnabled
+        && expected.coverChord = actual.coverChord
+        && expected.coverLayoutRow = actual.coverLayoutRow
+        && expected.coverLayoutColumn = actual.coverLayoutColumn
         && expected.layoutRow = actual.layoutRow
         && expected.layoutColumn = actual.layoutColumn
         && expected.chords["body"] = actual.chords["body"]
@@ -250,6 +271,8 @@ MxNMMontageHotkeyDefinitions(settings) {
 InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
     static busy := false
     if busy || !settings.ok || !settings.profiles.Has(profileId)
+        return
+    if !MxNMViewerWorkflowLock.Acquire()
         return
     busy := true
     startedAt := A_TickCount
@@ -294,6 +317,22 @@ InvokeMxNMMontageHotkey(profileId, chord, settings, *) {
         Flash("Montage 执行异常，已记录停止阶段；请复制诊断信息。", 2200)
     } finally {
         busy := false
+        MxNMViewerWorkflowLock.Release()
+    }
+}
+
+; Shared by Montage and cover export. A second workflow must never interrupt
+; a partially dispatched save sequence.
+class MxNMViewerWorkflowLock {
+    static Busy := false
+    static Acquire() {
+        if this.Busy
+            return false
+        this.Busy := true
+        return true
+    }
+    static Release() {
+        this.Busy := false
     }
 }
 
@@ -468,6 +507,8 @@ MxNMMontageStaticClick(controlId, className, xRatio, yRatio, effectId, effectCla
     x := rect.l + Round(width * xRatio), y := rect.t + Round(height * yRatio)
     if MxNMMontageWindowFromPoint(x, y) != resolved.hwnd
         return MxNMMontageResult(false, "POINT_HWND_MISMATCH")
+    if !MxNMMontageViewerStillActive(session)
+        return MxNMMontageResult(false, "VIEWER_FOREGROUND_CHANGED")
     if !MxNMMontagePhysicalClick(x, y)
         return MxNMMontageResult(false, "STATIC_PHYSICAL_CLICK_FAILED")
     if effectId {
