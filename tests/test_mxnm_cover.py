@@ -138,6 +138,23 @@ class FakeCoverTransport {
 ''')
 
 
+    def test_owned_surface_can_reach_window_border_but_not_escape_frame(self):
+        self.run_cover('''
+    outer := {left: 1920, top: 0, right: 4481, bottom: 1440}
+    client := {left: 1921, top: 1, right: 4480, bottom: 1439}
+    canvas := {hwnd: 22, className: "#32770", width: 1425, height: 1360,
+        rect: {left: 2566, top: 80, right: 3991, bottom: 1440}}
+    if MxNMCoverChooseSurface([canvas], client, 11).candidateCount != 0
+        throw Error("Regression fixture no longer reproduces inset-client rejection")
+    result := MxNMCoverChooseSurface([canvas], outer, 11)
+    if !result.ok || result.candidateCount != 1
+        throw Error("Owned canvas touching outer border rejected")
+    canvas.rect.bottom := 1441
+    if MxNMCoverChooseSurface([canvas], outer, 11).ok
+        throw Error("Canvas outside actual frame accepted")
+''')
+
+
 class CoverIntegrationTests(unittest.TestCase):
     def test_cover_uses_montage_transports_and_owns_no_raw_screen_coordinates(self):
         text = (ROOT / "src/mxnm_cover.ahk").read_text(encoding="utf-8")
@@ -148,6 +165,9 @@ class CoverIntegrationTests(unittest.TestCase):
         for forbidden in ("3637", "2935", "MouseClick", "Send ", '"null"', "MxNMMontageRun("):
             self.assertNotIn(forbidden, text)
         self.assertIn('"mxnm_cover.ahk"', (ROOT / "scripts/build_release.py").read_text(encoding="utf-8"))
+        resolver = text.split("\nMxNMCoverResolveSurface(session) {", 1)[1].split("\nMxNMCoverChooseSurface(", 1)[0]
+        self.assertIn("Win32WindowRect(session.viewerRootOwner)", resolver)
+        self.assertNotIn("Win32ClientRectScreen(session.viewerRootOwner)", resolver)
 
 
 if __name__ == "__main__":

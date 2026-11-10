@@ -106,6 +106,8 @@ class MxNMCoverTransport {
             return MxNMMontageComboSelect(21155, "default", session)
         if step = "BIND_SURFACE" {
             surface := MxNMCoverResolveSurface(session)
+            if session.HasOwnProp("operation") && surface.HasOwnProp("candidateCount")
+                session.operation.SetField("viewer.candidateCount", surface.candidateCount)
             if surface.ok
                 session.coverSurface := surface
             return surface
@@ -210,7 +212,10 @@ MxNMCoverFourPaneProfileMatches(panes) {
 }
 
 MxNMCoverResolveSurface(session) {
-    rootRect := Win32ClientRectScreen(session.viewerRootOwner)
+    ; Owned drawing dialogs may extend over the root's non-client border.
+    ; Enclose their screen-space client rect in the root WINDOW rect, not its
+    ; inset client rect. No tolerance expansion or candidate ranking is used.
+    rootRect := Win32WindowRect(session.viewerRootOwner)
     if !IsObject(rootRect)
         return {ok: false, code: "COVER_ROOT_RECT_INVALID"}
     identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
@@ -237,9 +242,9 @@ MxNMCoverChooseSurface(candidates, rootRect, rootHwnd) {
     }
     ; Do not rank or guess between large canvas candidates.
     if matches.Length != 1
-        return {ok: false, code: "COVER_SURFACE_NOT_UNIQUE"}
+        return {ok: false, code: "COVER_SURFACE_NOT_UNIQUE", candidateCount: matches.Length}
     candidate := matches[1]
-    return {ok: true, code: "COVER_SURFACE_READY", hwnd: candidate.hwnd, rect: candidate.rect}
+    return {ok: true, code: "COVER_SURFACE_READY", hwnd: candidate.hwnd, rect: candidate.rect, candidateCount: 1}
 }
 
 MxNMCoverSurfaceUnchanged(session) {
