@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Use one per-paste Caption save-readiness gate instead of the first-window
+  500 ms delay: 80 ms minimum, 40 ms stable button availability, 800 ms timeout.
+  Verify unique button identity and live point hit before one save click;
+  leave the image unadvanced on failure and log safe readiness codes/counts.
+  Persistence remains unobservable; Windows/MedEx field acceptance is pending.
+
 ## [0.9.0] - 2026-11-10
 
 - Migrate the last legacy cover workflow to guarded Viewer controls. Save MIP

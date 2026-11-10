@@ -5,10 +5,11 @@ class ReportImageCaptionDefaults {
     static TargetReadyTimeoutMs := 1500
     static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
-    static PasteSettleMs := 20
-    ; The first paste into a newly observed renderer can be visible before its
-    ; backing editor state accepts the change. Gate only that cold boundary.
-    static FirstTargetSessionPasteSettleMs := 500
+    ; Uniform paste-to-save readiness, with no first-window warm-up state.
+    static SaveReadyMinimumMs := 80
+    static SaveReadyStableMs := 40
+    static SaveReadyTimeoutMs := 800
+    static SaveReadyPollMs := 20
     static ExplicitSaveSettleMs := 200
     ; WheelDown has a vendor-side conditional save path that is skipped when
     ; advances are too close together. Only wait for the missing remainder.
@@ -36,6 +37,7 @@ class ReportImageCaptionCode {
     static TARGET_ACTIVATION_FAILED := "TARGET_ACTIVATION_FAILED"
     static PASTE_FAILED := "PASTE_FAILED"
     static SAVE_DISPATCH_FAILED := "SAVE_DISPATCH_FAILED"
+    static SAVE_NOT_READY := "SAVE_NOT_READY"
     static PARTIAL_SUCCESS := "PARTIAL_SUCCESS"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
@@ -861,7 +863,6 @@ ExecuteReportImageCaptionAction(
     activationStartedAt := 0
     pasteDispatchedAt := 0
     saveDispatchedAt := 0
-    pasteSettle := ReportImageCaptionPasteSettle(target)
     if IsObject(operation) {
         operation.SetField(
             "caption.saveDispatchResult",
@@ -877,11 +878,11 @@ ExecuteReportImageCaptionAction(
         )
         operation.SetField(
             "caption.preSaveSettlePath",
-            pasteSettle.path
+            "SAVE_BUTTON_READY_GATE"
         )
         operation.SetField(
             "caption.preSaveSettleMs",
-            pasteSettle.milliseconds
+            0
         )
     }
     try {
@@ -969,18 +970,34 @@ ExecuteReportImageCaptionAction(
         pasteDispatchedAt := A_TickCount
         if IsObject(operation)
             operation.Stage("PASTE_DISPATCHED")
-        Sleep pasteSettle.milliseconds
-        if IsObject(operation)
+        saveReady := WaitForReportImageCaptionSaveReady(target)
+        if IsObject(operation) {
+            operation.SetField("caption.preSaveSettleMs", saveReady.elapsedMs)
+            operation.SetField("caption.saveReadyCode", saveReady.code)
+            operation.SetField("caption.saveReadySamples", saveReady.sampleCount)
+        }
+        if !saveReady.ok {
+            return MakeReportImageCaptionResult(
+                false, ReportImageCaptionCode.SAVE_NOT_READY, true
+            )
+        }
+        if IsObject(operation) {
             operation.Stage("PASTE_SETTLE_COMPLETED")
+            operation.Stage("SAVE_READY_CONFIRMED")
+        }
 
-        if WinExist("A") != target.hwnd
-            || !ReportImageCaptionPointBelongsToTarget(
-                target.hwnd,
-                target.savePoint
-            ) {
+        ; Query uniqueness again at dispatch. No input is replayed if the
+        ; ready button was replaced, disabled or covered in the meantime.
+        finalButton := ResolveReportImageCaptionSaveButton(target)
+        finalReady := finalButton.ok
+            ? ProbeReportImageCaptionSaveButton(target, finalButton.button)
+            : finalButton
+        if !finalReady.ok {
+            if IsObject(operation)
+                operation.SetField("caption.saveReadyCode", finalReady.code)
             return MakeReportImageCaptionResult(
                 false,
-                ReportImageCaptionCode.SAVE_DISPATCH_FAILED,
+                ReportImageCaptionCode.SAVE_NOT_READY,
                 true
             )
         }
@@ -994,7 +1011,6 @@ ExecuteReportImageCaptionAction(
                 1,
                 0
             )
-            ReportImageCaptionPasteGate.ObserveSave(target)
             saveDispatchedAt := A_TickCount
             if IsObject(operation) {
                 operation.SetField(
@@ -1108,31 +1124,107 @@ ExecuteReportImageCaptionAction(
     }
 }
 
-ReportImageCaptionPasteSettle(target) {
-    return ReportImageCaptionPasteGate.Plan(target)
+; Per-paste policy; only a disabled button is waitable. Identity, geometry and
+; hit-test uncertainty stop input, with no warm-up flag shared across images.
+class ReportImageCaptionSaveReadinessGate {
+    __New(startedAt) {
+        this.StartedAt := startedAt
+        this.ReadySince := -1
+    }
+
+    Observe(probe, now) {
+        if !probe.ok && !probe.waitable
+            return {done: true, ok: false, code: probe.code}
+        elapsed := now - this.StartedAt
+        if elapsed < 0 || elapsed >= ReportImageCaptionDefaults.SaveReadyTimeoutMs
+            return {done: true, ok: false, code: "SAVE_READY_TIMEOUT"}
+        if !probe.ok {
+            this.ReadySince := -1
+        } else {
+            if this.ReadySince < 0
+                this.ReadySince := now
+            if elapsed >= ReportImageCaptionDefaults.SaveReadyMinimumMs
+                && now - this.ReadySince >= ReportImageCaptionDefaults.SaveReadyStableMs
+                return {done: true, ok: true, code: "SAVE_BUTTON_READY"}
+        }
+        return {done: false, ok: false, code: "SAVE_READY_WAITING"}
+    }
 }
 
-; This state belongs to the caption transaction, never to diagnostic observation.
-; Retain only the most recently warmed target, matching the single caption cache.
-class ReportImageCaptionPasteGate {
-    static ReadyTargetKey := ""
-
-    static Plan(target) {
-        firstPaste := this.ReadyTargetKey != this.TargetKey(target)
-        return {
-            path: firstPaste ? "FIRST_TARGET_SESSION_GATE" : "STANDARD",
-            milliseconds: firstPaste
-                ? ReportImageCaptionDefaults.FirstTargetSessionPasteSettleMs
-                : ReportImageCaptionDefaults.PasteSettleMs
+WaitForReportImageCaptionSaveReady(target) {
+    startedAt := A_TickCount
+    gate := ReportImageCaptionSaveReadinessGate(startedAt)
+    samples := 0
+    resolved := ResolveReportImageCaptionSaveButton(target)
+    if !resolved.ok
+        return {ok: false, code: resolved.code, elapsedMs: A_TickCount - startedAt, sampleCount: 0}
+    loop {
+        probe := ProbeReportImageCaptionSaveButton(target, resolved.button)
+        samples += 1
+        decision := gate.Observe(probe, A_TickCount)
+        if decision.done {
+            decision.elapsedMs := A_TickCount - startedAt
+            decision.sampleCount := samples
+            return decision
         }
+        Sleep ReportImageCaptionDefaults.SaveReadyPollMs
     }
+}
 
-    static ObserveSave(target) {
-        this.ReadyTargetKey := this.TargetKey(target)
+ResolveReportImageCaptionSaveButton(target) {
+    try {
+        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
+            return {ok: false, waitable: false, code: "SAVE_TARGET_CHANGED"}
+        root := ReportImageCaptionUiaRoot(target.hwnd)
+        buttons := root.FindElements({Type: "Button", Name: "保存"})
+        if buttons.Length != 1
+            return {ok: false, waitable: false, code: "SAVE_BUTTON_NOT_UNIQUE"}
+        button := buttons[1]
+        if !UIA.CompareElements(button, target.saveAnchor.element)
+            return {ok: false, waitable: false, code: "SAVE_BUTTON_CHANGED"}
+        return {ok: true, code: "SAVE_BUTTON_RESOLVED", button: button}
+    } catch {
+        return {ok: false, waitable: false, code: "SAVE_BUTTON_QUERY_FAILED"}
     }
+}
 
-    static TargetKey(target) {
-        return String(target.pid) ":" String(target.hwnd)
+ProbeReportImageCaptionSaveButton(target, button) {
+    try {
+        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
+            || Win32RootOwner(target.hwnd) != target.hwnd
+            return {ok: false, waitable: false, code: "SAVE_TARGET_CHANGED"}
+        rect := ReportImageCaptionElementRect(button)
+        if button.ProcessId != target.pid || button.ControlType != 50000
+            || button.IsOffscreen || !IsObject(rect)
+            || RectKey(rect) != target.saveAnchor.rectKey
+            || !RectHasPoint(rect, target.savePoint)
+            || !ReportImageCaptionPointBelongsToTarget(target.hwnd, target.savePoint)
+            return {ok: false, waitable: false, code: "SAVE_BUTTON_GEOMETRY_CHANGED"}
+        if !button.IsEnabled
+            return {ok: false, waitable: true, code: "SAVE_BUTTON_DISABLED"}
+        ; No Chromium activation, focus change, Name/Value reads or mouse move.
+        hit := UIA.ElementFromPoint(target.savePoint.x, target.savePoint.y, , 0)
+        hitMatches := false
+        loop 6 {
+            if hit.ProcessId != target.pid
+                break
+            if UIA.CompareElements(hit, button) {
+                hitMatches := true
+                break
+            }
+            hit := UIA.RawViewWalker.TryGetParentElement(hit)
+            if !IsObject(hit)
+                break
+        }
+        if !hitMatches
+            return {ok: false, waitable: false, code: "SAVE_BUTTON_POINT_MISMATCH"}
+        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
+            || Win32RootOwner(target.hwnd) != target.hwnd || !button.IsEnabled
+            || RectKey(ReportImageCaptionElementRect(button)) != target.saveAnchor.rectKey
+            return {ok: false, waitable: false, code: "SAVE_BUTTON_CHANGED_DURING_PROBE"}
+        return {ok: true, waitable: false, code: "SAVE_BUTTON_READY"}
+    } catch {
+        return {ok: false, waitable: false, code: "SAVE_BUTTON_PROBE_FAILED"}
     }
 }
 
@@ -1295,6 +1387,8 @@ ReportImageCaptionFailureMessage(result) {
         return "报告图像窗口未激活，未执行粘贴"
     if result.code = ReportImageCaptionCode.PASTE_FAILED
         return "caption 粘贴失败"
+    if result.code = ReportImageCaptionCode.SAVE_NOT_READY
+        return "保存入口校验未通过，未自动翻页；请检查当前图并手动保存。"
     if result.code = ReportImageCaptionCode.SAVE_DISPATCH_FAILED
         return "caption 已粘贴，但未能触发保存"
     if result.code = ReportImageCaptionCode.PARTIAL_SUCCESS

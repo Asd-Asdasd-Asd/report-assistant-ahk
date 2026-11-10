@@ -10,15 +10,25 @@ try {
 }
 
 RunViewerStateRegression() {
-    target := {pid: 101, hwnd: 1001}
-    ReportImageCaptionPasteGate.ReadyTargetKey := ""
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 500, "first target")
-    ; Resolving/planning then cancelling must not consume the first save gate.
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 500, "cancel before paste")
-    ReportImageCaptionPasteGate.ObserveSave(target)
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 20, "saved target")
-    AssertViewerState(ReportImageCaptionPasteGate.Plan({pid: 101, hwnd: 1002}).milliseconds = 500, "new HWND in same process")
-    AssertViewerState(ReportImageCaptionPasteGate.Plan({pid: 102, hwnd: 1001}).milliseconds = 500, "new process")
+    ready := {ok: true, waitable: false, code: "SAVE_BUTTON_READY"}
+    gate := ReportImageCaptionSaveReadinessGate(1000)
+    AssertViewerState(!gate.Observe(ready, 1000).done, "first ready sample cannot dispatch")
+    AssertViewerState(!gate.Observe(ready, 1040).done, "minimum paste settle still applies")
+    AssertViewerState(gate.Observe(ready, 1080).ok, "stable button ready at 80 ms")
+    anotherPaste := ReportImageCaptionSaveReadinessGate(2000)
+    AssertViewerState(!anotherPaste.Observe(ready, 2000).done, "each paste starts its own readiness")
+    AssertViewerState(anotherPaste.Observe(ready, 2080).ok, "no first-window 500 ms gate")
+    busy := {ok: false, waitable: true, code: "SAVE_BUTTON_DISABLED"}
+    gate := ReportImageCaptionSaveReadinessGate(1000)
+    gate.Observe(ready, 1000)
+    AssertViewerState(!gate.Observe(busy, 1060).done, "disabled button may become ready without input")
+    AssertViewerState(!gate.Observe(ready, 1080).done, "disable resets stable interval")
+    AssertViewerState(gate.Observe(ready, 1120).ok, "stable interval after re-enable")
+    timeoutGate := ReportImageCaptionSaveReadinessGate(1000)
+    AssertViewerState(timeoutGate.Observe(busy, 1800).code = "SAVE_READY_TIMEOUT", "bounded readiness timeout")
+    fatalGate := ReportImageCaptionSaveReadinessGate(1000)
+    fatal := fatalGate.Observe({ok: false, waitable: false, code: "SAVE_BUTTON_NOT_UNIQUE"}, 1000)
+    AssertViewerState(fatal.done && !fatal.ok && fatal.code = "SAVE_BUTTON_NOT_UNIQUE", "ambiguous target stops immediately")
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 2999, 3000) = "WAITING", "held before deadline")
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 3000, 3000) = "KEY_RELEASE_TIMEOUT", "held at deadline")
     AssertViewerState(MxNMViewerReleaseDecision(false, true, 0, 3000) = "RELEASED", "next press can release")

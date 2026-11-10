@@ -195,6 +195,8 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
             "caption.activationMs", true,
             "caption.preSaveSettlePath", true,
             "caption.preSaveSettleMs", true,
+            "caption.saveReadyCode", true,
+            "caption.saveReadySamples", true,
             "caption.pasteToSaveMs", true,
             "caption.advanceGatePath", true,
             "caption.advanceGateMs", true,
