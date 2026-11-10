@@ -11,8 +11,8 @@ global MxNMMontageDiagnosticSession := 0
 global MxNMMontageDiagnosticArmed := false
 
 ^!+F8::AdvanceMxNMMontageDiagnostic()
-^!+F5::StartMxNMMontageDiagnostic("cover")
-^!+F4::MoveToMxNMMontageLegacyPoint()
+^!+F10::StartMxNMMontageDiagnostic("cover")
+^!+F11::MoveToMxNMMontageLegacyPoint()
 ^!+F9::ArmMxNMMontageDiagnosticCapture()
 ^!+F7::ResetMxNMMontageDiagnostic()
 ^!+F6::FinishMxNMMontageDiagnostic("OPERATOR_FINISHED_EARLY")
@@ -181,7 +181,7 @@ ResetMxNMMontageDiagnostic() {
     ShowMxNMMontageDiagnosticTip(
         "控件诊断已重置。`n"
         . "让 Viewer 位于前台，然后按 Ctrl+Alt+Shift+F8 开始 Montage，`n"
-        . "或按 Ctrl+Alt+Shift+F5 开始封面图。"
+        . "或按 Ctrl+Alt+Shift+F10 开始封面图。"
     )
 }
 
@@ -345,7 +345,7 @@ MxNMCoverDiagnosticStages() {
 
 ShowMxNMMontageStagePrompt(stageIndex, stages, profile) {
     legacyHint := profile = "cover"
-        ? "F4 可把鼠标移到旧脚本坐标（不点击）。记录后再自己点一下目标。`n"
+        ? "F11 可把鼠标移到旧脚本坐标（不点击）。记录后再自己点一下目标。`n"
         : ""
     ShowMxNMMontageDiagnosticTip(
         MxNMMontageDiagnosticTitle(profile) " " stageIndex "/" stages.Length "`n"

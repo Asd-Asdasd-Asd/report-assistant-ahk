@@ -70,8 +70,8 @@ class MxNMMontageControlDiagnosticTests(unittest.TestCase):
         harness_points = re.findall(r"legacyX: (\d+), legacyY: (\d+)", harness)
         self.assertEqual(harness_points, legacy_points)
         for required in (
-            "^!+F5::StartMxNMMontageDiagnostic(\"cover\")",
-            "^!+F4::MoveToMxNMMontageLegacyPoint()",
+            "^!+F10::StartMxNMMontageDiagnostic(\"cover\")",
+            "^!+F11::MoveToMxNMMontageLegacyPoint()",
             "\\mxnm_cover_control_diagnostic.txt",
             "FormatMxNMCoverLayoutConfig(session[\"viewerPid\"])",
             "LegacyScreenPoint=",

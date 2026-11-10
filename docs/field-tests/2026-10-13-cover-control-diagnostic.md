@@ -20,8 +20,8 @@ native control、UIA 元数据和 `MxPetCtTemp.ini` 中的数值布局字段；�
 
 按旧流程的 9 步顺序手工走一遍；每一步“先悬停记录，再自己点一下”：
 
-1. 让 Viewer 位于前台，按 `Ctrl+Alt+Shift+F5` 开始封面图模式。
-2. 按 ToolTip 提示把鼠标停在目标上。可按 `Ctrl+Alt+Shift+F4` 把鼠标移到旧脚本坐标
+1. 让 Viewer 位于前台，按 `Ctrl+Alt+Shift+F10` 开始封面图模式。
+2. 按 ToolTip 提示把鼠标停在目标上。可按 `Ctrl+Alt+Shift+F11` 把鼠标移到旧脚本坐标
    （只移动、不点击）；若没停在目标上，手工挪到正确位置。
 3. 按 `Ctrl+Alt+Shift+F8` 记录，然后**自己点击**该目标，让 Viewer 进入下一步状态。
 4. 若目标是弹出菜单或下拉项、按组合键会收起，用 `Ctrl+Alt+Shift+F9`，4 秒内展开并
