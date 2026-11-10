@@ -529,6 +529,8 @@ WriteMxNMMontageSettings(configPath, settings) {
     section := MxNMMontageDefaults.Section
     IniWrite(settings.coverEnabled ? "true" : "false", configPath, section, MxNMMontageDefaults.CoverEnabledKey)
     IniWrite(settings.coverChord, configPath, section, MxNMMontageDefaults.CoverChordKey)
+    IniWrite(settings.coverLayoutRow, configPath, section, MxNMMontageDefaults.CoverLayoutRowKey)
+    IniWrite(settings.coverLayoutColumn, configPath, section, MxNMMontageDefaults.CoverLayoutColumnKey)
     IniWrite(
         settings.enabled ? "true" : "false",
         configPath,

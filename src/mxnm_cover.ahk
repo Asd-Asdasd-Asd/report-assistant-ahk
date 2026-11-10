@@ -3,10 +3,10 @@
 ; Reuses Montage transports, never its thickness/zoom/null-caption workflow.
 MxNMCoverHotkeyDefinitions(settings) {
     return [HotkeyDefinition("viewer-cover", settings.coverChord,
-        InvokeMxNMCoverHotkey.Bind(settings.coverChord))]
+        InvokeMxNMCoverHotkey.Bind(settings.coverChord, settings))]
 }
 
-InvokeMxNMCoverHotkey(chord, *) {
+InvokeMxNMCoverHotkey(chord, settings, *) {
     operation := BeginAutomationDiagnosticOperation("ViewerCover")
     operation.SetField("viewer.command", "cover")
     operation.SetField("viewer.effectState", "UNOBSERVABLE")
@@ -35,6 +35,8 @@ InvokeMxNMCoverHotkey(chord, *) {
                 payload := ClipboardAll()
                 saved := true
                 session.operation := operation
+                session.coverLayoutRow := settings.coverLayoutRow
+                session.coverLayoutColumn := settings.coverLayoutColumn
                 result := MxNMCoverRun(session)
             }
         }
@@ -66,7 +68,7 @@ InvokeMxNMCoverHotkey(chord, *) {
 MxNMCoverRun(session, transport := 0) {
     if !IsObject(transport)
         transport := MxNMCoverTransport()
-    steps := ["PREFLIGHT", "LAYOUT_R2C3", "ANNOTATION_TAB", "CAPTION_DEFAULT",
+    steps := ["PREFLIGHT", "SELECT_LAYOUT", "ANNOTATION_TAB", "CAPTION_DEFAULT",
         "BIND_SURFACE", "SELECT_MIP", "SAVE_LEFT", "SELECT_FUSION",
         "RESET_DEFAULT", "SAVE_RIGHT"]
     leftDispatched := false
@@ -93,8 +95,8 @@ class MxNMCoverTransport {
             return MxNMCoverPreflight(session)
         if !MxNMCoverControlsUnchanged(session)
             return {ok: false, code: "COVER_CONTROLS_CHANGED"}
-        if step = "LAYOUT_R2C3" {
-            point := MxNMMontageLayoutPoint(2, 3)
+        if step = "SELECT_LAYOUT" {
+            point := MxNMMontageLayoutPoint(session.coverLayoutRow, session.coverLayoutColumn)
             result := MxNMMontageStaticClick(21112, "Static", point.xRatio, point.yRatio, 0, "", 0, session)
             if result.ok
                 Sleep MxNMMontageTiming.LayoutSettleMs
@@ -139,7 +141,7 @@ MxNMCoverPreflight(session) {
     paths := ResolveMxNMConfigPathsFromProcessPath("MedExNMFusion.exe", processPath)
     if !paths.ok
         return {ok: false, code: "COVER_CONFIG_UNAVAILABLE"}
-    if !MxNMCoverLayoutSupported(paths.layoutConfigPath)
+    if !MxNMCoverLayoutSupported(paths.layoutConfigPath, session.coverLayoutRow, session.coverLayoutColumn)
         return {ok: false, code: "COVER_LAYOUT_UNSUPPORTED"}
     session.coverConfigPath := paths.layoutConfigPath
     session.coverControls := Map()
@@ -158,7 +160,7 @@ MxNMCoverPreflight(session) {
 
 MxNMCoverControlsUnchanged(session) {
     if !MxNMMontageViewerStillActive(session)
-        || !MxNMCoverLayoutSupported(session.coverConfigPath)
+        || !MxNMCoverLayoutSupported(session.coverConfigPath, session.coverLayoutRow, session.coverLayoutColumn)
         return false
     for id, control in session.coverControls {
         resolved := MxNMMontageResolveControl(session, id, control.className)
@@ -168,19 +170,22 @@ MxNMCoverControlsUnchanged(session) {
     return true
 }
 
-MxNMCoverLayoutSupported(path) {
-    ; Explicitly supported layout schema. R2C3 maps to ShowModel7 in this
-    ; profile. Config confirms semantics, NOT the currently selected layout.
+MxNMCoverLayoutSupported(path, row := 2, column := 3) {
+    ; First-page row-major layout matrix. Default R2C3 maps to ShowModel7.
+    ; Config confirms semantics, NOT the currently selected layout.
     ; The layout selection still uses the validated Montage physical transport.
     try {
-        if IniRead(path, "ShowModel7", "LowWndSize", "") != "4"
-            || IniRead(path, "ShowModel7", "ShowModelPage", "") != "0"
+        if !MxNMMontagePositiveInteger(row, 1, 5) || !MxNMMontagePositiveInteger(column, 1, 4)
+            return false
+        section := "ShowModel" ((row - 1) * 4 + column)
+        if IniRead(path, section, "LowWndSize", "") != "4"
+            || IniRead(path, section, "ShowModelPage", "") != "0"
             return false
         panes := []
         for index in [1, 2, 3, 4] {
             pane := Map()
             for key in ["Left", "Top", "Width", "Height", "ImageType", "ImageOrient", "ImageOrigin"] {
-                value := IniRead(path, "ShowModel7", "LowWnd" key "_" index, "")
+                value := IniRead(path, section, "LowWnd" key "_" index, "")
                 if !RegExMatch(value, "^\d+$")
                     return false
                 pane[key] := Integer(value)

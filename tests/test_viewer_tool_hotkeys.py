@@ -158,7 +158,7 @@ class ViewerToolHotkeyTests(unittest.TestCase):
         self.assertEqual(ui.count('"CheckBox", "x276'), 8)
         self.assertEqual(ui.count('"CheckBox", "x648'), 10)
         self.assertEqual(ui.count('w90 h26", "启用"'), 7)
-        self.assertEqual(ui.count('w70 h26", "使用"'), 9)
+        self.assertEqual(ui.count('w70 h26", "使用"'), 10)
         self.assertNotIn("Limit15", ui)
         self.assertIn("ValidateFeatureHotkeySettings(", ui)
         self.assertIn(

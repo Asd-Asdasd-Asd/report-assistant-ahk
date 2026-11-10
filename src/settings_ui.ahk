@@ -87,7 +87,7 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs := this.Window.Add(
             "Tab3", "x12 y12 w876 h690",
-            ["报告模板", "快捷键", "其他"]
+            ["报告模板", "快捷键"]
         )
 
         this.Tabs.UseTab(1)
@@ -156,123 +156,110 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs.UseTab(2)
         this.Window.Add(
-            "Text", "x40 y64 w820 h38",
+            "Text", "x40 y52 w820 h38",
             "快速标图必须含修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
         )
-        this.Window.Add("Text", "x72 y126 w170", "功能")
-        this.Window.Add("Text", "x276 y126 w90", "状态")
-        this.Window.Add("Text", "x402 y126 w220", "快捷键")
-        this.Window.Add("Text", "x648 y126 w70", "Win")
+        this.Window.Add("Text", "x72 y96 w170", "功能")
+        this.Window.Add("Text", "x276 y96 w90", "状态")
+        this.Window.Add("Text", "x402 y96 w220", "快捷键")
+        this.Window.Add("Text", "x648 y96 w70", "Win")
 
-        this.Window.Add("Text", "x72 y174 w170", "快速标图")
+        this.Window.Add("Text", "x72 y132 w170", "快速标图")
         this.ReportImageCaptionEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y166 w90 h26", "启用"
+            "CheckBox", "x276 y124 w90 h26", "启用"
         )
         this.ReportImageCaptionChordInput := this.Window.Add(
-            "Hotkey", "x402 y166 w220 h26"
+            "Hotkey", "x402 y124 w220 h26"
         )
         this.ReportImageCaptionWinInput := this.Window.Add(
-            "CheckBox", "x648 y166 w70 h26", "使用"
+            "CheckBox", "x648 y124 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y222 w170", "箭头")
+        this.Window.Add("Text", "x72 y170 w170", "箭头")
         this.ViewerArrowEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y214 w90 h26", "启用"
+            "CheckBox", "x276 y162 w90 h26", "启用"
         )
         this.ViewerArrowChordInput := this.Window.Add(
-            "Hotkey", "x402 y214 w220 h26"
+            "Hotkey", "x402 y162 w220 h26"
         )
         this.ViewerArrowWinInput := this.Window.Add(
-            "CheckBox", "x648 y214 w70 h26", "使用"
+            "CheckBox", "x648 y162 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y270 w170", "长度测量")
+        this.Window.Add("Text", "x72 y208 w170", "长度测量")
         this.ViewerLengthEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y262 w90 h26", "启用"
+            "CheckBox", "x276 y200 w90 h26", "启用"
         )
         this.ViewerLengthChordInput := this.Window.Add(
-            "Hotkey", "x402 y262 w220 h26"
+            "Hotkey", "x402 y200 w220 h26"
         )
         this.ViewerLengthWinInput := this.Window.Add(
-            "CheckBox", "x648 y262 w70 h26", "使用"
+            "CheckBox", "x648 y200 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y318 w170", "3D SUV测量")
+        this.Window.Add("Text", "x72 y246 w170", "3D SUV测量")
         this.ViewerSuv3DEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y310 w90 h26", "启用"
+            "CheckBox", "x276 y238 w90 h26", "启用"
         )
         this.ViewerSuv3DChordInput := this.Window.Add(
-            "Hotkey", "x402 y310 w220 h26"
+            "Hotkey", "x402 y238 w220 h26"
         )
         this.ViewerSuv3DWinInput := this.Window.Add(
-            "CheckBox", "x648 y310 w70 h26", "使用"
+            "CheckBox", "x648 y238 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y366 w170", "截图（发送 F12）")
+        this.Window.Add("Text", "x72 y284 w170", "截图（发送 F12）")
         this.ViewerCaptureEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y358 w90 h26", "启用"
+            "CheckBox", "x276 y276 w90 h26", "启用"
         )
         this.ViewerCaptureChordInput := this.Window.Add(
-            "Hotkey", "x402 y358 w220 h26"
+            "Hotkey", "x402 y276 w220 h26"
         )
         this.ViewerCaptureWinInput := this.Window.Add(
-            "CheckBox", "x648 y358 w70 h26", "使用"
+            "CheckBox", "x648 y276 w70 h26", "使用"
         )
 
-        this.Window.Add("Text", "x72 y414 w170", "清除全部标注")
+        this.Window.Add("Text", "x72 y322 w170", "清除全部标注")
         this.ViewerClearEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y406 w90 h26", "启用"
+            "CheckBox", "x276 y314 w90 h26", "启用"
         )
         this.ViewerClearChordInput := this.Window.Add(
-            "Hotkey", "x402 y406 w220 h26"
+            "Hotkey", "x402 y314 w220 h26"
         )
         this.ViewerClearWinInput := this.Window.Add(
-            "CheckBox", "x648 y406 w70 h26", "使用"
+            "CheckBox", "x648 y314 w70 h26", "使用"
         )
 
-        this.Window.Add(
-            "Text", "x72 y456 w170", "Montage 排版（Beta）"
-        )
-        this.MontageEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y448 w110 h26", "启用全部"
-        )
+        this.Window.Add("GroupBox", "x40 y356 w812 h192", "Montage 排版")
+        this.MontageEnabledInput := this.Window.Add("CheckBox", "x276 y364 w110 h26", "启用全部")
+        this.Window.Add("Text", "x72 y412 w170", "Body 排版")
+        this.MontageBodyChordInput := this.Window.Add("Hotkey", "x402 y404 w220 h26")
+        this.MontageBodyWinInput := this.Window.Add("CheckBox", "x648 y404 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y448 w170", "Head 排版")
+        this.MontageHeadChordInput := this.Window.Add("Hotkey", "x402 y440 w220 h26")
+        this.MontageHeadWinInput := this.Window.Add("CheckBox", "x648 y440 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y484 w170", "Lung 排版")
+        this.MontageLungChordInput := this.Window.Add("Hotkey", "x402 y476 w220 h26")
+        this.MontageLungWinInput := this.Window.Add("CheckBox", "x648 y476 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y524 w170", "Montage 布局位置")
+        this.Window.Add("Text", "x276 y524 w28", "行")
+        this.MontageLayoutRowInput := this.Window.Add("DropDownList", "x308 y516 w70", ["1", "2", "3", "4", "5"])
+        this.Window.Add("Text", "x402 y524 w28", "列")
+        this.MontageLayoutColumnInput := this.Window.Add("DropDownList", "x434 y516 w70", ["1", "2", "3", "4"])
+        this.Window.Add("Text", "x520 y524 w300", "默认第 4 行、第 4 列；第 5 行可能被遮挡。")
 
-        this.Window.Add("Text", "x72 y504 w170", "Body 排版（Beta）")
-        this.MontageBodyChordInput := this.Window.Add(
-            "Hotkey", "x402 y496 w220 h26"
-        )
-        this.MontageBodyWinInput := this.Window.Add(
-            "CheckBox", "x648 y496 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y552 w170", "Head 排版（Beta）")
-        this.MontageHeadChordInput := this.Window.Add(
-            "Hotkey", "x402 y544 w220 h26"
-        )
-        this.MontageHeadWinInput := this.Window.Add(
-            "CheckBox", "x648 y544 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y600 w170", "Lung 排版（Beta）")
-        this.MontageLungChordInput := this.Window.Add(
-            "Hotkey", "x402 y592 w220 h26"
-        )
-        this.MontageLungWinInput := this.Window.Add(
-            "CheckBox", "x648 y592 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y648 w170", "图片布局位置（Beta）")
-        this.Window.Add("Text", "x276 y648 w28", "行")
-        this.MontageLayoutRowInput := this.Window.Add(
-            "DropDownList", "x308 y640 w70", ["1", "2", "3", "4", "5"]
-        )
-        this.Window.Add("Text", "x402 y648 w28", "列")
-        this.MontageLayoutColumnInput := this.Window.Add(
-            "DropDownList", "x434 y640 w70", ["1", "2", "3", "4"]
-        )
-        this.Window.Add(
-            "Text", "x520 y648 w300", "默认第 4 行、第 4 列；第 5 行可能被遮挡。"
-        )
+        this.Window.Add("GroupBox", "x40 y560 w812 h128", "封面图")
+        this.Window.Add("Text", "x72 y590 w170", "左右封面")
+        this.CoverEnabledInput := this.Window.Add("CheckBox", "x276 y582 w90 h26", "启用")
+        this.CoverChordInput := this.Window.Add("Hotkey", "x402 y582 w220 h26")
+        this.CoverWinInput := this.Window.Add("CheckBox", "x648 y582 w70 h26", "使用")
+        this.Window.Add("Text", "x72 y632 w170", "封面图布局位置")
+        this.Window.Add("Text", "x276 y632 w28", "行")
+        this.CoverLayoutRowInput := this.Window.Add("DropDownList", "x308 y624 w70", ["1", "2", "3", "4", "5"])
+        this.Window.Add("Text", "x402 y632 w28", "列")
+        this.CoverLayoutColumnInput := this.Window.Add("DropDownList", "x434 y624 w70", ["1", "2", "3", "4"])
+        this.Window.Add("Text", "x520 y632 w300", "默认第 2 行、第 3 列；与 Montage 独立。")
+        this.Window.Add("Text", "x72 y660 w740", "MIP 保存为报告左图，冠状位融合图恢复默认层面后保存为报告右图。")
         for control in [
             this.ReportImageCaptionEnabledInput,
             this.ViewerArrowEnabledInput,
@@ -289,7 +276,9 @@ class ReportAssistantSettingsWindow {
             this.MontageEnabledInput,
             this.MontageBodyWinInput,
             this.MontageHeadWinInput,
-            this.MontageLungWinInput
+            this.MontageLungWinInput,
+            this.CoverEnabledInput,
+            this.CoverWinInput
         ] {
             control.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
         }
@@ -304,25 +293,15 @@ class ReportAssistantSettingsWindow {
             this.MontageHeadChordInput,
             this.MontageLungChordInput,
             this.MontageLayoutRowInput,
-            this.MontageLayoutColumnInput
+            this.MontageLayoutColumnInput,
+            this.CoverChordInput,
+            this.CoverLayoutRowInput,
+            this.CoverLayoutColumnInput
         ] {
             control.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
         }
         this.LoadFeatureHotkeyControls()
         this.LoadMontageHotkeyControls()
-
-        this.Tabs.UseTab(3)
-        this.Window.Add("Text", "x72 y80 w220", "封面图（Beta）")
-        this.CoverEnabledInput := this.Window.Add("CheckBox", "x276 y72 w90 h26", "启用")
-        this.CoverChordInput := this.Window.Add("Hotkey", "x402 y72 w220 h26")
-        this.CoverWinInput := this.Window.Add("CheckBox", "x648 y72 w100 h26", "使用 Win")
-        this.Window.Add("Text", "x72 y120 w720 h70", "选择第 2 行第 3 列：右下 MIP 保存为报告左图，左下冠状位融合图恢复默认后保存为报告右图。仅用于已验证布局，请检查报告草稿。")
-        this.CoverEnabledInput.Value := this.MontageSettings.coverEnabled ? 1 : 0
-        this.CoverChordInput.Value := ViewerHotkeyNativeChord(this.MontageSettings.coverChord)
-        this.CoverWinInput.Value := ViewerHotkeyUsesWin(this.MontageSettings.coverChord) ? 1 : 0
-        this.CoverEnabledInput.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
-        this.CoverWinInput.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
-        this.CoverChordInput.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
 
         this.Tabs.UseTab()
         this.SaveButton := this.Window.Add(
@@ -540,6 +519,11 @@ class ReportAssistantSettingsWindow {
     LoadMontageHotkeyControls() {
         this.LoadingControls := true
         try {
+            this.CoverEnabledInput.Value := this.MontageSettings.coverEnabled ? 1 : 0
+            this.CoverChordInput.Value := ViewerHotkeyNativeChord(this.MontageSettings.coverChord)
+            this.CoverWinInput.Value := ViewerHotkeyUsesWin(this.MontageSettings.coverChord) ? 1 : 0
+            this.CoverLayoutRowInput.Choose(this.MontageSettings.coverLayoutRow)
+            this.CoverLayoutColumnInput.Choose(this.MontageSettings.coverLayoutColumn)
             this.MontageEnabledInput.Value :=
                 this.MontageSettings.enabled ? 1 : 0
             this.MontageBodyChordInput.Value :=
@@ -578,6 +562,8 @@ class ReportAssistantSettingsWindow {
     }
 
     StoreMontageHotkeyControls() {
+        this.MontageSettings.coverLayoutRow := this.CoverLayoutRowInput.Value
+        this.MontageSettings.coverLayoutColumn := this.CoverLayoutColumnInput.Value
         this.MontageSettings.coverEnabled := this.CoverEnabledInput.Value = 1
         this.MontageSettings.coverChord := MergeViewerHotkeyChord(this.CoverChordInput.Value, this.CoverWinInput.Value = 1)
         this.MontageSettings.enabled :=
@@ -800,8 +786,11 @@ class ReportAssistantSettingsWindow {
 
     FocusMontageValidationError(field) {
         if field = "CoverChord" {
-            this.Tabs.Choose(3)
             this.CoverChordInput.Focus()
+        } else if field = "CoverLayoutRow" {
+            this.CoverLayoutRowInput.Focus()
+        } else if field = "CoverLayoutColumn" {
+            this.CoverLayoutColumnInput.Focus()
         } else if field = "MontageBodyChord"
             this.MontageBodyChordInput.Focus()
         else if field = "MontageHeadChord"

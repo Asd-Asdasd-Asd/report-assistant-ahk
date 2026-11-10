@@ -23,14 +23,16 @@ class LegacyCompatTests(unittest.TestCase):
             self.assertNotIn(f"RAlt & {key}::", compat)
         self.assertIn("GlobalHjklArrows=true", compat)
 
-    def test_unmigrated_viewer_actions_remain_available(self) -> None:
+    def test_only_historical_side_button_notification_remains(self) -> None:
         compat = source("legacy/medex_legacy_compat.ahk")
         retained_hotkeys = (
             "~XButton1::",
-            "^#+c::",
         )
         for hotkey in retained_hotkeys:
             self.assertIn(hotkey, compat)
+        self.assertNotIn("^#+c::", compat)
+        self.assertNotIn("MouseClick", compat)
+        self.assertIn('"viewer-cover"', source("src/mxnm_cover.ahk"))
 
     def test_montage_hotkeys_are_owned_by_production(self) -> None:
         compat = source("legacy/medex_legacy_compat.ahk")

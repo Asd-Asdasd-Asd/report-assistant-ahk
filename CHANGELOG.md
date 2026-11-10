@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-10
+
+- Migrate the last legacy cover workflow to guarded Viewer controls. Save MIP
+  to report left and reset the coronal fusion slice before saving report right;
+  user field acceptance confirmed both images and captions on 2026-11-10.
+- Place Cover and Montage together on the Shortcuts tab with independent
+  layout positions and remove their Beta labels. Retire the duplicate legacy
+  compatibility cover hotkey after field acceptance.
+- Correct cover surface containment to use the Viewer window frame rather
+  than its inset client area; retain unique-target checks and record candidate counts.
+- Fix Windows path separators in generated-harness coverage validation.
+
 - Record every template hotstring as a `ReportHotstring` operation in
   `automation-events.log`, successes included: preflight, color-reset result,
   arrow/black click timing, popup sample count, and a post-write observation
@@ -16,8 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   10-minute detailed-diagnostics tray item, and per-action snapshot filtering.
 - Add `src/core/win32_window.ahk` and `src/core/log_file.ahk`; route window
   queries, foreground-process checks and diagnostic log rotation through them
-  instead of per-module copies. Behaviour is unchanged; Windows regression
-  pending.
+  instead of per-module copies. Core Windows regression was confirmed by the
+  user on 2026-10-13 within the documented validation scope.
 - Remove the ineffective `config.local.ahk` override, placeholder viewer
   actions and coordinate helpers; target process names are now constants.
 - Share one AHK bundler (`scripts/ahk_bundle.py`) and one field-tool EXE build

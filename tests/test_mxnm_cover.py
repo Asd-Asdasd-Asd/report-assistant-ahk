@@ -19,6 +19,59 @@ class CoverWindowsTests(unittest.TestCase):
         self.run_ahk('FileAppend("PASS`n", "*")\nExitApp(0)\n' + release
                      + '\n#Warn All, StdOut\n')
 
+    def test_settings_window_stores_two_independent_layouts_without_overlap(self):
+        from scripts.build_release import build_release_text
+
+        body = '''
+RunSettingsLayoutTest()
+RunSettingsLayoutTest() {
+    try {
+        testConfig := A_ScriptDir "\\settings-layout.ini"
+        FileAppend(BuildDefaultReportHotstringConfig(), testConfig, "UTF-16")
+        load := LoadEditableReportHotstringConfig(testConfig)
+        if !load.Ok
+            throw Error("Could not load isolated settings fixture")
+        controller := ReportAssistantSettingsWindow(load)
+        controller.Window.Show("Hide w900 h760")
+        controller.Tabs.Choose(2)
+        inputs := [controller.MontageBodyChordInput, controller.MontageHeadChordInput,
+            controller.MontageLungChordInput, controller.CoverChordInput,
+            controller.MontageLayoutRowInput, controller.MontageLayoutColumnInput,
+            controller.CoverLayoutRowInput, controller.CoverLayoutColumnInput]
+        for index, input in inputs {
+            input.GetPos(&x, &y, &w, &h)
+            if y < 96 || y + 26 > 688 || x < 40 || x + w > 852
+                throw Error("Shortcut input escapes tab content")
+            for otherIndex, other in inputs {
+                if otherIndex <= index
+                    continue
+                other.GetPos(&ox, &oy, &ow, &oh)
+                if x < ox + ow && x + w > ox && y < oy + 26 && y + 26 > oy
+                    throw Error("Shortcut/layout inputs overlap")
+            }
+        }
+        controller.MontageLayoutRowInput.Choose(4)
+        controller.MontageLayoutColumnInput.Choose(4)
+        controller.CoverLayoutRowInput.Choose(2)
+        controller.CoverLayoutColumnInput.Choose(3)
+        controller.StoreMontageHotkeyControls()
+        WriteMxNMMontageSettings(testConfig, controller.MontageSettings)
+        reloaded := LoadMxNMMontageSettings(testConfig)
+        if reloaded.layoutRow != 4 || reloaded.layoutColumn != 4
+            || reloaded.coverLayoutRow != 2 || reloaded.coverLayoutColumn != 3
+            throw Error("Settings UI mixed up independent layouts")
+        controller.Window.Destroy()
+        FileAppend("PASS`n", "*")
+        ExitApp(0)
+    } catch as testError {
+        FileAppend(testError.Message, "**")
+        ExitApp(1)
+    }
+}
+'''
+        self.run_ahk(body + build_release_text(timestamp="settings-layout-test")
+                     + '\n#Warn All, StdOut\n')
+
     def run_cover(self, body):
         # Include definitions only. No app startup, hotkey registration, Viewer
         # commands, clipboard capture or report persistence is executed.
@@ -54,7 +107,7 @@ class FakeCoverTransport {
 
     def test_order_and_every_failure_stop_without_replay(self):
         self.run_cover('''
-    expected := ["PREFLIGHT", "LAYOUT_R2C3", "ANNOTATION_TAB", "CAPTION_DEFAULT",
+    expected := ["PREFLIGHT", "SELECT_LAYOUT", "ANNOTATION_TAB", "CAPTION_DEFAULT",
         "BIND_SURFACE", "SELECT_MIP", "SAVE_LEFT", "SELECT_FUSION", "RESET_DEFAULT", "SAVE_RIGHT"]
     success := FakeCoverTransport()
     result := MxNMCoverRun({}, success)
@@ -120,12 +173,18 @@ class FakeCoverTransport {
     settings := LoadMxNMMontageSettings(configPath)
     if !settings.ok || settings.coverEnabled || settings.coverChord != "^#+c"
         throw Error("Cover defaults incorrect")
+    if settings.coverLayoutRow != 2 || settings.coverLayoutColumn != 3
+        throw Error("Cover layout defaults incorrect")
     settings.coverEnabled := true
     settings.coverChord := "^#+v"
+    settings.coverLayoutRow := 3
+    settings.coverLayoutColumn := 1
     WriteMxNMMontageSettings(configPath, settings)
     reloaded := LoadMxNMMontageSettings(configPath)
     if !MxNMMontageSettingsMatch(settings, reloaded)
         throw Error("Cover settings did not survive save")
+    if reloaded.layoutRow != 4 || reloaded.layoutColumn != 4
+        throw Error("Cover layout replaced Montage layout")
     if !ValidateMxNMMontageSettings(settings).Ok
         throw Error("Cover-only mode requires Montage enabled")
     settings.coverChord := "^!q"
@@ -154,11 +213,35 @@ class FakeCoverTransport {
         throw Error("Canvas outside actual frame accepted")
 ''')
 
+    def test_configured_cover_layout_validates_its_own_model_before_input(self):
+        self.run_cover('''
+    configPath := A_ScriptDir "\\layout-profiles.ini"
+    IniWrite("4", configPath, "ShowModel9", "LowWndSize")
+    IniWrite("0", configPath, "ShowModel9", "ShowModelPage")
+    loop 4 {
+        index := A_Index
+        pane := Map("Left", Mod(index - 1, 2) * 375, "Top", index > 2 ? 472 : 0,
+            "Width", 375, "Height", 472, "ImageType", [1, 2, 3, 1][index],
+            "ImageOrient", 2, "ImageOrigin", index = 4 ? 2 : 1)
+        for name, value in pane
+            IniWrite(value, configPath, "ShowModel9", "LowWnd" name "_" index)
+    }
+    if !MxNMCoverLayoutSupported(configPath, 3, 1)
+        throw Error("Configured model was not used")
+    if MxNMCoverLayoutSupported(configPath, 2, 3)
+        throw Error("Missing configured model fell back to another model")
+    if MxNMCoverLayoutSupported(configPath, 6, 1)
+        throw Error("Out-of-range layout accepted")
+    IniWrite("2", configPath, "ShowModel9", "LowWndImageType_3")
+    if MxNMCoverLayoutSupported(configPath, 3, 1)
+        throw Error("Non-fusion layout accepted")
+''')
+
 
 class CoverIntegrationTests(unittest.TestCase):
     def test_cover_uses_montage_transports_and_owns_no_raw_screen_coordinates(self):
         text = (ROOT / "src/mxnm_cover.ahk").read_text(encoding="utf-8")
-        for required in ("MxNMMontageLayoutPoint(2, 3)", "MxNMMontageComboSelect(21155, \"default\", session)",
+        for required in ("MxNMMontageLayoutPoint(session.coverLayoutRow, session.coverLayoutColumn)", "MxNMMontageComboSelect(21155, \"default\", session)",
                          "MxNMMontageResolveControl", "ClipboardAll()", "A_Clipboard := payload",
                          "COVER_SURFACE_NOT_UNIQUE", '"SAVE_COMMANDS_DISPATCHED"'):
             self.assertIn(required, text)

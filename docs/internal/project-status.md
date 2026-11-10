@@ -11,17 +11,18 @@
   行为按逐函数对照保持不变。验证范围见 `docs/internal/2026-10-10-project-review.md` 末尾的验证清单；
   该清单以外的现场场景仍按常规回归处理。
 
-## 封面图迁移分支（等待现场验收，尚未合并 main）
+## 封面图迁移完成（2026-11-10 现场验收通过）
 
 - 保存左图/右图写入报告草稿、结果可见且不提交，迁移后可直接自动执行（2026-10-13 用户确认）。
 - 2026-11-10 用户已完成九步 hover 探测并确认按 legacy 顺序手工执行结果正常；布局选择面板第二行第三列，Viewer 右下 MIP 保存为报告左图，左下融合冠状位先恢复默认层面再保存为报告右图。
-- `codex/cover-workflow` 新增 `src/mxnm_cover.ahk`，复用 Montage 控件操作，独立开关默认关闭；完整实现的现场执行尚未验收。
+- `src/mxnm_cover.ahk` 复用 Montage 控件操作，独立开关默认关闭；用户确认修复版完整执行成功，左右图和图注均正常。
+- 版本升至 0.9.0，封面图与 Montage 同列于“快捷键”页，分别设置布局行列（默认封面图 2/3，Montage 4/4）；去除相关 Beta 标记。
 - 目标为相同四窗格 schema 的 profile；运行时发现唯一 surface，配置只校验语义，不能作为独立的点击目标发现来源。布局当前选中状态、复位完成和图片持久化均无已验证的可读信号。
-- 用户确认现场验收通过后才合并 main 并移除 compatibility 中旧入口；验收说明见 `../field-tests/2026-11-10-cover-workflow-acceptance.md`。
+- 已撤下 compatibility 中 Ctrl+Win+Shift+C 重复入口；原始 legacy 脚本保留作历史参考，不自动操作运行实例。验收记录见 `../field-tests/2026-11-10-cover-workflow-acceptance.md`。
 
 ## 当前状态
 
-- 源码版本为 `0.8.0`。本轮维护包含 Windows 测试编码、快捷键校验/注册反馈、配置失败时停用模板和打包中断恢复；尚未部署新的 Windows EXE。
+- 源码版本为 `0.9.0`。封面图核心流程已在用户工作站通过现场验收；新增布局设置和 UI 调整通过独立回归，其他机器及非默认封面图布局仍需分别验证。
 - Viewer 测量目标使用 `MxNMMeasurementProvider.ResolveTarget` → `MxNMContextTargetSessionProvider`，按当前 Viewer 身份发现并验证图像 surface。
 - 当前 production 路径不依赖旧的 config-only 几何计划；旧实现和 checkpoint 仅作历史审计材料。
 - Viewer 快捷键、测量、颜色恢复和 Caption 首次保存均要求明确的窗口/进程/控件/目标证据；证据不唯一时 fail closed。
