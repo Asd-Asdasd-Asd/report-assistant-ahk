@@ -149,16 +149,16 @@ class ViewerToolHotkeyTests(unittest.TestCase):
             "快速标图",
             "箭头",
             "长度测量",
-            "3D SUV测量",
-            "截图（发送 F12）",
+            "3D SUV",
+            "截图",
             "清除全部标注",
         ):
             self.assertIn(label, ui)
         self.assertEqual(ui.count('"Hotkey"'), 10)
-        self.assertEqual(ui.count('"CheckBox", "x276'), 8)
-        self.assertEqual(ui.count('"CheckBox", "x648'), 10)
-        self.assertEqual(ui.count('w90 h26", "启用"'), 7)
-        self.assertEqual(ui.count('w70 h26", "使用"'), 10)
+        self.assertEqual(ui.count('"CheckBox", "x230'), 8)
+        self.assertEqual(ui.count('"CheckBox", "x560'), 10)
+        self.assertEqual(ui.count('w70 h24", "启用"'), 7)
+        self.assertEqual(ui.count('w60 h24", "使用"'), 10)
         self.assertNotIn("Limit15", ui)
         self.assertIn("ValidateFeatureHotkeySettings(", ui)
         self.assertIn(

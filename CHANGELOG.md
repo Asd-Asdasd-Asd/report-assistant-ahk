@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Compact the native settings window to 800×660. Move long option explanations
+  into small question-mark buttons opening native, dismissible help menus;
+  keep configuration values and independent layout controls unchanged.
+
 - Use one per-paste Caption save-readiness gate instead of the first-window
   500 ms delay: 80 ms minimum, 40 ms stable button availability, 800 ms timeout.
   Verify unique button identity and live point hit before one save click;

@@ -32,15 +32,27 @@ RunSettingsLayoutTest() {
         if !load.Ok
             throw Error("Could not load isolated settings fixture")
         controller := ReportAssistantSettingsWindow(load)
-        controller.Window.Show("Hide w900 h760")
+        controller.Window.Show("Hide w800 h660")
         controller.Tabs.Choose(2)
         inputs := [controller.MontageBodyChordInput, controller.MontageHeadChordInput,
             controller.MontageLungChordInput, controller.CoverChordInput,
             controller.MontageLayoutRowInput, controller.MontageLayoutColumnInput,
             controller.CoverLayoutRowInput, controller.CoverLayoutColumnInput]
+        for record in controller.HelpButtons {
+            definition := ReportAssistantSettingsDefaults.HelpTopic(record.Topic)
+            helpMenu := controller.BuildHelpMenu(record.Topic)
+            itemCount := DllCall("User32\\GetMenuItemCount", "Ptr", helpMenu.Handle, "Int")
+            if itemCount != definition.Lines.Length + 2
+                throw Error("Help menu lost a heading, separator or explanation")
+            record.Control.GetPos(&hx, &hy, &hw, &hh)
+            if hw != 18 || hh != 18 || hx < 28 || hx + hw > 772 || hy < 48 || hy + hh > 594
+                throw Error("Help icon size or bounds incorrect")
+        }
+        if controller.Dirty
+            throw Error("Building help menus changed settings")
         for index, input in inputs {
             input.GetPos(&x, &y, &w, &h)
-            if y < 96 || y + 26 > 688 || x < 40 || x + w > 852
+            if y < 80 || y + 26 > 594 || x < 28 || x + w > 772
                 throw Error("Shortcut input escapes tab content")
             for otherIndex, other in inputs {
                 if otherIndex <= index
