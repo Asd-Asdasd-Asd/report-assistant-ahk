@@ -312,9 +312,17 @@ class ReportAssistantSettingsWindow {
         this.LoadMontageHotkeyControls()
 
         this.Tabs.UseTab(3)
-        this.Window.Add(
-            "Text", "x40 y70 w820 h30 Center", "其他设置将在后续版本开放。"
-        )
+        this.Window.Add("Text", "x72 y80 w220", "封面图（Beta）")
+        this.CoverEnabledInput := this.Window.Add("CheckBox", "x276 y72 w90 h26", "启用")
+        this.CoverChordInput := this.Window.Add("Hotkey", "x402 y72 w220 h26")
+        this.CoverWinInput := this.Window.Add("CheckBox", "x648 y72 w100 h26", "使用 Win")
+        this.Window.Add("Text", "x72 y120 w720 h70", "选择第 2 行第 3 列：右下 MIP 保存为报告左图，左下冠状位融合图恢复默认后保存为报告右图。仅用于已验证布局，请检查报告草稿。")
+        this.CoverEnabledInput.Value := this.MontageSettings.coverEnabled ? 1 : 0
+        this.CoverChordInput.Value := ViewerHotkeyNativeChord(this.MontageSettings.coverChord)
+        this.CoverWinInput.Value := ViewerHotkeyUsesWin(this.MontageSettings.coverChord) ? 1 : 0
+        this.CoverEnabledInput.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
+        this.CoverWinInput.OnEvent("Click", this.OnViewerHotkeyChanged.Bind(this))
+        this.CoverChordInput.OnEvent("Change", this.OnViewerHotkeyChanged.Bind(this))
 
         this.Tabs.UseTab()
         this.SaveButton := this.Window.Add(
@@ -570,6 +578,8 @@ class ReportAssistantSettingsWindow {
     }
 
     StoreMontageHotkeyControls() {
+        this.MontageSettings.coverEnabled := this.CoverEnabledInput.Value = 1
+        this.MontageSettings.coverChord := MergeViewerHotkeyChord(this.CoverChordInput.Value, this.CoverWinInput.Value = 1)
         this.MontageSettings.enabled :=
             this.MontageEnabledInput.Value = 1
         this.MontageSettings.layoutRow :=
@@ -789,7 +799,10 @@ class ReportAssistantSettingsWindow {
     }
 
     FocusMontageValidationError(field) {
-        if field = "MontageBodyChord"
+        if field = "CoverChord" {
+            this.Tabs.Choose(3)
+            this.CoverChordInput.Focus()
+        } else if field = "MontageBodyChord"
             this.MontageBodyChordInput.Focus()
         else if field = "MontageHeadChord"
             this.MontageHeadChordInput.Focus()

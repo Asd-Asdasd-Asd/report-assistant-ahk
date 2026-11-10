@@ -19,6 +19,9 @@
 
 ## Compatibility 仍保留
 
+2026-11-10：封面图在 `codex/cover-workflow` 实现，等待用户现场验收后才移除下方旧入口。
+测试新版封面图时必须手工退出 compatibility；新版封面图默认关闭，不自动结束旧脚本。
+
 | Hotkey | 行为 | 当前风险 |
 | --- | --- | --- |
 | Ctrl+Win+Shift+C | 左 MIP、右 coronal sectional/fusion cover workflow | 多个固定坐标，中途失败仍可能继续；迁移前控件探测见 [封面图控件探测](../field-tests/2026-10-13-cover-control-diagnostic.md) |

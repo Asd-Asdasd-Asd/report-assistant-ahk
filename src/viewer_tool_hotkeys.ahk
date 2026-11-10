@@ -82,6 +82,10 @@ RunMxNMViewerHotkey(commandName, chord) {
     operation.SetField("viewer.command", commandName)
     operation.SetField("viewer.dispatchResult", "NOT_DISPATCHED")
     operation.SetField("viewer.effectState", "UNOBSERVABLE")
+    if MxNMViewerWorkflowLock.Busy {
+        operation.Complete("CANCELLED", "BUSY")
+        return false
+    }
     if active {
         operation.Complete("CANCELLED", "BUSY")
         return false

@@ -17,6 +17,14 @@ RegisterConfiguredFeatures(settings, montageSettings := 0) {
             MedExViewerForegroundActive
         )
     }
+    if IsObject(montageSettings) && montageSettings.ok
+        && montageSettings.coverEnabled && montageValidation.Ok {
+        RegisterHotkeyDefinitions(
+            MxNMCoverHotkeyDefinitions(montageSettings),
+            ReservedApplicationHotkeyChords(),
+            MedExViewerForegroundActive
+        )
+    }
     RegisterHotkeyDefinitions(
         ReportImageCaptionHotkeyDefinitions(settings),
         ReservedApplicationHotkeyChords(),

@@ -1,6 +1,6 @@
 # 项目状态与交接
 
-更新时间：2026-10-13。当前版本以 `src/app_metadata.ahk` 为准。
+更新时间：2026-11-10。当前版本以 `src/app_metadata.ahk` 为准。
 
 ## 2026-10-10 重构分支 `refactor/core-cleanup`
 
@@ -11,10 +11,13 @@
   行为按逐函数对照保持不变。验证范围见 `docs/internal/2026-10-10-project-review.md` 末尾的验证清单；
   该清单以外的现场场景仍按常规回归处理。
 
-## 下一步：封面图迁移（最后一个 legacy 功能）
+## 封面图迁移分支（等待现场验收，尚未合并 main）
 
 - 保存左图/右图写入报告草稿、结果可见且不提交，迁移后可直接自动执行（2026-10-13 用户确认）。
-- 待现场运行封面图控件探测并回传结果：`docs/field-tests/2026-10-13-cover-control-diagnostic.md`。
+- 2026-11-10 用户已完成九步 hover 探测并确认按 legacy 顺序手工执行结果正常；布局选择面板第二行第三列，Viewer 右下 MIP 保存为报告左图，左下融合冠状位先恢复默认层面再保存为报告右图。
+- `codex/cover-workflow` 新增 `src/mxnm_cover.ahk`，复用 Montage 控件操作，独立开关默认关闭；完整实现的现场执行尚未验收。
+- 目标为相同四窗格 schema 的 profile；运行时发现唯一 surface，配置只校验语义，不能作为独立的点击目标发现来源。布局当前选中状态、复位完成和图片持久化均无已验证的可读信号。
+- 用户确认现场验收通过后才合并 main 并移除 compatibility 中旧入口；验收说明见 `../field-tests/2026-11-10-cover-workflow-acceptance.md`。
 
 ## 当前状态
 
