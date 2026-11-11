@@ -6,15 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-11
+
 - Compact the native settings window to 800×660. Move long option explanations
   into small question-mark buttons opening native, dismissible help menus;
   keep configuration values and independent layout controls unchanged.
 
-- Use one per-paste Caption save-readiness gate instead of the first-window
-  500 ms delay: 80 ms minimum, 40 ms stable button availability, 800 ms timeout.
-  Verify unique button identity and live point hit before one save click;
-  leave the image unadvanced on failure and log safe readiness codes/counts.
-  Persistence remains unobservable; Windows/MedEx field acceptance is pending.
+- Wait 250 ms after every Caption paste, then check the unique Save button's
+  identity, bounds and native window ownership before clicking it. Keep the
+  image unadvanced if the target cannot be verified.
+- Resolve Cover panes from the current Viewer geometry, supporting four pane
+  windows and the existing shared drawing dialog. Log geometry and candidate
+  counts when the drawing area cannot be verified.
+- User field testing confirmed both the Caption and Cover fixes.
 
 ## [0.9.0] - 2026-11-10
 

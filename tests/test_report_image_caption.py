@@ -256,7 +256,7 @@ class ReportImageCaptionTests(unittest.TestCase):
             action,
         )
         self.assertIn("static CaptionFocusSettleMs := 15", self.module)
-        self.assertIn("static SaveReadyMinimumMs := 80", self.module)
+        self.assertIn("static PasteToSaveSettleMs := 250", self.module)
         self.assertNotIn("FirstTargetSessionPasteSettleMs", self.module)
         self.assertIn("static ExplicitSaveSettleMs := 200", self.module)
         self.assertIn("static InterAdvanceSaveGateMs := 550", self.module)
@@ -273,18 +273,20 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertNotIn("A_Clipboard :=", action)
         self.assertIn("SetReportImageCaptionClipboard(cache.payload)", action)
 
-    def test_every_caption_save_checks_button_readiness_before_dispatch(self) -> None:
+    def test_every_caption_save_waits_and_revalidates_target_before_dispatch(self) -> None:
         action = self.body(
             "\nExecuteReportImageCaptionAction(\n    cache,",
-            "\nclass ReportImageCaptionSaveReadinessGate",
+            "\nValidateReportImageCaptionSaveTarget(",
         )
-        self.assertIn("WaitForReportImageCaptionSaveReady(target)", action)
-        self.assertLess(action.index("if !saveReady.ok"), action.index("target.savePoint.x"))
-        self.assertLess(action.index("if !finalReady.ok"), action.index("target.savePoint.x"))
+        self.assertLess(action.index('SendInput "^v"'), action.index("Sleep ReportImageCaptionDefaults.PasteToSaveSettleMs"))
+        self.assertLess(action.index("Sleep ReportImageCaptionDefaults.PasteToSaveSettleMs"),
+                        action.index("ValidateReportImageCaptionSaveTarget(target)"))
+        self.assertLess(action.index("if !saveTarget.ok"), action.index("target.savePoint.x"))
         self.assertNotIn("ReportImageCaptionPasteGate", self.module)
         self.assertNotIn("ReadyTargetKey", self.module)
-        self.assertIn("SAVE_READY_CONFIRMED", action)
-        self.assertIn("caption.saveReadyCode", action)
+        self.assertIn("PASTE_SETTLE_COMPLETED", action)
+        self.assertIn("caption.saveTargetCode", action)
+        self.assertNotIn("UIA.ElementFromPoint", self.module)
 
     def test_explicit_save_button_is_dispatched_before_advance(self) -> None:
         candidate = self.body(
@@ -316,7 +318,7 @@ class ReportImageCaptionTests(unittest.TestCase):
         )
         action = self.body(
             "\nExecuteReportImageCaptionAction(\n    cache,",
-            "\nclass ReportImageCaptionSaveReadinessGate",
+            "\nValidateReportImageCaptionSaveTarget(",
         )
         self.assertIn("static LastAdvanceTicks := Map()", gate)
         self.assertIn('path: "NO_PRIOR_ADVANCE"', gate)

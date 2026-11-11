@@ -9,15 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @unittest.skipUnless(os.name == "nt" and maintenance.ahk_executable(), "requires Windows and AutoHotkey v2")
-class CaptionSaveReadinessWindowsTests(unittest.TestCase):
+class CaptionSaveTimingWindowsTests(unittest.TestCase):
     run_ahk = maintenance.MaintenanceWindowsTests.run_ahk
 
-    def test_actual_action_never_saves_or_advances_after_readiness_failure(self):
+    def test_actual_action_waits_then_saves_or_stops_without_advancing(self):
         source = (ROOT / "src/report_image_caption.ahk").read_text(encoding="utf-8")
         definitions = source.split("\nReportImageCaptionHotkeyDefinitions(", 1)[0]
         action = "ExecuteReportImageCaptionAction(" + source.split(
             "\nExecuteReportImageCaptionAction(", 1)[1].split(
-                "\n; Per-paste policy;", 1)[0]
+                "\nValidateReportImageCaptionSaveTarget(", 1)[0]
         # Substitute external boundaries only. Preserve production branches,
         # result codes, ordering and return paths. No real clipboard or input.
         action = action.replace('WinExist("A")', "CaptionTestForeground()")
@@ -31,13 +31,13 @@ class CaptionSaveReadinessWindowsTests(unittest.TestCase):
         result_function = "MakeReportImageCaptionResult(" + source.split(
             "\nMakeReportImageCaptionResult(", 1)[1].split("\nReportImageCaptionFailureMessage(", 1)[0]
         self.run_ahk('''
-RunCaptionReadinessActionTest()
-RunCaptionReadinessActionTest() {
-    global CaptionScenario, CaptionEvents
+RunCaptionSaveTimingActionTest()
+RunCaptionSaveTimingActionTest() {
+    global CaptionScenario, CaptionEvents, CaptionPasteTick
     try {
         target := {hwnd: 1001, pid: 101, captionPoint: {x: 1, y: 1},
             savePoint: {x: 2, y: 2}, imagePoint: {x: 3, y: 3}}
-        for scenario in ["TIMEOUT", "FINAL_DISABLED", "FINAL_AMBIGUOUS", "READY"] {
+        for scenario in ["FINAL_DISABLED", "FINAL_AMBIGUOUS", "READY", "READY"] {
             CaptionScenario := scenario
             CaptionEvents := []
             ReportImageCaptionAdvanceGate.LastAdvanceTicks := Map()
@@ -68,17 +68,11 @@ ReportImageCaptionPointBelongsToTarget(hwnd, point) => true
 SetReportImageCaptionClipboard(payload) => true
 ReportImageCaptionFeedbackOrigin(cache, x, y) => 0
 ShowReportImageCaptionTransferFeedback(origin, destination) => true
-WaitForReportImageCaptionSaveReady(target) {
-    global CaptionScenario
-    return {ok: CaptionScenario != "TIMEOUT", code: "TEST_READY", elapsedMs: 80, sampleCount: 3}
-}
-ResolveReportImageCaptionSaveButton(target) {
-    global CaptionScenario
-    return {ok: CaptionScenario != "FINAL_AMBIGUOUS", code: "TEST_UNIQUE", button: {}}
-}
-ProbeReportImageCaptionSaveButton(target, button) {
-    global CaptionScenario
-    return {ok: CaptionScenario != "FINAL_DISABLED", code: "TEST_ENABLED"}
+ValidateReportImageCaptionSaveTarget(target) {
+    global CaptionScenario, CaptionPasteTick
+    if A_TickCount - CaptionPasteTick < 235
+        throw Error("Paste-to-save wait was too short")
+    return {ok: CaptionScenario = "READY", code: "TEST_SAVE_TARGET"}
 }
 CaptionTestClick(which, x, *) {
     global CaptionEvents
@@ -89,12 +83,14 @@ CaptionTestMove(x, *) {
     CaptionEvents.Push("move" x)
 }
 CaptionTestSend(keys) {
-    global CaptionEvents
+    global CaptionEvents, CaptionPasteTick
+    if keys = "^v"
+        CaptionPasteTick := A_TickCount
     CaptionEvents.Push(keys)
 }
 ''' + definitions + "\n" + action + "\n" + result_function)
 
-    def test_save_readiness_policy_in_generated_windows_harness(self):
+    def test_generated_viewer_state_harness(self):
         # Synthetic windows only; this harness never interacts with MedEx.
         import subprocess
         result = subprocess.run(
@@ -106,16 +102,16 @@ CaptionTestSend(keys) {
         self.assertEqual(result.returncode, 0, (result.stdout + result.stderr).decode("utf-8", errors="replace"))
         self.assertIn(b"Viewer state regression: PASS", result.stdout)
 
-    def test_live_uia_save_button_disabled_duplicate_and_hit_checks(self):
+    def test_save_target_checks_live_button_identity_and_native_ownership(self):
         source = (ROOT / "src/report_image_caption.ahk").read_text(encoding="utf-8")
-        probes = "ResolveReportImageCaptionSaveButton(target) {" + source.split(
-            "\nResolveReportImageCaptionSaveButton(target) {", 1)[1].split(
+        probes = "ValidateReportImageCaptionSaveTarget(target) {" + source.split(
+            "\nValidateReportImageCaptionSaveTarget(target) {", 1)[1].split(
                 "\nSetReportImageCaptionClipboard(payload) {", 1)[0]
         # Keep the test panel nonactivating; only foreground observation is
-        # substituted. Identity, enabled state, native/UIA hit tests are real.
+        # substituted. Identity, enabled state, native point ownership is real.
         probes = probes.replace('WinExist("A")', "CaptionPanelForeground()")
-        geometry = "ReportImageCaptionElementRect(element) {" + source.split(
-            "\nReportImageCaptionElementRect(element) {", 1)[1].split(
+        geometry = "ReportImageCaptionElementUsable(element, expectedPid) {" + source.split(
+            "\nReportImageCaptionElementUsable(element, expectedPid) {", 1)[1].split(
                 "\nReportImageCaptionRectWidth(rect) {", 1)[0]
         includes = f'#Include {ROOT / "src/Lib/UIA.ahk"}\n#Include {ROOT / "src/core/win32_window.ahk"}\n'
         self.run_ahk(includes + '''
@@ -135,20 +131,20 @@ RunCaptionPanelTest() {
         target := {hwnd: panel.Hwnd, pid: DllCall("GetCurrentProcessId", "UInt"),
             saveAnchor: {element: elements[1], rectKey: RectKey(rect)},
             savePoint: {x: (rect.l + rect.r) // 2, y: (rect.t + rect.b) // 2}}
-        resolved := ResolveReportImageCaptionSaveButton(target)
-        if !resolved.ok || !ProbeReportImageCaptionSaveButton(target, resolved.button).ok
+        if !ValidateReportImageCaptionSaveTarget(target).ok
             throw Error("Unique enabled save button not recognized")
         button.Enabled := false
-        disabled := ProbeReportImageCaptionSaveButton(target, resolved.button)
-        if disabled.ok || !disabled.waitable || disabled.code != "SAVE_BUTTON_DISABLED"
+        disabled := ValidateReportImageCaptionSaveTarget(target)
+        if disabled.ok || disabled.code != "SAVE_BUTTON_UNAVAILABLE"
             throw Error("Disabled button accepted or treated as ambiguous")
         button.Enabled := true
         target.savePoint.x := rect.r + 10
-        if ProbeReportImageCaptionSaveButton(target, resolved.button).ok
+        if ValidateReportImageCaptionSaveTarget(target).ok
             throw Error("Point outside button accepted")
+        target.savePoint.x := (rect.l + rect.r) // 2
         panel.Add("Button", "x120 y10 w100 h30", "保存")
-        duplicate := ResolveReportImageCaptionSaveButton(target)
-        if duplicate.ok || duplicate.waitable || duplicate.code != "SAVE_BUTTON_NOT_UNIQUE"
+        duplicate := ValidateReportImageCaptionSaveTarget(target)
+        if duplicate.ok || duplicate.code != "SAVE_BUTTON_NOT_UNIQUE"
             throw Error("Duplicate save button did not stop immediately")
         panel.Destroy()
         FileAppend("PASS`n", "*")

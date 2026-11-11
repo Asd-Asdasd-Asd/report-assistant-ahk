@@ -90,7 +90,7 @@ RunSettingsLayoutTest() {
         includes = "\n".join(
             f'#Include {ROOT / path}' for path in (
                 "src/app_config.ahk", "src/core/win32_window.ahk", "src/mxnm_montage.ahk",
-                "src/mxnm_cover.ahk", "src/hotkey_registration.ahk",
+                "src/mxnm_cover.ahk", "src/mxnm_context_target_session.ahk", "src/hotkey_registration.ahk",
                 "src/feature_model.ahk", "src/feature_normalization.ahk",
                 "src/hotstring_config_editor.ahk",
             )
@@ -114,6 +114,10 @@ class FakeCoverTransport {
         this.Calls.Push(step)
         return {ok: step != this.FailAt, code: step = this.FailAt ? "TEST_STOP" : "READY"}
     }
+}
+CoverCandidate(hwnd, parent, className, left, top, right, bottom) {
+    return {hwnd: hwnd, parent: parent, className: className,
+        width: right - left, height: bottom - top, rect: {left: left, top: top, right: right, bottom: bottom}}
 }
 ''')
 
@@ -164,18 +168,44 @@ class FakeCoverTransport {
     if MxNMCoverFourPaneProfileMatches(panes)
         throw Error("Non-fusion lower-left accepted")
     root := {left: 1920, top: 0, right: 4481, bottom: 1440}
-    canvas := {hwnd: 22, className: "#32770", width: 1425, height: 1360,
-        rect: {left: 2566, top: 80, right: 3991, bottom: 1440}}
-    result := MxNMCoverChooseSurface([canvas], root, 11)
+    palette := {left: 1930, top: 100, right: 2150, bottom: 375}
+    identity := {rootHwnd: 11}
+    match := (pane, point) => true
+    canvas := CoverCandidate(22, 11, "#32770", 2180, 80, 2910, 920)
+    result := MxNMCoverChooseSurface([canvas], root, palette, identity, match)
     if !result.ok || result.hwnd != 22
-        throw Error("Unique inner canvas rejected")
-    if MxNMCoverChooseSurface([], root, 11).ok
+        throw Error("Unique canvas rejected under former root-relative size thresholds")
+    if result.mode != "SHARED_CANVAS" || MxNMCoverPaneCenter(result.panes[4]).x != 2727
+        throw Error("Shared canvas resolved the wrong lower-right point")
+    if MxNMCoverChooseSurface([], root, palette, identity, match).ok
         throw Error("Missing canvas accepted")
-    if MxNMCoverChooseSurface([canvas, canvas.Clone()], root, 11).ok
+    second := CoverCandidate(33, 11, "#32770", 3000, 80, 3750, 920)
+    if MxNMCoverChooseSurface([canvas, second], root, palette, identity, match).code != "COVER_SURFACE_NOT_UNIQUE"
         throw Error("Ambiguous canvas accepted")
-    canvas.rect.left := 1000
-    if MxNMCoverChooseSurface([canvas], root, 11).ok
-        throw Error("Canvas outside root accepted")
+    blocked := MxNMCoverChooseSurface([canvas], root, palette, identity, (pane, point) => point.y < 500)
+    if blocked.ok || blocked.code != "COVER_PANE_POINT_MISMATCH"
+        throw Error("Canvas with an obscured lower pane accepted")
+''')
+
+    def test_live_geometry_orders_independent_panes_and_deduplicates_their_canvas(self):
+        self.run_cover('''
+    root := {left: -1600, top: 0, right: 0, bottom: 1000}
+    palette := {left: -1590, top: 100, right: -1380, bottom: 370}
+    identity := {rootHwnd: 11}
+    canvas := CoverCandidate(22, 11, "#32770", -1360, 50, -160, 990)
+    tl := CoverCandidate(31, 22, "DrawingView", -1360, 50, -762, 518)
+    tr := CoverCandidate(32, 22, "DrawingView", -758, 50, -160, 518)
+    bl := CoverCandidate(33, 22, "DrawingView", -1360, 522, -762, 990)
+    br := CoverCandidate(34, 22, "DrawingView", -758, 522, -160, 990)
+    match := (pane, point) => true
+    for candidates in [[br, tl, bl, tr], [br, canvas, tl, bl, tr]] {
+        result := MxNMCoverChooseSurface(candidates, root, palette, identity, match)
+        if !result.ok || result.mode != "PANE_WINDOWS" || result.panes[3].hwnd != 33 || result.panes[4].hwnd != 34
+            throw Error("Wrong lower pane mapping or duplicate shared canvas")
+    }
+    br.rect.top := 620
+    if MxNMCoverChooseSurface([br, tl, bl, tr], root, palette, identity, match).ok
+        throw Error("Unequal grid accepted")
 ''')
 
     def test_settings_round_trip_and_cross_feature_conflicts(self):
@@ -213,15 +243,17 @@ class FakeCoverTransport {
         self.run_cover('''
     outer := {left: 1920, top: 0, right: 4481, bottom: 1440}
     client := {left: 1921, top: 1, right: 4480, bottom: 1439}
-    canvas := {hwnd: 22, className: "#32770", width: 1425, height: 1360,
-        rect: {left: 2566, top: 80, right: 3991, bottom: 1440}}
-    if MxNMCoverChooseSurface([canvas], client, 11).candidateCount != 0
+    canvas := CoverCandidate(22, 11, "#32770", 2566, 80, 3991, 1440)
+    palette := {left: 1940, top: 100, right: 2200, bottom: 375}
+    identity := {rootHwnd: 11}
+    match := (pane, point) => true
+    if MxNMCoverChooseSurface([canvas], client, palette, identity, match).candidateCount != 0
         throw Error("Regression fixture no longer reproduces inset-client rejection")
-    result := MxNMCoverChooseSurface([canvas], outer, 11)
+    result := MxNMCoverChooseSurface([canvas], outer, palette, identity, match)
     if !result.ok || result.candidateCount != 1
         throw Error("Owned canvas touching outer border rejected")
     canvas.rect.bottom := 1441
-    if MxNMCoverChooseSurface([canvas], outer, 11).ok
+    if MxNMCoverChooseSurface([canvas], outer, palette, identity, match).ok
         throw Error("Canvas outside actual frame accepted")
 ''')
 
