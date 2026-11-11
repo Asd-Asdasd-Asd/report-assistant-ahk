@@ -7,6 +7,8 @@ class MedExColorResetDefaults {
     static ConfirmedProcessName := ""
     static AllowProvisionalProcess := true
     static ColorResetStrategy := MedExColorResetStrategy.RELATIVE_MOUSE_PIXEL_VALIDATED
+    static PopupSignatureTimeoutMs := 250
+    static PopupSignaturePollMs := 25
 
     ; Field-validated control semantics: one trigger click followed by bounded
     ; adaptive polling for the exact black item.
@@ -191,6 +193,7 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             false
         ) = true
         context["closedSignatureTestMode"] := skipArrowClickForClosedSignatureTest
+        menuOpenedAt := A_TickCount
         if !skipArrowClickForClosedSignatureTest {
             try {
                 Click arrowPoint["x"], arrowPoint["y"]
@@ -207,33 +210,11 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             }
         }
 
-        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
-        context["popupSignatureSampleCount"] := 1
-        context["popupSignatureFirstReason"] := signature["reason"]
-        context["popupSignatureFirstSamples"] := signature["samples"]
-        if !signature["matched"] {
-            delayMs := Max(0, Min(100, Integer(MedExAdapterOption(
-                options,
-                "signatureSecondSampleDelayMs",
-                CandidateGRelativeMouseProfile.SignatureSecondSampleDelayMs
-            ))))
-            context["signatureSecondSampleDelayMs"] := delayMs
-            if delayMs > 0
-                Sleep delayMs
-            if !MedExForegroundWindowMatches(foregroundHwnd) {
-                context["foregroundGuardReason"] := "foregroundChangedBeforeCandidateGSecondSignatureSample"
-                return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
-                    context, startedAt, options)
-            }
-            signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
-            context["popupSignatureSampleCount"] := 2
-            context["popupSignatureSecondReason"] := signature["reason"]
-            context["popupSignatureSecondSamples"] := signature["samples"]
-        }
-        context["popupSignatureMatched"] := signature["matched"]
-        context["popupSignatureReason"] := signature["reason"]
-        if !signature["matched"]
-            return FinishMedExColorReset(false, ColorResetCode.POPUP_SIGNATURE_MISMATCH,
+        popupFailure := WaitForCandidateGPopupSignature(
+            arrowPoint, foregroundHwnd, menuOpenedAt, context, options
+        )
+        if popupFailure != ""
+            return FinishMedExColorReset(false, popupFailure,
                 context, startedAt, options)
 
         if !MedExForegroundWindowMatches(foregroundHwnd) {
@@ -241,6 +222,9 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
             return FinishMedExColorReset(false, ColorResetCode.FOREGROUND_CHANGED,
                 context, startedAt, options)
         }
+        if A_TickCount - menuOpenedAt >= MedExColorResetDefaults.PopupSignatureTimeoutMs
+            return FinishMedExColorReset(false, ColorResetCode.POPUP_SIGNATURE_MISMATCH,
+                context, startedAt, options)
         try {
             Click blackPoint["x"], blackPoint["y"]
             RecordOptionalPerformanceTimestamp(
@@ -270,6 +254,37 @@ RunMedExRelativeMousePixelValidatedColorReset(options := 0) {
                 context["mouseRestored"] := false
             }
         }
+    }
+}
+
+WaitForCandidateGPopupSignature(arrowPoint, foregroundHwnd, menuOpenedAt, context, options) {
+    timeoutMs := MedExColorResetDefaults.PopupSignatureTimeoutMs
+    loop {
+        if !MedExForegroundWindowMatches(foregroundHwnd) {
+            context["foregroundGuardReason"] := "foregroundChangedWhileWaitingForCandidateGPopup"
+            return ColorResetCode.FOREGROUND_CHANGED
+        }
+        if A_TickCount - menuOpenedAt >= timeoutMs
+            return ColorResetCode.POPUP_SIGNATURE_MISMATCH
+
+        signature := SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options)
+        context["popupSignatureSampleCount"] := A_Index
+        if A_Index = 1 {
+            context["popupSignatureFirstReason"] := signature["reason"]
+            context["popupSignatureFirstSamples"] := signature["samples"]
+        } else if A_Index = 2 {
+            context["popupSignatureSecondReason"] := signature["reason"]
+            context["popupSignatureSecondSamples"] := signature["samples"]
+        }
+        context["popupSignatureReason"] := signature["reason"]
+        remainingMs := timeoutMs - (A_TickCount - menuOpenedAt)
+        if remainingMs <= 0
+            return ColorResetCode.POPUP_SIGNATURE_MISMATCH
+        if signature["matched"] {
+            context["popupSignatureMatched"] := true
+            return ""
+        }
+        Sleep Min(remainingMs, MedExColorResetDefaults.PopupSignaturePollMs)
     }
 }
 

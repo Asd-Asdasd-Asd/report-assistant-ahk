@@ -53,6 +53,8 @@
 - [ ] Wrong process、foreground change、缺少/重复语义锚点、非法 geometry 或
   popup signature mismatch 均在 black click 前 fail closed。
 - [ ] Arrow 和 black 各最多点击一次；执行后鼠标回到原位置。
+- [ ] 重启后首次执行带有效 Viewer 测量值的 `;fzg`，确认颜色菜单关闭且后续输入为黑色。
+  菜单在 250 ms 内校验通过时点击黑色；超时或前台窗口切换时停止。
 - [ ] Fast-failure path 不粘贴原 clipboard；clipboard restore 仍由唯一
   `finally` owner 完成。
 - [ ] 重新编译后的第一次颜色下拉若选中黑色但菜单未关闭，只记录现象；

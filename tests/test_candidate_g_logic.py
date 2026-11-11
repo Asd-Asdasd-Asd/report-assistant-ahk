@@ -7,6 +7,8 @@ import re
 import unittest
 from pathlib import Path
 
+import test_maintenance_windows as maintenance
+
 
 ROOT = Path(__file__).resolve().parents[1]
 LOGIC = ROOT / "src" / "medex_candidate_g_logic.ahk"
@@ -300,7 +302,8 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertLess(body.index("ValidateCandidateGRuntimeProfile"), arrow_click)
         self.assertLess(body.index("RectContainsPoint(clientRectScreen, arrowPoint)"), arrow_click)
         self.assertLess(body.index("RectContainsPoint(clientRectScreen, blackPoint)"), arrow_click)
-        self.assertLess(body.index('if !signature["matched"]'), black_click)
+        self.assertLess(body.index("if popupFailure !="), black_click)
+        self.assertLess(body.index("A_TickCount - menuOpenedAt >="), black_click)
         self.assertGreaterEqual(body.count("MedExForegroundWindowMatches"), 3)
         self.assertNotIn("MedExForegroundTargetMatches", body)
         self.assertIn("MouseMove originalMouseX, originalMouseY, 0", body)
@@ -322,7 +325,7 @@ class CandidateGLogicTests(unittest.TestCase):
         )[1].split("\nRunMedExUiaInvokeColorReset(options := 0)", 1)[0]
         self.assertIn("candidateGSkipArrowClickForClosedSignatureTest", body)
         self.assertIn("if !skipArrowClickForClosedSignatureTest", body)
-        signature_gate = body.index('if !signature["matched"]')
+        signature_gate = body.index("if popupFailure !=")
         black_click = body.index('Click blackPoint["x"], blackPoint["y"]')
         self.assertLess(signature_gate, black_click)
 
@@ -377,6 +380,78 @@ class CandidateGLogicTests(unittest.TestCase):
         self.assertNotIn("ResetMedExInsertionColor", candidate)
         self.assertNotIn("RunMedExRelativeMousePixelValidatedColorReset", candidate)
         self.assertNotIn("{Left 5}", source)
+
+
+@unittest.skipUnless(maintenance.ahk_executable(), "requires AutoHotkey v2")
+class CandidateGPopupTimingWindowsTests(unittest.TestCase):
+    run_ahk = maintenance.MaintenanceWindowsTests.run_ahk
+
+    def test_delayed_match_timeout_and_foreground_changes(self) -> None:
+        adapter = ADAPTER.read_text(encoding="utf-8")
+        interaction = adapter.split("\n        menuOpenedAt := A_TickCount", 1)[1]
+        interaction = "menuOpenedAt := A_TickCount" + interaction.split(
+            '\n        context["automationChainResult"] := ColorResetCode.RELATIVE_MOUSE_CHAIN_OK', 1
+        )[0]
+        interaction = interaction.replace("Click arrowPoint", "RecordClick arrowPoint").replace(
+            "Click blackPoint", "RecordClick blackPoint"
+        )
+        poll = "WaitForCandidateGPopupSignature(" + adapter.split(
+            "\nWaitForCandidateGPopupSignature(", 1
+        )[1].split("\nSampleAndEvaluateCandidateGPopupSignature(", 1)[0]
+        poll = poll.replace("Sleep Min(", "AdvanceClock Min(")
+        defaults = adapter.split("\nResetMedExInsertionColor(", 1)[0]
+        codes = (ROOT / "src/medex_color_reset_logic.ahk").read_text(
+            encoding="utf-8"
+        ).split("\nclass RedTextOperationCode", 1)[0]
+        entry = r'''
+try {
+    RunTest(0, 999, 0, "OK", "arrow>black>", 1)
+    RunTest(75, 999, 0, "OK", "arrow>black>", 4)
+    RunTest(999, 999, 0, ColorResetCode.POPUP_SIGNATURE_MISMATCH, "arrow>", 10)
+    RunTest(225, 999, 30, ColorResetCode.POPUP_SIGNATURE_MISMATCH, "arrow>", 5)
+    RunTest(75, 40, 0, ColorResetCode.FOREGROUND_CHANGED, "arrow>", 2)
+    RunTest(0, 5, 10, ColorResetCode.FOREGROUND_CHANGED, "arrow>", 1)
+    FileAppend("PASS`n", "*")
+    ExitApp(0)
+} catch as testError {
+    FileAppend(testError.Message, "**")
+    ExitApp(1)
+}
+
+RunTest(readyAt, changeAt, sampleCost, expectedCode, expectedClicks, expectedSamples) {
+    global popupTest := {tick: 0, readyAt: readyAt, changeAt: changeAt,
+        sampleCost: sampleCost, clicks: ""}
+    context := Map("popupSignatureSampleCount", 0)
+    result := RunInteraction(context)
+    if result != expectedCode || popupTest.clicks != expectedClicks
+        || context["popupSignatureSampleCount"] != expectedSamples
+        throw Error("Unexpected result: " result ", " popupTest.clicks
+            ", samples=" context["popupSignatureSampleCount"])
+}
+
+RunInteraction(context) {
+    arrowPoint := Map("x", 1, "y", 0), blackPoint := Map("x", 2, "y", 0)
+    options := 0, foregroundHwnd := 1, startedAt := 0, performanceContext := 0
+    skipArrowClickForClosedSignatureTest := false
+'''
+        interaction = interaction + '\n    return "OK"\n}\n\n'
+        stubs = r'''
+TestTick() => popupTest.tick
+AdvanceClock(ms) => popupTest.tick += ms
+MedExForegroundWindowMatches(hwnd) => TestTick() < popupTest.changeAt
+RecordClick(x, y) => popupTest.clicks .= x = 1 ? "arrow>" : "black>"
+RecordOptionalPerformanceTimestamp(*) => 0
+AddSafeExceptionContext(*) => 0
+FinishMedExColorReset(ok, code, *) => code
+
+SampleAndEvaluateCandidateGPopupSignature(arrowPoint, options) {
+    AdvanceClock(popupTest.sampleCost)
+    matched := TestTick() >= popupTest.readyAt
+    return Map("matched", matched, "reason", matched ? "matched" : "mismatch", "samples", Map())
+}
+'''
+        self.run_ahk(entry + (interaction + poll).replace("A_TickCount", "TestTick()")
+                     + stubs + defaults + codes)
 
 
 if __name__ == "__main__":

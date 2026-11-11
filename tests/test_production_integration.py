@@ -310,11 +310,9 @@ class ProductionColorResetIntegrationTests(unittest.TestCase):
 
     def test_font_anchor_retry_is_zero_raw_match_only_and_bounded(self) -> None:
         adapter = source("src/adapters/medex_report_editor.ahk")
-        reset = function_body(
-            adapter,
-            "ResetMedExInsertionColor",
-            "RunMedExColorMenuInteraction",
-        )
+        reset = adapter.split(
+            "\nRunMedExUiaInvokeColorReset(options := 0) {", 1
+        )[1].split("\nRunMedExColorMenuInteraction(", 1)[0]
         self.assertIn('"rawFontSizePatternMatchCount", 0) = 0', reset)
         self.assertIn("static EnableFontAnchorRetry := false", adapter)
         self.assertIn("retryEligible && enableFontAnchorRetry", reset)

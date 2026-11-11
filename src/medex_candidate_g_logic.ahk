@@ -46,7 +46,6 @@ class CandidateGRelativeMouseProfile {
     static ArrowOffsetY := 0
     static BlackOffsetX := 6
     static BlackOffsetY := 83
-    static SignatureSecondSampleDelayMs := 20
 
     ; Privacy-safe popup signature calibrated on the supported workstation.
     static PopupLightOffsetX := 6

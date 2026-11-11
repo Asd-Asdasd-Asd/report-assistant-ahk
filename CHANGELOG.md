@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Wait up to 250 ms for the report color menu to render after one open click.
+  Select black as soon as the palette matches. Stop if the deadline passes or
+  the foreground window changes.
+
 ## [0.9.1] - 2026-11-11
 
 - Compact the native settings window to 800×660. Move long option explanations
