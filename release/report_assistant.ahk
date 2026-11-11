@@ -1,7 +1,7 @@
 ; Generated file. Edit src/*.ahk instead.
 ; Application version: 0.9.1
-; Source revision: f7cd7220cec384fe5c61812e4d13508033ffc480
-; Generated at: 2026-11-11 05:50:58 UTC
+; Source revision: a3366fc4cca5421cd10034ba653c2ce0511a5069
+; Generated at: 2026-11-11 07:58:19 UTC
 ;@Ahk2Exe-SetFileVersion 0.9.1.0
 ;@Ahk2Exe-SetProductVersion 0.9.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
@@ -15,7 +15,7 @@ class AppMetadata {
     static Version := "0.9.1"
     static Channel := "internal-test"
     static BuildDate := "2026-11-11"
-    static SourceRevision := "f7cd7220cec384fe5c61812e4d13508033ffc480"
+    static SourceRevision := "a3366fc4cca5421cd10034ba653c2ce0511a5069"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -19318,22 +19318,24 @@ class ReportHotstringDefaults {
 }
 
 class RawHotstringEntry {
-    __New(section, enabled, name, trigger, text) {
+    __New(section, enabled, name, trigger, text, clipboardText := "") {
         this.Section := String(section)
         this.Enabled := String(enabled)
         this.Name := String(name)
         this.Trigger := String(trigger)
         this.Text := String(text)
+        this.ClipboardText := String(clipboardText)
     }
 }
 
 class HotstringEntry {
-    __New(section, enabled, name, trigger, text) {
+    __New(section, enabled, name, trigger, text, clipboardText := "") {
         this.Section := String(section)
         this.Enabled := enabled = true
         this.Name := String(name)
         this.Trigger := String(trigger)
         this.Text := String(text)
+        this.ClipboardText := String(clipboardText)
     }
 }
 
@@ -19466,7 +19468,8 @@ ReadReportHotstringSection(configPath, section) {
         IniRead(configPath, section, "Enabled", "true"),
         IniRead(configPath, section, "Name", ""),
         IniRead(configPath, section, "Trigger", ""),
-        DecodeReportHotstringText(IniRead(configPath, section, "Text", ""))
+        DecodeReportHotstringText(IniRead(configPath, section, "Text", "")),
+        DecodeReportHotstringText(IniRead(configPath, section, "ClipboardText", ""))
     )
 }
 
@@ -19890,7 +19893,8 @@ NormalizeReportHotstringEntry(raw) {
         enabled,
         name,
         trigger,
-        raw.Text
+        raw.Text,
+        raw.ClipboardText
     )
 }
 
@@ -22313,13 +22317,15 @@ WriteReportAssistantConfigV2Audit(configPath, outputPath) {
 
 ; --- BEGIN hotstring_config_editor.ahk ---
 class EditableReportHotstringEntry {
-    __New(section, enabled, name, trigger, text, isBuiltin := false) {
+    __New(section, enabled, name, trigger, text, isBuiltin := false,
+        clipboardText := "") {
         this.Section := String(section)
         this.Enabled := enabled = true
         this.Name := String(name)
         this.Trigger := String(trigger)
         this.Text := String(text)
         this.IsBuiltin := isBuiltin = true
+        this.ClipboardText := String(clipboardText)
     }
 }
 
@@ -22419,7 +22425,8 @@ LoadEditableReportHotstringConfig(configPath := "") {
             raw.Name,
             raw.Trigger,
             raw.Text,
-            IsBuiltinReportHotstringSection(raw.Section)
+            IsBuiltinReportHotstringSection(raw.Section),
+            raw.ClipboardText
         ))
     }
     if entries.Length = 0 {
@@ -22660,6 +22667,13 @@ SaveEditableReportHotstringConfig(
                 ),
                 tempPath, entry.Section, "Text"
             )
+            if entry.ClipboardText != "" {
+                ; IniRead removes the outer quotes and preserves the enclosed whitespace.
+                IniWrite(
+                    '"' EncodeReportHotstringText(entry.ClipboardText) '"',
+                    tempPath, entry.Section, "ClipboardText"
+                )
+            }
         }
 
         if IsObject(featureSettings) {
@@ -22914,6 +22928,8 @@ EditableReportHotstringEntryMatches(expected, actual) {
     if Trim(expected.Trigger, " `t`r`n") != actual.Trigger
         return false
     return NormalizeEditableReportHotstringText(expected.Text) = actual.Text
+        && NormalizeReportHotstringTextNewlines(expected.ClipboardText)
+            == actual.ClipboardText
 }
 
 EditableReportHotstringEntriesBySection(entries) {
@@ -23111,9 +23127,36 @@ class ReportTemplateWriteCode {
 RunConfiguredReportHotstring(entry, *) {
     operation := BeginAutomationDiagnosticOperation("ReportHotstring")
     outcome := ReportHotstringOutcome(false, "FAILED", "UNEXPECTED_ERROR")
-    try outcome := RunObservedReportHotstring(entry, operation)
-    finally operation.Complete(outcome.automationResult, outcome.code)
+    try {
+        outcome := RunObservedReportHotstring(entry, operation)
+        if outcome.automationResult = "COMPLETED" && entry.ClipboardText != "" {
+            clipboardFailure := CommitReportHotstringClipboard(entry.ClipboardText)
+            if clipboardFailure != "" {
+                outcome := ReportHotstringOutcome(true, "DEGRADED", clipboardFailure)
+                ShowReportAssistantVisualFeedback("报告已写入，剪贴板未能更新")
+            }
+        }
+    } finally operation.Complete(outcome.automationResult, outcome.code)
     return outcome.result
+}
+
+CommitReportHotstringClipboard(text) {
+    previousCritical := A_IsCritical
+    Critical "On"
+    try {
+        try savedClipboard := ClipboardAll()
+        catch
+            return "CLIPBOARD_SAVE_FAILED"
+
+        try A_Clipboard := StrReplace(text, "`n", "`r`n")
+        catch {
+            try A_Clipboard := savedClipboard
+            catch
+                return "CLIPBOARD_RESTORE_FAILED"
+            return "CLIPBOARD_WRITE_FAILED"
+        }
+        return ""
+    } finally Critical previousCritical
 }
 
 ReportHotstringOutcome(result, automationResult, code) {
@@ -25861,9 +25904,14 @@ class ReportAssistantSettingsWindow {
         this.AddHelpButton("template-trigger", 752, 338)
         this.Window.Add("Text", "x28 y416 w68", "模板文字")
         this.TextInput := this.Window.Add(
-            "Edit", "x28 y438 w744 h140 +Multi +VScroll"
+            "Edit", "x28 y438 w744 h86 +Multi +VScroll"
         )
         this.TextInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
+        this.Window.Add("Text", "x28 y532 w250", "执行后复制到剪贴板（可选）")
+        this.ClipboardTextInput := this.Window.Add(
+            "Edit", "x28 y552 w744 h43 +Multi +VScroll +WantReturn"
+        )
+        this.ClipboardTextInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
 
         this.Tabs.UseTab(2)
         this.Window.Add("Text", "x48 y56 w130", "功能")
@@ -26065,6 +26113,8 @@ class ReportAssistantSettingsWindow {
         this.NameInput.Text := entry.Name
         this.TriggerInput.Text := entry.Trigger
         this.TextInput.Text := ReportHotstringTextForMultilineEdit(entry.Text)
+        this.ClipboardTextInput.Text :=
+            ReportHotstringTextForMultilineEdit(entry.ClipboardText)
         this.DeleteButton.Enabled := !entry.IsBuiltin
     }
 
@@ -26075,6 +26125,7 @@ class ReportAssistantSettingsWindow {
             this.NameInput.Text := ""
             this.TriggerInput.Text := ""
             this.TextInput.Text := ""
+            this.ClipboardTextInput.Text := ""
             this.DeleteButton.Enabled := false
         } finally {
             this.LoadingControls := false
@@ -26090,6 +26141,8 @@ class ReportAssistantSettingsWindow {
         entry.Name := this.NameInput.Text
         entry.Trigger := this.TriggerInput.Text
         entry.Text := ReportHotstringTextFromMultilineEdit(this.TextInput.Text)
+        entry.ClipboardText :=
+            ReportHotstringTextFromMultilineEdit(this.ClipboardTextInput.Text)
         row := this.FindListRowBySection(entry.Section)
         if row > 0 {
             this.TemplateList.Modify(
