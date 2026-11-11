@@ -1,9 +1,9 @@
 ; Generated file. Edit src/*.ahk instead.
-; Application version: 0.9.0
-; Source revision: 2db936d0045e6d3fd34275437d76b2855cc64acf
-; Generated at: 2026-11-10 10:15:14 UTC
-;@Ahk2Exe-SetFileVersion 0.9.0.0
-;@Ahk2Exe-SetProductVersion 0.9.0
+; Application version: 0.9.1
+; Source revision: cfaff370cba6278003b05a2e6a6e83d263f98bf4
+; Generated at: 2026-11-11 02:20:10 UTC
+;@Ahk2Exe-SetFileVersion 0.9.1.0
+;@Ahk2Exe-SetProductVersion 0.9.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
 
 #Requires AutoHotkey v2.0
@@ -12,10 +12,10 @@
 
 ; --- BEGIN app_metadata.ahk ---
 class AppMetadata {
-    static Version := "0.9.0"
+    static Version := "0.9.1"
     static Channel := "internal-test"
-    static BuildDate := "2026-11-10"
-    static SourceRevision := "2db936d0045e6d3fd34275437d76b2855cc64acf"
+    static BuildDate := "2026-11-11"
+    static SourceRevision := "cfaff370cba6278003b05a2e6a6e83d263f98bf4"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -252,6 +252,8 @@ BeginAutomationDiagnosticOperation(action) {
 }
 
 AutomationDiagnosticFieldAllowed(action, fieldName) {
+    if action = "ViewerCover" && (fieldName = "cover.geometry" || fieldName = "cover.surfaceMode")
+        return true
     if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" || action = "ViewerCover" {
         static viewerFields := Map(
             "viewer.command", true,
@@ -307,8 +309,7 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
             "caption.activationMs", true,
             "caption.preSaveSettlePath", true,
             "caption.preSaveSettleMs", true,
-            "caption.saveReadyCode", true,
-            "caption.saveReadySamples", true,
+            "caption.saveTargetCode", true,
             "caption.pasteToSaveMs", true,
             "caption.advanceGatePath", true,
             "caption.advanceGateMs", true,
@@ -21440,8 +21441,10 @@ class MxNMCoverTransport {
         if step = "SELECT_LAYOUT" {
             point := MxNMMontageLayoutPoint(session.coverLayoutRow, session.coverLayoutColumn)
             result := MxNMMontageStaticClick(21112, "Static", point.xRatio, point.yRatio, 0, "", 0, session)
-            if result.ok
+            if result.ok {
+                session.coverLayoutDispatched := true
                 Sleep MxNMMontageTiming.LayoutSettleMs
+            }
             return result
         }
         if step = "ANNOTATION_TAB"
@@ -21450,8 +21453,7 @@ class MxNMCoverTransport {
             return MxNMMontageComboSelect(21155, "default", session)
         if step = "BIND_SURFACE" {
             surface := MxNMCoverResolveSurface(session)
-            if session.HasOwnProp("operation") && surface.HasOwnProp("candidateCount")
-                session.operation.SetField("viewer.candidateCount", surface.candidateCount)
+            MxNMCoverLogSurface(session, surface)
             if surface.ok
                 session.coverSurface := surface
             return surface
@@ -21459,7 +21461,7 @@ class MxNMCoverTransport {
         if !MxNMCoverSurfaceUnchanged(session)
             return {ok: false, code: "COVER_SURFACE_CHANGED"}
         if step = "SELECT_MIP" || step = "SELECT_FUSION"
-            return MxNMCoverSelectPane(session, step = "SELECT_MIP" ? .75 : .25)
+            return MxNMCoverSelectPane(session, step = "SELECT_MIP" ? 4 : 3)
         if step != "SAVE_LEFT" && step != "SAVE_RIGHT" && step != "RESET_DEFAULT"
             return {ok: false, code: "COVER_STEP_UNKNOWN"}
         controlId := step = "SAVE_LEFT" ? 21104 : step = "SAVE_RIGHT" ? 21105 : 21102
@@ -21559,12 +21561,14 @@ MxNMCoverFourPaneProfileMatches(panes) {
 }
 
 MxNMCoverResolveSurface(session) {
-    ; Owned drawing dialogs may extend over the root's non-client border.
-    ; Enclose their screen-space client rect in the root WINDOW rect, not its
-    ; inset client rect. No tolerance expansion or candidate ranking is used.
     rootRect := Win32WindowRect(session.viewerRootOwner)
-    if !IsObject(rootRect)
+    layoutRect := Win32WindowRect(session.coverControls[21112].hwnd)
+    if !IsObject(rootRect) || !IsObject(layoutRect)
+        || layoutRect.right <= layoutRect.left || layoutRect.bottom <= layoutRect.top
         return {ok: false, code: "COVER_ROOT_RECT_INVALID"}
+    if !session.HasOwnProp("coverLayoutDispatched")
+        return {ok: false, code: "COVER_LAYOUT_NOT_DISPATCHED"}
+
     identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
     candidates := [], seen := Map()
     callback := CallbackCreate(CollectMxNMContextSurfaceCandidate.Bind(identity, rootRect, seen, candidates), "Fast", 2)
@@ -21574,24 +21578,208 @@ MxNMCoverResolveSurface(session) {
             DllCall("User32\EnumChildWindows", "Ptr", topHwnd, "Ptr", callback, "Ptr", 0, "Int")
         }
     } finally CallbackFree(callback)
-    return MxNMCoverChooseSurface(candidates, rootRect, session.viewerRootOwner)
+    for candidate in candidates
+        candidate.parent := Win32ParentHwnd(candidate.hwnd)
+    return MxNMCoverChooseSurface(candidates, rootRect, layoutRect, identity,
+        MxNMCoverPanePointMatches.Bind(identity))
 }
 
-MxNMCoverChooseSurface(candidates, rootRect, rootHwnd) {
-    matches := []
+MxNMCoverChooseSurface(candidates, rootRect, layoutRect, identity, pointMatches) {
+    groups := Map(), canvases := []
+    dialogs := []
+    frameCount := 0, imageSideCount := 0, gridCount := 0
+    panelWidth := layoutRect.right - layoutRect.left
+    panelHeight := layoutRect.bottom - layoutRect.top
     for candidate in candidates {
-        if candidate.hwnd = rootHwnd || candidate.className != "#32770"
-            || candidate.width < (rootRect.right - rootRect.left) * .4
-            || candidate.height < (rootRect.bottom - rootRect.top) * .65
-            || !RectEncloses(rootRect, candidate.rect)
+        if candidate.className = "#32770" && candidate.hwnd != identity.rootHwnd
+            && dialogs.Length < 3 && candidate.width >= panelWidth {
+            rect := candidate.rect
+            dialogs.Push((rect.left - rootRect.left) "/" (rect.top - rootRect.top)
+                "/" candidate.width "/" candidate.height)
+        }
+        if candidate.hwnd = identity.rootHwnd || !RectEncloses(rootRect, candidate.rect)
             continue
-        matches.Push(candidate)
+        frameCount += 1
+        ; The live layout palette bounds the toolbar side. Size filters scale
+        ; with that control and do not assume a maximized Viewer or a monitor.
+        if candidate.rect.left < layoutRect.right
+            || candidate.width * 2 < panelWidth || candidate.height * 2 < panelHeight
+            || !MxNMCoverIsDrawingClass(candidate.className)
+            continue
+        imageSideCount += 1
+        if candidate.className = "#32770" && MxNMCoverSpansImageArea(candidate.rect, layoutRect)
+            canvases.Push(candidate)
+        if candidate.parent {
+            key := candidate.parent "|" candidate.className
+            if !groups.Has(key)
+                groups[key] := []
+            groups[key].Push(candidate)
+        }
     }
-    ; Do not rank or guess between large canvas candidates.
-    if matches.Length != 1
-        return {ok: false, code: "COVER_SURFACE_NOT_UNIQUE", candidateCount: matches.Length}
-    candidate := matches[1]
-    return {ok: true, code: "COVER_SURFACE_READY", hwnd: candidate.hwnd, rect: candidate.rect, candidateCount: 1}
+
+    layouts := [], sharedLayouts := []
+    for _, siblings in groups {
+        panes := MxNMCoverArrangePaneWindows(siblings)
+        if !IsObject(panes)
+            continue
+        bounds := {left: panes[1].rect.left, top: panes[1].rect.top,
+            right: panes[4].rect.right, bottom: panes[4].rect.bottom}
+        if !MxNMCoverSpansImageArea(bounds, layoutRect)
+            continue
+        gridCount += 1
+        if MxNMCoverAllPanePointsMatch(panes, pointMatches)
+            layouts.Push({mode: "PANE_WINDOWS", panes: panes, hwnd: siblings[1].parent})
+    }
+    for canvas in canvases {
+        panes := MxNMCoverSplitCanvas(canvas)
+        if MxNMCoverAllPanePointsMatch(panes, pointMatches)
+            sharedLayouts.Push({mode: "SHARED_CANVAS", panes: panes, hwnd: canvas.hwnd})
+    }
+
+    ; The same drawing area may expose both its canvas and its four children.
+    ; Independent valid areas remain ambiguous even if one has richer metadata.
+    for shared in sharedLayouts {
+        if layouts.Length = 1 && layouts[1].mode = "PANE_WINDOWS"
+            && MxNMCoverSameDrawingArea(layouts[1], shared)
+            continue
+        layouts.Push(shared)
+    }
+    summary := {
+        ok: layouts.Length = 1,
+        code: layouts.Length = 1 ? "COVER_SURFACE_READY"
+            : layouts.Length > 1 ? "COVER_SURFACE_NOT_UNIQUE"
+            : gridCount || canvases.Length ? "COVER_PANE_POINT_MISMATCH" : "COVER_SURFACE_NOT_FOUND",
+        candidateCount: layouts.Length,
+        geometry: "runtime=" candidates.Length ",frame=" frameCount ",imageSide=" imageSideCount
+            ",grids=" gridCount ",canvas=" canvases.Length ",canvasHit=" sharedLayouts.Length
+            ",root=" (rootRect.right - rootRect.left) "/" (rootRect.bottom - rootRect.top)
+            ",panelRight=" (layoutRect.right - rootRect.left)
+    }
+    for dialog in dialogs
+        summary.geometry .= ",dlg=" dialog
+    if summary.ok {
+        summary.mode := layouts[1].mode
+        summary.hwnd := layouts[1].hwnd
+        summary.panes := layouts[1].panes
+    }
+    return summary
+}
+
+MxNMCoverSpansImageArea(rect, layoutRect) {
+    return rect.right - rect.left >= layoutRect.right - layoutRect.left
+        && rect.bottom - rect.top >= (layoutRect.bottom - layoutRect.top) * 2
+        && rect.top < layoutRect.bottom && rect.bottom > layoutRect.bottom
+}
+
+MxNMCoverIsDrawingClass(className) {
+    return className != "" && className != "Static" && className != "ComboBox"
+        && className != "Edit" && !MxNMContextClassLooksLikeToolChrome(className)
+}
+
+MxNMCoverArrangePaneWindows(siblings) {
+    if siblings.Length != 4
+        return 0
+    bounds := siblings[1].rect.Clone()
+    for sibling in siblings {
+        rect := sibling.rect
+        bounds.left := Min(bounds.left, rect.left)
+        bounds.top := Min(bounds.top, rect.top)
+        bounds.right := Max(bounds.right, rect.right)
+        bounds.bottom := Max(bounds.bottom, rect.bottom)
+    }
+    cells := MxNMCoverSplitCanvas({rect: bounds, hwnd: 0})
+    panes := [0, 0, 0, 0]
+    for sibling in siblings {
+        for index, cell in cells {
+            if !MxNMCoverPaneRectMatches(sibling.rect, cell.rect)
+                continue
+            if IsObject(panes[index])
+                return 0
+            panes[index] := sibling
+            break
+        }
+    }
+    for pane in panes {
+        if !IsObject(pane)
+            return 0
+    }
+    return panes
+}
+
+MxNMCoverSplitCanvas(canvas) {
+    rect := canvas.rect
+    columns := [rect.left, (rect.left + rect.right) // 2, rect.right]
+    rows := [rect.top, (rect.top + rect.bottom) // 2, rect.bottom]
+    panes := []
+    loop 2 {
+        row := A_Index
+        loop 2 {
+            column := A_Index
+            panes.Push({hwnd: canvas.hwnd, rect: {
+                left: columns[column], right: columns[column + 1],
+                top: rows[row], bottom: rows[row + 1]
+            }})
+        }
+    }
+    return panes
+}
+
+MxNMCoverPaneRectMatches(actual, cell) {
+    ; Allow narrow pane borders and gutters in proportion to the cell.
+    dx := Max(1, (cell.right - cell.left) * .03)
+    dy := Max(1, (cell.bottom - cell.top) * .03)
+    return Abs(actual.left - cell.left) <= dx && Abs(actual.right - cell.right) <= dx
+        && Abs(actual.top - cell.top) <= dy && Abs(actual.bottom - cell.bottom) <= dy
+}
+
+MxNMCoverSameDrawingArea(grid, shared) {
+    if grid.hwnd != shared.hwnd
+        return false
+    for index, pane in grid.panes {
+        if !MxNMCoverPaneRectMatches(pane.rect, shared.panes[index].rect)
+            return false
+    }
+    return true
+}
+
+MxNMCoverPaneCenter(pane) {
+    rect := pane.rect
+    return {x: (rect.left + rect.right) // 2, y: (rect.top + rect.bottom) // 2}
+}
+
+MxNMCoverAllPanePointsMatch(panes, pointMatches) {
+    for pane in panes {
+        if !pointMatches.Call(pane, MxNMCoverPaneCenter(pane))
+            return false
+    }
+    return true
+}
+
+MxNMCoverPanePointMatches(identity, pane, point) {
+    hit := Win32WindowFromPoint(point)
+    if !hit || Win32WindowPid(hit) != identity.pid || Win32RootOwner(hit) != identity.rootHwnd
+        || !Win32IsWindowEnabled(hit) || !RectHasPoint(pane.rect, point)
+        return false
+    if hit = pane.hwnd
+        return true
+    if !Win32IsChild(pane.hwnd, hit)
+        return false
+    hitRect := Win32ClientRectScreen(hit)
+    paneRect := Win32ClientRectScreen(pane.hwnd)
+    ; Accept a render child spanning the whole canvas or the expected cell.
+    ; A small child overlay at the center cannot pass either geometry check.
+    return IsObject(hitRect) && IsObject(paneRect)
+        && (MxNMCoverPaneRectMatches(hitRect, pane.rect) || MxNMCoverPaneRectMatches(hitRect, paneRect))
+        && MxNMCoverIsDrawingClass(Win32WindowClass(hit))
+}
+
+MxNMCoverLogSurface(session, surface) {
+    if !session.HasOwnProp("operation") || !surface.HasOwnProp("candidateCount")
+        return
+    session.operation.SetField("viewer.candidateCount", surface.candidateCount)
+    session.operation.SetField("cover.geometry", surface.geometry)
+    if surface.ok
+        session.operation.SetField("cover.surfaceMode", surface.mode)
 }
 
 MxNMCoverSurfaceUnchanged(session) {
@@ -21599,25 +21787,26 @@ MxNMCoverSurfaceUnchanged(session) {
         return false
     current := MxNMCoverResolveSurface(session)
     bound := session.coverSurface
-    if !current.ok || current.hwnd != bound.hwnd
+    if !current.ok || current.hwnd != bound.hwnd || current.mode != bound.mode {
+        MxNMCoverLogSurface(session, current)
         return false
-    for edge in ["left", "top", "right", "bottom"] {
-        if current.rect.%edge% != bound.rect.%edge%
+    }
+    for index, pane in current.panes {
+        prior := bound.panes[index]
+        if pane.hwnd != prior.hwnd || RectKey(pane.rect) != RectKey(prior.rect)
             return false
     }
-    return Win32WindowPid(bound.hwnd) = session.viewerPid
-        && MxNMMontageRootOwner(bound.hwnd) = session.viewerRootOwner
+    return MxNMMontageViewerStillActive(session)
 }
 
-MxNMCoverSelectPane(session, xRatio) {
-    rect := session.coverSurface.rect
-    x := rect.left + Round((rect.right - rect.left) * xRatio)
-    y := rect.top + Round((rect.bottom - rect.top) * .75)
-    if !MxNMCoverSurfaceUnchanged(session)
-        || MxNMMontageWindowFromPoint(x, y) != session.coverSurface.hwnd
+MxNMCoverSelectPane(session, index) {
+    pane := session.coverSurface.panes[index]
+    point := MxNMCoverPaneCenter(pane)
+    identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
+    if !MxNMCoverSurfaceUnchanged(session) || !MxNMCoverPanePointMatches(identity, pane, point)
+        || !MxNMMontageViewerStillActive(session)
         return {ok: false, code: "COVER_PANE_POINT_MISMATCH"}
-    ; Only one click; never retry an ambiguous selection.
-    if !MxNMMontagePhysicalClick(x, y)
+    if !MxNMMontagePhysicalClick(point.x, point.y)
         return {ok: false, code: "COVER_PANE_CLICK_FAILED"}
     Sleep 100
     return {ok: true, code: "COVER_PANE_CLICK_DISPATCHED"}
@@ -24089,11 +24278,7 @@ class ReportImageCaptionDefaults {
     static TargetReadyTimeoutMs := 1500
     static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
-    ; Uniform paste-to-save readiness, with no first-window warm-up state.
-    static SaveReadyMinimumMs := 80
-    static SaveReadyStableMs := 40
-    static SaveReadyTimeoutMs := 800
-    static SaveReadyPollMs := 20
+    static PasteToSaveSettleMs := 250
     static ExplicitSaveSettleMs := 200
     ; WheelDown has a vendor-side conditional save path that is skipped when
     ; advances are too close together. Only wait for the missing remainder.
@@ -24962,7 +25147,7 @@ ExecuteReportImageCaptionAction(
         )
         operation.SetField(
             "caption.preSaveSettlePath",
-            "SAVE_BUTTON_READY_GATE"
+            "FIXED_PASTE_SETTLE"
         )
         operation.SetField(
             "caption.preSaveSettleMs",
@@ -25054,31 +25239,16 @@ ExecuteReportImageCaptionAction(
         pasteDispatchedAt := A_TickCount
         if IsObject(operation)
             operation.Stage("PASTE_DISPATCHED")
-        saveReady := WaitForReportImageCaptionSaveReady(target)
+        Sleep ReportImageCaptionDefaults.PasteToSaveSettleMs
         if IsObject(operation) {
-            operation.SetField("caption.preSaveSettleMs", saveReady.elapsedMs)
-            operation.SetField("caption.saveReadyCode", saveReady.code)
-            operation.SetField("caption.saveReadySamples", saveReady.sampleCount)
-        }
-        if !saveReady.ok {
-            return MakeReportImageCaptionResult(
-                false, ReportImageCaptionCode.SAVE_NOT_READY, true
-            )
-        }
-        if IsObject(operation) {
+            operation.SetField("caption.preSaveSettleMs", A_TickCount - pasteDispatchedAt)
             operation.Stage("PASTE_SETTLE_COMPLETED")
-            operation.Stage("SAVE_READY_CONFIRMED")
         }
 
-        ; Query uniqueness again at dispatch. No input is replayed if the
-        ; ready button was replaced, disabled or covered in the meantime.
-        finalButton := ResolveReportImageCaptionSaveButton(target)
-        finalReady := finalButton.ok
-            ? ProbeReportImageCaptionSaveButton(target, finalButton.button)
-            : finalButton
-        if !finalReady.ok {
+        saveTarget := ValidateReportImageCaptionSaveTarget(target)
+        if !saveTarget.ok {
             if IsObject(operation)
-                operation.SetField("caption.saveReadyCode", finalReady.code)
+                operation.SetField("caption.saveTargetCode", saveTarget.code)
             return MakeReportImageCaptionResult(
                 false,
                 ReportImageCaptionCode.SAVE_NOT_READY,
@@ -25208,107 +25378,32 @@ ExecuteReportImageCaptionAction(
     }
 }
 
-; Per-paste policy; only a disabled button is waitable. Identity, geometry and
-; hit-test uncertainty stop input, with no warm-up flag shared across images.
-class ReportImageCaptionSaveReadinessGate {
-    __New(startedAt) {
-        this.StartedAt := startedAt
-        this.ReadySince := -1
-    }
-
-    Observe(probe, now) {
-        if !probe.ok && !probe.waitable
-            return {done: true, ok: false, code: probe.code}
-        elapsed := now - this.StartedAt
-        if elapsed < 0 || elapsed >= ReportImageCaptionDefaults.SaveReadyTimeoutMs
-            return {done: true, ok: false, code: "SAVE_READY_TIMEOUT"}
-        if !probe.ok {
-            this.ReadySince := -1
-        } else {
-            if this.ReadySince < 0
-                this.ReadySince := now
-            if elapsed >= ReportImageCaptionDefaults.SaveReadyMinimumMs
-                && now - this.ReadySince >= ReportImageCaptionDefaults.SaveReadyStableMs
-                return {done: true, ok: true, code: "SAVE_BUTTON_READY"}
-        }
-        return {done: false, ok: false, code: "SAVE_READY_WAITING"}
-    }
-}
-
-WaitForReportImageCaptionSaveReady(target) {
-    startedAt := A_TickCount
-    gate := ReportImageCaptionSaveReadinessGate(startedAt)
-    samples := 0
-    resolved := ResolveReportImageCaptionSaveButton(target)
-    if !resolved.ok
-        return {ok: false, code: resolved.code, elapsedMs: A_TickCount - startedAt, sampleCount: 0}
-    loop {
-        probe := ProbeReportImageCaptionSaveButton(target, resolved.button)
-        samples += 1
-        decision := gate.Observe(probe, A_TickCount)
-        if decision.done {
-            decision.elapsedMs := A_TickCount - startedAt
-            decision.sampleCount := samples
-            return decision
-        }
-        Sleep ReportImageCaptionDefaults.SaveReadyPollMs
-    }
-}
-
-ResolveReportImageCaptionSaveButton(target) {
-    try {
-        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
-            return {ok: false, waitable: false, code: "SAVE_TARGET_CHANGED"}
-        root := ReportImageCaptionUiaRoot(target.hwnd)
-        buttons := root.FindElements({Type: "Button", Name: "保存"})
-        if buttons.Length != 1
-            return {ok: false, waitable: false, code: "SAVE_BUTTON_NOT_UNIQUE"}
-        button := buttons[1]
-        if !UIA.CompareElements(button, target.saveAnchor.element)
-            return {ok: false, waitable: false, code: "SAVE_BUTTON_CHANGED"}
-        return {ok: true, code: "SAVE_BUTTON_RESOLVED", button: button}
-    } catch {
-        return {ok: false, waitable: false, code: "SAVE_BUTTON_QUERY_FAILED"}
-    }
-}
-
-ProbeReportImageCaptionSaveButton(target, button) {
+ValidateReportImageCaptionSaveTarget(target) {
     try {
         if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
             || Win32RootOwner(target.hwnd) != target.hwnd
-            return {ok: false, waitable: false, code: "SAVE_TARGET_CHANGED"}
+            return {ok: false, code: "SAVE_TARGET_CHANGED"}
+        root := ReportImageCaptionUiaRoot(target.hwnd)
+        buttons := root.FindElements({Type: "Button", Name: "保存"})
+        if buttons.Length != 1
+            return {ok: false, code: "SAVE_BUTTON_NOT_UNIQUE"}
+        button := buttons[1]
+        if !UIA.CompareElements(button, target.saveAnchor.element)
+            return {ok: false, code: "SAVE_BUTTON_CHANGED"}
         rect := ReportImageCaptionElementRect(button)
-        if button.ProcessId != target.pid || button.ControlType != 50000
-            || button.IsOffscreen || !IsObject(rect)
-            || RectKey(rect) != target.saveAnchor.rectKey
+        if !ReportImageCaptionElementUsable(button, target.pid)
+            return {ok: false, code: "SAVE_BUTTON_UNAVAILABLE"}
+        if !IsObject(rect) || RectKey(rect) != target.saveAnchor.rectKey
             || !RectHasPoint(rect, target.savePoint)
-            || !ReportImageCaptionPointBelongsToTarget(target.hwnd, target.savePoint)
-            return {ok: false, waitable: false, code: "SAVE_BUTTON_GEOMETRY_CHANGED"}
-        if !button.IsEnabled
-            return {ok: false, waitable: true, code: "SAVE_BUTTON_DISABLED"}
-        ; No Chromium activation, focus change, Name/Value reads or mouse move.
-        hit := UIA.ElementFromPoint(target.savePoint.x, target.savePoint.y, , 0)
-        hitMatches := false
-        loop 6 {
-            if hit.ProcessId != target.pid
-                break
-            if UIA.CompareElements(hit, button) {
-                hitMatches := true
-                break
-            }
-            hit := UIA.RawViewWalker.TryGetParentElement(hit)
-            if !IsObject(hit)
-                break
-        }
-        if !hitMatches
-            return {ok: false, waitable: false, code: "SAVE_BUTTON_POINT_MISMATCH"}
+            return {ok: false, code: "SAVE_BUTTON_GEOMETRY_CHANGED"}
+        ; Electron's point provider may return its renderer rather than the
+        ; DOM button. Recheck native ownership after the UIA queries yield.
         if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
-            || Win32RootOwner(target.hwnd) != target.hwnd || !button.IsEnabled
-            || RectKey(ReportImageCaptionElementRect(button)) != target.saveAnchor.rectKey
-            return {ok: false, waitable: false, code: "SAVE_BUTTON_CHANGED_DURING_PROBE"}
-        return {ok: true, waitable: false, code: "SAVE_BUTTON_READY"}
+            || !ReportImageCaptionPointBelongsToTarget(target.hwnd, target.savePoint)
+            return {ok: false, code: "SAVE_TARGET_POINT_CHANGED"}
+        return {ok: true, code: "SAVE_TARGET_VALIDATED"}
     } catch {
-        return {ok: false, waitable: false, code: "SAVE_BUTTON_PROBE_FAILED"}
+        return {ok: false, code: "SAVE_BUTTON_QUERY_FAILED"}
     }
 }
 
