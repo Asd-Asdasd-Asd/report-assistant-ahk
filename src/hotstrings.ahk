@@ -17,9 +17,36 @@ class ReportTemplateWriteCode {
 RunConfiguredReportHotstring(entry, *) {
     operation := BeginAutomationDiagnosticOperation("ReportHotstring")
     outcome := ReportHotstringOutcome(false, "FAILED", "UNEXPECTED_ERROR")
-    try outcome := RunObservedReportHotstring(entry, operation)
-    finally operation.Complete(outcome.automationResult, outcome.code)
+    try {
+        outcome := RunObservedReportHotstring(entry, operation)
+        if outcome.automationResult = "COMPLETED" && entry.ClipboardText != "" {
+            clipboardFailure := CommitReportHotstringClipboard(entry.ClipboardText)
+            if clipboardFailure != "" {
+                outcome := ReportHotstringOutcome(true, "DEGRADED", clipboardFailure)
+                ShowReportAssistantVisualFeedback("报告已写入，剪贴板未能更新")
+            }
+        }
+    } finally operation.Complete(outcome.automationResult, outcome.code)
     return outcome.result
+}
+
+CommitReportHotstringClipboard(text) {
+    previousCritical := A_IsCritical
+    Critical "On"
+    try {
+        try savedClipboard := ClipboardAll()
+        catch
+            return "CLIPBOARD_SAVE_FAILED"
+
+        try A_Clipboard := StrReplace(text, "`n", "`r`n")
+        catch {
+            try A_Clipboard := savedClipboard
+            catch
+                return "CLIPBOARD_RESTORE_FAILED"
+            return "CLIPBOARD_WRITE_FAILED"
+        }
+        return ""
+    } finally Critical previousCritical
 }
 
 ReportHotstringOutcome(result, automationResult, code) {

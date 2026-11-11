@@ -66,12 +66,13 @@ Trigger=;red
 Text={{red:（见图）}}
 ```
 
-报告模板 section 仅使用：
+报告模板 section 支持：
 
 - `Enabled`
 - `Name`
 - `Trigger`
 - `Text`
+- `ClipboardText`（可选，缺省或留空时保持原剪贴板）
 
 Section 使用稳定且不区分大小写的 identity：
 
@@ -83,6 +84,8 @@ Hotstring.custom-<stable-id>
 ListView row number 不是 identity。Settings UI 使用隐藏 `Section` 映射排序后的视觉行，选择、编辑、保存和删除均按 `Section` 查找模型。
 
 Text codec 将真实换行保存为 `\n`，普通反斜杠保存为 `\\`；Windows Edit 的 CRLF 在 UI 边界归一化，重复打开和保存不得 double escaping。
+
+`ClipboardText` 使用相同的换行与反斜杠编码，设置保存时使用 INI 外层引号保留边缘空白。其内容为纯文本，不经过模板展开。所有临时剪贴板事务结束后，仅完整成功的热字串才发布此文本供手动粘贴。
 
 ## 模板语法
 

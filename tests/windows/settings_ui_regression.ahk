@@ -28,10 +28,67 @@ RunSettingsUiRegression() {
     TestSettingsListSectionIdentity()
     TestSettingsTemplateElementInsertion()
     TestSettingsDeletePersistence()
+    TestClipboardTextPersistence()
     TestViewerHotkeyWinModifier()
     TestMxNMMontageSettingsPersistence()
     MsgBox "Settings UI regression passed.", "MedEx test", "Iconi"
     ExitApp 0
+}
+
+TestClipboardTextPersistence() {
+    testDirectory := A_Temp "\MedExClipboardSettings-" A_TickCount
+    DirCreate testDirectory
+    configPath := testDirectory "\config.ini"
+    try {
+        FileAppend SettingsTestConfigText(), configPath, "UTF-16"
+        loaded := LoadEditableReportHotstringConfig(configPath)
+        AssertSettingsTest(loaded.Ok, "test config did not load")
+        builtin := "Hotstring.builtin-red"
+        custom := "Hotstring.custom-alpha"
+        text := '  "第一行" {{date}}`n`nC:\temp\new  '
+        controller := ReportAssistantSettingsWindow(loaded)
+        try {
+            for section in [builtin, custom] {
+                controller.SelectSection(section)
+                AssertSettingsTest(controller.ClipboardTextInput.Text == "",
+                    "legacy template should have empty clipboard text")
+                controller.ClipboardTextInput.Text :=
+                    ReportHotstringTextForMultilineEdit(text)
+                controller.OnEditorChanged()
+            }
+            controller.SelectSection(builtin)
+            AssertSettingsTest(
+                ReportHotstringTextFromMultilineEdit(controller.ClipboardTextInput.Text) == text,
+                "clipboard text was lost when switching template rows"
+            )
+            saved := SaveEditableReportHotstringConfig(
+                loaded.Entries, [], loaded.OriginalText,
+                controller.ModifiedSectionKeys, configPath
+            )
+            AssertSettingsTest(saved.Ok, "clipboard text save failed")
+
+            for section in [builtin, custom] {
+                entry := NormalizeReportHotstringEntry(
+                    ReadReportHotstringSection(configPath, section)
+                )
+                AssertSettingsTest(entry.ClipboardText == text,
+                    "configured clipboard text did not round-trip")
+            }
+
+            controller.ClipboardTextInput.Text := ""
+            controller.OnEditorChanged()
+            cleared := SaveEditableReportHotstringConfig(
+                loaded.Entries, [], saved.SavedText,
+                Map(StrLower(builtin), true), configPath
+            )
+            AssertSettingsTest(cleared.Ok, "clearing clipboard text failed")
+            AssertSettingsTest(ReadReportHotstringSection(configPath, builtin).ClipboardText == ""
+                && ReadReportHotstringSection(configPath, custom).ClipboardText == text,
+                "clearing one template changed another template's clipboard text")
+        } finally controller.DestroyWindow()
+    } finally {
+        try DirDelete testDirectory, true
+    }
 }
 
 TestViewerHotkeyWinModifier() {

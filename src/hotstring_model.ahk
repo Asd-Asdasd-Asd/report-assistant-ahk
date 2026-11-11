@@ -72,21 +72,23 @@ class ReportHotstringDefaults {
 }
 
 class RawHotstringEntry {
-    __New(section, enabled, name, trigger, text) {
+    __New(section, enabled, name, trigger, text, clipboardText := "") {
         this.Section := String(section)
         this.Enabled := String(enabled)
         this.Name := String(name)
         this.Trigger := String(trigger)
         this.Text := String(text)
+        this.ClipboardText := String(clipboardText)
     }
 }
 
 class HotstringEntry {
-    __New(section, enabled, name, trigger, text) {
+    __New(section, enabled, name, trigger, text, clipboardText := "") {
         this.Section := String(section)
         this.Enabled := enabled = true
         this.Name := String(name)
         this.Trigger := String(trigger)
         this.Text := String(text)
+        this.ClipboardText := String(clipboardText)
     }
 }

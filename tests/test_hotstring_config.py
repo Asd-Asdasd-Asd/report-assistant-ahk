@@ -78,12 +78,12 @@ class HotstringConfigTests(unittest.TestCase):
             self.assertIn(f'lines.Push("{line}")', builder)
         self.assertNotIn("Mode=", builder)
 
-    def test_schema2_loader_reads_only_four_template_fields(self) -> None:
+    def test_schema2_loader_reads_template_fields_with_optional_clipboard_text(self) -> None:
         config = source("src/hotstring_config.ahk")
         fields = re.findall(
             r'IniRead\(configPath, section, "([A-Za-z]+)"', config
         )
-        self.assertEqual(fields, ["Enabled", "Name", "Trigger", "Text"])
+        self.assertEqual(fields, ["Enabled", "Name", "Trigger", "Text", "ClipboardText"])
         self.assertNotIn('"Mode"', config)
 
     def test_invalid_config_is_fail_closed_without_builtin_fallback(self) -> None:

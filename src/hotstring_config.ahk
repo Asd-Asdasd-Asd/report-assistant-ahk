@@ -124,7 +124,8 @@ ReadReportHotstringSection(configPath, section) {
         IniRead(configPath, section, "Enabled", "true"),
         IniRead(configPath, section, "Name", ""),
         IniRead(configPath, section, "Trigger", ""),
-        DecodeReportHotstringText(IniRead(configPath, section, "Text", ""))
+        DecodeReportHotstringText(IniRead(configPath, section, "Text", "")),
+        DecodeReportHotstringText(IniRead(configPath, section, "ClipboardText", ""))
     )
 }
 

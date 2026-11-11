@@ -207,9 +207,14 @@ class ReportAssistantSettingsWindow {
         this.AddHelpButton("template-trigger", 752, 338)
         this.Window.Add("Text", "x28 y416 w68", "模板文字")
         this.TextInput := this.Window.Add(
-            "Edit", "x28 y438 w744 h140 +Multi +VScroll"
+            "Edit", "x28 y438 w744 h86 +Multi +VScroll"
         )
         this.TextInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
+        this.Window.Add("Text", "x28 y532 w250", "执行后复制到剪贴板（可选）")
+        this.ClipboardTextInput := this.Window.Add(
+            "Edit", "x28 y552 w744 h43 +Multi +VScroll +WantReturn"
+        )
+        this.ClipboardTextInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
 
         this.Tabs.UseTab(2)
         this.Window.Add("Text", "x48 y56 w130", "功能")
@@ -411,6 +416,8 @@ class ReportAssistantSettingsWindow {
         this.NameInput.Text := entry.Name
         this.TriggerInput.Text := entry.Trigger
         this.TextInput.Text := ReportHotstringTextForMultilineEdit(entry.Text)
+        this.ClipboardTextInput.Text :=
+            ReportHotstringTextForMultilineEdit(entry.ClipboardText)
         this.DeleteButton.Enabled := !entry.IsBuiltin
     }
 
@@ -421,6 +428,7 @@ class ReportAssistantSettingsWindow {
             this.NameInput.Text := ""
             this.TriggerInput.Text := ""
             this.TextInput.Text := ""
+            this.ClipboardTextInput.Text := ""
             this.DeleteButton.Enabled := false
         } finally {
             this.LoadingControls := false
@@ -436,6 +444,8 @@ class ReportAssistantSettingsWindow {
         entry.Name := this.NameInput.Text
         entry.Trigger := this.TriggerInput.Text
         entry.Text := ReportHotstringTextFromMultilineEdit(this.TextInput.Text)
+        entry.ClipboardText :=
+            ReportHotstringTextFromMultilineEdit(this.ClipboardTextInput.Text)
         row := this.FindListRowBySection(entry.Section)
         if row > 0 {
             this.TemplateList.Modify(

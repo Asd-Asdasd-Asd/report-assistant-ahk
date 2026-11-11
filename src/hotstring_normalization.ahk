@@ -76,7 +76,8 @@ NormalizeReportHotstringEntry(raw) {
         enabled,
         name,
         trigger,
-        raw.Text
+        raw.Text,
+        raw.ClipboardText
     )
 }
 

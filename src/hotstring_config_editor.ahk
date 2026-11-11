@@ -1,11 +1,13 @@
 class EditableReportHotstringEntry {
-    __New(section, enabled, name, trigger, text, isBuiltin := false) {
+    __New(section, enabled, name, trigger, text, isBuiltin := false,
+        clipboardText := "") {
         this.Section := String(section)
         this.Enabled := enabled = true
         this.Name := String(name)
         this.Trigger := String(trigger)
         this.Text := String(text)
         this.IsBuiltin := isBuiltin = true
+        this.ClipboardText := String(clipboardText)
     }
 }
 
@@ -105,7 +107,8 @@ LoadEditableReportHotstringConfig(configPath := "") {
             raw.Name,
             raw.Trigger,
             raw.Text,
-            IsBuiltinReportHotstringSection(raw.Section)
+            IsBuiltinReportHotstringSection(raw.Section),
+            raw.ClipboardText
         ))
     }
     if entries.Length = 0 {
@@ -346,6 +349,13 @@ SaveEditableReportHotstringConfig(
                 ),
                 tempPath, entry.Section, "Text"
             )
+            if entry.ClipboardText != "" {
+                ; IniRead removes the outer quotes and preserves the enclosed whitespace.
+                IniWrite(
+                    '"' EncodeReportHotstringText(entry.ClipboardText) '"',
+                    tempPath, entry.Section, "ClipboardText"
+                )
+            }
         }
 
         if IsObject(featureSettings) {
@@ -600,6 +610,8 @@ EditableReportHotstringEntryMatches(expected, actual) {
     if Trim(expected.Trigger, " `t`r`n") != actual.Trigger
         return false
     return NormalizeEditableReportHotstringText(expected.Text) = actual.Text
+        && NormalizeReportHotstringTextNewlines(expected.ClipboardText)
+            == actual.ClipboardText
 }
 
 EditableReportHotstringEntriesBySection(entries) {

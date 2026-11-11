@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Add optional plain-text clipboard content per report hotstring. Copy it after
+  the hotstring completes successfully, for manual pasting.
 - Wait up to 250 ms for the report color menu to render after one open click.
   Select black as soon as the palette matches. Stop if the deadline passes or
   the foreground window changes.

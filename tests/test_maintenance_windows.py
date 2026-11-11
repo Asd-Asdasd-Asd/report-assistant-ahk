@@ -109,3 +109,78 @@ RegisterReportHotstrings(entries, executor) {
 RunConfiguredReportHotstring(*) {
 }
 ''')
+
+    def test_hotstring_clipboard_commits_only_after_full_success(self):
+        source = (ROOT / "src/hotstrings.ahk").read_text(encoding="utf-8")
+        entry = source[source.index("RunConfiguredReportHotstring(entry, *) {"):
+                       source.index("RunObservedReportHotstring(entry, operation) {")]
+        entry = entry.replace("ClipboardAll()", "SaveTestClipboard()")
+        entry = entry.replace(
+            'A_Clipboard := StrReplace(text, "`n", "`r`n")',
+            'WriteTestClipboard(StrReplace(text, "`n", "`r`n"))',
+        ).replace("A_Clipboard := savedClipboard", "WriteTestClipboard(savedClipboard)")
+        self.assertNotIn("A_Clipboard", entry)
+        self.assertNotIn("ClipboardAll()", entry)
+        self.run_ahk(r'''
+try {
+    text := "第一行`n{{date}}"
+    RunCase("COMPLETED", "", "", "OK", 0, 0, "original")
+    RunCase("FAILED", text, "", "TEST_OUTCOME", 0, 0, "original")
+    RunCase("DEGRADED", text, "", "TEST_OUTCOME", 0, 0, "original")
+    RunCase("COMPLETED", text, "", "OK", 1, 1, "第一行`r`n{{date}}")
+    RunCase("COMPLETED", text, "save", "CLIPBOARD_SAVE_FAILED", 1, 0, "original")
+    RunCase("COMPLETED", text, "write", "CLIPBOARD_WRITE_FAILED", 1, 2, "original")
+    RunCase("COMPLETED", text, "restore", "CLIPBOARD_RESTORE_FAILED", 1, 2,
+        "partial write")
+    FileAppend("PASS`n", "*")
+    ExitApp(0)
+} catch as err {
+    FileAppend(err.Message, "**")
+    ExitApp(1)
+}
+
+RunCase(status, text, failure, expectedCode, saves, writes, expectedClipboard) {
+    global testState := {status: status, failure: failure, clipboard: "original",
+        saves: 0, writes: 0, bodyRuns: 0, completion: "", feedback: 0}
+    oldCritical := A_IsCritical
+    result := RunConfiguredReportHotstring({ClipboardText: text})
+    expectedStatus := failure = "" ? status : "DEGRADED"
+    if testState.bodyRuns != 1 || testState.saves != saves || testState.writes != writes
+        || testState.clipboard !== expectedClipboard || result != (status != "FAILED")
+        || testState.completion != expectedStatus ":" expectedCode
+        || testState.feedback != (failure != "") || A_IsCritical != oldCritical
+        throw Error("Hotstring clipboard case failed: " status "/" failure)
+}
+
+RunObservedReportHotstring(entry, operation) {
+    testState.bodyRuns += 1
+    return ReportHotstringOutcome(testState.status != "FAILED", testState.status,
+        testState.status = "COMPLETED" ? "OK" : "TEST_OUTCOME")
+}
+
+SaveTestClipboard() {
+    testState.saves += 1
+    if testState.bodyRuns != 1 || testState.failure = "save"
+        throw Error("Synthetic clipboard snapshot failed")
+    return testState.clipboard
+}
+
+WriteTestClipboard(value) {
+    testState.writes += 1
+    if testState.failure != "" && testState.writes = 1 {
+        testState.clipboard := "partial write"
+        throw Error("Synthetic clipboard write failed")
+    }
+    if testState.failure = "restore"
+        throw Error("Synthetic clipboard restore failed")
+    testState.clipboard := value
+}
+
+BeginAutomationDiagnosticOperation(*) {
+    return {Complete: (self, status, code) => testState.completion := status ":" code}
+}
+
+ShowReportAssistantVisualFeedback(*) {
+    testState.feedback += 1
+}
+''' + entry)
