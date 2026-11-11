@@ -416,10 +416,7 @@ class ReportImageCaptionDefaults {
     static TargetReadyTimeoutMs := 1500
     static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
-    static PasteSettleMs := 20
-    ; The first paste into a newly observed renderer can be visible before its
-    ; backing editor state accepts the change. Gate only that cold boundary.
-    static FirstTargetSessionPasteSettleMs := 500
+    static PasteToSaveSettleMs := 250
     static ExplicitSaveSettleMs := 200
     ; WheelDown has a vendor-side conditional save path that is skipped when
     ; advances are too close together. Only wait for the missing remainder.
@@ -431,30 +428,6 @@ class ReportImageCaptionDefaults {
     static MinCaptionPaneHeightPx := 40
     static MinCaptionPaneWidthRatio := 0.4
     static MinImageRegionHeightRatio := 0.5
-}
-
-
-
-class ReportImageCaptionPasteGate {
-    static ReadyTargetKey := ""
-
-    static Plan(target) {
-        firstPaste := this.ReadyTargetKey != this.TargetKey(target)
-        return {
-            path: firstPaste ? "FIRST_TARGET_SESSION_GATE" : "STANDARD",
-            milliseconds: firstPaste
-                ? ReportImageCaptionDefaults.FirstTargetSessionPasteSettleMs
-                : ReportImageCaptionDefaults.PasteSettleMs
-        }
-    }
-
-    static ObserveSave(target) {
-        this.ReadyTargetKey := this.TargetKey(target)
-    }
-
-    static TargetKey(target) {
-        return String(target.pid) ":" String(target.hwnd)
-    }
 }
 
 
@@ -998,15 +971,6 @@ try {
 }
 
 RunViewerStateRegression() {
-    target := {pid: 101, hwnd: 1001}
-    ReportImageCaptionPasteGate.ReadyTargetKey := ""
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 500, "first target")
-    ; Resolving/planning then cancelling must not consume the first save gate.
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 500, "cancel before paste")
-    ReportImageCaptionPasteGate.ObserveSave(target)
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 20, "saved target")
-    AssertViewerState(ReportImageCaptionPasteGate.Plan({pid: 101, hwnd: 1002}).milliseconds = 500, "new HWND in same process")
-    AssertViewerState(ReportImageCaptionPasteGate.Plan({pid: 102, hwnd: 1001}).milliseconds = 500, "new process")
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 2999, 3000) = "WAITING", "held before deadline")
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 3000, 3000) = "KEY_RELEASE_TIMEOUT", "held at deadline")
     AssertViewerState(MxNMViewerReleaseDecision(false, true, 0, 3000) = "RELEASED", "next press can release")

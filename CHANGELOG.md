@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-11
+
+- Compact the native settings window to 800×660. Move long option explanations
+  into small question-mark buttons opening native, dismissible help menus;
+  keep configuration values and independent layout controls unchanged.
+
+- Wait 250 ms after every Caption paste, then check the unique Save button's
+  identity, bounds and native window ownership before clicking it. Keep the
+  image unadvanced if the target cannot be verified.
+- Resolve Cover panes from the current Viewer geometry, supporting four pane
+  windows and the existing shared drawing dialog. Log geometry and candidate
+  counts when the drawing area cannot be verified.
+- User field testing confirmed both the Caption and Cover fixes.
+
 ## [0.9.0] - 2026-11-10
 
 - Migrate the last legacy cover workflow to guarded Viewer controls. Save MIP

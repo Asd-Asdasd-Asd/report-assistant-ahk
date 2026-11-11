@@ -98,8 +98,10 @@ class MxNMCoverTransport {
         if step = "SELECT_LAYOUT" {
             point := MxNMMontageLayoutPoint(session.coverLayoutRow, session.coverLayoutColumn)
             result := MxNMMontageStaticClick(21112, "Static", point.xRatio, point.yRatio, 0, "", 0, session)
-            if result.ok
+            if result.ok {
+                session.coverLayoutDispatched := true
                 Sleep MxNMMontageTiming.LayoutSettleMs
+            }
             return result
         }
         if step = "ANNOTATION_TAB"
@@ -108,8 +110,7 @@ class MxNMCoverTransport {
             return MxNMMontageComboSelect(21155, "default", session)
         if step = "BIND_SURFACE" {
             surface := MxNMCoverResolveSurface(session)
-            if session.HasOwnProp("operation") && surface.HasOwnProp("candidateCount")
-                session.operation.SetField("viewer.candidateCount", surface.candidateCount)
+            MxNMCoverLogSurface(session, surface)
             if surface.ok
                 session.coverSurface := surface
             return surface
@@ -117,7 +118,7 @@ class MxNMCoverTransport {
         if !MxNMCoverSurfaceUnchanged(session)
             return {ok: false, code: "COVER_SURFACE_CHANGED"}
         if step = "SELECT_MIP" || step = "SELECT_FUSION"
-            return MxNMCoverSelectPane(session, step = "SELECT_MIP" ? .75 : .25)
+            return MxNMCoverSelectPane(session, step = "SELECT_MIP" ? 4 : 3)
         if step != "SAVE_LEFT" && step != "SAVE_RIGHT" && step != "RESET_DEFAULT"
             return {ok: false, code: "COVER_STEP_UNKNOWN"}
         controlId := step = "SAVE_LEFT" ? 21104 : step = "SAVE_RIGHT" ? 21105 : 21102
@@ -217,12 +218,14 @@ MxNMCoverFourPaneProfileMatches(panes) {
 }
 
 MxNMCoverResolveSurface(session) {
-    ; Owned drawing dialogs may extend over the root's non-client border.
-    ; Enclose their screen-space client rect in the root WINDOW rect, not its
-    ; inset client rect. No tolerance expansion or candidate ranking is used.
     rootRect := Win32WindowRect(session.viewerRootOwner)
-    if !IsObject(rootRect)
+    layoutRect := Win32WindowRect(session.coverControls[21112].hwnd)
+    if !IsObject(rootRect) || !IsObject(layoutRect)
+        || layoutRect.right <= layoutRect.left || layoutRect.bottom <= layoutRect.top
         return {ok: false, code: "COVER_ROOT_RECT_INVALID"}
+    if !session.HasOwnProp("coverLayoutDispatched")
+        return {ok: false, code: "COVER_LAYOUT_NOT_DISPATCHED"}
+
     identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
     candidates := [], seen := Map()
     callback := CallbackCreate(CollectMxNMContextSurfaceCandidate.Bind(identity, rootRect, seen, candidates), "Fast", 2)
@@ -232,24 +235,208 @@ MxNMCoverResolveSurface(session) {
             DllCall("User32\EnumChildWindows", "Ptr", topHwnd, "Ptr", callback, "Ptr", 0, "Int")
         }
     } finally CallbackFree(callback)
-    return MxNMCoverChooseSurface(candidates, rootRect, session.viewerRootOwner)
+    for candidate in candidates
+        candidate.parent := Win32ParentHwnd(candidate.hwnd)
+    return MxNMCoverChooseSurface(candidates, rootRect, layoutRect, identity,
+        MxNMCoverPanePointMatches.Bind(identity))
 }
 
-MxNMCoverChooseSurface(candidates, rootRect, rootHwnd) {
-    matches := []
+MxNMCoverChooseSurface(candidates, rootRect, layoutRect, identity, pointMatches) {
+    groups := Map(), canvases := []
+    dialogs := []
+    frameCount := 0, imageSideCount := 0, gridCount := 0
+    panelWidth := layoutRect.right - layoutRect.left
+    panelHeight := layoutRect.bottom - layoutRect.top
     for candidate in candidates {
-        if candidate.hwnd = rootHwnd || candidate.className != "#32770"
-            || candidate.width < (rootRect.right - rootRect.left) * .4
-            || candidate.height < (rootRect.bottom - rootRect.top) * .65
-            || !RectEncloses(rootRect, candidate.rect)
+        if candidate.className = "#32770" && candidate.hwnd != identity.rootHwnd
+            && dialogs.Length < 3 && candidate.width >= panelWidth {
+            rect := candidate.rect
+            dialogs.Push((rect.left - rootRect.left) "/" (rect.top - rootRect.top)
+                "/" candidate.width "/" candidate.height)
+        }
+        if candidate.hwnd = identity.rootHwnd || !RectEncloses(rootRect, candidate.rect)
             continue
-        matches.Push(candidate)
+        frameCount += 1
+        ; The live layout palette bounds the toolbar side. Size filters scale
+        ; with that control and do not assume a maximized Viewer or a monitor.
+        if candidate.rect.left < layoutRect.right
+            || candidate.width * 2 < panelWidth || candidate.height * 2 < panelHeight
+            || !MxNMCoverIsDrawingClass(candidate.className)
+            continue
+        imageSideCount += 1
+        if candidate.className = "#32770" && MxNMCoverSpansImageArea(candidate.rect, layoutRect)
+            canvases.Push(candidate)
+        if candidate.parent {
+            key := candidate.parent "|" candidate.className
+            if !groups.Has(key)
+                groups[key] := []
+            groups[key].Push(candidate)
+        }
     }
-    ; Do not rank or guess between large canvas candidates.
-    if matches.Length != 1
-        return {ok: false, code: "COVER_SURFACE_NOT_UNIQUE", candidateCount: matches.Length}
-    candidate := matches[1]
-    return {ok: true, code: "COVER_SURFACE_READY", hwnd: candidate.hwnd, rect: candidate.rect, candidateCount: 1}
+
+    layouts := [], sharedLayouts := []
+    for _, siblings in groups {
+        panes := MxNMCoverArrangePaneWindows(siblings)
+        if !IsObject(panes)
+            continue
+        bounds := {left: panes[1].rect.left, top: panes[1].rect.top,
+            right: panes[4].rect.right, bottom: panes[4].rect.bottom}
+        if !MxNMCoverSpansImageArea(bounds, layoutRect)
+            continue
+        gridCount += 1
+        if MxNMCoverAllPanePointsMatch(panes, pointMatches)
+            layouts.Push({mode: "PANE_WINDOWS", panes: panes, hwnd: siblings[1].parent})
+    }
+    for canvas in canvases {
+        panes := MxNMCoverSplitCanvas(canvas)
+        if MxNMCoverAllPanePointsMatch(panes, pointMatches)
+            sharedLayouts.Push({mode: "SHARED_CANVAS", panes: panes, hwnd: canvas.hwnd})
+    }
+
+    ; The same drawing area may expose both its canvas and its four children.
+    ; Independent valid areas remain ambiguous even if one has richer metadata.
+    for shared in sharedLayouts {
+        if layouts.Length = 1 && layouts[1].mode = "PANE_WINDOWS"
+            && MxNMCoverSameDrawingArea(layouts[1], shared)
+            continue
+        layouts.Push(shared)
+    }
+    summary := {
+        ok: layouts.Length = 1,
+        code: layouts.Length = 1 ? "COVER_SURFACE_READY"
+            : layouts.Length > 1 ? "COVER_SURFACE_NOT_UNIQUE"
+            : gridCount || canvases.Length ? "COVER_PANE_POINT_MISMATCH" : "COVER_SURFACE_NOT_FOUND",
+        candidateCount: layouts.Length,
+        geometry: "runtime=" candidates.Length ",frame=" frameCount ",imageSide=" imageSideCount
+            ",grids=" gridCount ",canvas=" canvases.Length ",canvasHit=" sharedLayouts.Length
+            ",root=" (rootRect.right - rootRect.left) "/" (rootRect.bottom - rootRect.top)
+            ",panelRight=" (layoutRect.right - rootRect.left)
+    }
+    for dialog in dialogs
+        summary.geometry .= ",dlg=" dialog
+    if summary.ok {
+        summary.mode := layouts[1].mode
+        summary.hwnd := layouts[1].hwnd
+        summary.panes := layouts[1].panes
+    }
+    return summary
+}
+
+MxNMCoverSpansImageArea(rect, layoutRect) {
+    return rect.right - rect.left >= layoutRect.right - layoutRect.left
+        && rect.bottom - rect.top >= (layoutRect.bottom - layoutRect.top) * 2
+        && rect.top < layoutRect.bottom && rect.bottom > layoutRect.bottom
+}
+
+MxNMCoverIsDrawingClass(className) {
+    return className != "" && className != "Static" && className != "ComboBox"
+        && className != "Edit" && !MxNMContextClassLooksLikeToolChrome(className)
+}
+
+MxNMCoverArrangePaneWindows(siblings) {
+    if siblings.Length != 4
+        return 0
+    bounds := siblings[1].rect.Clone()
+    for sibling in siblings {
+        rect := sibling.rect
+        bounds.left := Min(bounds.left, rect.left)
+        bounds.top := Min(bounds.top, rect.top)
+        bounds.right := Max(bounds.right, rect.right)
+        bounds.bottom := Max(bounds.bottom, rect.bottom)
+    }
+    cells := MxNMCoverSplitCanvas({rect: bounds, hwnd: 0})
+    panes := [0, 0, 0, 0]
+    for sibling in siblings {
+        for index, cell in cells {
+            if !MxNMCoverPaneRectMatches(sibling.rect, cell.rect)
+                continue
+            if IsObject(panes[index])
+                return 0
+            panes[index] := sibling
+            break
+        }
+    }
+    for pane in panes {
+        if !IsObject(pane)
+            return 0
+    }
+    return panes
+}
+
+MxNMCoverSplitCanvas(canvas) {
+    rect := canvas.rect
+    columns := [rect.left, (rect.left + rect.right) // 2, rect.right]
+    rows := [rect.top, (rect.top + rect.bottom) // 2, rect.bottom]
+    panes := []
+    loop 2 {
+        row := A_Index
+        loop 2 {
+            column := A_Index
+            panes.Push({hwnd: canvas.hwnd, rect: {
+                left: columns[column], right: columns[column + 1],
+                top: rows[row], bottom: rows[row + 1]
+            }})
+        }
+    }
+    return panes
+}
+
+MxNMCoverPaneRectMatches(actual, cell) {
+    ; Allow narrow pane borders and gutters in proportion to the cell.
+    dx := Max(1, (cell.right - cell.left) * .03)
+    dy := Max(1, (cell.bottom - cell.top) * .03)
+    return Abs(actual.left - cell.left) <= dx && Abs(actual.right - cell.right) <= dx
+        && Abs(actual.top - cell.top) <= dy && Abs(actual.bottom - cell.bottom) <= dy
+}
+
+MxNMCoverSameDrawingArea(grid, shared) {
+    if grid.hwnd != shared.hwnd
+        return false
+    for index, pane in grid.panes {
+        if !MxNMCoverPaneRectMatches(pane.rect, shared.panes[index].rect)
+            return false
+    }
+    return true
+}
+
+MxNMCoverPaneCenter(pane) {
+    rect := pane.rect
+    return {x: (rect.left + rect.right) // 2, y: (rect.top + rect.bottom) // 2}
+}
+
+MxNMCoverAllPanePointsMatch(panes, pointMatches) {
+    for pane in panes {
+        if !pointMatches.Call(pane, MxNMCoverPaneCenter(pane))
+            return false
+    }
+    return true
+}
+
+MxNMCoverPanePointMatches(identity, pane, point) {
+    hit := Win32WindowFromPoint(point)
+    if !hit || Win32WindowPid(hit) != identity.pid || Win32RootOwner(hit) != identity.rootHwnd
+        || !Win32IsWindowEnabled(hit) || !RectHasPoint(pane.rect, point)
+        return false
+    if hit = pane.hwnd
+        return true
+    if !Win32IsChild(pane.hwnd, hit)
+        return false
+    hitRect := Win32ClientRectScreen(hit)
+    paneRect := Win32ClientRectScreen(pane.hwnd)
+    ; Accept a render child spanning the whole canvas or the expected cell.
+    ; A small child overlay at the center cannot pass either geometry check.
+    return IsObject(hitRect) && IsObject(paneRect)
+        && (MxNMCoverPaneRectMatches(hitRect, pane.rect) || MxNMCoverPaneRectMatches(hitRect, paneRect))
+        && MxNMCoverIsDrawingClass(Win32WindowClass(hit))
+}
+
+MxNMCoverLogSurface(session, surface) {
+    if !session.HasOwnProp("operation") || !surface.HasOwnProp("candidateCount")
+        return
+    session.operation.SetField("viewer.candidateCount", surface.candidateCount)
+    session.operation.SetField("cover.geometry", surface.geometry)
+    if surface.ok
+        session.operation.SetField("cover.surfaceMode", surface.mode)
 }
 
 MxNMCoverSurfaceUnchanged(session) {
@@ -257,25 +444,26 @@ MxNMCoverSurfaceUnchanged(session) {
         return false
     current := MxNMCoverResolveSurface(session)
     bound := session.coverSurface
-    if !current.ok || current.hwnd != bound.hwnd
+    if !current.ok || current.hwnd != bound.hwnd || current.mode != bound.mode {
+        MxNMCoverLogSurface(session, current)
         return false
-    for edge in ["left", "top", "right", "bottom"] {
-        if current.rect.%edge% != bound.rect.%edge%
+    }
+    for index, pane in current.panes {
+        prior := bound.panes[index]
+        if pane.hwnd != prior.hwnd || RectKey(pane.rect) != RectKey(prior.rect)
             return false
     }
-    return Win32WindowPid(bound.hwnd) = session.viewerPid
-        && MxNMMontageRootOwner(bound.hwnd) = session.viewerRootOwner
+    return MxNMMontageViewerStillActive(session)
 }
 
-MxNMCoverSelectPane(session, xRatio) {
-    rect := session.coverSurface.rect
-    x := rect.left + Round((rect.right - rect.left) * xRatio)
-    y := rect.top + Round((rect.bottom - rect.top) * .75)
-    if !MxNMCoverSurfaceUnchanged(session)
-        || MxNMMontageWindowFromPoint(x, y) != session.coverSurface.hwnd
+MxNMCoverSelectPane(session, index) {
+    pane := session.coverSurface.panes[index]
+    point := MxNMCoverPaneCenter(pane)
+    identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
+    if !MxNMCoverSurfaceUnchanged(session) || !MxNMCoverPanePointMatches(identity, pane, point)
+        || !MxNMMontageViewerStillActive(session)
         return {ok: false, code: "COVER_PANE_POINT_MISMATCH"}
-    ; Only one click; never retry an ambiguous selection.
-    if !MxNMMontagePhysicalClick(x, y)
+    if !MxNMMontagePhysicalClick(point.x, point.y)
         return {ok: false, code: "COVER_PANE_CLICK_FAILED"}
     Sleep 100
     return {ok: true, code: "COVER_PANE_CLICK_DISPATCHED"}

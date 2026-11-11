@@ -10,15 +10,6 @@ try {
 }
 
 RunViewerStateRegression() {
-    target := {pid: 101, hwnd: 1001}
-    ReportImageCaptionPasteGate.ReadyTargetKey := ""
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 500, "first target")
-    ; Resolving/planning then cancelling must not consume the first save gate.
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 500, "cancel before paste")
-    ReportImageCaptionPasteGate.ObserveSave(target)
-    AssertViewerState(ReportImageCaptionPasteGate.Plan(target).milliseconds = 20, "saved target")
-    AssertViewerState(ReportImageCaptionPasteGate.Plan({pid: 101, hwnd: 1002}).milliseconds = 500, "new HWND in same process")
-    AssertViewerState(ReportImageCaptionPasteGate.Plan({pid: 102, hwnd: 1001}).milliseconds = 500, "new process")
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 2999, 3000) = "WAITING", "held before deadline")
     AssertViewerState(MxNMViewerReleaseDecision(true, true, 3000, 3000) = "KEY_RELEASE_TIMEOUT", "held at deadline")
     AssertViewerState(MxNMViewerReleaseDecision(false, true, 0, 3000) = "RELEASED", "next press can release")

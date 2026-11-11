@@ -5,10 +5,7 @@ class ReportImageCaptionDefaults {
     static TargetReadyTimeoutMs := 1500
     static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
-    static PasteSettleMs := 20
-    ; The first paste into a newly observed renderer can be visible before its
-    ; backing editor state accepts the change. Gate only that cold boundary.
-    static FirstTargetSessionPasteSettleMs := 500
+    static PasteToSaveSettleMs := 250
     static ExplicitSaveSettleMs := 200
     ; WheelDown has a vendor-side conditional save path that is skipped when
     ; advances are too close together. Only wait for the missing remainder.
@@ -36,6 +33,7 @@ class ReportImageCaptionCode {
     static TARGET_ACTIVATION_FAILED := "TARGET_ACTIVATION_FAILED"
     static PASTE_FAILED := "PASTE_FAILED"
     static SAVE_DISPATCH_FAILED := "SAVE_DISPATCH_FAILED"
+    static SAVE_NOT_READY := "SAVE_NOT_READY"
     static PARTIAL_SUCCESS := "PARTIAL_SUCCESS"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
@@ -861,7 +859,6 @@ ExecuteReportImageCaptionAction(
     activationStartedAt := 0
     pasteDispatchedAt := 0
     saveDispatchedAt := 0
-    pasteSettle := ReportImageCaptionPasteSettle(target)
     if IsObject(operation) {
         operation.SetField(
             "caption.saveDispatchResult",
@@ -877,11 +874,11 @@ ExecuteReportImageCaptionAction(
         )
         operation.SetField(
             "caption.preSaveSettlePath",
-            pasteSettle.path
+            "FIXED_PASTE_SETTLE"
         )
         operation.SetField(
             "caption.preSaveSettleMs",
-            pasteSettle.milliseconds
+            0
         )
     }
     try {
@@ -969,18 +966,19 @@ ExecuteReportImageCaptionAction(
         pasteDispatchedAt := A_TickCount
         if IsObject(operation)
             operation.Stage("PASTE_DISPATCHED")
-        Sleep pasteSettle.milliseconds
-        if IsObject(operation)
+        Sleep ReportImageCaptionDefaults.PasteToSaveSettleMs
+        if IsObject(operation) {
+            operation.SetField("caption.preSaveSettleMs", A_TickCount - pasteDispatchedAt)
             operation.Stage("PASTE_SETTLE_COMPLETED")
+        }
 
-        if WinExist("A") != target.hwnd
-            || !ReportImageCaptionPointBelongsToTarget(
-                target.hwnd,
-                target.savePoint
-            ) {
+        saveTarget := ValidateReportImageCaptionSaveTarget(target)
+        if !saveTarget.ok {
+            if IsObject(operation)
+                operation.SetField("caption.saveTargetCode", saveTarget.code)
             return MakeReportImageCaptionResult(
                 false,
-                ReportImageCaptionCode.SAVE_DISPATCH_FAILED,
+                ReportImageCaptionCode.SAVE_NOT_READY,
                 true
             )
         }
@@ -994,7 +992,6 @@ ExecuteReportImageCaptionAction(
                 1,
                 0
             )
-            ReportImageCaptionPasteGate.ObserveSave(target)
             saveDispatchedAt := A_TickCount
             if IsObject(operation) {
                 operation.SetField(
@@ -1108,31 +1105,32 @@ ExecuteReportImageCaptionAction(
     }
 }
 
-ReportImageCaptionPasteSettle(target) {
-    return ReportImageCaptionPasteGate.Plan(target)
-}
-
-; This state belongs to the caption transaction, never to diagnostic observation.
-; Retain only the most recently warmed target, matching the single caption cache.
-class ReportImageCaptionPasteGate {
-    static ReadyTargetKey := ""
-
-    static Plan(target) {
-        firstPaste := this.ReadyTargetKey != this.TargetKey(target)
-        return {
-            path: firstPaste ? "FIRST_TARGET_SESSION_GATE" : "STANDARD",
-            milliseconds: firstPaste
-                ? ReportImageCaptionDefaults.FirstTargetSessionPasteSettleMs
-                : ReportImageCaptionDefaults.PasteSettleMs
-        }
-    }
-
-    static ObserveSave(target) {
-        this.ReadyTargetKey := this.TargetKey(target)
-    }
-
-    static TargetKey(target) {
-        return String(target.pid) ":" String(target.hwnd)
+ValidateReportImageCaptionSaveTarget(target) {
+    try {
+        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
+            || Win32RootOwner(target.hwnd) != target.hwnd
+            return {ok: false, code: "SAVE_TARGET_CHANGED"}
+        root := ReportImageCaptionUiaRoot(target.hwnd)
+        buttons := root.FindElements({Type: "Button", Name: "保存"})
+        if buttons.Length != 1
+            return {ok: false, code: "SAVE_BUTTON_NOT_UNIQUE"}
+        button := buttons[1]
+        if !UIA.CompareElements(button, target.saveAnchor.element)
+            return {ok: false, code: "SAVE_BUTTON_CHANGED"}
+        rect := ReportImageCaptionElementRect(button)
+        if !ReportImageCaptionElementUsable(button, target.pid)
+            return {ok: false, code: "SAVE_BUTTON_UNAVAILABLE"}
+        if !IsObject(rect) || RectKey(rect) != target.saveAnchor.rectKey
+            || !RectHasPoint(rect, target.savePoint)
+            return {ok: false, code: "SAVE_BUTTON_GEOMETRY_CHANGED"}
+        ; Electron's point provider may return its renderer rather than the
+        ; DOM button. Recheck native ownership after the UIA queries yield.
+        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
+            || !ReportImageCaptionPointBelongsToTarget(target.hwnd, target.savePoint)
+            return {ok: false, code: "SAVE_TARGET_POINT_CHANGED"}
+        return {ok: true, code: "SAVE_TARGET_VALIDATED"}
+    } catch {
+        return {ok: false, code: "SAVE_BUTTON_QUERY_FAILED"}
     }
 }
 
@@ -1295,6 +1293,8 @@ ReportImageCaptionFailureMessage(result) {
         return "报告图像窗口未激活，未执行粘贴"
     if result.code = ReportImageCaptionCode.PASTE_FAILED
         return "caption 粘贴失败"
+    if result.code = ReportImageCaptionCode.SAVE_NOT_READY
+        return "保存入口校验未通过，未自动翻页；请检查当前图并手动保存。"
     if result.code = ReportImageCaptionCode.SAVE_DISPATCH_FAILED
         return "caption 已粘贴，但未能触发保存"
     if result.code = ReportImageCaptionCode.PARTIAL_SUCCESS

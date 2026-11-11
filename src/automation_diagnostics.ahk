@@ -140,6 +140,8 @@ BeginAutomationDiagnosticOperation(action) {
 }
 
 AutomationDiagnosticFieldAllowed(action, fieldName) {
+    if action = "ViewerCover" && (fieldName = "cover.geometry" || fieldName = "cover.surfaceMode")
+        return true
     if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" || action = "ViewerCover" {
         static viewerFields := Map(
             "viewer.command", true,
@@ -195,6 +197,7 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
             "caption.activationMs", true,
             "caption.preSaveSettlePath", true,
             "caption.preSaveSettleMs", true,
+            "caption.saveTargetCode", true,
             "caption.pasteToSaveMs", true,
             "caption.advanceGatePath", true,
             "caption.advanceGateMs", true,

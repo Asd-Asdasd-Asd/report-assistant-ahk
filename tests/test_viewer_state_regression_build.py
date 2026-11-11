@@ -15,13 +15,14 @@ class ViewerStateRegressionBuildTests(unittest.TestCase):
         self.assertIn('RunViewerStateRegression()', text)
         self.assertIn('ResolveMxNMViewerToolControlSet(plan,', text)
 
-    def test_caption_gate_is_updated_after_save_dispatch(self):
+    def test_caption_settle_and_target_validation_precede_save_and_advance(self):
         text = (ROOT / 'src/report_image_caption.ahk').read_text(encoding="utf-8")
         action = text.split('\nExecuteReportImageCaptionAction(\n', 1)[1].split(
-            '\nReportImageCaptionPasteSettle(target)', 1)[0]
-        observe = action.index('ReportImageCaptionPasteGate.ObserveSave(target)')
-        self.assertLess(action.index('target.savePoint.x'), observe)
-        self.assertLess(action.index('Sleep pasteSettle.milliseconds'), observe)
+            '\nValidateReportImageCaptionSaveTarget(', 1)[0]
+        self.assertLess(action.index('Sleep ReportImageCaptionDefaults.PasteToSaveSettleMs'),
+                        action.index('if !saveTarget.ok'))
+        self.assertLess(action.index('if !saveTarget.ok'), action.index('target.savePoint.x'))
+        self.assertLess(action.index('target.savePoint.x'), action.index('SendInput "{WheelDown}"'))
         self.assertNotIn('FirstTargetProcessUse', action)
 
     def test_viewer_diagnostic_fields_are_allowlisted(self):

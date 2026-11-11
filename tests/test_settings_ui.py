@@ -105,7 +105,7 @@ class SettingsUiTests(unittest.TestCase):
 
     def test_list_identity_is_section_based_and_product_sorting_remains_available(self) -> None:
         ui = source("src/settings_ui.ahk")
-        self.assertIn('"ListView", "x28 y52 w844 h220 -Multi"', ui)
+        self.assertRegex(ui, r'"ListView", "[^"]*-Multi"')
         self.assertNotIn("NoSort", ui)
         self.assertIn('["状态", "模板名称", "触发词", ""]', ui)
         self.assertIn("this.TemplateList.ModifyCol(4, 0)", ui)
@@ -175,9 +175,9 @@ class SettingsUiTests(unittest.TestCase):
         editor = source("src/hotstring_config_editor.ahk")
         for label in (
             "Montage 排版",
-            "Body 排版",
-            "Head 排版",
-            "Lung 排版",
+            "Body",
+            "Head",
+            "Lung",
             "Montage 布局位置",
             "封面图布局位置",
         ):
@@ -195,6 +195,19 @@ class SettingsUiTests(unittest.TestCase):
         self.assertIn("ValidateMxNMMontageSettings(", ui)
         self.assertIn("WriteMxNMMontageSettings(", editor)
         self.assertIn("MxNMMontageSettingsMatch(", editor)
+
+    def test_compact_settings_put_long_explanations_in_click_help_menus(self) -> None:
+        ui = source("src/settings_ui.ahk")
+        self.assertIn('this.Window.Show("w800 h660")', ui)
+        self.assertIn('" w18 h18", "?"', ui)
+        self.assertIn('button.OnEvent("Click", this.ShowHelpMenu.Bind(this, topic))', ui)
+        constructor = ui.split("__New(loadResult) {", 1)[1].split("\n    Activate()", 1)[0]
+        self.assertNotIn("红色标记必须是模板最后一个元素", constructor)
+        self.assertNotIn("MIP 保存为报告左图", constructor)
+        self.assertNotIn("默认第 4 行", constructor)
+        self.assertIn('this.AddHelpButton("cover-layout"', constructor)
+        self.assertIn('this.AddHelpButton("montage-layout"', constructor)
+        self.assertIn('helpMenu.Show(rect.left, rect.bottom + 3)', ui)
 
 
 if __name__ == "__main__":

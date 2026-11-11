@@ -1,9 +1,9 @@
 ; Generated file. Edit src/*.ahk instead.
-; Application version: 0.9.0
-; Source revision: dc983e97350ba55a5341ec6df751a51a83f61808
-; Generated at: 2026-11-10 03:56:47 UTC
-;@Ahk2Exe-SetFileVersion 0.9.0.0
-;@Ahk2Exe-SetProductVersion 0.9.0
+; Application version: 0.9.1
+; Source revision: cfaff370cba6278003b05a2e6a6e83d263f98bf4
+; Generated at: 2026-11-11 02:20:10 UTC
+;@Ahk2Exe-SetFileVersion 0.9.1.0
+;@Ahk2Exe-SetProductVersion 0.9.1
 ;@Ahk2Exe-SetName MedEx Report Assistant
 
 #Requires AutoHotkey v2.0
@@ -12,10 +12,10 @@
 
 ; --- BEGIN app_metadata.ahk ---
 class AppMetadata {
-    static Version := "0.9.0"
+    static Version := "0.9.1"
     static Channel := "internal-test"
-    static BuildDate := "2026-11-10"
-    static SourceRevision := "dc983e97350ba55a5341ec6df751a51a83f61808"
+    static BuildDate := "2026-11-11"
+    static SourceRevision := "cfaff370cba6278003b05a2e6a6e83d263f98bf4"
 }
 
 AppMetadataChannelDisplayName(channel := "") {
@@ -252,6 +252,8 @@ BeginAutomationDiagnosticOperation(action) {
 }
 
 AutomationDiagnosticFieldAllowed(action, fieldName) {
+    if action = "ViewerCover" && (fieldName = "cover.geometry" || fieldName = "cover.surfaceMode")
+        return true
     if action = "ViewerTool" || action = "ViewerCapture" || action = "ViewerClear" || action = "ViewerCover" {
         static viewerFields := Map(
             "viewer.command", true,
@@ -307,6 +309,7 @@ AutomationDiagnosticFieldAllowed(action, fieldName) {
             "caption.activationMs", true,
             "caption.preSaveSettlePath", true,
             "caption.preSaveSettleMs", true,
+            "caption.saveTargetCode", true,
             "caption.pasteToSaveMs", true,
             "caption.advanceGatePath", true,
             "caption.advanceGateMs", true,
@@ -21438,8 +21441,10 @@ class MxNMCoverTransport {
         if step = "SELECT_LAYOUT" {
             point := MxNMMontageLayoutPoint(session.coverLayoutRow, session.coverLayoutColumn)
             result := MxNMMontageStaticClick(21112, "Static", point.xRatio, point.yRatio, 0, "", 0, session)
-            if result.ok
+            if result.ok {
+                session.coverLayoutDispatched := true
                 Sleep MxNMMontageTiming.LayoutSettleMs
+            }
             return result
         }
         if step = "ANNOTATION_TAB"
@@ -21448,8 +21453,7 @@ class MxNMCoverTransport {
             return MxNMMontageComboSelect(21155, "default", session)
         if step = "BIND_SURFACE" {
             surface := MxNMCoverResolveSurface(session)
-            if session.HasOwnProp("operation") && surface.HasOwnProp("candidateCount")
-                session.operation.SetField("viewer.candidateCount", surface.candidateCount)
+            MxNMCoverLogSurface(session, surface)
             if surface.ok
                 session.coverSurface := surface
             return surface
@@ -21457,7 +21461,7 @@ class MxNMCoverTransport {
         if !MxNMCoverSurfaceUnchanged(session)
             return {ok: false, code: "COVER_SURFACE_CHANGED"}
         if step = "SELECT_MIP" || step = "SELECT_FUSION"
-            return MxNMCoverSelectPane(session, step = "SELECT_MIP" ? .75 : .25)
+            return MxNMCoverSelectPane(session, step = "SELECT_MIP" ? 4 : 3)
         if step != "SAVE_LEFT" && step != "SAVE_RIGHT" && step != "RESET_DEFAULT"
             return {ok: false, code: "COVER_STEP_UNKNOWN"}
         controlId := step = "SAVE_LEFT" ? 21104 : step = "SAVE_RIGHT" ? 21105 : 21102
@@ -21557,12 +21561,14 @@ MxNMCoverFourPaneProfileMatches(panes) {
 }
 
 MxNMCoverResolveSurface(session) {
-    ; Owned drawing dialogs may extend over the root's non-client border.
-    ; Enclose their screen-space client rect in the root WINDOW rect, not its
-    ; inset client rect. No tolerance expansion or candidate ranking is used.
     rootRect := Win32WindowRect(session.viewerRootOwner)
-    if !IsObject(rootRect)
+    layoutRect := Win32WindowRect(session.coverControls[21112].hwnd)
+    if !IsObject(rootRect) || !IsObject(layoutRect)
+        || layoutRect.right <= layoutRect.left || layoutRect.bottom <= layoutRect.top
         return {ok: false, code: "COVER_ROOT_RECT_INVALID"}
+    if !session.HasOwnProp("coverLayoutDispatched")
+        return {ok: false, code: "COVER_LAYOUT_NOT_DISPATCHED"}
+
     identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
     candidates := [], seen := Map()
     callback := CallbackCreate(CollectMxNMContextSurfaceCandidate.Bind(identity, rootRect, seen, candidates), "Fast", 2)
@@ -21572,24 +21578,208 @@ MxNMCoverResolveSurface(session) {
             DllCall("User32\EnumChildWindows", "Ptr", topHwnd, "Ptr", callback, "Ptr", 0, "Int")
         }
     } finally CallbackFree(callback)
-    return MxNMCoverChooseSurface(candidates, rootRect, session.viewerRootOwner)
+    for candidate in candidates
+        candidate.parent := Win32ParentHwnd(candidate.hwnd)
+    return MxNMCoverChooseSurface(candidates, rootRect, layoutRect, identity,
+        MxNMCoverPanePointMatches.Bind(identity))
 }
 
-MxNMCoverChooseSurface(candidates, rootRect, rootHwnd) {
-    matches := []
+MxNMCoverChooseSurface(candidates, rootRect, layoutRect, identity, pointMatches) {
+    groups := Map(), canvases := []
+    dialogs := []
+    frameCount := 0, imageSideCount := 0, gridCount := 0
+    panelWidth := layoutRect.right - layoutRect.left
+    panelHeight := layoutRect.bottom - layoutRect.top
     for candidate in candidates {
-        if candidate.hwnd = rootHwnd || candidate.className != "#32770"
-            || candidate.width < (rootRect.right - rootRect.left) * .4
-            || candidate.height < (rootRect.bottom - rootRect.top) * .65
-            || !RectEncloses(rootRect, candidate.rect)
+        if candidate.className = "#32770" && candidate.hwnd != identity.rootHwnd
+            && dialogs.Length < 3 && candidate.width >= panelWidth {
+            rect := candidate.rect
+            dialogs.Push((rect.left - rootRect.left) "/" (rect.top - rootRect.top)
+                "/" candidate.width "/" candidate.height)
+        }
+        if candidate.hwnd = identity.rootHwnd || !RectEncloses(rootRect, candidate.rect)
             continue
-        matches.Push(candidate)
+        frameCount += 1
+        ; The live layout palette bounds the toolbar side. Size filters scale
+        ; with that control and do not assume a maximized Viewer or a monitor.
+        if candidate.rect.left < layoutRect.right
+            || candidate.width * 2 < panelWidth || candidate.height * 2 < panelHeight
+            || !MxNMCoverIsDrawingClass(candidate.className)
+            continue
+        imageSideCount += 1
+        if candidate.className = "#32770" && MxNMCoverSpansImageArea(candidate.rect, layoutRect)
+            canvases.Push(candidate)
+        if candidate.parent {
+            key := candidate.parent "|" candidate.className
+            if !groups.Has(key)
+                groups[key] := []
+            groups[key].Push(candidate)
+        }
     }
-    ; Do not rank or guess between large canvas candidates.
-    if matches.Length != 1
-        return {ok: false, code: "COVER_SURFACE_NOT_UNIQUE", candidateCount: matches.Length}
-    candidate := matches[1]
-    return {ok: true, code: "COVER_SURFACE_READY", hwnd: candidate.hwnd, rect: candidate.rect, candidateCount: 1}
+
+    layouts := [], sharedLayouts := []
+    for _, siblings in groups {
+        panes := MxNMCoverArrangePaneWindows(siblings)
+        if !IsObject(panes)
+            continue
+        bounds := {left: panes[1].rect.left, top: panes[1].rect.top,
+            right: panes[4].rect.right, bottom: panes[4].rect.bottom}
+        if !MxNMCoverSpansImageArea(bounds, layoutRect)
+            continue
+        gridCount += 1
+        if MxNMCoverAllPanePointsMatch(panes, pointMatches)
+            layouts.Push({mode: "PANE_WINDOWS", panes: panes, hwnd: siblings[1].parent})
+    }
+    for canvas in canvases {
+        panes := MxNMCoverSplitCanvas(canvas)
+        if MxNMCoverAllPanePointsMatch(panes, pointMatches)
+            sharedLayouts.Push({mode: "SHARED_CANVAS", panes: panes, hwnd: canvas.hwnd})
+    }
+
+    ; The same drawing area may expose both its canvas and its four children.
+    ; Independent valid areas remain ambiguous even if one has richer metadata.
+    for shared in sharedLayouts {
+        if layouts.Length = 1 && layouts[1].mode = "PANE_WINDOWS"
+            && MxNMCoverSameDrawingArea(layouts[1], shared)
+            continue
+        layouts.Push(shared)
+    }
+    summary := {
+        ok: layouts.Length = 1,
+        code: layouts.Length = 1 ? "COVER_SURFACE_READY"
+            : layouts.Length > 1 ? "COVER_SURFACE_NOT_UNIQUE"
+            : gridCount || canvases.Length ? "COVER_PANE_POINT_MISMATCH" : "COVER_SURFACE_NOT_FOUND",
+        candidateCount: layouts.Length,
+        geometry: "runtime=" candidates.Length ",frame=" frameCount ",imageSide=" imageSideCount
+            ",grids=" gridCount ",canvas=" canvases.Length ",canvasHit=" sharedLayouts.Length
+            ",root=" (rootRect.right - rootRect.left) "/" (rootRect.bottom - rootRect.top)
+            ",panelRight=" (layoutRect.right - rootRect.left)
+    }
+    for dialog in dialogs
+        summary.geometry .= ",dlg=" dialog
+    if summary.ok {
+        summary.mode := layouts[1].mode
+        summary.hwnd := layouts[1].hwnd
+        summary.panes := layouts[1].panes
+    }
+    return summary
+}
+
+MxNMCoverSpansImageArea(rect, layoutRect) {
+    return rect.right - rect.left >= layoutRect.right - layoutRect.left
+        && rect.bottom - rect.top >= (layoutRect.bottom - layoutRect.top) * 2
+        && rect.top < layoutRect.bottom && rect.bottom > layoutRect.bottom
+}
+
+MxNMCoverIsDrawingClass(className) {
+    return className != "" && className != "Static" && className != "ComboBox"
+        && className != "Edit" && !MxNMContextClassLooksLikeToolChrome(className)
+}
+
+MxNMCoverArrangePaneWindows(siblings) {
+    if siblings.Length != 4
+        return 0
+    bounds := siblings[1].rect.Clone()
+    for sibling in siblings {
+        rect := sibling.rect
+        bounds.left := Min(bounds.left, rect.left)
+        bounds.top := Min(bounds.top, rect.top)
+        bounds.right := Max(bounds.right, rect.right)
+        bounds.bottom := Max(bounds.bottom, rect.bottom)
+    }
+    cells := MxNMCoverSplitCanvas({rect: bounds, hwnd: 0})
+    panes := [0, 0, 0, 0]
+    for sibling in siblings {
+        for index, cell in cells {
+            if !MxNMCoverPaneRectMatches(sibling.rect, cell.rect)
+                continue
+            if IsObject(panes[index])
+                return 0
+            panes[index] := sibling
+            break
+        }
+    }
+    for pane in panes {
+        if !IsObject(pane)
+            return 0
+    }
+    return panes
+}
+
+MxNMCoverSplitCanvas(canvas) {
+    rect := canvas.rect
+    columns := [rect.left, (rect.left + rect.right) // 2, rect.right]
+    rows := [rect.top, (rect.top + rect.bottom) // 2, rect.bottom]
+    panes := []
+    loop 2 {
+        row := A_Index
+        loop 2 {
+            column := A_Index
+            panes.Push({hwnd: canvas.hwnd, rect: {
+                left: columns[column], right: columns[column + 1],
+                top: rows[row], bottom: rows[row + 1]
+            }})
+        }
+    }
+    return panes
+}
+
+MxNMCoverPaneRectMatches(actual, cell) {
+    ; Allow narrow pane borders and gutters in proportion to the cell.
+    dx := Max(1, (cell.right - cell.left) * .03)
+    dy := Max(1, (cell.bottom - cell.top) * .03)
+    return Abs(actual.left - cell.left) <= dx && Abs(actual.right - cell.right) <= dx
+        && Abs(actual.top - cell.top) <= dy && Abs(actual.bottom - cell.bottom) <= dy
+}
+
+MxNMCoverSameDrawingArea(grid, shared) {
+    if grid.hwnd != shared.hwnd
+        return false
+    for index, pane in grid.panes {
+        if !MxNMCoverPaneRectMatches(pane.rect, shared.panes[index].rect)
+            return false
+    }
+    return true
+}
+
+MxNMCoverPaneCenter(pane) {
+    rect := pane.rect
+    return {x: (rect.left + rect.right) // 2, y: (rect.top + rect.bottom) // 2}
+}
+
+MxNMCoverAllPanePointsMatch(panes, pointMatches) {
+    for pane in panes {
+        if !pointMatches.Call(pane, MxNMCoverPaneCenter(pane))
+            return false
+    }
+    return true
+}
+
+MxNMCoverPanePointMatches(identity, pane, point) {
+    hit := Win32WindowFromPoint(point)
+    if !hit || Win32WindowPid(hit) != identity.pid || Win32RootOwner(hit) != identity.rootHwnd
+        || !Win32IsWindowEnabled(hit) || !RectHasPoint(pane.rect, point)
+        return false
+    if hit = pane.hwnd
+        return true
+    if !Win32IsChild(pane.hwnd, hit)
+        return false
+    hitRect := Win32ClientRectScreen(hit)
+    paneRect := Win32ClientRectScreen(pane.hwnd)
+    ; Accept a render child spanning the whole canvas or the expected cell.
+    ; A small child overlay at the center cannot pass either geometry check.
+    return IsObject(hitRect) && IsObject(paneRect)
+        && (MxNMCoverPaneRectMatches(hitRect, pane.rect) || MxNMCoverPaneRectMatches(hitRect, paneRect))
+        && MxNMCoverIsDrawingClass(Win32WindowClass(hit))
+}
+
+MxNMCoverLogSurface(session, surface) {
+    if !session.HasOwnProp("operation") || !surface.HasOwnProp("candidateCount")
+        return
+    session.operation.SetField("viewer.candidateCount", surface.candidateCount)
+    session.operation.SetField("cover.geometry", surface.geometry)
+    if surface.ok
+        session.operation.SetField("cover.surfaceMode", surface.mode)
 }
 
 MxNMCoverSurfaceUnchanged(session) {
@@ -21597,25 +21787,26 @@ MxNMCoverSurfaceUnchanged(session) {
         return false
     current := MxNMCoverResolveSurface(session)
     bound := session.coverSurface
-    if !current.ok || current.hwnd != bound.hwnd
+    if !current.ok || current.hwnd != bound.hwnd || current.mode != bound.mode {
+        MxNMCoverLogSurface(session, current)
         return false
-    for edge in ["left", "top", "right", "bottom"] {
-        if current.rect.%edge% != bound.rect.%edge%
+    }
+    for index, pane in current.panes {
+        prior := bound.panes[index]
+        if pane.hwnd != prior.hwnd || RectKey(pane.rect) != RectKey(prior.rect)
             return false
     }
-    return Win32WindowPid(bound.hwnd) = session.viewerPid
-        && MxNMMontageRootOwner(bound.hwnd) = session.viewerRootOwner
+    return MxNMMontageViewerStillActive(session)
 }
 
-MxNMCoverSelectPane(session, xRatio) {
-    rect := session.coverSurface.rect
-    x := rect.left + Round((rect.right - rect.left) * xRatio)
-    y := rect.top + Round((rect.bottom - rect.top) * .75)
-    if !MxNMCoverSurfaceUnchanged(session)
-        || MxNMMontageWindowFromPoint(x, y) != session.coverSurface.hwnd
+MxNMCoverSelectPane(session, index) {
+    pane := session.coverSurface.panes[index]
+    point := MxNMCoverPaneCenter(pane)
+    identity := {pid: session.viewerPid, rootHwnd: session.viewerRootOwner}
+    if !MxNMCoverSurfaceUnchanged(session) || !MxNMCoverPanePointMatches(identity, pane, point)
+        || !MxNMMontageViewerStillActive(session)
         return {ok: false, code: "COVER_PANE_POINT_MISMATCH"}
-    ; Only one click; never retry an ambiguous selection.
-    if !MxNMMontagePhysicalClick(x, y)
+    if !MxNMMontagePhysicalClick(point.x, point.y)
         return {ok: false, code: "COVER_PANE_CLICK_FAILED"}
     Sleep 100
     return {ok: true, code: "COVER_PANE_CLICK_DISPATCHED"}
@@ -24087,10 +24278,7 @@ class ReportImageCaptionDefaults {
     static TargetReadyTimeoutMs := 1500
     static TargetReadyPollMs := 40
     static CaptionFocusSettleMs := 15
-    static PasteSettleMs := 20
-    ; The first paste into a newly observed renderer can be visible before its
-    ; backing editor state accepts the change. Gate only that cold boundary.
-    static FirstTargetSessionPasteSettleMs := 500
+    static PasteToSaveSettleMs := 250
     static ExplicitSaveSettleMs := 200
     ; WheelDown has a vendor-side conditional save path that is skipped when
     ; advances are too close together. Only wait for the missing remainder.
@@ -24118,6 +24306,7 @@ class ReportImageCaptionCode {
     static TARGET_ACTIVATION_FAILED := "TARGET_ACTIVATION_FAILED"
     static PASTE_FAILED := "PASTE_FAILED"
     static SAVE_DISPATCH_FAILED := "SAVE_DISPATCH_FAILED"
+    static SAVE_NOT_READY := "SAVE_NOT_READY"
     static PARTIAL_SUCCESS := "PARTIAL_SUCCESS"
     static UNEXPECTED_ERROR := "UNEXPECTED_ERROR"
 }
@@ -24943,7 +25132,6 @@ ExecuteReportImageCaptionAction(
     activationStartedAt := 0
     pasteDispatchedAt := 0
     saveDispatchedAt := 0
-    pasteSettle := ReportImageCaptionPasteSettle(target)
     if IsObject(operation) {
         operation.SetField(
             "caption.saveDispatchResult",
@@ -24959,11 +25147,11 @@ ExecuteReportImageCaptionAction(
         )
         operation.SetField(
             "caption.preSaveSettlePath",
-            pasteSettle.path
+            "FIXED_PASTE_SETTLE"
         )
         operation.SetField(
             "caption.preSaveSettleMs",
-            pasteSettle.milliseconds
+            0
         )
     }
     try {
@@ -25051,18 +25239,19 @@ ExecuteReportImageCaptionAction(
         pasteDispatchedAt := A_TickCount
         if IsObject(operation)
             operation.Stage("PASTE_DISPATCHED")
-        Sleep pasteSettle.milliseconds
-        if IsObject(operation)
+        Sleep ReportImageCaptionDefaults.PasteToSaveSettleMs
+        if IsObject(operation) {
+            operation.SetField("caption.preSaveSettleMs", A_TickCount - pasteDispatchedAt)
             operation.Stage("PASTE_SETTLE_COMPLETED")
+        }
 
-        if WinExist("A") != target.hwnd
-            || !ReportImageCaptionPointBelongsToTarget(
-                target.hwnd,
-                target.savePoint
-            ) {
+        saveTarget := ValidateReportImageCaptionSaveTarget(target)
+        if !saveTarget.ok {
+            if IsObject(operation)
+                operation.SetField("caption.saveTargetCode", saveTarget.code)
             return MakeReportImageCaptionResult(
                 false,
-                ReportImageCaptionCode.SAVE_DISPATCH_FAILED,
+                ReportImageCaptionCode.SAVE_NOT_READY,
                 true
             )
         }
@@ -25076,7 +25265,6 @@ ExecuteReportImageCaptionAction(
                 1,
                 0
             )
-            ReportImageCaptionPasteGate.ObserveSave(target)
             saveDispatchedAt := A_TickCount
             if IsObject(operation) {
                 operation.SetField(
@@ -25190,31 +25378,32 @@ ExecuteReportImageCaptionAction(
     }
 }
 
-ReportImageCaptionPasteSettle(target) {
-    return ReportImageCaptionPasteGate.Plan(target)
-}
-
-; This state belongs to the caption transaction, never to diagnostic observation.
-; Retain only the most recently warmed target, matching the single caption cache.
-class ReportImageCaptionPasteGate {
-    static ReadyTargetKey := ""
-
-    static Plan(target) {
-        firstPaste := this.ReadyTargetKey != this.TargetKey(target)
-        return {
-            path: firstPaste ? "FIRST_TARGET_SESSION_GATE" : "STANDARD",
-            milliseconds: firstPaste
-                ? ReportImageCaptionDefaults.FirstTargetSessionPasteSettleMs
-                : ReportImageCaptionDefaults.PasteSettleMs
-        }
-    }
-
-    static ObserveSave(target) {
-        this.ReadyTargetKey := this.TargetKey(target)
-    }
-
-    static TargetKey(target) {
-        return String(target.pid) ":" String(target.hwnd)
+ValidateReportImageCaptionSaveTarget(target) {
+    try {
+        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
+            || Win32RootOwner(target.hwnd) != target.hwnd
+            return {ok: false, code: "SAVE_TARGET_CHANGED"}
+        root := ReportImageCaptionUiaRoot(target.hwnd)
+        buttons := root.FindElements({Type: "Button", Name: "保存"})
+        if buttons.Length != 1
+            return {ok: false, code: "SAVE_BUTTON_NOT_UNIQUE"}
+        button := buttons[1]
+        if !UIA.CompareElements(button, target.saveAnchor.element)
+            return {ok: false, code: "SAVE_BUTTON_CHANGED"}
+        rect := ReportImageCaptionElementRect(button)
+        if !ReportImageCaptionElementUsable(button, target.pid)
+            return {ok: false, code: "SAVE_BUTTON_UNAVAILABLE"}
+        if !IsObject(rect) || RectKey(rect) != target.saveAnchor.rectKey
+            || !RectHasPoint(rect, target.savePoint)
+            return {ok: false, code: "SAVE_BUTTON_GEOMETRY_CHANGED"}
+        ; Electron's point provider may return its renderer rather than the
+        ; DOM button. Recheck native ownership after the UIA queries yield.
+        if WinExist("A") != target.hwnd || Win32WindowPid(target.hwnd) != target.pid
+            || !ReportImageCaptionPointBelongsToTarget(target.hwnd, target.savePoint)
+            return {ok: false, code: "SAVE_TARGET_POINT_CHANGED"}
+        return {ok: true, code: "SAVE_TARGET_VALIDATED"}
+    } catch {
+        return {ok: false, code: "SAVE_BUTTON_QUERY_FAILED"}
     }
 }
 
@@ -25377,6 +25566,8 @@ ReportImageCaptionFailureMessage(result) {
         return "报告图像窗口未激活，未执行粘贴"
     if result.code = ReportImageCaptionCode.PASTE_FAILED
         return "caption 粘贴失败"
+    if result.code = ReportImageCaptionCode.SAVE_NOT_READY
+        return "保存入口校验未通过，未自动翻页；请检查当前图并手动保存。"
     if result.code = ReportImageCaptionCode.SAVE_DISPATCH_FAILED
         return "caption 已粘贴，但未能触发保存"
     if result.code = ReportImageCaptionCode.PARTIAL_SUCCESS
@@ -25449,6 +25640,64 @@ RegisterConfiguredFeatures(settings, montageSettings := 0) {
 ; --- BEGIN settings_ui.ahk ---
 class ReportAssistantSettingsDefaults {
     static WindowTitle := "MedEx Report Assistant 设置"
+
+    static HelpTopic(topic) {
+        static topics := Map(
+            "shortcut-rules", {Title: "快捷键设置", Lines: [
+                "可使用 Ctrl、Alt、Shift，并可勾选右侧 Win。",
+                "箭头、长度、3D SUV、清除可用单个字母或数字。",
+                "无修饰单键仅在 Viewer 前台生效。",
+                "快速标图必须包含修饰键；保存设置后重新加载。"]},
+            "caption", {Title: "快速标图", Lines: [
+                "先在报告中选中文字，再触发快捷键。",
+                "文字写入图像描述后，切到下一张图。",
+                "在图像窗口继续触发，可复用同一句文字。",
+                "可以按住修饰键，每按一次主键标一张。",
+                "保存入口校验失败会停止翻页，请检查当前图。"]},
+            "viewer-tools", {Title: "Viewer 工具", Lines: [
+                "在 MedEx 报告或 Viewer 前台选择测量工具。",
+                "完整按下并松开快捷键，执行一次选择。",
+                "无修饰字母或数字仅在 Viewer 前台生效。"]},
+            "capture", {Title: "截图", Lines: [
+                "仅在 Viewer 前台发送一次 F12。",
+                "完整按下并松开快捷键后执行。",
+                "白闪只表示按键已发送，不代表图片已保存。"]},
+            "clear", {Title: "清除全部标注", Lines: [
+                "清除当前目标图像里的全部标注。",
+                "目标或菜单不明确时停止，不自动重复清除。",
+                "不会撤销已经写入报告的内容。"]},
+            "montage", {Title: "Montage 排版", Lines: [
+                "Body、Head、Lung 使用各自已有预设。",
+                "自动调整图注、窗宽、层厚、当前层和缩放。",
+                "三种排版共用下方的布局位置。",
+                "仅在 Viewer 前台执行，完成后请检查结果。"]},
+            "montage-layout", {Title: "Montage 布局位置", Lines: [
+                "填写 Viewer 排版面板中的行、列位置。",
+                "默认第 4 行、第 4 列，与封面图设置独立。",
+                "第 5 行可能被遮挡，修改后请用测试检查验证。"]},
+            "cover", {Title: "封面图", Lines: [
+                "Viewer 右下 MIP 保存为报告左图。",
+                "左下冠状位融合图恢复默认层面后保存为右图。",
+                "仅写入报告草稿，不提交、审核或发送报告。",
+                "仅在 Viewer 前台执行，完成后请检查左右图。"]},
+            "cover-layout", {Title: "封面图布局位置", Lines: [
+                "默认第 2 行、第 3 列，与 Montage 设置独立。",
+                "对应布局须为左下融合冠状位、右下 MIP 的四格。",
+                "布局不符合时停止，修改后请在目标工作站验证。"]},
+            "template-elements", {Title: "插入模板元素", Lines: [
+                "元素会插入模板文字的当前光标位置。",
+                "自动获取 SUVMax 与自动获取尺寸不能混用。",
+                "红色“（见图）”必须放在模板最后。",
+                "在列表中选择模板，内置模板不能删除。"]},
+            "template-trigger", {Title: "触发词", Lines: [
+                "输入完整触发词后展开模板，无需空格或回车。",
+                "每条模板的触发词必须唯一且不能为空。",
+                "仅在 MedEx 范围内生效。"]}
+        )
+        if !topics.Has(topic)
+            throw ValueError("Unknown settings help topic")
+        return topics[topic]
+    }
 
     static TemplateElementDefinitions() {
         return [
@@ -25529,186 +25778,147 @@ class ReportAssistantSettingsWindow {
         this.LoadingControls := false
         this.Closing := false
 
+        this.HelpButtons := []
         this.Window := Gui(, ReportAssistantSettingsDefaults.WindowTitle)
         this.Window.SetFont("s9", "Segoe UI")
         this.Window.OnEvent("Close", this.OnClose.Bind(this))
         this.Window.OnEvent("Escape", this.OnClose.Bind(this))
 
         this.Tabs := this.Window.Add(
-            "Tab3", "x12 y12 w876 h690",
+            "Tab3", "x12 y12 w776 h592",
             ["报告模板", "快捷键"]
         )
 
         this.Tabs.UseTab(1)
         this.TemplateList := this.Window.Add(
-            "ListView", "x28 y52 w844 h220 -Multi",
+            "ListView", "x28 y52 w744 h198 -Multi",
             ["状态", "模板名称", "触发词", ""]
         )
-        this.TemplateList.ModifyCol(1, 70)
-        this.TemplateList.ModifyCol(2, 420)
-        this.TemplateList.ModifyCol(3, 350)
+        this.TemplateList.ModifyCol(1, 60)
+        this.TemplateList.ModifyCol(2, 330)
+        this.TemplateList.ModifyCol(3, 310)
         this.TemplateList.ModifyCol(4, 0)
         this.TemplateList.OnEvent(
             "ItemSelect", this.OnTemplateSelected.Bind(this)
         )
 
         this.AddButton := this.Window.Add(
-            "Button", "x28 y282 w92 h28", "添加模板"
+            "Button", "x28 y260 w92 h26", "添加模板"
         )
         this.AddButton.OnEvent("Click", this.OnAddTemplate.Bind(this))
         this.DeleteButton := this.Window.Add(
-            "Button", "x128 y282 w92 h28", "删除模板"
+            "Button", "x128 y260 w92 h26", "删除模板"
         )
         this.DeleteButton.OnEvent("Click", this.OnDeleteTemplate.Bind(this))
 
         this.EnabledInput := this.Window.Add(
-            "CheckBox", "x28 y326 w120", "启用此模板"
+            "CheckBox", "x28 y300 w120", "启用此模板"
         )
         this.EnabledInput.OnEvent("Click", this.OnEditorChanged.Bind(this))
 
-        this.Window.Add("Text", "x28 y364 w68", "模板名称")
+        this.Window.Add("Text", "x28 y340 w68", "模板名称")
         this.NameInput := this.Window.Add(
-            "Edit", "x102 y360 w330 h24"
+            "Edit", "x102 y336 w260 h24"
         )
         this.NameInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
 
-        this.Window.Add("Text", "x456 y364 w54", "触发词")
+        this.Window.Add("Text", "x380 y340 w54", "触发词")
         this.TriggerInput := this.Window.Add(
-            "Edit", "x516 y360 w356 h24"
+            "Edit", "x440 y336 w306 h24"
         )
         this.TriggerInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
 
         this.TemplateElementDefinitions :=
             ReportAssistantSettingsDefaults.TemplateElementDefinitions()
-        this.Window.Add("Text", "x28 y404 w88", "插入模板元素")
+        this.Window.Add("Text", "x28 y380 w68", "插入元素")
         this.TemplateElementInput := this.Window.Add(
-            "DropDownList", "x122 y398 w220",
+            "DropDownList", "x122 y374 w200",
             ReportAssistantSettingsDefaults.TemplateElementLabels(
                 this.TemplateElementDefinitions
             )
         )
         this.InsertTemplateElementButton := this.Window.Add(
-            "Button", "x350 y398 w68 h26", "插入"
+            "Button", "x330 y374 w64 h26", "插入"
         )
         this.InsertTemplateElementButton.OnEvent(
             "Click", this.OnInsertTemplateElement.Bind(this)
         )
-        this.Window.Add(
-            "Text", "x438 y404 w434",
-            "红色标记必须是模板最后一个元素。"
-        )
-        this.Window.Add("Text", "x28 y440 w68", "模板文字")
+        this.AddHelpButton("template-elements", 98, 376)
+        this.AddHelpButton("template-trigger", 752, 338)
+        this.Window.Add("Text", "x28 y416 w68", "模板文字")
         this.TextInput := this.Window.Add(
-            "Edit", "x28 y462 w844 h94 +Multi +VScroll"
+            "Edit", "x28 y438 w744 h140 +Multi +VScroll"
         )
         this.TextInput.OnEvent("Change", this.OnEditorChanged.Bind(this))
 
         this.Tabs.UseTab(2)
-        this.Window.Add(
-            "Text", "x40 y52 w820 h38",
-            "快速标图必须含修饰键；单个字母/数字无修饰键仅在 Viewer 前台生效。"
-        )
-        this.Window.Add("Text", "x72 y96 w170", "功能")
-        this.Window.Add("Text", "x276 y96 w90", "状态")
-        this.Window.Add("Text", "x402 y96 w220", "快捷键")
-        this.Window.Add("Text", "x648 y96 w70", "Win")
+        this.Window.Add("Text", "x48 y56 w130", "功能")
+        this.Window.Add("Text", "x230 y56 w70", "状态")
+        this.Window.Add("Text", "x340 y56 w60", "按键")
+        this.AddHelpButton("shortcut-rules", 406, 50)
+        this.Window.Add("Text", "x560 y56 w60", "Win")
+        this.Window.Add("Text", "x48 y92 w130", "快速标图")
+        this.AddHelpButton("caption", 186, 89)
+        this.ReportImageCaptionEnabledInput := this.Window.Add("CheckBox", "x230 y86 w70 h24", "启用")
+        this.ReportImageCaptionChordInput := this.Window.Add("Hotkey", "x340 y86 w190 h24")
+        this.ReportImageCaptionWinInput := this.Window.Add("CheckBox", "x560 y86 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y128 w130", "箭头")
+        this.AddHelpButton("viewer-tools", 186, 125)
+        this.ViewerArrowEnabledInput := this.Window.Add("CheckBox", "x230 y122 w70 h24", "启用")
+        this.ViewerArrowChordInput := this.Window.Add("Hotkey", "x340 y122 w190 h24")
+        this.ViewerArrowWinInput := this.Window.Add("CheckBox", "x560 y122 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y164 w130", "长度测量")
+        this.AddHelpButton("viewer-tools", 186, 161)
+        this.ViewerLengthEnabledInput := this.Window.Add("CheckBox", "x230 y158 w70 h24", "启用")
+        this.ViewerLengthChordInput := this.Window.Add("Hotkey", "x340 y158 w190 h24")
+        this.ViewerLengthWinInput := this.Window.Add("CheckBox", "x560 y158 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y200 w130", "3D SUV")
+        this.AddHelpButton("viewer-tools", 186, 197)
+        this.ViewerSuv3DEnabledInput := this.Window.Add("CheckBox", "x230 y194 w70 h24", "启用")
+        this.ViewerSuv3DChordInput := this.Window.Add("Hotkey", "x340 y194 w190 h24")
+        this.ViewerSuv3DWinInput := this.Window.Add("CheckBox", "x560 y194 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y236 w130", "截图")
+        this.AddHelpButton("capture", 186, 233)
+        this.ViewerCaptureEnabledInput := this.Window.Add("CheckBox", "x230 y230 w70 h24", "启用")
+        this.ViewerCaptureChordInput := this.Window.Add("Hotkey", "x340 y230 w190 h24")
+        this.ViewerCaptureWinInput := this.Window.Add("CheckBox", "x560 y230 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y272 w130", "清除全部标注")
+        this.AddHelpButton("clear", 186, 269)
+        this.ViewerClearEnabledInput := this.Window.Add("CheckBox", "x230 y266 w70 h24", "启用")
+        this.ViewerClearChordInput := this.Window.Add("Hotkey", "x340 y266 w190 h24")
+        this.ViewerClearWinInput := this.Window.Add("CheckBox", "x560 y266 w60 h24", "使用")
 
-        this.Window.Add("Text", "x72 y132 w170", "快速标图")
-        this.ReportImageCaptionEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y124 w90 h26", "启用"
-        )
-        this.ReportImageCaptionChordInput := this.Window.Add(
-            "Hotkey", "x402 y124 w220 h26"
-        )
-        this.ReportImageCaptionWinInput := this.Window.Add(
-            "CheckBox", "x648 y124 w70 h26", "使用"
-        )
+        this.Window.Add("GroupBox", "x28 y308 w744 h168", "Montage 排版")
+        this.AddHelpButton("montage", 166, 306)
+        this.MontageEnabledInput := this.Window.Add("CheckBox", "x230 y314 w100 h24", "启用全部")
+        this.Window.Add("Text", "x48 y354 w130", "Body")
+        this.MontageBodyChordInput := this.Window.Add("Hotkey", "x340 y348 w190 h24")
+        this.MontageBodyWinInput := this.Window.Add("CheckBox", "x560 y348 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y386 w130", "Head")
+        this.MontageHeadChordInput := this.Window.Add("Hotkey", "x340 y380 w190 h24")
+        this.MontageHeadWinInput := this.Window.Add("CheckBox", "x560 y380 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y418 w130", "Lung")
+        this.MontageLungChordInput := this.Window.Add("Hotkey", "x340 y412 w190 h24")
+        this.MontageLungWinInput := this.Window.Add("CheckBox", "x560 y412 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y454 w130", "布局位置")
+        this.AddHelpButton("montage-layout", 186, 449)
+        this.Window.Add("Text", "x230 y454 w20", "行")
+        this.MontageLayoutRowInput := this.Window.Add("DropDownList", "x254 y446 w60", ["1", "2", "3", "4", "5"])
+        this.Window.Add("Text", "x340 y454 w20", "列")
+        this.MontageLayoutColumnInput := this.Window.Add("DropDownList", "x364 y446 w60", ["1", "2", "3", "4"])
 
-        this.Window.Add("Text", "x72 y170 w170", "箭头")
-        this.ViewerArrowEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y162 w90 h26", "启用"
-        )
-        this.ViewerArrowChordInput := this.Window.Add(
-            "Hotkey", "x402 y162 w220 h26"
-        )
-        this.ViewerArrowWinInput := this.Window.Add(
-            "CheckBox", "x648 y162 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y208 w170", "长度测量")
-        this.ViewerLengthEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y200 w90 h26", "启用"
-        )
-        this.ViewerLengthChordInput := this.Window.Add(
-            "Hotkey", "x402 y200 w220 h26"
-        )
-        this.ViewerLengthWinInput := this.Window.Add(
-            "CheckBox", "x648 y200 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y246 w170", "3D SUV测量")
-        this.ViewerSuv3DEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y238 w90 h26", "启用"
-        )
-        this.ViewerSuv3DChordInput := this.Window.Add(
-            "Hotkey", "x402 y238 w220 h26"
-        )
-        this.ViewerSuv3DWinInput := this.Window.Add(
-            "CheckBox", "x648 y238 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y284 w170", "截图（发送 F12）")
-        this.ViewerCaptureEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y276 w90 h26", "启用"
-        )
-        this.ViewerCaptureChordInput := this.Window.Add(
-            "Hotkey", "x402 y276 w220 h26"
-        )
-        this.ViewerCaptureWinInput := this.Window.Add(
-            "CheckBox", "x648 y276 w70 h26", "使用"
-        )
-
-        this.Window.Add("Text", "x72 y322 w170", "清除全部标注")
-        this.ViewerClearEnabledInput := this.Window.Add(
-            "CheckBox", "x276 y314 w90 h26", "启用"
-        )
-        this.ViewerClearChordInput := this.Window.Add(
-            "Hotkey", "x402 y314 w220 h26"
-        )
-        this.ViewerClearWinInput := this.Window.Add(
-            "CheckBox", "x648 y314 w70 h26", "使用"
-        )
-
-        this.Window.Add("GroupBox", "x40 y356 w812 h192", "Montage 排版")
-        this.MontageEnabledInput := this.Window.Add("CheckBox", "x276 y364 w110 h26", "启用全部")
-        this.Window.Add("Text", "x72 y412 w170", "Body 排版")
-        this.MontageBodyChordInput := this.Window.Add("Hotkey", "x402 y404 w220 h26")
-        this.MontageBodyWinInput := this.Window.Add("CheckBox", "x648 y404 w70 h26", "使用")
-        this.Window.Add("Text", "x72 y448 w170", "Head 排版")
-        this.MontageHeadChordInput := this.Window.Add("Hotkey", "x402 y440 w220 h26")
-        this.MontageHeadWinInput := this.Window.Add("CheckBox", "x648 y440 w70 h26", "使用")
-        this.Window.Add("Text", "x72 y484 w170", "Lung 排版")
-        this.MontageLungChordInput := this.Window.Add("Hotkey", "x402 y476 w220 h26")
-        this.MontageLungWinInput := this.Window.Add("CheckBox", "x648 y476 w70 h26", "使用")
-        this.Window.Add("Text", "x72 y524 w170", "Montage 布局位置")
-        this.Window.Add("Text", "x276 y524 w28", "行")
-        this.MontageLayoutRowInput := this.Window.Add("DropDownList", "x308 y516 w70", ["1", "2", "3", "4", "5"])
-        this.Window.Add("Text", "x402 y524 w28", "列")
-        this.MontageLayoutColumnInput := this.Window.Add("DropDownList", "x434 y516 w70", ["1", "2", "3", "4"])
-        this.Window.Add("Text", "x520 y524 w300", "默认第 4 行、第 4 列；第 5 行可能被遮挡。")
-
-        this.Window.Add("GroupBox", "x40 y560 w812 h128", "封面图")
-        this.Window.Add("Text", "x72 y590 w170", "左右封面")
-        this.CoverEnabledInput := this.Window.Add("CheckBox", "x276 y582 w90 h26", "启用")
-        this.CoverChordInput := this.Window.Add("Hotkey", "x402 y582 w220 h26")
-        this.CoverWinInput := this.Window.Add("CheckBox", "x648 y582 w70 h26", "使用")
-        this.Window.Add("Text", "x72 y632 w170", "封面图布局位置")
-        this.Window.Add("Text", "x276 y632 w28", "行")
-        this.CoverLayoutRowInput := this.Window.Add("DropDownList", "x308 y624 w70", ["1", "2", "3", "4", "5"])
-        this.Window.Add("Text", "x402 y632 w28", "列")
-        this.CoverLayoutColumnInput := this.Window.Add("DropDownList", "x434 y624 w70", ["1", "2", "3", "4"])
-        this.Window.Add("Text", "x520 y632 w300", "默认第 2 行、第 3 列；与 Montage 独立。")
-        this.Window.Add("Text", "x72 y660 w740", "MIP 保存为报告左图，冠状位融合图恢复默认层面后保存为报告右图。")
+        this.Window.Add("GroupBox", "x28 y492 w744 h102", "封面图")
+        this.AddHelpButton("cover", 108, 490)
+        this.Window.Add("Text", "x48 y516 w130", "生成封面")
+        this.CoverEnabledInput := this.Window.Add("CheckBox", "x230 y510 w70 h24", "启用")
+        this.CoverChordInput := this.Window.Add("Hotkey", "x340 y510 w190 h24")
+        this.CoverWinInput := this.Window.Add("CheckBox", "x560 y510 w60 h24", "使用")
+        this.Window.Add("Text", "x48 y556 w130", "布局位置")
+        this.AddHelpButton("cover-layout", 186, 551)
+        this.Window.Add("Text", "x230 y556 w20", "行")
+        this.CoverLayoutRowInput := this.Window.Add("DropDownList", "x254 y550 w60", ["1", "2", "3", "4", "5"])
+        this.Window.Add("Text", "x340 y556 w20", "列")
+        this.CoverLayoutColumnInput := this.Window.Add("DropDownList", "x364 y550 w60", ["1", "2", "3", "4"])
         for control in [
             this.ReportImageCaptionEnabledInput,
             this.ViewerArrowEnabledInput,
@@ -25754,11 +25964,11 @@ class ReportAssistantSettingsWindow {
 
         this.Tabs.UseTab()
         this.SaveButton := this.Window.Add(
-            "Button", "x688 y716 w90 h30 Default", "保存"
+            "Button", "x588 y616 w84 h28 Default", "保存"
         )
         this.SaveButton.OnEvent("Click", this.OnSave.Bind(this))
         this.CancelButton := this.Window.Add(
-            "Button", "x786 y716 w90 h30", "取消"
+            "Button", "x688 y616 w84 h28", "取消"
         )
         this.CancelButton.OnEvent("Click", this.OnClose.Bind(this))
 
@@ -25768,8 +25978,35 @@ class ReportAssistantSettingsWindow {
     }
 
     Activate() {
-        this.Window.Show("w900 h760")
+        this.Window.Show("w800 h660")
         try WinActivate("ahk_id " this.Window.Hwnd)
+    }
+
+    AddHelpButton(topic, x, y) {
+        button := this.Window.Add("Button", "x" x " y" y " w18 h18", "?")
+        button.OnEvent("Click", this.ShowHelpMenu.Bind(this, topic))
+        this.HelpButtons.Push({Topic: topic, Control: button})
+        return button
+    }
+
+    BuildHelpMenu(topic) {
+        definition := ReportAssistantSettingsDefaults.HelpTopic(topic)
+        helpMenu := Menu()
+        helpMenu.Add(definition.Title, (*) => 0)
+        helpMenu.Disable(definition.Title)
+        helpMenu.Add()
+        for line in definition.Lines
+            helpMenu.Add(line, (*) => 0)
+        return helpMenu
+    }
+
+    ShowHelpMenu(topic, button, *) {
+        rect := Win32WindowRect(button.Hwnd)
+        if !IsObject(rect)
+            return
+        helpMenu := this.BuildHelpMenu(topic)
+        CoordMode "Menu", "Screen"
+        helpMenu.Show(rect.left, rect.bottom + 3)
     }
 
     RefreshTemplateList() {

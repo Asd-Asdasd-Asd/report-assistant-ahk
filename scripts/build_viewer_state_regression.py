@@ -20,7 +20,6 @@ def build() -> str:
         '#Requires AutoHotkey v2.0', '#SingleInstance Force', '#Warn',
         (ROOT / 'src/core/win32_window.ahk').read_text(encoding="utf-8"),
         section(caption, 'class ReportImageCaptionDefaults {', 'class ReportImageCaptionCode {'),
-        section(caption, 'class ReportImageCaptionPasteGate {', 'SetReportImageCaptionClipboard(payload) {'),
         section(hotkeys, 'MxNMViewerReleaseDecision(pressed, foregroundMatches, elapsedMs, timeoutMs) {', 'MxNMViewerModifierState() {'),
         section(diagnostics, 'NewerAutomationDiagnosticEvent(automationEvent, viewerEvent) {', 'AutomationDiagnosticLineField(line, fieldName, fallback := "") {'),
         section(diagnostics, 'AutomationDiagnosticStageList(stages) {', 'DefaultAutomationDiagnosticLogPath() {'),
