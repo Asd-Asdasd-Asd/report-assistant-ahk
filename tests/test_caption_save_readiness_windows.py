@@ -16,17 +16,22 @@ class CaptionSaveTimingWindowsTests(unittest.TestCase):
         source = (ROOT / "src/report_image_caption.ahk").read_text(encoding="utf-8")
         definitions = source.split("\nReportImageCaptionHotkeyDefinitions(", 1)[0]
         capture = source.split("\nCaptureFreshReportImageCaption(", 1)[1].split(
-            "\nReportImageCaptionFocusStillMatches(", 1
+            "\nReportImageCaptionMousePoint(", 1
         )[0]
+        capture += "\nReportImageCaptionTextBeforeMarker(" + source.split(
+            "\nReportImageCaptionTextBeforeMarker(", 1
+        )[1].split("\nReportImageCaptionFocusStillMatches(", 1)[0]
         capture = ("CaptureFreshReportImageCaption(" + capture).replace(
             "UIA.GetFocusedElement()", "({})"
         ).replace('WinExist("A")', "1001").replace(
             'A_Clipboard := ""', "CaptionTestClear()"
         ).replace('SendInput "^c"', 'CaptionTestInput("^c")').replace(
-            'SendInput "^+{End}^c"', 'CaptionTestInput("^+{End}^c")'
+            'SendInput "+{Right 24}^c"', 'CaptionTestInput("scan")'
         ).replace('SendInput "{Left}"', 'CaptionTestInput("{Left}")').replace(
+            'SendInput "+{Right " steps "}^c"', 'CaptionTestInput("+{Right " steps "}^c")'
+        ).replace(
             "ClipWait(", "CaptionTestWait("
-        ).replace("ClipboardAll()", '("RICH_SELECTION")').replace(
+        ).replace("ClipboardAll()", 'CaptionTestPayload()').replace(
             "A_Clipboard", "CaptionTestText()"
         )
         results = "MakeReportImageCaptionResult(" + source.split(
@@ -37,13 +42,16 @@ class CaptionSaveTimingWindowsTests(unittest.TestCase):
 try {
     global CaptionCase, CaptionKeys, CaptionSequence, CaptionText
     for sample in [
-        ["manual", "手选（见图）", "", "OK", "RICH_SELECTION", "^c"],
-        ["caret", "", "甲段`r`n乙段（见图）后续（见图）", "OK", "甲段`r`n乙段", "^c^+{End}^c{Left}"],
-        ["no-marker", "", "正文见图但没有括号", "FIGURE_MARKER_NOT_FOUND", "", "^c^+{End}^c{Left}"],
-        ["empty", "", " （见图）", "FIGURE_MARKER_NOT_FOUND", "", "^c^+{End}^c{Left}"],
-        ["end", "", "", "COPY_FAILED", "", "^c^+{End}^c"],
+        ["manual", "手选（见图）", "", "OK", "手选（见图）", "^c"],
+        ["caret", "", "甲段`r`n乙段（见图）后续（见图）", "OK", "甲段`r`n乙段", "^cscan{Left}+{Right 5}^c{Left}"],
+        ["marker-across-steps", "", "甲乙（见图）", "OK", "甲乙", "^cscanscan{Left}+{Right 2}^c{Left}"],
+        ["no-marker", "", "正文见图但没有括号", "FIGURE_MARKER_NOT_FOUND", "", "^cscanscan{Left}"],
+        ["empty", "", " （见图）", "FIGURE_MARKER_NOT_FOUND", "", "^cscan{Left}"],
+        ["end", "", "", "COPY_FAILED", "", "^cscan"],
         ["wrong-focus", "", "甲（见图）", "COPY_FAILED", "", "^c"],
-        ["focus-lost", "", "甲（见图）", "SOURCE_CHANGED", "", "^c^+{End}^c"],
+        ["pointer", "", "甲（见图）", "OK", "甲", "^c{Click}scan{Left}+{Right 1}^c{Left}"],
+        ["prefix-mismatch", "", "甲（见图）", "COPY_FAILED", "", "^cscan{Left}+{Right 1}^c{Left}"],
+        ["focus-lost", "", "甲（见图）", "SOURCE_CHANGED", "", "^cscan"],
         ["late-copy", "", "甲（见图）", "COPY_FAILED", "", "^c"],
         ["copy-error", "", "甲（见图）", "COPY_FAILED", "", "^c"]
     ] {
@@ -53,8 +61,9 @@ try {
         CaptionText := ""
         observedCapture := CaptureFreshReportImageCaption(1001)
         if observedCapture.code != sample[4] || CaptionKeys != sample[6]
-            throw Error(sample[1] ": wrong capture result or input sequence")
-        if observedCapture.ok && observedCapture.payload != sample[5]
+            throw Error(sample[1] ": " observedCapture.code " / " CaptionKeys)
+        if observedCapture.ok && (!IsObject(observedCapture.payload)
+            || observedCapture.payload.richText != sample[5])
             throw Error(sample[1] ": wrong caption payload")
     }
     FileAppend("PASS", "*")
@@ -73,11 +82,17 @@ CaptionTestInput(keys) {
     CaptionKeys .= keys
     if keys = "{Left}"
         return
-    CaptionText := keys = "^c" ? CaptionCase[2] : CaptionCase[3]
+    if InStr(keys, "+{Right ") = 1
+        CaptionText := CaptionCase[1] = "prefix-mismatch" ? "甲（" : CaptionCase[5]
+    else
+        CaptionText := keys = "^c" ? CaptionCase[2] : CaptionCase[3]
+    if CaptionCase[1] = "marker-across-steps" && CaptionKeys = "^cscan"
+        CaptionText := "甲乙（见"
     if CaptionText != "" || CaptionCase[1] = "copy-error"
         CaptionSequence += 1
 }
 CaptionTestWait(*) => CaptionTestText() != ""
+CaptionTestPayload() => {richText: CaptionTestText()}
 CaptionTestText() {
     global CaptionText
     return CaptionText
@@ -90,7 +105,17 @@ ReportImageCaptionFocusIsReportEditor(*) {
     global CaptionCase, CaptionSequence
     if CaptionCase[1] = "late-copy"
         CaptionSequence += 1
-    return CaptionCase[1] != "wrong-focus"
+    return CaptionCase[1] != "wrong-focus" && CaptionCase[1] != "pointer"
+}
+ReportImageCaptionMousePoint() => {x: 12, y: 34}
+ReportImageCaptionFocusAtPointer(source, pointer, sequence) {
+    global CaptionCase, CaptionKeys, CaptionSequence
+    if CaptionCase[1] != "pointer"
+        return 0
+    if source != 1001 || pointer.x != 12 || pointer.y != 34 || sequence != CaptionSequence
+        throw Error("Pointer fallback lost the initial location or clipboard sequence")
+    CaptionKeys .= "{Click}"
+    return {}
 }
 ReportImageCaptionClipboardSequence() {
     global CaptionSequence

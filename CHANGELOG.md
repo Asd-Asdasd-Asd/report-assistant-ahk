@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-13
+
+- Quick Caption uses the manual selection when present. Otherwise, it takes
+  the text from the caret to the first `（见图）`, with a mouse-position fallback
+  when the focused editor cannot be identified. It searches in short steps,
+  copies the caption with its original formatting, and restores the clipboard.
+- User field testing confirmed the mouse fallback and the fix for the
+  editor jumping to the end during automatic capture.
 - Add optional plain-text clipboard content per report hotstring. Copy it after
   the hotstring completes successfully, for manual pasting.
 - Wait up to 250 ms for the report color menu to render after one open click.

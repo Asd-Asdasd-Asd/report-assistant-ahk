@@ -369,6 +369,7 @@ class ReportImageCaptionProvider {
 }
 
 CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
+    pointer := ReportImageCaptionMousePoint()
     ; Retain the initial focus identity so a copy timeout cannot redirect
     ; the caret fallback to another editor in the same foreground window.
     focused := 0
@@ -404,7 +405,7 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
             )
             if sequenceAfterClear && sequenceAfterCopy = sequenceAfterClear
                 return CaptureReportImageCaptionFromCaret(
-                    sourceHwnd, focused, sequenceAfterClear, operation
+                    sourceHwnd, focused, pointer, sequenceAfterClear, operation
                 )
             return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
         }
@@ -488,59 +489,184 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
     }
 }
 
-CaptureReportImageCaptionFromCaret(sourceHwnd, focused, emptyClipboardSequence, operation) {
-    if !IsObject(focused) || !ReportImageCaptionFocusIsReportEditor(sourceHwnd, focused)
-        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+CaptureReportImageCaptionFromCaret(sourceHwnd, focused, pointer, emptyClipboardSequence, operation) {
+    capturePath := "CARET_TO_MARKER"
+    if !IsObject(focused) || !ReportImageCaptionFocusIsReportEditor(sourceHwnd, focused) {
+        focused := ReportImageCaptionFocusAtPointer(sourceHwnd, pointer, emptyClipboardSequence)
+        if !IsObject(focused)
+            return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+        capturePath := "POINTER_TO_MARKER"
+    }
+    if IsObject(operation)
+        operation.SetField("caption.capturePath", capturePath)
     if !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
         return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
-    if IsObject(operation)
-        operation.SetField("caption.capturePath", "CARET_TO_MARKER")
 
     ; A late first copy invalidates the assumption that the caret is collapsed.
     if ReportImageCaptionClipboardSequence() != emptyClipboardSequence
         return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
-    SendInput "^+{End}^c"
-    if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds, true)
-        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
-    copiedSequence := ReportImageCaptionClipboardSequence()
-    if !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
-        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
-    if !copiedSequence || copiedSequence = emptyClipboardSequence
-        || ReportImageCaptionClipboardSequence() != copiedSequence {
-        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
-    }
-
-    ; In UEditor, Left collapses a forward selection to its starting caret.
-    ; Only collapse after a fresh copy confirms that a range was selected.
-    caretRestoreSent := false
-    try textAfterCaret := A_Clipboard
-    finally {
-        if ReportImageCaptionFocusStillMatches(sourceHwnd, focused) {
-            SendInput "{Left}"
-            caretRestoreSent := true
-        }
-    }
-    if !caretRestoreSent
-        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
-
-    caption := ReportImageCaptionTextBeforeMarker(textAfterCaret)
+    scan := ScanReportImageCaptionMarker(sourceHwnd, focused, emptyClipboardSequence)
+    if !scan.ok
+        return scan
+    caption := scan.caption
     if caption = "" {
         return MakeReportImageCaptionResult(
             false, ReportImageCaptionCode.FIGURE_MARKER_NOT_FOUND
         )
     }
+    payload := CopyReportImageCaptionPrefix(sourceHwnd, focused, caption)
+    if !IsObject(payload)
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
     if IsObject(operation)
         operation.Stage("SOURCE_CAPTURED")
     result := MakeReportImageCaptionResult(true, ReportImageCaptionCode.OK)
-    result.payload := caption
+    result.payload := payload
     return result
+}
+
+ScanReportImageCaptionMarker(sourceHwnd, focused, emptySequence) {
+    previousText := ""
+    caption := ""
+    selectionCopied := false
+    restored := false
+    try {
+        loop {
+            if !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
+                return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
+            if !emptySequence || ReportImageCaptionClipboardSequence() != emptySequence
+                return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+
+            ; Extend the same selection locally so Chromium never jumps straight to the editor end.
+            SendInput "+{Right 24}^c"
+            if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds, true)
+                return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+            copiedSequence := ReportImageCaptionClipboardSequence()
+            if !copiedSequence || copiedSequence = emptySequence
+                return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+            selectionCopied := true
+            if !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
+                return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
+            selectedText := A_Clipboard
+            if InStr(selectedText, ReportHotstringDefaults.RedFigureMarker) {
+                caption := ReportImageCaptionTextBeforeMarker(selectedText)
+                break
+            }
+            if selectedText == previousText
+                break
+            previousText := selectedText
+            A_Clipboard := ""
+            emptySequence := ReportImageCaptionClipboardSequence()
+        }
+    } finally {
+        if selectionCopied && ReportImageCaptionFocusStillMatches(sourceHwnd, focused) {
+            SendInput "{Left}"
+            restored := true
+        }
+    }
+    return restored
+        ? {ok: true, caption: caption}
+        : MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
+}
+
+CopyReportImageCaptionPrefix(sourceHwnd, focused, caption) {
+    ; Re-select the prefix in UEditor so Ctrl+C supplies its original rich text.
+    ; Count grapheme clusters, then verify the actual selection before using it.
+    RegExReplace(StrReplace(caption, "`r`n", "`n"), "\X", "", &steps)
+    A_Clipboard := ""
+    emptySequence := ReportImageCaptionClipboardSequence()
+    if !steps || !emptySequence || !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
+        return 0
+    SendInput "+{Right " steps "}^c"
+    if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds, true)
+        return 0
+    if !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
+        return 0
+    copiedSequence := ReportImageCaptionClipboardSequence()
+    if !copiedSequence || copiedSequence = emptySequence
+        return 0
+    payload := 0
+    restored := false
+    try {
+        if A_Clipboard == caption
+            payload := ClipboardAll()
+    } finally {
+        if ReportImageCaptionFocusStillMatches(sourceHwnd, focused) {
+            SendInput "{Left}"
+            restored := true
+        }
+    }
+    return restored ? payload : 0
+}
+
+ReportImageCaptionMousePoint() {
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &mouseX, &mouseY
+    return {x: mouseX, y: mouseY}
+}
+
+ReportImageCaptionFocusAtPointer(sourceHwnd, pointer, emptyClipboardSequence) {
+    try {
+        pane := ResolveReportImageCaptionEditorAtPoint(sourceHwnd, pointer)
+        if !IsObject(pane)
+            return 0
+        currentPointer := ReportImageCaptionMousePoint()
+        if currentPointer.x != pointer.x || currentPointer.y != pointer.y
+            || Win32RootWindow(Win32WindowFromPoint(pointer)) != sourceHwnd
+            || ReportImageCaptionClipboardSequence() != emptyClipboardSequence
+            || WinExist("A") != sourceHwnd {
+            return 0
+        }
+        ; Send without the held hotkey modifiers so Chromium places a plain caret.
+        SendInput "{Click}"
+        Sleep 35
+
+        currentPane := ResolveReportImageCaptionEditorAtPoint(sourceHwnd, pointer)
+        if !IsObject(currentPane) || !UIA.CompareElements(pane, currentPane)
+            return 0
+        focused := UIA.GetFocusedElement()
+        nativeHwnd := focused.NativeWindowHandle
+        if focused.ProcessId = Win32WindowPid(sourceHwnd)
+            && focused.HasKeyboardFocus
+            && ((focused.Type = UIA.Type.Document && nativeHwnd
+                && Win32RootWindow(nativeHwnd) = sourceHwnd)
+                || ReportImageCaptionFocusIsReportEditor(sourceHwnd, focused))
+            && WinExist("A") = sourceHwnd {
+            return focused
+        }
+    }
+    return 0
+}
+
+ResolveReportImageCaptionEditorAtPoint(sourceHwnd, pointer) {
+    if WinExist("A") != sourceHwnd
+        || Win32RootWindow(Win32WindowFromPoint(pointer)) != sourceHwnd
+        || !RectHasPoint(Win32ClientRectScreen(sourceHwnd), pointer) {
+        return 0
+    }
+    expectedPid := Win32WindowPid(sourceHwnd)
+    if !expectedPid
+        return 0
+    root := UIA.ElementFromHandle(sourceHwnd, , false)
+    matchingPane := 0
+    for pane in root.FindElements({Type: "Pane"}) {
+        if !ReportImageCaptionElementUsable(pane, expectedPid)
+            || !RectHasPoint(ReportImageCaptionElementRect(pane), pointer)
+            || !ReportImageCaptionIsReportEditorPane(pane) {
+            continue
+        }
+        if IsObject(matchingPane)
+            return 0
+        matchingPane := pane
+    }
+    return matchingPane
 }
 
 ReportImageCaptionTextBeforeMarker(textAfterCaret) {
     markerPosition := InStr(textAfterCaret, ReportHotstringDefaults.RedFigureMarker)
     if markerPosition <= 1
         return ""
-    return Trim(SubStr(textAfterCaret, 1, markerPosition - 1), " `t`r`n")
+    prefix := SubStr(textAfterCaret, 1, markerPosition - 1)
+    return Trim(prefix, " `t`r`n") = "" ? "" : prefix
 }
 
 ReportImageCaptionFocusStillMatches(sourceHwnd, focused) {
@@ -1401,7 +1527,7 @@ MakeReportImageCaptionResult(
 ReportImageCaptionFailureMessage(result) {
     if result.code = ReportImageCaptionCode.COPY_FAILED
         || result.code = ReportImageCaptionCode.COPY_EMPTY {
-        return "未复制到报告文字，请确认光标在正文中或手动选择文字"
+        return "未复制到报告文字，请把鼠标停在正文句首，或手动选择文字"
     }
     if result.code = ReportImageCaptionCode.FIGURE_MARKER_NOT_FOUND
         return "光标与后续（见图）之间没有可用文字，快速标图未执行"
