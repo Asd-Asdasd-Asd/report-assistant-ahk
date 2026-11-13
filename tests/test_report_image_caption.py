@@ -107,11 +107,11 @@ class ReportImageCaptionTests(unittest.TestCase):
     def test_source_capture_requires_fresh_nonempty_clipboard(self) -> None:
         capture = self.body(
             "\nCaptureFreshReportImageCaption(sourceHwnd, operation := 0) {\n",
-            "\nResolveReportImageCaptionTarget(",
+            "\nCaptureReportImageCaptionFromCaret(",
         )
         self.assertIn('A_Clipboard := ""', capture)
         self.assertEqual(capture.count('SendInput "^c"'), 1)
-        self.assertIn("ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds)", capture)
+        self.assertIn("ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds, true)", capture)
         self.assertIn('Trim(copiedText, " `t`r`n") = ""', capture)
         self.assertIn("payload := ClipboardAll()", capture)
         self.assertIn("ReportImageCaptionCopyModifierMask()", capture)
@@ -119,6 +119,7 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertIn('"WAIT_TIMEOUT"', capture)
         self.assertIn('"EXCEPTION_" phase "_" Type(copyError)', capture)
         self.assertNotIn("savedClipboard", capture)
+        self.assertIn("sequenceAfterCopy = sequenceAfterClear", capture)
 
     def test_source_copy_diagnostic_is_compact_and_content_free(self) -> None:
         diagnostic = self.body(
@@ -138,18 +139,14 @@ class ReportImageCaptionTests(unittest.TestCase):
 
     def test_reuse_is_only_selected_for_the_exact_bound_target(self) -> None:
         invoke = self.body(
-            "static InvokeCore(foregroundHwnd, operation)",
+            "static InvokeBoundForeground(foregroundHwnd, operation)",
             "static InvokeCapture(sourceHwnd, priorCache := 0, operation := 0)",
         )
         reuse = self.body(
             "static InvokeReuse(targetHwnd, cache, operation := 0)",
             "CaptureFreshReportImageCaption(",
         )
-        self.assertIn(
-            "priorCache.targetHwnd\n"
-            "                    = foregroundHwnd",
-            invoke,
-        )
+        self.assertIn("priorCache.targetHwnd = foregroundHwnd", invoke)
         self.assertIn("ClearReportImageCaptionCache(false)", reuse)
         self.assertIn("ReportImageCaptionCacheBindingValid", reuse)
         self.assertIn("ResolveCachedReportImageCaptionTarget", reuse)
@@ -234,7 +231,7 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertNotIn('FindElements({Type: "Document"})', image)
         self.assertIn("Win32RootOwner(pointHwnd) = targetHwnd", self.module)
 
-    def test_action_keeps_caption_clipboard_and_restores_only_mouse(self) -> None:
+    def test_action_uses_transactional_clipboard_and_restores_mouse(self) -> None:
         action = self.body(
             "\nExecuteReportImageCaptionAction(\n    cache,",
             "\nSetReportImageCaptionClipboard(payload)",
@@ -272,6 +269,12 @@ class ReportImageCaptionTests(unittest.TestCase):
         self.assertNotIn("savedClipboard", action)
         self.assertNotIn("A_Clipboard :=", action)
         self.assertIn("SetReportImageCaptionClipboard(cache.payload)", action)
+        invoke = self.body(
+            "static InvokeCore(foregroundHwnd, operation)",
+            "static InvokeBoundForeground(foregroundHwnd, operation)",
+        )
+        self.assertIn("WithClipboardRestore(", invoke)
+        self.assertIn("ReportImageCaptionCode.CLIPBOARD_RESTORE_FAILED", invoke)
 
     def test_every_caption_save_waits_and_revalidates_target_before_dispatch(self) -> None:
         action = self.body(

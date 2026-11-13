@@ -25,11 +25,13 @@ class ReportImageCaptionCode {
     static BUSY := "BUSY"
     static COPY_FAILED := "COPY_FAILED"
     static COPY_EMPTY := "COPY_EMPTY"
+    static FIGURE_MARKER_NOT_FOUND := "FIGURE_MARKER_NOT_FOUND"
     static SOURCE_CHANGED := "SOURCE_CHANGED"
     static TARGET_NOT_UNIQUE := "TARGET_NOT_UNIQUE"
     static TARGET_INVALID := "TARGET_INVALID"
     static CACHE_UNAVAILABLE := "CACHE_UNAVAILABLE"
     static CLIPBOARD_WRITE_FAILED := "CLIPBOARD_WRITE_FAILED"
+    static CLIPBOARD_RESTORE_FAILED := "CLIPBOARD_RESTORE_FAILED"
     static TARGET_ACTIVATION_FAILED := "TARGET_ACTIVATION_FAILED"
     static PASTE_FAILED := "PASTE_FAILED"
     static SAVE_DISPATCH_FAILED := "SAVE_DISPATCH_FAILED"
@@ -154,8 +156,6 @@ class ReportImageCaptionProvider {
     }
 
     static InvokeCore(foregroundHwnd, operation) {
-        global REPORT_IMAGE_CAPTION_CACHE
-
         if this.Busy
             return MakeReportImageCaptionResult(
                 false,
@@ -172,23 +172,25 @@ class ReportImageCaptionProvider {
 
         this.Busy := true
         try {
-            priorCache := IsObject(REPORT_IMAGE_CAPTION_CACHE)
-                ? REPORT_IMAGE_CAPTION_CACHE
-                : 0
-            if IsObject(priorCache)
-                && priorCache.targetHwnd
-                    = foregroundHwnd {
-                return this.InvokeReuse(
-                    foregroundHwnd,
-                    priorCache,
-                    operation
+            result := MakeReportImageCaptionResult(
+                false, ReportImageCaptionCode.CLIPBOARD_WRITE_FAILED
+            )
+            transaction := WithClipboardRestore(
+                () => (result := this.InvokeBoundForeground(foregroundHwnd, operation), true)
+            )
+            if !transaction.actionSucceeded {
+                ClearReportImageCaptionCache(false)
+                if transaction.restoreAttempted
+                    result := MakeReportImageCaptionResult(false, ReportImageCaptionCode.UNEXPECTED_ERROR)
+            }
+            if transaction.restoreAttempted && !transaction.restoreSucceeded {
+                ClearReportImageCaptionCache(false)
+                return MakeReportImageCaptionResult(
+                    false, ReportImageCaptionCode.CLIPBOARD_RESTORE_FAILED,
+                    result.pasteDispatched, result.candidateCount
                 )
             }
-            return this.InvokeCapture(
-                foregroundHwnd,
-                priorCache,
-                operation
-            )
+            return result
         } catch {
             return MakeReportImageCaptionResult(
                 false,
@@ -197,6 +199,15 @@ class ReportImageCaptionProvider {
         } finally {
             this.Busy := false
         }
+    }
+
+    static InvokeBoundForeground(foregroundHwnd, operation) {
+        global REPORT_IMAGE_CAPTION_CACHE
+
+        priorCache := REPORT_IMAGE_CAPTION_CACHE
+        if IsObject(priorCache) && priorCache.targetHwnd = foregroundHwnd
+            return this.InvokeReuse(foregroundHwnd, priorCache, operation)
+        return this.InvokeCapture(foregroundHwnd, priorCache, operation)
     }
 
     static InvokeCapture(sourceHwnd, priorCache := 0, operation := 0) {
@@ -358,6 +369,13 @@ class ReportImageCaptionProvider {
 }
 
 CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
+    ; Retain the initial focus identity so a copy timeout cannot redirect
+    ; the caret fallback to another editor in the same foreground window.
+    focused := 0
+    try focused := UIA.GetFocusedElement()
+    if WinExist("A") != sourceHwnd
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
+
     copyStartedAt := A_TickCount
     keysBefore := ReportImageCaptionCopyModifierMask()
     keysAfter := keysBefore
@@ -371,7 +389,7 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
         phase := "SEND"
         SendInput "^c"
         phase := "WAIT"
-        if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds) {
+        if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds, true) {
             sequenceAfterCopy := ReportImageCaptionClipboardSequence()
             keysAfter := ReportImageCaptionCopyModifierMask()
             SetReportImageCaptionCopyDiagnostic(
@@ -384,10 +402,11 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
                 sequenceAfterCopy,
                 A_TickCount - copyStartedAt
             )
-            return MakeReportImageCaptionResult(
-                false,
-                ReportImageCaptionCode.COPY_FAILED
-            )
+            if sequenceAfterClear && sequenceAfterCopy = sequenceAfterClear
+                return CaptureReportImageCaptionFromCaret(
+                    sourceHwnd, focused, sequenceAfterClear, operation
+                )
+            return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
         }
         sequenceAfterCopy := ReportImageCaptionClipboardSequence()
         keysAfter := ReportImageCaptionCopyModifierMask()
@@ -408,6 +427,8 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
                 ReportImageCaptionCode.SOURCE_CHANGED
             )
         }
+        if !sequenceAfterClear || sequenceAfterCopy = sequenceAfterClear
+            return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
         phase := "READ_TEXT"
         copiedText := A_Clipboard
         if Trim(copiedText, " `t`r`n") = "" {
@@ -465,6 +486,111 @@ CaptureFreshReportImageCaption(sourceHwnd, operation := 0) {
             ReportImageCaptionCode.COPY_FAILED
         )
     }
+}
+
+CaptureReportImageCaptionFromCaret(sourceHwnd, focused, emptyClipboardSequence, operation) {
+    if !IsObject(focused) || !ReportImageCaptionFocusIsReportEditor(sourceHwnd, focused)
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+    if !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
+    if IsObject(operation)
+        operation.SetField("caption.capturePath", "CARET_TO_MARKER")
+
+    ; A late first copy invalidates the assumption that the caret is collapsed.
+    if ReportImageCaptionClipboardSequence() != emptyClipboardSequence
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+    SendInput "^+{End}^c"
+    if !ClipWait(ReportImageCaptionDefaults.CopyTimeoutSeconds, true)
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+    copiedSequence := ReportImageCaptionClipboardSequence()
+    if !ReportImageCaptionFocusStillMatches(sourceHwnd, focused)
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
+    if !copiedSequence || copiedSequence = emptyClipboardSequence
+        || ReportImageCaptionClipboardSequence() != copiedSequence {
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.COPY_FAILED)
+    }
+
+    ; In UEditor, Left collapses a forward selection to its starting caret.
+    ; Only collapse after a fresh copy confirms that a range was selected.
+    caretRestoreSent := false
+    try textAfterCaret := A_Clipboard
+    finally {
+        if ReportImageCaptionFocusStillMatches(sourceHwnd, focused) {
+            SendInput "{Left}"
+            caretRestoreSent := true
+        }
+    }
+    if !caretRestoreSent
+        return MakeReportImageCaptionResult(false, ReportImageCaptionCode.SOURCE_CHANGED)
+
+    caption := ReportImageCaptionTextBeforeMarker(textAfterCaret)
+    if caption = "" {
+        return MakeReportImageCaptionResult(
+            false, ReportImageCaptionCode.FIGURE_MARKER_NOT_FOUND
+        )
+    }
+    if IsObject(operation)
+        operation.Stage("SOURCE_CAPTURED")
+    result := MakeReportImageCaptionResult(true, ReportImageCaptionCode.OK)
+    result.payload := caption
+    return result
+}
+
+ReportImageCaptionTextBeforeMarker(textAfterCaret) {
+    markerPosition := InStr(textAfterCaret, ReportHotstringDefaults.RedFigureMarker)
+    if markerPosition <= 1
+        return ""
+    return Trim(SubStr(textAfterCaret, 1, markerPosition - 1), " `t`r`n")
+}
+
+ReportImageCaptionFocusStillMatches(sourceHwnd, focused) {
+    if !IsObject(focused) || WinExist("A") != sourceHwnd
+        return false
+    try return UIA.CompareElements(focused, UIA.GetFocusedElement())
+        && WinExist("A") = sourceHwnd
+    catch
+        return false
+}
+
+ReportImageCaptionFocusIsReportEditor(sourceHwnd, focused) {
+    expectedPid := Win32WindowPid(sourceHwnd)
+    try {
+        if !expectedPid || focused.ProcessId != expectedPid || !focused.HasKeyboardFocus
+            return false
+        element := focused
+        editorFound := false
+        loop 24 {
+            if element.ProcessId != expectedPid
+                return false
+            if !editorFound && element.Type = UIA.Type.Pane
+                editorFound := ReportImageCaptionIsReportEditorPane(element)
+            nativeHwnd := element.NativeWindowHandle
+            if nativeHwnd {
+                if Win32RootWindow(nativeHwnd) != sourceHwnd
+                    return false
+                if editorFound
+                    return true
+            }
+            element := UIA.RawViewWalker.TryGetParentElement(element)
+            if !IsObject(element)
+                return false
+        }
+    }
+    return false
+}
+
+ReportImageCaptionIsReportEditorPane(element) {
+    if RegExMatch(element.AutomationId, "\Aueditor_[12]\z")
+        return true
+    ; Chromium can expose the HTML id in IA2 while UIA reports a numeric id.
+    try {
+        static iid := "{E89F726E-C4F4-4C19-BB19-B647D7FA8478}"
+        accessible := element.LegacyIAccessiblePattern.GetIAccessible()
+        ia2 := ComObjQuery(accessible, iid, iid)
+        ComCall(45, ia2, "Ptr*", &attributes := 0) ; IAccessible2::get_attributes
+        return RegExMatch(UIA.BSTR(attributes), "(^|;)id:ueditor_[12](;|$)") > 0
+    }
+    return false
 }
 
 SetReportImageCaptionCopyDiagnostic(
@@ -1275,8 +1401,10 @@ MakeReportImageCaptionResult(
 ReportImageCaptionFailureMessage(result) {
     if result.code = ReportImageCaptionCode.COPY_FAILED
         || result.code = ReportImageCaptionCode.COPY_EMPTY {
-        return "未复制到报告文字，快速标图未执行"
+        return "未复制到报告文字，请确认光标在正文中或手动选择文字"
     }
+    if result.code = ReportImageCaptionCode.FIGURE_MARKER_NOT_FOUND
+        return "光标与后续（见图）之间没有可用文字，快速标图未执行"
     if result.code = ReportImageCaptionCode.SOURCE_CHANGED
         return "报告窗口已变化，快速标图未执行"
     if result.code = ReportImageCaptionCode.TARGET_NOT_UNIQUE
@@ -1288,7 +1416,11 @@ ReportImageCaptionFailureMessage(result) {
     if result.code = ReportImageCaptionCode.TARGET_INVALID
         return "报告图像窗口结构校验失败，未执行"
     if result.code = ReportImageCaptionCode.CLIPBOARD_WRITE_FAILED
-        return "caption 写入剪贴板失败，未执行"
+        return "无法准备标图剪贴板，未执行"
+    if result.code = ReportImageCaptionCode.CLIPBOARD_RESTORE_FAILED
+        return result.pasteDispatched
+            ? "原剪贴板恢复失败，请检查当前标图结果"
+            : "原剪贴板恢复失败，快速标图未完成"
     if result.code = ReportImageCaptionCode.TARGET_ACTIVATION_FAILED
         return "报告图像窗口未激活，未执行粘贴"
     if result.code = ReportImageCaptionCode.PASTE_FAILED
